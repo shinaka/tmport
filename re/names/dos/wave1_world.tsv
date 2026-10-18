@@ -1,0 +1,115 @@
+1568:0008	Cell_P5_CaveDoorW	unsigned far Cell_P5_CaveDoorW(void)	Type 5, cell EB (level 0): door up into the cave; player rising above y&0x7f 0x68 -> (0x460,0x70) cell 08, camX=x-0x20, transition 2, area 7, tune 2; door column x&0x78<=0x40 (code_world.md 6.4)
+1568:00ce	Cell_P6_CaveExitW	unsigned far Cell_P6_CaveExitW(void)	Type 6, cell 08: walking left (dx<0) -> (0x5b0,0x770) cell EB, camX=x-0xa0, transition 2, area 0, tune 0; mask 0x7c; no player test
+1568:0134	Cell_GroundCheckObj	int far Cell_GroundCheckObj(void)	Any object: on the path line (y&0x7f==0x70) stop dy>0 and clear Down; above 0x6c -> Music_Stop, transition 1, redraw, state 9, return 1; door column 0x26..0x5a
+1568:01b4	Cell_P9_CaveDoorE	unsigned far Cell_P9_CaveDoorE(void)	Type 9, cell F7 (level 0): door up into the cave -> (0x5b0,0x70) cell 0B, camX=x-0x124 (not 8-aligned: sprite 4 px left of the scenery, confirmed), area 0x0b, tune 2
+1568:0203	Cell_GroundCheckPlayer	int far Cell_GroundCheckPlayer(void)	Player only: as Cell_GroundCheckObj with threshold 0x68 and transition 2
+1568:029d	Cell_P10_CaveExitE	unsigned far Cell_P10_CaveExitE(void)	Type 10, cell 0B: walking right (dx>0) -> (0x3b0,0x7f0) cell F7, camX=x-0xa0, transition 2, area 0, tune 0; mask 0x7c
+1568:0303	Cell_P34_CaveUp	unsigned far Cell_P34_CaveUp(void)	Type 34, cell 0A: passage up from the cave -> (0xc0,0x170) cell 21 (upper room), camX=x-0x20; music stopped and not restarted
+1568:0341	Cell_P35_UpperRoomDown	unsigned far Cell_P35_UpperRoomDown(void)	Type 35, cell 21: passage down (any object, Cell_GroundCheckObj) -> (0x4c0,0x70) cell 09, transition 1, area 9, tune 2; mask 0x0f
+1568:0386	Cell_P11_ClubDoor	unsigned far Cell_P11_ClubDoor(void)	Type 11, cell F3 (level 0): clubhouse door -> (0x140,0x70) start room, camX=x-0x80, area 5, tune 1; restores the put-away showcase treasure (DS:9254 -> DS:8fb0)
+1568:03f6	Cell_P12_StartRoom	unsigned far Cell_P12_StartRoom(void)	Type 12, cell 02 (start room): door down to (0x1c0,0x7f0) cell F3 (puts the showcase away); prize picture (x&0x78>=0x5a, y&0x7f==0x60) -> treasure room (0x4f0,0x4e0) scene 4; after crown anim 0xa5 -> treasure room then Cell_P71_V71 (rank room)
+1568:05cb	Cell_P7_WallLeft	unsigned far Cell_P7_WallLeft(void)	Type 7 (cells 14 20 70): left wall, x&0x78<=0x43 stops dx<0 (any object); mask 0x10dc/0x10d8, fall bit dropped near the floor; visible call -> Cell_V7
+1568:0638	Cell_P8_WallRight	unsigned far Cell_P8_WallRight(void)	Type 8 (cells 1A 27 6A 76): right wall, x&0x78>=0x38 stops dx>0; mask 0x10dc/0x10d4; visible call -> Cell_V8
+1568:06a5	Cell_P50_ShelfEnter	unsigned far Cell_P50_ShelfEnter(void)	Type 50, cell 04 (clubhouse): always -> treasure shelf room 0 (0x460,0x1f0) cell 38, camX=x-0x20, transition 2; flags 7d7c/9201/8fba, 9129=0; hides slot 3
+1568:0718	Cell_P51_ShelfExit	unsigned far Cell_P51_ShelfExit(void)	Type 51, cell 38: walking left -> (0x200,0x70) clubhouse cell 04, camX=x-0x100; clears 7d7c/9201
+1568:078a	Cell_P52_Shelf0to1	unsigned far Cell_P52_Shelf0to1(void)	Type 52, cell 3B: always -> shelf room 1 (0x460,0x270) cell 48; 7d7e=1 9202=1 9201=0 8fba=1 9129=1
+1568:07fc	Cell_P53_Shelf1to0	unsigned far Cell_P53_Shelf1to0(void)	Type 53, cell 48: walking left -> (0x580,0x1f0) cell 3B, camX=x-0x100; 7d7c=1 9201=1 9202=0 8fba=1 9129=2
+1568:0880	Cell_P54_Shelf1to2	unsigned far Cell_P54_Shelf1to2(void)	Type 54, cell 4B: always -> shelf room 2 (0x460,0x2f0) cell 58; 7d80=1 9203=1 9202=0 8fba=1 9129=2
+1568:08f2	Cell_P55_Shelf2to1	unsigned far Cell_P55_Shelf2to1(void)	Type 55, cell 58: walking left -> (0x580,0x270) cell 4B; 7d7e=1 9202=1 9203=0 8fba=1 9129=3
+1568:0976	Cell_P65_Shelf2to3	unsigned far Cell_P65_Shelf2to3(void)	Type 65, cell 5B: always -> shelf room 3 (0x460,0x370) cell 68; 7d82=1 9204=1 9203=0 8fba=1 9129=3
+1568:09e8	Cell_P66_Shelf3to2	unsigned far Cell_P66_Shelf3to2(void)	Type 66, cell 68: walking left -> (0x580,0x2f0) cell 5B; 7d80=1 9203=1 9204=0 8fba=1 9129=4
+1568:0a6c	Cell_P30_V30_TrunkTop	unsigned far Cell_P30_V30_TrunkTop(void)	Type 30, cell BF (level 1): top of the trunk ladder; moving down on the path snaps x to 0x7cc and gives the ladder mask 0x5f3; above the path area 2; visible: Cell_DrawTreetop(0x600)
+1568:0b38	Cell_P17_MineDoorW	unsigned far Cell_P17_MineDoorW(void)	Type 17, cell B2 (level 1): door up into the mine tunnel -> (0x440,0x170) cell 28, camX=x-0x40, area 0x0a, tune 2
+1568:0b86	Cell_P37_MineExitW	unsigned far Cell_P37_MineExitW(void)	Type 37, cell 28: walking left with x&0x78<=0x48 -> (0x148,0x5f0) cell B2, camX=x-0xa0, transition 2, area 0, tune 0
+1568:0bfb	Cell_P18_MineDoorE	unsigned far Cell_P18_MineDoorE(void)	Type 18, cell BB (level 1): door up into the mine tunnel -> (0x540,0x170) cell 2A, camX=x-0x100, area 0x0b, tune 2
+1568:0c49	Cell_P38_MineExitE	unsigned far Cell_P38_MineExitE(void)	Type 38, cell 2A: walking right with x&0x78>=0x38 -> (0x5b8,0x5f0) cell BB, camX=x-0xa0, transition 2, area 0, tune 0
+1568:0cbe	Cell_P44_CastleDoor	unsigned far Cell_P44_CastleDoor(void)	Type 44, cell 73: castle hall door; on the floor g_slowCpu=0 and mask 0x4fd; Up (state<0x1f, y&0x7f<0x6c) -> (0x4c0,0x3f0) cell 79 outside the arch, transition 1, restores the slow-CPU flags, tune 0
+1568:0d94	Cell_P23_FallShaft	unsigned far Cell_P23_FallShaft(void)	Type 23 (cells 3D 4D 5D A4 D7): shaft, mask 0x1400 (fall); if g_level==2 and y==0x270 (cell 4D, ice-cave drop) -> (0x4c0,0x170) mine tunnel, g_level 1, transition 1, area 0x0e
+1568:0df3	Cell_P47_Boundary01	unsigned far Cell_P47_Boundary01(void)	Type 47, cell C7: shaft below the level-1 bridge, mask 0x1400; Cell_LevelBoundary01 when y&0x7f>0x68
+1568:0e13	Cell_P19_Boundary12	unsigned far Cell_P19_Boundary12(void)	Type 19, cell 94: shaft below the level-2 bridge, mask 0x1400; Cell_LevelBoundary12 when y&0x7f>0x68
+1568:0e33	Cell_P24_Wall	unsigned far Cell_P24_Wall(void)	Type 24 (no cell uses it): dx=0, returns 0xff
+1568:0e41	Cell_P46_V46_Boundary01	unsigned far Cell_P46_V46_Boundary01(void)	Type 46, cell CF: trunk ladder, returns 0x5f3; object call: Cell_LevelBoundary01 when y&0x7f>0x68; visible call: Cell_DrawTreetop(0x600)
+1568:0e6d	Cell_LevelBoundary01	void far Cell_LevelBoundary01(void)	Loaded scene 1 and dy>0: g_level 0, key state 2; loaded scene 0 and dy<0: g_level 1, key state 0x0a if the level-1 key (content 0x68) is still in slots 13..29 else 4
+1568:0ee3	Cell_DrawTreetop	void far Cell_DrawTreetop(int wy)	If not slow CPU and no decoration yet: Cell_DrawObject(cellScreenX+0x20, wy-camY+0x80, 0x17c = SPRITES 190 foliage)
+1568:0f13	Cell_P25_TrunkShaft	unsigned far Cell_P25_TrunkShaft(void)	Type 25, cell DF: trunk ladder shaft, returns 0x5f3 (ladder, camera mode, Up/Down)
+1568:0f17	Cell_P31_GateL0	unsigned far Cell_P31_GateL0(void)	Type 31, cell EF: level-0 gate (tree trunk); key state 2: snaps x to cell+0x48, ladder above 0x68, picture 0x40->0x4c (sfx 8); no key: Up arms hint 8, no Up/Down
+1568:1010	Cell_P26_Unused	unsigned far Cell_P26_Unused(void)	Type 26 (no cell uses it): camera clamp at camY 0x500 on DS:37ee/37f0 (overwritten by Player_Move, no effect); returns 0xff
+1568:1037	Cell_P27_Unused	unsigned far Cell_P27_Unused(void)	Type 27 (no cell uses it): as P26 with 0x380
+1568:105e	Cell_P28_Path	unsigned far Cell_P28_Path(void)	Types 28 32 33 49 58 59 67 68 69: plain path, dy>0 -> 0, returns 0xfc (no Up/Down)
+1568:1077	Cell_P29_Unused	unsigned far Cell_P29_Unused(void)	Type 29 (no cell uses it): upward camera clamp at 0x380; returns 0xff
+1568:1090	Cell_P36_V36_NetShop	unsigned far Cell_P36_V36_NetShop(void)	Type 36, cells BC EA: net shop; coins pay DS:92a1 (mask 0x200) 4->0, rock 0x47/0x48/0x46, climbing in at owed 0 gives +5 nets (owed -1), climbing out resets to 4; visible: sign digits 0x188.. / net 0x194 in slot 12 (decompiles after the DS repair)
+1568:1286	Cell_P40_V40_Geyser	unsigned far Cell_P40_V40_Geyser(void)	Type 40, cells 8E 9E: geyser column, mask 0xcf1 (lift); Cell_LevelBoundary12 when y&0x7f>0x68 (no kind test); Cell_DrawGeyser(0x500,0x50)
+1568:12b4	Cell_LevelBoundary12	void far Cell_LevelBoundary12(void)	Loaded scene 2 and dy>0: g_level 1, key state 4; loaded scene 1 and dy<0: g_level 2, key state 0x0c if the level-2 key (0x6a) is in slots 0..13 else 6
+1568:1329	Cell_P39_V39_GateL1	unsigned far Cell_P39_V39_GateL1(void)	Type 39, cell AE: level-1 gate (geyser cave); key state 4: snaps x to 0x740, opens 0x38->0x35 (sfx 8) above 0x68, lift mask 0xcf1 above 0x60; no key: hint 8; always Cell_DrawGeyser(0x500,0x50)
+1568:141c	Cell_P41_V41_GeyserTop	unsigned far Cell_P41_V41_GeyserTop(void)	Type 41, cell 7E: geyser hole on level 2; a player walking through x&0x78 0x18..0x50 (not jumping) slides down (anim 0x1d, state 0x1e, mask 0xcf4); elves turn; no kind test (stale elf in visible calls); Cell_DrawGeyser(0x500,0x1e)
+1568:1556	Cell_DrawGeyser	void far Cell_DrawGeyser(int wy, int depth)	Visible calls only, when the level-1 gate is open (picture[AE]==0x35): slot 12 animation 0x54 at cellScreenX+0x20, min(wy-camY,0x3b)+0x54 (decompiles after the DS repair)
+1568:15bc	Cell_P45_V45_Bridge	unsigned far Cell_P45_V45_Bridge(void)	Type 45, cells 84 B7: rope bridge; tier>=2 and a walking player at x&0x78 0x30..0x48: mask 0x1400 (fall), picture 0x2f->0x30, sfx 9; elves turn at a broken bridge; visible: rail frame 0x178 in slot 12; nothing on a slow CPU (decompiles after the DS repair)
+1568:16ed	Cell_P48_Landing	unsigned far Cell_P48_Landing(void)	Type 48, cells B4 E7: bottom of the bridge shafts; player on the path line: dy=0, mask 0xfc; above: 0x14f0 (keep falling)
+1568:1734	Cell_P56_V56_CastleHall	unsigned far Cell_P56_V56_CastleHall(void)	Type 56, cells 71 72 74 75: castle hall; ladder picture 0x27 gives 0x20ff (floor) / 0x24ff / 0x25ff (climb, ladder jumps); creature hit check; visible: removes a showing creature
+1568:182b	Cell_P57_V57_CastleWall	unsigned far Cell_P57_V57_CastleWall(void)	Type 57, castle wall rows 4-6: mask by picture (0x31 full ladder 0x25ff, 0x2d short ladder, else fall 0x15f0), 0x1400 outside x&0x78 0x30..0x60; creature hit check; visible: Castle_CreatureSpawn
+1568:18f1	Castle_CreatureHitCheck	void far Castle_CreatureHitCheck(void)	When the creature strike flag DS:9264 is set and the player is not ladder-jumping and within its height range: coin -1 (sfx 5 if any) and a forced Left/Right key bit that triggers a ladder jump
+1568:1953	Cell_P60_IceDoor	unsigned far Cell_P60_IceDoor(void)	Type 60, cell 7C (level 2): ice doorway up -> (0x6c0,0x170) cell 2D (ice cave), camX=x-0x40, area 0x0c, Music_Stop, Sfx_Stop, tune 2
+1568:19ab	Cell_P61_IceCaveExit	unsigned far Cell_P61_IceCaveExit(void)	Type 61, cell 2D: walking left with x&0x78<=0x48 -> (0x648,0x3f0) cell 7C, camX=x-0xa0, transition 2, area 0, tune 0
+1568:1a20	Cell_P62_IceSlide	unsigned far Cell_P62_IceSlide(void)	Type 62, cell 2E: walking right with x&0x78>=0x68 -> falls into the rock shaft (0x6a8,0x1f0) cell 3D, camX=0x600, anim 0x3f, state 0x1f, area 0x0e, key state 4, sfx 9
+1568:1aa4	Cell_P63_V63_CastleTop	unsigned far Cell_P63_V63_CastleTop(void)	Type 63, castle wall row 3: masks as P57; exit picture 0x32 climbed upwards ends the climb (scene 3 at (0x400,0x500), end-sequence anims, total += found, Treasure_PickShowcase); visible: Castle_CreatureSpawn
+1568:1c7b	Cell_V49_Showcase	void far Cell_V49_Showcase(void)	Visible handler of type 49 (cells 03, 9A): showcase treasure in slot 3 (frame DS:8fb0) and treasure-room sprites in slots 8/10 from DS:00f8..00fe and DS:9251 (decompiles after the DS repair)
+1568:1d92	Cell_NopV58	void far Cell_NopV58(void)	Empty visible handler (RETF) of type 58
+1568:1d93	Cell_NopV67	void far Cell_NopV67(void)	Empty visible handler (RETF) of type 67
+1568:1d94	Cell_NopV68	void far Cell_NopV68(void)	Empty visible handler (RETF) of type 68
+1568:1d95	Cell_NopV69	void far Cell_NopV69(void)	Empty visible handler (RETF) of type 69
+1568:1d96	Cell_V32_AnimDecor	void far Cell_V32_AnimDecor(void)	Visible handler of type 32 (cell E6): if not slow CPU, slot 12 animation 0x53 at cellScreenX+0x20, cellScreenY+0x80 (decompiles after the DS repair)
+1568:1ddb	Cell_V10	void far Cell_V10(void)	Visible handler of types 10, 33 (cave cells 0B, 09): if not slow CPU, frame 0x176 (SPRITES 187, rock column) at cellScreenX, cellScreenY+0x80
+1568:1dfa	Cell_V59	void far Cell_V59(void)	Visible handler of type 59 (mine tunnel 29): if not slow CPU, frame 0x17e (SPRITES 191, wooden post) at cellScreenX+0x18, cellScreenY+0x80
+1568:1e1c	Cell_V7	void far Cell_V7(void)	Wall decoration: frame 0x17a (SPRITES 189, rock edge) at cellScreenX-1, cellScreenY+0x78
+1568:1e35	Cell_V8	void far Cell_V8(void)	Wall decoration: frame 0x17b (SPRITES 189 mirrored) at cellScreenX+0x41, cellScreenY+0x78
+1568:1e50	Cell_DrawObject	void far Cell_DrawObject(int x, int y, int frame)	Slot 12 (cell decoration): x, y, depth 0x1e, frame, draw index 0x0c, last anim 0; DS:8fc4++ (decompiles after the DS repair)
+1568:1e9e	Castle_PlaceCreature	void far Castle_PlaceCreature(void)	Slot 6 at (cellScreenX, cellScreenY+0x70) depth 0x50, slot 7 at (0,0) depth 0x4f; DS:8fc4++
+1568:1eca	Cell_P0_Void	unsigned far Cell_P0_Void(void)	Type 0 (empty cells): increments DS:92c8 and sets the EGA overscan colour (INT 10h AX=1001h); returns AX as left by the BIOS (normally 0x1001: fall)
+1568:1ed8	Cell_BonusCoins	unsigned far Cell_BonusCoins(void)	Type 73, cell 26 (upper room): any object at x&0x7f==0x48 while picture[26]==0x4b: picture 0x49, sfx 4, redraw, coins +5 (once per game; picture saved, reset by Castle_ResetCells); returns 0xfc
+1568:1f0b	Cells_UpdateVisible	void far Cells_UpdateVisible(void)	Per tick when g_uiMode==0: visible handler DS:09d2[type] for the 4 cells of the camera row (cellScreenX = 2-((camX&0x78)>>1) + 0x40k, cellScreenY = 0x10-(camY&0x7f)); hides slot 12 when no decoration was placed
+1568:1fe4	Cell_GetMask	unsigned far Cell_GetMask(void)	Object handler DS:08a6[type] for the cell of g_curObj (index from x,y by ROL/XCHG, unmasked); sets DS:9274=2 and DS:92cb; returns the terrain mask
+176a:0006	Cell_P1	unsigned far Cell_P1(void)	Type 1, cell FF: level-0 seam, right-movers -> Cell_ConveyLeft(-0x500,-0x80) into E5; returns 0xfc
+176a:0019	Cell_ConveyLeft	void far Cell_ConveyLeft(int dx, int dy)	Moves a right-moving object by (dx,dy): the player anywhere in the cell (with Elves_ShiftNearby), an elf only at x&0x78==0x78
+176a:008a	Cell_P2	unsigned far Cell_P2(void)	Type 2, cell FD: elves moving right -> E3 while the player is in row 0x700 at x<=0x300 (Cell_ConveyLeftIf)
+176a:00a6	Cell_ConveyLeftIf	void far Cell_ConveyLeftIf(int dx, int dy, unsigned xmax, int row)	Elves only: dx>0, player.x<=xmax, player row==row -> move by (dx,dy)
+176a:00fd	Cell_P3	unsigned far Cell_P3(void)	Type 3, cell E3: level-0 seam, left-movers -> Cell_ConveyRight(+0x500,+0x80) into FD
+176a:0110	Cell_ConveyRight	void far Cell_ConveyRight(int dx, int dy)	Moves a left-moving object by (dx,dy): the player anywhere in the cell (with Elves_ShiftNearby), an elf only at x&0x78==0
+176a:0181	Cell_P4	unsigned far Cell_P4(void)	Type 4, cell E5: elves moving left -> FF while the player is in row 0x780 at x>=0x680 (Cell_ConveyRightIf)
+176a:019d	Cell_ConveyRightIf	void far Cell_ConveyRightIf(int dx, int dy, unsigned xmin, int row)	Elves only: dx<0, player.x>=xmin, player row==row -> move by (dx,dy)
+176a:01f8	Cell_P13	unsigned far Cell_P13(void)	Type 13, cell C2: level-1 seam, right-movers -> Cell_ConveyLeft(+0x580,-0x100) into AD
+176a:020a	Cell_P14	unsigned far Cell_P14(void)	Type 14, cell C0: elves moving right -> AB while the player is in row 0x500 at x<=0x700
+176a:0225	Cell_P15	unsigned far Cell_P15(void)	Type 15, cell AB: level-1 seam, left-movers -> Cell_ConveyRight(-0x580,+0x100) into C0
+176a:0237	Cell_P16	unsigned far Cell_P16(void)	Type 16, cell AD: elves moving left at x&0x78==0x78 -> C2 (x-0x580, y+0x100) while the player is in row 0x600, or in row 0x580 with (x&0xff80)>0x600
+176a:029d	Cell_P22	unsigned far Cell_P22(void)	Type 22, cell 88: level-2 seam, right-movers -> Cell_ConveyLeft(+0x80,-0x80) into 79
+176a:02af	Cell_P21	unsigned far Cell_P21(void)	Type 21, cell 77: level-2 seam, left-movers -> Cell_ConveyRight(-0x80,+0x80) into 86
+176a:02c1	Cell_P43	unsigned far Cell_P43(void)	Type 43, cell 86: elves moving right -> 77 while the player is in row 0x380 at x<=0x500
+176a:02dc	Cell_P42_GateL2	unsigned far Cell_P42_GateL2(void)	Type 42, cell 79: level-2 gate (stone arch); elf conveyor to 88; key state 6: snaps x to 0x4c0, opens 0x26->0x3c in 79 and 88 (sfx 8), then above 0x60 -> castle hall door (0x1c0,0x3f0), transition 1, area 0x0d, tune 2, slow scroll off; no hint without the key
+176a:159e	Castle_CreatureSpawn	void far Castle_CreatureSpawn(void)	Visible castle cells: counts them (DS:90fa); with no creature and tier>=1, a player at this cell center rolls (rand()&mask[tier])==1 (anim 0x3c), at the center of the cell to the left rolls ==0 (anim 0x3b); keeps or removes the creature by its animation
+4d94:0afa	g_creatureMask	u16[4]	rand() mask per tier for the castle creature: 0, 0x1ff, 0xff, 0x3f (Castle_CreatureSpawn)
+4d94:3d31	g_slowScroll	u16	Double scroll/camera steps (copy of the slow-CPU flag; 0 in the castle)
+4d94:37ee	g_camStepX	i16	Camera x step of the last Player_Move (0 = no scroll); latched in DS:37f6
+4d94:37f0	g_camStepY	i16	Camera y step of the last Player_Move; latched in DS:37f8
+4d94:37f2	g_camXFrame	u16	camX latched by Frame_Begin
+4d94:37f4	g_camYFrame	u16	camY latched by Frame_Begin
+4d94:7d7c	g_shelfRoomRedraw	u8[2*4]	Per treasure shelf room k: byte 7d7c+2k = draw its shelves; 7d7d+2k = first collected-list index of the room
+4d94:8fa5	g_slowCpuSaved	u16	Real slow-CPU flag kept while the castle forces fast mode
+4d94:8fa7	g_plrScreenX	i16	Player screen x offset (bytes) at the start of the tick (Game_Tick)
+4d94:8fa9	g_plrScreenY	i16	Player screen y offset (rows) at the start of the tick
+4d94:8fc2	g_cellScreenY	i16	Screen y of the top of the visible cell row (0x10 - (camY & 0x7f))
+4d94:8fc4	g_decorCount	u16	Decorations/creature placed by visible handlers this tick (0 -> slot 12 hidden)
+4d94:9124	g_camCellCol	u16	Camera cell column (Frame_Begin)
+4d94:9126	g_camCellRow16	u16	Camera cell row * 16 (Frame_Begin)
+4d94:9129	g_shelfCamRoom	u8	Shelf room entered from its left end (shelf x relative to camX 0x440); other values: entered from the right (0x480)
+4d94:9201	g_inShelfRoom	u8[4]	Player is in treasure shelf room 0..3
+4d94:920d	g_camTileColOff	u16	(camX & 0x78) << 2: tile column offset in a block map
+4d94:920f	g_camTileRowOff	u16	(camY >> 2) & 0x1e: tile row offset in a map column
+4d94:924f	g_redrawReq	u16	Request a full play-field redraw (latched into DS:8fbb by Frame_Begin, cleared by Playfield_Redraw)
+4d94:9254	g_storedShowcase	i8	Showcase treasure put away while outside the clubhouse (Cell_P12 / Cell_P11)
+4d94:926a	g_plrCellMask	u16	Terrain mask from the last Player_Move, applied to g_keys at the next tick
+4d94:926c	g_hideMenuBar	u16	Blank the menu bar when entering scene 3/4 (Scene_Update)
+4d94:9278	g_partialRedraw	u16	Redraw only the searched cell (latched into DS:8fc8)
+4d94:9287	g_creatureCell	u16	0 = no castle creature, else the visible castle-cell index where it appeared
+4d94:90fa	g_castleCellIdx	u16	Counts the visible castle cells within one Cells_UpdateVisible call
+4d94:92c8	g_borderColor	u8	Overscan colour counter of Cell_P0_Void
+4d94:92cb	g_curCell	u16	Cell index of the object in the last Cell_GetMask
+4d94:9297	g_drawnCamX	u16	camX as last drawn (Scroll_Update / Playfield_Redraw); 9299 = 920d, 9270 = 9124, 929b = camY, 929d = 920f, 9272 = 9126 as drawn

@@ -89,7 +89,7 @@ targets follow at `1460:04de`.
    register test at 0x3D4 → CGA, or Tandy when `'!'` was found.
    **Inferred:** VGA and SVGA cards run the game in EGA mode. Only a real MCGA (or `-M`) gets
    type 5.
-4. Still -1 → the message at `4d94:0693` ("This computer needs a graphics adapter ...") and exit.
+4. Still -1 → the "no graphics adapter" message at `4d94:0693` and exit.
 
 **Sound auto-detect** (`1000:04a1`): Tandy machine → 1. Otherwise the AdLib timer probe
 `4ac9:0d0f` succeeds → 2. Otherwise INT 15h AH=C0h reporting model/submodel `0xFC/0x0B`, plus a
@@ -141,23 +141,23 @@ fast-grab loop (see §7), and those have no separate raw copy where none existed
 | 033-036 | Path with flags ("Press ↓ to drop coin" in the message box); coin toss; POOF cloud (nothing found); the hiding place blinking |
 | 037-043 | More of the level 1 path: cave, plants, an elf throwing dust, two tall "ELF XING" signs, the NETS 4 COINS net cave, the locked tree-trunk gate, the path looping back to the clubhouse |
 | 044-046 | Quizzes 2 and 3; coin hint |
-| 047-050 | Coin dropped at the key place: POOF, the place blinks and a key appears, the key icon turns yellow, "You found the key!" hint |
+| 047-050 | Coin dropped at the key place: POOF, the place blinks and a key appears, the key icon turns yellow, key-found hint |
 | 051-057 | At the lock; the trunk turns into a ladder; climbing the trunk, the treetop and a rope ladder (vertical scrolling); arriving on level 2 |
 | 058-067 | Level 2: path, "FLYING FISH" signs, a cave gated by a portcullis (the lock), a wooden doorway, a tree with two big nests, at the doorway, the dissolve transition, inside the mine tunnel, the tunnel exit (another doorway), the level 2 net cave |
 | 068-069 | Clubhouse rank screen (treasure chest with thresholds 300/230/170/115/70/25/5, rank "Trainee", Total Treasures 0); prize button with no prizes yet |
 | 070a-c | File > Exit and Save; confirm dialog; Yes (the game then returns to the DOS prompt) |
-| 071-077 | Level 2 quiz; "Your net has worn out" hint; net cave: the rock counter goes 4→3→... and the rock slides open; net repaired (0→5); three clue words; level 2 key found (key icon turns pink) |
+| 071-077 | Level 2 quiz; worn-out-net hint; net cave: the rock counter goes 4→3→... and the rock slides open; net repaired (0→5); three clue words; level 2 key found (key icon turns pink) |
 | 078-081 | Level 2 lock opened: a geyser cloud lifts the player (vertical scroll) while the clue words are wiped one line at a time; arriving on level 3 (snow) |
 | 082-088 | Level 3: shovels and sleds, snowmen and a rope bridge over a gap, the bridge, the stone arch with a blue portcullis and keyhole (the castle lock), an ice doorway, snowballs, a level 3 quiz |
 | 089-093 | Walking onto the geyser top on level 3 drops the player back to level 2; inside the ice cave (a slide-down tunnel); falling down a rock shaft; landing on level 2 at the mine-tunnel exit; the open level 2 gate with the geyser |
 | 094-096 | Level 3 clue words; key found (key icon turns green); arch opened |
 | 097-101 | Castle hall; ladder; ladder shaft with several ladders; jumping between ladders; **treasure room at the top** (Master of Mischief with the crown in a window, treasure chest, chute, urn, sparkles) |
-| 102-104 | Rank chest screen shown after the castle (no menu bar); back in the clubhouse with the "You made it to the top of the mountain!" message; File-menu hint |
+| 102-104 | Rank chest screen shown after the castle (no menu bar); back in the clubhouse with the reached-the-top message; File-menu hint |
 
 ### 4.2 `tandy\` (22 frames)
 
-Title; story pages 1 and 2 (page 2 adds "S to Learn About Super Solvers Series"); the "other
-Super Solvers adventures" page; walk-off; sign-in; the "You have a saved game ..." prompt; the
+Title; story pages 1 and 2 (page 2 adds the S key line for the series page); the other
+Super Solvers titles page; walk-off; sign-in; the saved-game prompt; the
 resumed level 2 game (from the USERS.DAT saved by the EGA run); Help menu; About page 1; the Esc
 exit dialog; an elf caught on level 2; File menu; Start New Player confirmation; sign-in again;
 the new name "Ben"; clubhouse hint; clubhouse; controls hint; outside (different scenery from
@@ -286,7 +286,7 @@ The mouse is supported according to the help menu, but it cannot be driven from 
   (two, four), line 2 an attribute (tall, big, small) and line 3 an object (signs, nests,
   pinecones). Clue words belong to a level: they are wiped when you go up, and come back when
   you return to a level (seen after sliding back down to level 2).
-- New game: coins 5, net 10, treasure 0. A net at 0 gives the "Your net has worn out" hint. The
+- New game: coins 5, net 10, treasure 0. A net at 0 gives the worn-out-net hint. The
   net cave rock reads "NETS 4 COINS". Each coin dropped there lowers the number, the rock slides
   aside after the fourth, and ↑ refills the net to 5 (seen twice, from 0).
 
@@ -310,14 +310,14 @@ The mouse is supported according to the help menu, but it cannot be driven from 
   again, and walking onto the geyser top on level 3 drops you back to level 2.
 - Level 3 → castle: the lock is a stone arch with a blue portcullis. The castle hall has a
   ladder, which leads to a shaft of several parallel ladders. →+↑ jumps to the next ladder
-  ("jump to another ladder" hint string), and the top of the shaft is the treasure room. Then
-  comes the rank chest screen, then the clubhouse with "You made it to the top of the mountain!
-  ... Walk out the door to play again." The clue words and key are reset.
+  (the ladder-jump hint text), and the top of the shaft is the treasure room. Then
+  comes the rank chest screen, then the clubhouse with the reached-the-top message,
+  which says to leave through the door for another game. The clue words and key are reset.
 - Wooden doorways on level 2 (↑) lead into a mine tunnel. Walking through it comes out at
   another doorway elsewhere on the same level. The cut into the tunnel is a **block dissolve**
   over ~7 frames (~120 ms) in roughly 8x8-px cells (`ega_doorway_dissolve.avi`, frames 74-81).
 - The level 3 ice doorway is a **slide-down tunnel**: an ice cave, then a fall down a rock shaft,
-  then landing on level 2 at the mine-tunnel exit. The "Whoops! You slid down a tunnel" hint
+  then landing on level 2 at the mine-tunnel exit. The slid-down-a-tunnel hint
   was not shown, presumably because hints only appear on first occurrences (inferred).
 - The gap and the rope bridge on level 3 were crossed by walking (the bridge was present). The
   "flip over gaps" and elf-dust dodging were not exercised.
@@ -403,3 +403,121 @@ structures (clubhouse, net caves, locks, doorways) looked the same.
   PCM), when sound is needed.
 - What `-X` toggles (`[4d94:923c]`); exactly how Enter behaves on each attract page (§5.1); the
   reason for the "Packed file is corrupt" log line (§1).
+
+---
+
+## Round 2 (wave 1, runtime agent)
+
+Second capture pass, made for the wave-1 logic specs and the requests of the other wave-1 agents
+(answers with frame numbers: `extracted/scratch/dos_requests/*.answers.md`). Same setup as §1
+(DOSBox-X 2026.10.01, `tools/dosbox_tmdos.conf`, EGA, `cycles=fixed 6000`, host sound muted,
+window parked, keyboard posted). All names below are relative to `extracted/captures/dos/`.
+Native PNGs are 320x200 (2x2 doubling checked and removed), DOSBox-X originals in `ega/raw/`;
+AVIs are 59.9228 fps ZMBV with a 48 kHz stereo PCM track.
+
+### R2.1 New tools and techniques
+
+* **Save-state RAM access** (`extracted/scratch/dos_w1_runtime/savmem.py`): a DOSBox-X `.sav` is a
+  zip whose `Memory` entry is a 0x88-byte header followed by the guest's physical RAM. DGROUP is
+  located by the Turbo C copyright at DS:0004 (in these sessions DGROUP is at segment 0x45B8, i.e.
+  Ghidra segment S runs at S − 0x7DC). `vars`/`peek` read game variables; `poke`/`pokew` write
+  them into a new state (rezipped with the same entry names). `where.py` lists position, level,
+  coins, state for every state of the library; `layout.py` prints the 48 hiding places with their
+  pictures and contents. This made "crafted" situations possible without a full play-through:
+  found treasures, totals, tier, coins and nets were set in RAM of real game states.
+* **Frame and tick logger** (`framelog.py`): patches a state with three far-called stubs placed in
+  the free DOS block above the game (8000:0000..8800:7FFF; checked with `mcb.py`): main loop
+  130f:0097 (one `g_ticks` entry per loop iteration), Game_Tick step path 130f:0112 (a 16-byte record
+  per executed logic tick: ticks, player x/y, camera x/y, player state, `g_keys`, coins), Game_Tick
+  blocked path 130f:0190 (ticks blocked by DS:910D). `stepchanges.py STATE` prints the ticks where
+  something changed, `flseq.py STATE` the frame timeline. States named `savestates/r2/fl_*` carry
+  this patch (behaviour unchanged, measurement only; use the plain states for anything else).
+* **Sound test harness** (`soundtest.py`): extends the patched frame stub with a scheduler that calls
+  `Music_Stop`, `Sfx_Play(n)` and `Music_Play(t)` at fixed PIT-tick delays, so every effect and tune
+  can be recorded in isolation on each sound device from a real game state.
+* **Silent audio capture**: with `[mixer] nosound=true` DOSBox-X still renders its mixer into
+  captures. `tmctl.py audio wav|opl|mtavi start|stop OUT` (new, additive) drives "Record audio to
+  WAV", "Record FM (OPL) output" (.dro register log) and the multi-track AVI. Nothing reached the
+  host speakers at any time. The AVIs of `rec` carry the same audio.
+* AVI helpers: `avimeasure.py` (scroll-step detection, region change list, pixel diffs) and
+  `avi2png.py` (curated native frames from AVIs).
+
+### R2.2 Scenes captured (EGA)
+
+| Scene | Files | How / notes |
+|---|---|---|
+| **Treasure found** (2-of-3 place) | `avi/ega_r2_treasure_found.avi`; `ega/r2_treasure_00_before` … `_07_closed_count1`, `ega/r2_treasure_01_found_hint` | Ada, level 0, cell 0xE9 (treasure 5). Throw AVI 61-152, POOF ~125, blink 154-171, opened with the treasure sprite 172-197, closed + HUD count 198, hint 4 at 204. State before the drop: `savestates/ega/r2_treasure_spot` (press Down) |
+| **End sequence, 2 found** | `avi/ega_r2_end_t2_nokey.avi`, `avi/ega_r2_end_t2_enter_skip.avi`; `ega/r2_end_01_castle_top_horn` … `_08_rank_chest_fill` | crafted from `ega/castle_shaft` (treasures marked found in RAM). Runs on without keys: castle top, treasures fly into the chest, chute, fall (AVI 1212-1657), dissolve, treasure room, dissolve, rank chest fill (8 rows, 4 ticks each) |
+| **All found (6 at tier 0) and star rank-up** | `avi/ega_r2_end_t6_allfound_nokey.avi`, `avi/ega_r2_end_t6_to_clubhouse.avi`; `ega/r2_end_allfound_01/02_mom_reaction`, `ega/r2_end_t6_rank_chest_1star`, `ega/r2_end_t6_clubhouse_message`, `ega/r2_end_t6_clubhouse_after` | total 0 -> 6: the chest gets the 1-star coin row; the band label still reads "Trainee" on that screen; end message 34 and hint 13 afterwards |
+| **Crown / champion ending (total 300)** | `avi/ega_r2_crown_nokey.avi` (all found, 294 -> 300), `avi/ega_r2_crown_t2_total300_nokey.avi` (2 found, 298 -> 300); `ega/r2_crown_01_chest_glow` … `_07_rank_champion_hidden`, `ega/r2_crown_a`, `ega/r2_crown_b` | chest glow, Master of Mischief loses the crown, crown on the pedestal, fall, treasure room with two figures, rank chest with stars and CHAMPION; flash visible at AVI 3042/3053/3063/3074/3084 |
+| **Champion end messages** | `avi/ega_r2_crown_to_end_messages.avi`; `ega/r2_crown_08_end_message` (message 35 with the name), `_09_after_message` (36), `_10_after_message2` (hint 13) | Enter on the rank chest after the crown run |
+| **Castle creature** | `avi/ega_r2_castle_tier3_climb.avi`; `ega/r2_castle_creature_01_appears`, `_02_strike`, `_03_hit_coin_lost` | `ega/castle_shaft` with g_tier forced to 3 in RAM; window creature left of the climber, arm strike, coin 31 -> 30 (AVI 228-260) |
+| **Elf dust** | `avi/ega_r2_tierc_standing_elves.avi`; `ega/r2_elf_dust_01_before_hit`, `_02_hit_coin_lost`, `_03_coin_flies_back` | crafted player `tierc` (tier 3) standing outside the clubhouse: all coins taken (HUD changes at AVI 1490, 1857, 1957, 2263) |
+| **Coin creature** | `avi/ega_r2_coin_creature_touch.avi`; `ega/r2_coin_creature_01` … `_04_touch_b` | coins 0, nets 3 (RAM); the gold coin on the path; touching it +2. State `savestates/ega/coin_creature` |
+| **Bridges breaking (tier 2)** | `avi/ega_r2_bridge_break_l3.avi`, `avi/ega_r2_bridge_l3_jump.avi`, `avi/ega_r2_bridge_break_l2.avi`; `ega/r2_bridge_l3_00_before`, `_01*`, `_02_after`, `ega/r2_bridge_l2_02_after` | Ada's states with g_tier = 2 and total 120 in RAM; break at x 0x230 (level 3) / 0x3B0 (level 2), fall 8 px per 5 ticks, land on the level below with a jump; landing on the bridge after a jump also breaks it |
+| **Falling through a hole** | `avi/ega_r2_geyser_hole_slide.avi`; `ega/r2_geyser_hole_00_before` … `_03_landed` | level 3 geyser top (cell 0x7E): slide state 30 at x 0x750, 8 rows per 7-8 ticks down to level 2 |
+| **Level change both ways** | up: `avi/ega_r2_level_change_up_trunk_climb.avi` (trunk ladder level 1 -> 2, logged in `r2/fl_climb`); down: the geyser hole, the two bridge falls, the castle chute | |
+| **Jumps on the path** | `avi/ega_r2_jumps_path.avi` | PgUp held (chained jumps), PgUp tapped, Up-then-Right (no jump) |
+| **Prize rooms** | `avi/ega_r2_prize_rooms_walk.avi`; `ega/r2_prize_room_1` … `_6` | crafted player `tierb` (40 collected): four shelf rooms in strip rows 3-6, entered by walking right out of the start room |
+| **Treasure room from the clubhouse** | `avi/ega_r2_treasure_room_from_clubhouse.avi`; `ega/r2_treasure_room_from_clubhouse_00` … `_03_down` | tierb: Up at x 0x168 of the start room enters scene 4; Left/Right change the treasure on the shelf; Down leaves |
+| **Cave doors, bonus coins** | `ega/r2_w_cave_f7_00` … `_03`, `ega/r2_w_cave_eb_00/01`, `ega/r2_w_bonus_00` … `_03`; `avi/ega_r2_bonus_coins.avi` | camera x = player x − 0x124 after the 0xF7 door (state `savestates/ega/w_cave_f7`), player x − 0x20 after the 0xEB door (`savestates/ega/w_cave_eb`); bonus spot +5 once (state `savestates/ega/w_bonus`) |
+| **Slow-CPU mode (-X)** | `avi/ega_r2_slowcpu_X_walk.avi`; `ega/r2_slowcpu_scroll_avi150/151/157/158` | 16-px scroll steps, rows 112..143 not scrolled (tearing); DS:A212 = 7 |
+| **Start-of-game rank messages** | `ega/r2_tierb_start_message_outside` (4 stars), `ega/r2_tierc_start_message_outside` (champion) | shown when walking out of the clubhouse door, not at sign-in |
+| **UI boxes and pages** | `ega/r2_ui_help_mouse_*` (4 pages, PgUp/PgDn), `ega/r2_ui_help_hints_p1`, `ega/r2_ui_box_start_over(_after_left)`, `ega/r2_ui_box_new_player_hints`, `ega/r2_ui_box_sound`, `ega/r2_ui_signin_*` (Esc box, Ctrl+R remove list and confirmation, identical name, 9 players, list full), `ega/r2_signin_crafted_list` | |
+| **Keyboard check** | `ega/r2_kbd_shift_test_name_entry` ("XYz"), `ega/r2_kbd_shift_test_first_letter` ("Bc") | only shifted A is dropped by the name box; other shifted letters work |
+| **Title, 60 s** | `avi/ega_r2_title_60s_nokeys.avi` | title page then story page 1, sparkles |
+
+Crafted USERS.DAT files: `USERS_crafted_tierb_layout.DAT`, `USERS_crafted_tierc_layout.DAT` (the
+elves agent's crafted roster after a new game of tierb / tierc and Exit and Save), and
+`extracted/scratch/dos_w1_runtime/USERS_9players.DAT` (list-full test).
+
+### R2.3 Audio (silent capture)
+
+| File | Device | Content |
+|---|---|---|
+| `audio/speaker_soundtest_sfx0-11_tunes0-2.wav` | PC speaker (`-Si`, EGA) | from a real game state (Ben, clubhouse): Music_Stop at +100 PIT ticks, effects 0..11 every 600 ticks, tune 0 at +700, tune 1 at +12 900, tune 2 at +17 300, stop at +6 000 (schedule in `extracted/scratch/dos_w1_runtime/sound_script.txt`); 188.7 s, 48 kHz stereo 16-bit |
+| `audio/tandy_soundtest_sfx0-11_tunes0-2.wav` | Tandy 1000 PSG (`--machine tandy`) | same schedule (from `tandy/outside`) |
+| `audio/adlib_soundtest_sfx0-11_tunes0-2.wav` + `.dro` | AdLib (SB16 OPL, EGA default); effects on the speaker | same schedule (from `ega/shack`); the .dro (51 KB) is the raw OPL register log of the whole run — evidence for the instrument register order open in `fmt_sound.md` §10 |
+| `audio/ega_adlib_treasure_found.wav` + `.dro` | AdLib | the treasure search of R2.2 with music and effects 7 etc. |
+
+Every AVI of Round 1 and Round 2 also carries the emulated audio (EGA runs: AdLib music + speaker
+effects; Tandy runs: PSG); `extracted/scratch/dos_w1_runtime/avi_audio.py` extracts it.
+
+### R2.4 Timing measured (summary; details in `code_runtime.md` §1.3, §9, §10)
+
+* The main loop ran 1690 frames/s when nothing was drawn, 820-880/s while walking, 73/s during the
+  coin count-up, 55/s during the search; game ticks always 47.34/s; DS:910D blocked a tick only
+  behind slow frames.
+* Walk 8 px per 5.125 ticks (41 per 8 steps); climb 8 rows per 7.25 ticks; jump 58 ticks; net swing
+  80 ticks; coin throw 71 + 30 ticks; search 37 frames (0.79 s); count-up 13.1 ms per coin; rank
+  chest 4 ticks per row; CHAMPION flash ~914 frames/s; dissolve 127 ms; keyboard repeat 500 ms then
+  ~30/s.
+
+### R2.5 Save states added
+
+`savestates/ega/`: `r2_treasure_spot`, `w_cave_f7`, `w_cave_eb`, `w_bonus`, `coin_creature`.
+`savestates/r2/` (71 states): crafted end-game states (`castle_shaft_t2`, `castle_shaft_t6`,
+`castle_shaft_t6_294`, `castle_upper_t2`, `castle_upper_t2_298`, `castle_upper_t6`,
+`castle_upper_t6_294`, `castle_shaft_tier3`), the results after each run (`end_t2_enter_after`,
+`end_t6_rankchest`, `end_t6_clubhouse`, `crown_t2_298_wait`), tier-2 level states
+(`l3_at_tree_tier2`, `l2_at_nests_tier2`), crafted-player games (`tierb_exitbox`,
+`tierb_start_msg`, `tierb_after_troom`, `tierb_prize_end`, `tierc_start`), speaker and slow-CPU
+sessions (`speaker_clubhouse`, `slowcpu_clubhouse`), the sound-test states (`snd_speaker`,
+`snd_tandy`, `snd_adlib`), and the logger states `fl_*`.
+
+### R2.6 Corrections to Round 1
+
+* §5.1 "Shifted keys are dropped": only shifted A is dropped (name box); Shift works otherwise
+  (R2.2 keyboard check).
+* §2 "`-X` toggles [4d94:923c] (purpose unknown)": it is the slow-CPU flag (`code_runtime.md` §2.4,
+  R2.2).
+* §8 "listening to the audio (muted by design)": solved without unmuting (R2.3).
+* §5.6 "No treasure was found", §8 not-captured list: now captured (R2.2) except the items below.
+
+### R2.7 Still not captured
+
+* A quiz answer paying +2 coins (the count-up was measured with a RAM edit and with the bonus spot).
+* An elf-dust miss (jumping over the dust).
+* Hercules mode; the MCGA and CGA looks of the Round 2 scenes; Tandy captures of the Round 2 scenes
+  (Tandy pixels equal EGA, §6).
+* Mouse input (cannot be injected without the host mouse).

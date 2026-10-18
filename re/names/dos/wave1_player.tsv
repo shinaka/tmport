@@ -1,0 +1,153 @@
+18cf:000d	PlrSt_00_Idle	void far PlrSt_00_Idle(void)	State 0 (only the BSS start value): front pose anim 6, then state 10; ladder flag -> 15 first
+18cf:0038	EndSeq_Setup	void far EndSeq_Setup(void)	Castle-top scene: places slots 3,4,6-11 (origin 2,0x10; slot 11 at 0x18,0x2a), sets their depth, stops sfx and music
+18cf:00a9	PlrSt_41_EndIntro	void far PlrSt_41_EndIntro(void)	End sequence: after anim 0x78 -> player anim 0x80 on slot 6
+18cf:00c4	PlrSt_42_EndHorn	void far PlrSt_42_EndHorn(void)	End sequence: sfx 8, horn anims 0x7f (slot 7) and 0x79 (slot 6)
+18cf:00f8	PlrSt_43_EndBeam	void far PlrSt_43_EndBeam(void)	End sequence: beam 0x7a (slot 9), player 0x7b (slot 6)
+18cf:0122	PlrSt_44_EndSparkle	void far PlrSt_44_EndSparkle(void)	End sequence: sfx loop on, sfx 2, sparkle 0x7d (slot 9)
+18cf:014d	PlrSt_45_EndChestOpen	void far PlrSt_45_EndChestOpen(void)	End sequence: sfx loop off, sfx 8, chest opens 0x83 (slot 8)
+18cf:0182	PlrSt_46_EndStep	void far PlrSt_46_EndStep(void)	End sequence: slot 6 x=10, anim 0x82
+18cf:01a3	PlrSt_47_EndStep	void far PlrSt_47_EndStep(void)	End sequence: anims 0x7e (slot 7), 0x8b (slot 6)
+18cf:01cd	PlrSt_48_EndFlightInit	void far PlrSt_48_EndFlightInit(void)	End sequence: slot 6 x=2 anim 0x86, counters DS:92d4/92da = 0, unmark mirror cells, music 1
+18cf:0205	PlrSt_49_EndFlightNext	void far PlrSt_49_EndFlightNext(void)	End sequence: scans one hiding slot per tick; a found treasure starts its flight (anim 0x87, frame patched into script 0x88); after 48 -> chest closes (0x8c), state 52
+18cf:0280	PlrSt_50_EndFlightStart	void far PlrSt_50_EndFlightStart(void)	End sequence: treasure sprite (anim 0x88) at (0x88,0x40)
+18cf:02a7	PlrSt_51_EndFlightStep	void far PlrSt_51_EndFlightStep(void)	End sequence: treasure flight step x-=4, y=DS:0b06[i]; end -> state 49
+18cf:02f2	PlrSt_52_EndRank	void far PlrSt_52_EndRank(void)	End sequence: rank stars from the new total (DS:0110); total>=300 -> champion branch (state 63)
+18cf:0343	PlrSt_53_EndRankSparkle	void far PlrSt_53_EndRankSparkle(void)	End sequence: one sparkle (0x98) per rank star at DS:0b5e/0b6a
+18cf:0398	PlrSt_54_EndRankWait	void far PlrSt_54_EndRankWait(void)	End sequence: wait for the sparkle, back to 53
+18cf:03a4	PlrSt_55_EndCrown	void far PlrSt_55_EndCrown(void)	End sequence: crown/creature reaction; all found (tier*3+6) -> 0x97/0x92 else 0x94/0x8a; none -> 0x91
+18cf:0441	PlrSt_56_EndCreature	void far PlrSt_56_EndCreature(void)	End sequence: creature eyes 0x93, or puffs 0x95/0x96 when all found
+18cf:049b	PlrSt_57_EndPlayer	void far PlrSt_57_EndPlayer(void)	End sequence: player anim 0x84
+18cf:04ca	PlrSt_58_EndShowcaseCheck	void far PlrSt_58_EndShowcaseCheck(void)	End sequence: no treasure -> celebrate (0x85, state 61); else chest 0x8d
+18cf:050e	PlrSt_59_EndShowcaseStart	void far PlrSt_59_EndShowcaseStart(void)	End sequence: showcase treasure (DS:9219) leaves the chest (script 0x88 patched)
+18cf:0546	PlrSt_60_EndShowcaseStep	void far PlrSt_60_EndShowcaseStep(void)	End sequence: showcase flight step (DS:0b3c), then celebrate 0x85
+18cf:05b2	PlrSt_61_EndDone	void far PlrSt_61_EndDone(void)	End sequence finished: DS:92d2 = 1 (Cell_P64 continues without a key)
+18cf:05c4	PlrSt_63_ChampSparkle	void far PlrSt_63_ChampSparkle(void)	Champion branch: sparkle 0x99 (slot 9)
+18cf:05eb	PlrSt_64_ChampChest	void far PlrSt_64_ChampChest(void)	Champion branch: sfx loop on, sfx 7, chest 0x9a, cloud 0x9c
+18cf:0625	PlrSt_65_ChampArcs	void far PlrSt_65_ChampArcs(void)	Champion branch: sfx off, arcs 0x9b, crown 0x97, creature 0x92
+18cf:0685	PlrSt_66_ChampScream	void far PlrSt_66_ChampScream(void)	Champion branch: creature 0x9d, sfx 9
+18cf:06be	PlrSt_67_ChampCrownFly	void far PlrSt_67_ChampCrownFly(void)	Champion branch: crown flies (0xa0), creature shrinks (0x9e)
+18cf:06f4	PlrSt_68_ChampCatch	void far PlrSt_68_ChampCatch(void)	Champion branch: player catches the crown (0x9f, 0xa1)
+18cf:0738	PlrSt_69_ChampCrowned	void far PlrSt_69_ChampCrowned(void)	Champion branch: sfx 6, player 0xa2, 5 sparkles follow
+18cf:0773	PlrSt_70_ChampSparkle	void far PlrSt_70_ChampSparkle(void)	Champion branch: sparkle at DS:0b76/0b80; after 5 -> celebrate, state 61
+18cf:07ea	PlrSt_71_ChampSparkleWait	void far PlrSt_71_ChampSparkleWait(void)	Champion branch: wait for the sparkle, back to 70
+18cf:07f6	PlrSt_05_Searching	void far PlrSt_05_Searching(void)	Frozen while the search runs; a direction ends it (timer 1 when the place is still in front)
+18cf:081b	PlrSt_09_AfterTeleport	void far PlrSt_09_AfterTeleport(void)	Frozen until no direction key is held, then state 10
+18cf:082a	PlrSt_03_Spawn	void far PlrSt_03_Spawn(void)	State 3 -> 4 (set at sign-in)
+18cf:0831	PlrSt_04_Arrive	void far PlrSt_04_Arrive(void)	Picks stand / ladder (x snapped to cell middle) / up-passage / fall from the mask
+18cf:08cc	PlrSt_10_OnPath	void far PlrSt_10_OnPath(void)	Main idle state: up (ladder/passage/look up), down, jumps, nets, walks, fall, coin drop or net by facing
+18cf:0b36	Player_NetLeft	void far Player_NetLeft(void)	Net swing left: anim 0x14 (0x15 torn when nets==0), slot 2 x=0, state 21
+18cf:0b6a	Player_NetRight	void far Player_NetRight(void)	Net swing right: anim 0x17 (0x18 torn), slot 2 x=0, state 24
+18cf:0b9e	PlrSt_11_WalkLeft	void far PlrSt_11_WalkLeft(void)	Walking left (anim 4 restarted while Left is held)
+18cf:0ca0	PlrSt_12_WalkRight	void far PlrSt_12_WalkRight(void)	Walking right (anim 5)
+18cf:0da2	PlrSt_13_LookUp	void far PlrSt_13_LookUp(void)	Back pose 0xb; held Up walks up (anim 9); ladder/passage start
+18cf:0e39	PlrSt_14_Front	void far PlrSt_14_Front(void)	Front pose; Down climbs down a ladder or walks down (anim 10) to the path line
+18cf:0ed8	PlrSt_15_ClimbUp	void far PlrSt_15_ClimbUp(void)	Ladder up (anim 0xc while Up held); ladder jump (0x2000, clears g_slowCpu); fall
+18cf:0fa9	PlrSt_16_ClimbDown	void far PlrSt_16_ClimbDown(void)	Ladder down (anim 0xd while Down held); ladder jump; fall
+18cf:107a	PlrSt_17_JumpLeft	void far PlrSt_17_JumpLeft(void)	Flip left (0xe, repeated 0x10 while jump-left held), then landing
+18cf:10df	PlrSt_18_JumpLeftLand	void far PlrSt_18_JumpLeftLand(void)	Landing left (0x12) or flip again
+18cf:1120	PlrSt_19_JumpRight	void far PlrSt_19_JumpRight(void)	Flip right (0xf / 0x11)
+18cf:1185	PlrSt_20_JumpRightLand	void far PlrSt_20_JumpRightLand(void)	Landing right (0x13) or flip again
+18cf:11c6	PlrSt_21_NetLeftSwing	void far PlrSt_21_NetLeftSwing(void)	Net left: wait for the throw anim
+18cf:11d6	PlrSt_22_NetLeftHold	void far PlrSt_22_NetLeftHold(void)	Net left: hold while Space is held, then retract (0x16)
+18cf:11fd	PlrSt_23_NetLeftDone	void far PlrSt_23_NetLeftDone(void)	Net left done: stand left, hide slot 2
+18cf:1224	PlrSt_24_NetRightSwing	void far PlrSt_24_NetRightSwing(void)	Net right: wait for the throw anim
+18cf:1234	PlrSt_25_NetRightHold	void far PlrSt_25_NetRightHold(void)	Net right: hold, then retract (0x19)
+18cf:125b	PlrSt_26_NetRightDone	void far PlrSt_26_NetRightDone(void)	Net right done
+18cf:1282	PlrSt_27_CoinLeftDone	void far PlrSt_27_CoinLeftDone(void)	Coin toss left finished: shop payment (mask 0x200) or Search_Start
+18cf:12bc	PlrSt_28_CoinRightDone	void far PlrSt_28_CoinRightDone(void)	Coin toss right finished
+18cf:12f6	PlrSt_29_PassageUp	void far PlrSt_29_PassageUp(void)	Carried up through a passage (anim 0x1c, sfx 1 every tick) while mask 0x800
+18cf:1367	PlrSt_30_SlideDown	void far PlrSt_30_SlideDown(void)	Sliding down a gap/tunnel (anim 0x1d, sfx 1) while mask 0x800
+18cf:13b9	PlrSt_31_FallLeft	void far PlrSt_31_FallLeft(void)	Falling (anim 0x3f) while mask 0x1000, then flip-land left or ladder
+18cf:140c	PlrSt_32_FallRight	void far PlrSt_32_FallRight(void)	Falling (anim 0x40), then flip-land right or ladder
+18cf:145f	PlrSt_33_LadderJump	void far PlrSt_33_LadderJump(void)	After a ladder jump: climb on or fall right
+18cf:1495	PlrSt_34_Chute	void far PlrSt_34_Chute(void)	After the castle top: falls down the chute (0x5d); hands over the showcase treasure
+18cf:14b1	PlrSt_35_TreasureRoomLand	void far PlrSt_35_TreasureRoomLand(void)	Treasure room arrival: falls until floor, landing anim 0x52, state 1
+18cf:14e0	Search_Start	void far Search_Start(void)	If no search runs: state 10; place in front -> state 5, timer 0x39, cell, closed picture, busy flag
+18cf:1532	Search_CanSearch	int far Search_CanSearch(void)	Picks the cell in front (DS:9276) and tests its picture <= level picture count + 3
+18cf:15f0	Player_Move	void far Player_Move(void)	Cell mask, camera by transition mode, scroll-or-move decision, world wrap, player slot position and depth
+18cf:17c9	Obj_WrapWorldX	void far Obj_WrapWorldX(void)	Wraps g_curObj x across 0x800-wide rows (y -/+ 0x80, field +6 cleared)
+18cf:181a	Player_Update	void far Player_Update(void)	Per tick when uiMode==0 and no transition: mask keys, run state handler, Player_Move
+4306:0022	Anim_Tick	void far Anim_Tick(void)	Advances the scripts of 13 slots (1 when a modal UI is up); ops -2..-7, -10; held at delay 0 while a step is pending
+4306:02c0	Anim_InitSlots	void far Anim_InitSlots(void)	Clears 13 slots and draw records, order table identity, save-heap reset flag
+4306:0393	Sprites_Snapshot	void far Sprites_Snapshot(int from,int to)	Copies slot x,y,depth,frame to draw records (skips stopped animations), flags a change
+4306:0497	Sprites_DrawSorted	void far Sprites_DrawSorted(int from,int to)	Draws records by descending depth, children offset by their owner, saving the background; raises DS:929f
+4306:06dd	Sprites_EraseAll	void far Sprites_EraseAll(int from,int to)	Restores saved backgrounds in reverse draw order
+4306:0784	Anim_SetIfIdle	void far Anim_SetIfIdle(int slot,int anim)	Sets the anim id only if the slot is idle (first frame at the next tick)
+4306:07b9	Anim_Queue	void far Anim_Queue(int slot,int anim)	Stops and sets anim id unless it equals the previous anim
+4306:07fa	Anim_Set	void far Anim_Set(int slot,int anim)	Restarts slot with anim (no-op if already running it)
+4306:0844	Anim_Stop	void far Anim_Stop(int slot)	prev = anim, pos = delay = 0 (anim id kept)
+4306:088e	Anim_Start	void far Anim_Start(int slot,int anim)	Sets anim id and the first frame(s) of the slot group
+4306:092f	Anim_Clear	void far Anim_Clear(int slot)	anim = prev = pos = delay = 0, frame = -1 (hidden)
+4a03:0003	Search_Update	void far Search_Update(void)	Per frame: search blink/open/content sprite schedule over 37 frames; result at timer 1
+4a03:038c	Treasure_PickShowcase	void far Treasure_PickShowcase(void)	Picks the showcase treasure among those found (compares only with collected[0] and the shown one)
+4a03:04a8	PrizeRoom_DrawShelf	void far PrizeRoom_DrawShelf(void)	Draws the 12 collected treasures of the prize room being shown (DS:9201..9204), doubles raised
+4a03:078c	Treasure_AddCollected	void far Treasure_AddCollected(void)	Old showcase to the first free shelf slot, new showcase to the pedestal, duplicates removed (shelf bit)
+176a:0404	Cell_P64_EndScreen	unsigned far Cell_P64_EndScreen(void)	Castle-top end screen: when done or on any command -> chute (0x6a4,0x1f0), state 34
+176a:0485	Cell_P20_CastleGate	unsigned far Cell_P20_CastleGate(void)	Bottom of the chute: clears the saved game, endState 1; <300 treasure room, >=300 clubhouse celebration
+176a:0596	Cell_P70_TreasureRoom	unsigned far Cell_P70_TreasureRoom(void)	Treasure room: showcase display switch (53 cases), carousel, leave, auto-advance to the rank screen
+176a:0f47	TreasureRoom_Leave	void far TreasureRoom_Leave(void)	Back to (0x170,0x70) scene 0, slots reset, Game_AdvanceEnd
+176a:0fa6	Cell_P71_V71_ToRankScreen	unsigned far Cell_P71_V71_ToRankScreen(void)	Clubhouse chest picture: Up at y 0x60 -> rank screen (0x680,0x80) scene 4
+176a:1094	Cell_P72_RankScreen	unsigned far Cell_P72_RankScreen(void)	Rank screen: any click/Enter/Esc/Down -> clubhouse (0xf0,0x70), Game_AdvanceEnd
+176a:1162	ShackPair_08_36_Approach	void far ShackPair_08_36_Approach(char dir)	Treasure-room pair 0x08/0x36: partner/pedestal x step
+176a:11b7	ShackPair_08_36_Swap	void far ShackPair_08_36_Swap(char dir)	Treasure-room pair 0x08/0x36: alternating frames 0x36/0x6a while moving apart
+176a:1220	ShackPair_0e_2c	void far ShackPair_0e_2c(char dir)	Treasure-room pair 0x0e/0x2c approach step
+176a:1275	ShackPair_06_5a	void far ShackPair_06_5a(void)	Treasure-room pair 0x06/0x5a approach step
+176a:129d	ShackPair_1c_22	void far ShackPair_1c_22(char dir)	Treasure-room pair 0x1c/0x22 approach step
+176a:12f2	ShackPair_18_58	void far ShackPair_18_58(char dir)	Treasure-room pair 0x18/0x58 approach step
+176a:1347	ShackFly_1e	void far ShackFly_1e(void)	Treasure 0x1e rises (y offset 0x43 -> 0), becomes 0xcc, comes back
+176a:13d7	ShackFly_50	void far ShackFly_50(void)	Treasure 0x50 rises as 0x84, comes back as 0x86
+176a:1463	ShackTrio_4a_4c_4e	void far ShackTrio_4a_4c_4e(char which)	Treasure-room trio 0x4a/0x4c/0x4e approach step
+176a:1531	Shack_ResetDisplay	void far Shack_ResetDisplay(int anim)	Restores the pedestal state (positions, partners), optionally starts display anim on slot 3
+130f:0edf	RankScreen_Update	void far RankScreen_Update(void)	Rank chest screen: name, total, fill one row per tick group (colour 7->6), star rows, CHAMPION blink (per frame)
+130f:1261	RankScreen_DrawStar	void far RankScreen_DrawStar(int x,int y,int frame)	Draws one sprite with flag 0x40 at x,y
+1000:176c	Gfx_ReplaceColorRect	void far Gfx_ReplaceColorRect(void)	(outside my modules) AX/BX colour words, SI..CX x bytes, DI..DX rows: pixels of colour AX become BX
+1000:18af	Gfx_SetDirtyTracking	void far Gfx_SetDirtyTracking(char on)	(outside my modules) AL -> DS:37ae, bit 0 tested by the fill/blit tails [I: dirty-span recording]
+4d94:0b02	g_playerSlotPtr	far	Far pointer to sprite slot 1 (DS:8fec), the player
+4d94:0b06	g_endFlightPathY	i16[]	End sequence: y of each treasure flight step, -1 terminated (26 steps)
+4d94:0b3c	g_endShowcasePathY	i16[]	End sequence: y of each showcase flight step, -1 terminated (16 steps)
+4d94:0b5e	g_endRankSparkleX	i16[6]	End sequence: x of the rank sparkles
+4d94:0b6a	g_endRankSparkleY	i16[6]	End sequence: y of the rank sparkles
+4d94:0b76	g_endChampSparkleX	i16[5]	Champion branch: x of the sparkles
+4d94:0b80	g_endChampSparkleY	i16[5]	Champion branch: y of the sparkles
+4d94:00f6	g_shackSavedShown	i16	Treasure room: shown treasure stashed during a fly animation (-1 none)
+4d94:00f8	g_shackPartner1	i16	Treasure room: frame code of partner treasure 1 (slot 8), -1 none
+4d94:00fa	g_shackPartner2	i8	Treasure room: frame code of partner treasure 2 (slot 10), 0xff none
+4d94:00fb	g_shackState	u8	Treasure room: bit 7 display started (sfx 2 played), low bits carousel busy
+4d94:00fc	g_shackPartner1X	u16	Treasure room: x (bytes, cell-relative) of partner 1, rest 0x50
+4d94:00fe	g_shackPartner2X	u16	Treasure room: x of partner 2, rest 0x50
+4d94:37ee	g_scrollDX	i16	Camera scroll request x (bytes) set by Player_Move, latched by Frame_Begin
+4d94:37f0	g_scrollDY	i16	Camera scroll request y (rows)
+4d94:8fa5	g_slowCpuSaved	u16	Copy of the slow-CPU flag, restored at the castle top
+4d94:8fa7	g_playerScrX	i16	Player x relative to the camera, bytes (Game_Tick)
+4d94:8fa9	g_playerScrY	i16	Player y relative to the camera, rows (Game_Tick)
+4d94:8faf	g_shackNoCase	u8	Treasure room: shown treasure had no display case
+4d94:9100	g_tick60	u8	Counts 60..1 per tick (0x3c reload), drives g_seconds and the rank fill
+4d94:9128	g_searchPicture	u8	Closed picture of the cell being searched
+4d94:9129	g_prizeRoom	u8	Prize room index for the shelf x formula
+4d94:9145	g_drawRecs	Drec[13]	Draw records, 14 bytes: x, y, depth, frame, owner (bit 15 = drawn), far save pointer
+4d94:9201	g_inPrizeRoom	u8[4]	Prize room n is being shown (latched to DS:8f9f.. per frame)
+4d94:9211	g_shackY	i16	Treasure room: pedestal treasure y offset (rest 0x44)
+4d94:9213	g_shackX	u16	Treasure room: pedestal treasure x offset (rest 0x1a, off-screen 0x50)
+4d94:9219	g_showcasePick	u8	Showcase treasure chosen at the castle top (bit 7 = new pick); 0xff after hand-over
+4d94:923a	g_keysUnmasked	u16	g_keys before the terrain mask was applied this tick
+4d94:924f	g_redrawRequest	u16	Request a full play-field redraw next frame (latched to DS:8fbb)
+4d94:9251	g_shackFlags	u8	Treasure room: 1 carousel move, 0x80 right/fly started, 2 swap done, 0x10 fly phase 2, 0x20 display anim owns slot 3, 0x40 pair/fly running
+4d94:9254	g_shownStash	u8	Shown treasure parked while the player is out of the clubhouse
+4d94:925d	g_rankScreen	u8	Rank screen state: 1 start, 2 filling, 0 off (latched to DS:8fbd)
+4d94:926a	g_playerMask	u16	Terrain mask of the player's cell, applied to g_keys next tick
+4d94:926c	g_busy	u16	Search or end scenes running: blocks hints, end messages, menu commands
+4d94:9282	g_shackStay	u8	Treasure room: do not auto-advance to the rank screen
+4d94:9283	g_drawSlotCount	u16	Slots drawn this frame: 13, or 1 (pointer) while a modal UI is up
+4d94:929f	g_saveHeapHigh	u16	High-water mark of the sprite save heap offset; low byte saved as USERS.DAT header byte 1
+4d94:92a6	g_rankFillRow	u16	Rank screen: rows filled so far
+4d94:92a8	g_rankFillTarget	u16	Rank screen: rows to fill
+4d94:92b0	g_rankTickGroup	u16	Rank screen: last (DS:9100 & 0xfc) seen
+4d94:92d0	g_endCount	i16	End sequence: sparkles still to show
+4d94:92d2	g_endSeqDone	u16	End sequence finished
+4d94:92d4	g_endScanIdx	u16	End sequence: next hiding slot to scan
+4d94:92d6	g_endAllFound	u16	End sequence: all treasures of the game found
+4d94:92d8	g_endPathIdx	u16	End sequence: index into the flight/sparkle tables
+4d94:92da	g_endTreasureCount	u16	End sequence: treasures flown into the chest
+4d94:92dc	g_drawOrder	u16[13]	Draw record indices in drawing order (for the erase)
+4d94:92f6	g_spritesChanged	u16	A draw record changed since the last erase
+4d94:92f8	g_saveHeapReset	u16	Next save-under starts a new save heap

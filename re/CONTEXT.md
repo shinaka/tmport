@@ -88,8 +88,8 @@ Captures go to `extracted\captures\` (`ref\` for curated reference frames).
 `extracted\dos_c\` (the game is in `C:\TM`; never mount `TM-DOS`). `tmctl` writes `C:\RUN.BAT` on
 each start. Host sound is muted (`nosound=true`). Later commands follow the running profile;
 `state save/load` use `extracted\captures\dos\savestates\` and `extracted\dos_c\TM\USERS.DAT`.
-Raw slots 1-9 are shared with the Windows profile. The game drops shifted keys, so type names in
-lower case. EGA shots are 640x400 (2x2 doubled); Tandy/CGA/MCGA shots are 320x200. Reference
+Raw slots 1-9 are shared with the Windows profile. The name box drops a shifted A (other shifted
+letters work), so type names in lower case. Audio can be captured silently: `tmctl.py audio wav|opl|mtavi`. EGA shots are 640x400 (2x2 doubled); Tandy/CGA/MCGA shots are 320x200. Reference
 frames, AVIs, states and USERS.DAT snapshots are in `extracted\captures\dos\`; see
 `re\dos\docs\REFERENCE_CAPTURES.md`.
 
@@ -98,6 +98,10 @@ frames, AVIs, states and USERS.DAT snapshots are in `extracted\captures\dos\`; s
 Scoped as a possible second engine edition; start with `re\dos\docs\SCOPING.md` (decision report,
 engine plan, waves), then `re\dos\docs\ARCHITECTURE.md` (program, rules, differences from Windows)
 and the format specs `fmt_graphics.md`, `fmt_data.md`, `fmt_sound.md` in the same folder.
+Wave 1 logic specs: `code_world.md` (grid, cells, camera, scenes), `code_player.md` (player,
+animation scripts, search, end sequence, treasure room), `code_elves_layout_hints.md`, `code_ui.md`
+(menus, boxes, help, title, sign-in, quiz, HUD, sound triggers), `code_runtime.md` (main loop,
+timer, input, init) and `PORTING_NOTES.md` (runtime model, options, quirks).
 
 - Decoders: `tools\dos\` (`pan.py`, `pak.py`, `dos_font.py`, `dos_gfx_common.py`, `dos_text.py`,
   `puzzles.py`, `users_dos.py`, `dos_sound.py`). They read `TM-DOS\` and unpack SST.EXE's EXEPACK

@@ -47,6 +47,11 @@ Usage (python -P tmctl.py <cmd> ...):
   rec start | rec stop OUT.avi
                              toggle DOSBox-X video recording (AVI + ZMBV, every emulated frame);
                              stop moves the new AVI to OUT.avi. Decode with tools/avi_frames.py.
+  audio wav|opl|mtavi start | audio KIND stop OUT
+                             toggle a DOSBox-X audio capture: wav = mixed output as WAV,
+                             opl = raw OPL register log (.dro), mtavi = multi-track AVI (one
+                             audio track per device). Works with [mixer] nosound=true, so
+                             nothing plays on the host; the AVIs of 'rec' also carry audio.
   menu                       list DOSBox-X menu commands and ids
 
 Profiles (--profile win|dos, default win; the Windows profile behaves exactly as before):
@@ -310,6 +315,41 @@ def record(action, out=None, timeout=30.0):
     raise SystemExit('recording did not appear')
 
 
+AUDIO_KINDS = {  # kind -> (menu needle, file pattern written by DOSBox-X into CAPDIR)
+    'wav': ('Record audio to WAV', '*.wav'),
+    'opl': ('Record FM (OPL) output', '*.dro'),
+    'mtavi': ('Record audio to multi-track AVI', '*.avi'),
+}
+
+
+def audio(kind, action, out=None, timeout=30.0):
+    """Toggle a DOSBox-X audio capture (WAV, raw OPL .dro, multi-track AVI). Works with
+    [mixer] nosound=true (nothing reaches the host speakers; the mixer still renders the
+    capture). On stop, move the newest capture file of that kind to out."""
+    needle, pattern = AUDIO_KINDS[kind]
+    if action == 'start':
+        menu_cmd('/Capture/', needle)
+        print('recording', kind)
+        return
+    menu_cmd('/Capture/', needle)
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        files = glob.glob(os.path.join(CAPDIR, pattern))
+        if files:
+            src = max(files, key=os.path.getmtime)
+            s1 = os.path.getsize(src)
+            time.sleep(0.5)
+            if os.path.getsize(src) == s1 and s1 > 0:
+                if out and os.path.abspath(src) != os.path.abspath(out):
+                    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+                    shutil.move(src, out)
+                    src = out
+                print(src)
+                return
+        time.sleep(0.2)
+    raise SystemExit(f'{kind} capture did not appear')
+
+
 def shot(out, timeout=30.0):
     before = set(glob.glob(os.path.join(CAPDIR, '*.png')))
     menu_cmd('/Capture/', 'Take screenshot')
@@ -519,6 +559,8 @@ def main(argv):
         shot(args[0])
     elif cmd == 'rec':
         record(args[0], args[1] if len(args) > 1 else None)
+    elif cmd == 'audio':
+        audio(args[0], args[1], args[2] if len(args) > 2 else None)
     elif cmd in ('save', 'load'):
         slot = int(args[0])
         menu_cmd('/Select save slot/', f'Slot {slot} ')

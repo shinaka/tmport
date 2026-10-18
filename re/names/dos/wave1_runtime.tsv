@@ -1,0 +1,64 @@
+4d94:0102	g_fullPicPending	u16	Full-screen picture request for Screen_DrawOverlay (1 = draw frame DS:37ca at 0,0 and the menu titles)
+4d94:0618	g_savedVideoMode	u8	Video mode at start (INT 10h AH=0Fh), restored by Video_RestoreMode
+4d94:0619	g_savedLogicalFloppy	u8	Saved BIOS byte 0040:0504
+4d94:061a	g_netAllowed	u8	1 when ssrnet.dat exists
+4d94:061b	g_savedKbdFlags	u8	BIOS keyboard flags 0040:0017 at start (bits 5/6 cleared in the BIOS copy, never restored)
+4d94:0631	g_diskPathPtrs	far[3]	{null, DS:036e, DS:03c9} by disk number (File_OpenByIndex)
+4d94:37ee	g_camStepX	i16	Camera delta of the last Player_Move, x bytes (latched into DS:37f6 by Frame_Begin)
+4d94:37f0	g_camStepY	i16	Camera delta of the last Player_Move, y rows (latched into DS:37f8)
+4d94:37f2	g_frameCamX	u16	Camera x latched by Frame_Begin for this frame
+4d94:37f4	g_frameCamY	u16	Camera y latched by Frame_Begin for this frame
+4d94:37f6	g_frameCamStepX	i16	Latched camera delta x (sign selects the scroll direction; 0 in redraw frames)
+4d94:37f8	g_frameCamStepY	i16	Latched camera delta y
+4d94:3d33	g_biosChainCount	u8	Timer_ISR countdown 12..0: chain the BIOS INT 8 every 13th interrupt
+4d94:3d34	g_gameTickCount	u8	Timer_ISR countdown 4..0: Game_Tick every 5th interrupt
+4d94:8f9f	g_frameTunnelSeen	u8[4]	Frame latch of the tunnel-seen flags DS:9201..9204 (drawn by Hud_Redraw)
+4d94:8fa7	g_playerScrX	i16	Player screen x in bytes, computed at the start of each logic tick
+4d94:8fa9	g_playerScrY	i16	Player screen y in rows, computed at the start of each logic tick
+4d94:8fb2	g_frameTransition	u16	Frame latch of g_transition (dissolve in Frame_Present)
+4d94:8fba	g_playfieldRedrawn	u8	Set by Playfield_Redraw, read and cleared by Treasures_DrawFound
+4d94:8fbd	g_frameRankState	u8	Frame latch of the rank chest state DS:925d
+4d94:8fc8	g_framePartialRedraw	u16	Frame latch of DS:9278: redraw only the searched cell's columns
+4d94:90f4	g_mouseButtons	u16	Mouse buttons (INT 33h AX=3 BX), this tick
+4d94:90f6	g_cmdQueued	i16	One-slot queue of an input command (-1 none)
+4d94:90f8	g_promptFrame	u16	Status-bar prompt selector (frame 60 + v/2; 4 = drop coin, 6 = Enter)
+4d94:90fe	g_tick13	i16	Game_Tick cycle counter 12..0
+4d94:9100	g_secondTicks	u8	Game ticks left in the current hint "second" (60 per second, only counted down to a reset while g_uiMode == 0)
+4d94:911a	g_mouseX	u16	Mouse x 0..159 (byte units)
+4d94:911e	g_mouseY	u16	Mouse y 0..199
+4d94:9122	g_coinsShown	u16	Coin number shown on the HUD (counts up/down one per frame towards g_coins)
+4d94:9124	g_camBlockCol	u16	Camera block column (Frame_Begin)
+4d94:9126	g_camBlockRow16	u16	Camera block row * 16 (Frame_Begin)
+4d94:912a	g_mouse	i16	-1 when a mouse driver answered INT 33h AX=0
+4d94:9143	g_mouseButtonsPrev	u16	Mouse buttons of the previous tick
+4d94:920d	g_camTileColOfs	u16	Camera tile column inside the block * 32 (map byte offset)
+4d94:920f	g_camTileRowOfs	u16	Camera tile row inside the block * 2 (map byte offset)
+4d94:922e	g_hudRedraw	u16	HUD full redraw request (1, or 2 = also redraw the sprites)
+4d94:9238	g_cmdImmediate	u16	Deliver the next input command at once (set by UI code, cleared on delivery)
+4d94:924f	g_fullRedrawReq	u16	Full play-field redraw request (latched into g_fullRedraw)
+4d94:9257	g_jumpFromDiagonal	u16	Jump bit 0x20 came from a diagonal or a mouse jump; the next key event clears it
+4d94:925b	g_hudRedrawReq2	u16	Extra HUD redraw request ORed into DS:922e at Frame_Begin
+4d94:925d	g_rankState	u8	Rank chest screen state: 0 off, 1 start, 2 filling
+4d94:925e	g_mouseXPrev	u16	Mouse x of the previous tick
+4d94:9266	g_mouseYPrev	u16	Mouse y of the previous tick
+4d94:9270	g_drawnBlockCol	u16	Camera block column of the last drawn play-field
+4d94:9272	g_drawnBlockRow16	u16	Camera block row * 16 of the last drawn play-field
+4d94:9278	g_partialRedrawReq	u16	Partial redraw request (searched cell)
+4d94:9283	g_spriteSlotsDrawn	u16	Sprite slots drawn this frame: 13 in play, 1 (pointer only) with a UI mode
+4d94:9285	g_lastBiosKey	u16	Last BIOS key read by Input_Poll (0 none)
+4d94:9297	g_drawnCamX	u16	Camera x of the last drawn play-field
+4d94:9299	g_drawnTileColOfs	u16	Tile column offset of the last drawn play-field
+4d94:929b	g_drawnCamY	u16	Camera y of the last drawn play-field
+4d94:929d	g_drawnTileRowOfs	u16	Tile row offset of the last drawn play-field
+4d94:92a6	g_rankRowsDone	u16	Rank chest rows drawn so far
+4d94:92a8	g_rankRowsWanted	u16	Rank chest rows to draw (fill value of the next rank pair)
+4d94:92ac	g_mousePtrVisible	u16	Mouse pointer shown (hidden after 600 idle ticks)
+4d94:92ae	g_mouseIdleTicks	u16	Ticks without mouse change
+4d94:92b0	g_rankTickPhase	u16	DS:9100 & 0xfc at the last chest row (one row per 4 game ticks)
+4d94:92b2	g_floppyCount	u8	Floppy drives from the equipment word
+4d94:92c1	g_critErr	u16	Critical error flag set by HardErr_Handler
+4d94:92c3	g_critErrCode	u16	Critical error errval
+4d94:92c5	g_critErrAx	u16	Critical error AX (AL = drive)
+4d94:92fa	g_ctrlReleased	u16	Kbd_ISR Ctrl flag (1 after Ctrl release, 0 after press); no reader
+4d94:92fc	g_oldInt9	far	Saved INT 09h vector
+4d94:9136	g_startDrive	u16	Current drive at start (getdisk)
