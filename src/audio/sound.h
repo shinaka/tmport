@@ -33,6 +33,15 @@ struct Sound {
 // header or has a zero sample rate. A sample count larger than the body is clipped.
 std::optional<Sound> soundFromSsnd(std::span<const uint8_t> resource, int id = -1);
 
+// Samples over which the end of a sound is faded out for playback (about 1.5 ms at 22050 Hz).
+inline constexpr size_t kFadeOutSamples = 32;
+// Fades the last kFadeOutSamples (or fewer) samples of 8-bit unsigned PCM linearly to silence
+// (0x80); the final sample becomes exactly 0x80. About a third of the shipped sounds end with one
+// stray byte after their trailing silence (..., 0x80, 0x80, 0xCE) because the SSND sample count
+// takes it in; played as is, that byte is a click at the end of the sound. Playback only: the
+// decoded Sound and WAV exports keep the original bytes (PORTING_NOTES §6.1).
+void fadeOutTail(std::span<uint8_t> pcm);
+
 // RIFF/WAVE file: PCM, 1 channel, 8 bits, the sound's rate. WAV 8-bit data is unsigned like SSND,
 // so the samples are copied unchanged. Byte-identical to Python's wave module as used by
 // tools/assets/ssnd.py (odd data lengths get a zero pad byte that the RIFF size includes).

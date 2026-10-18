@@ -410,6 +410,7 @@ DGROUP's relocation records.
 | Missing-DLL behaviour, uninitialised sound ids, scratch/BNDL 327 leaks, celebration leak | 1018, 1038, 10f0 | drop |
 | Tab-stop and substitution measure quirks in the text engine | 10b0 | keep (unused by shipped text; matters only for mods) |
 | A save after a deleted/short/unreadable `users.dat` drops the other players; a stale `sel` overwrites another player's slot | 1160:0f28, 1158:0040 | **drop** (REVIEW_1 H-1 / M-1; see §4.10) |
+| SSND sample counts take in one stray byte after the trailing silence in ~930 of the 2861 sounds (`..., 0x80, 0x80, 0xCE`): an audible click at the end of the sound | 1088:0014 (plays `count` bytes) | **drop**: playback fades the last 32 samples to 0x80 (`audio::fadeOutTail`, `SdlWaveOutput::start`); decoded sounds and WAV exports keep the original bytes |
 | Unchecked data-driven limits: door/elf moves to room 0xFF, layout re-roll with < 3 records, > 10 question lines | 10e0:0447, 1178, 1100:04b5, 1150:0901 | **drop** (REVIEW_1 M-2 / M-3 / L-1; unreachable with shipped data, reachable with mods) |
 
 ---

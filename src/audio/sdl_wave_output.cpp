@@ -5,6 +5,9 @@
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_timer.h>
 
+#include <algorithm>
+#include <array>
+
 #include "util/log.h"
 
 namespace tmport::audio {
@@ -68,7 +71,16 @@ void SdlWaveOutput::start(const Sound& s) {
         const SDL_AudioSpec src{SDL_AUDIO_U8, 1, static_cast<int>(s.sampleRate)};
         if (SDL_SetAudioStreamFormat(stream_, &src, nullptr)) rate_ = s.sampleRate;
     }
-    if (!s.pcm.empty()) SDL_PutAudioStreamData(stream_, s.pcm.data(), static_cast<int>(s.pcm.size()));
+    if (!s.pcm.empty()) {
+        // The last few samples go through a faded copy (fadeOutTail: no click at the end).
+        const size_t tail = std::min(s.pcm.size(), kFadeOutSamples);
+        const size_t head = s.pcm.size() - tail;
+        if (head) SDL_PutAudioStreamData(stream_, s.pcm.data(), static_cast<int>(head));
+        std::array<uint8_t, kFadeOutSamples> faded{};
+        std::copy_n(s.pcm.data() + head, tail, faded.data());
+        fadeOutTail({faded.data(), tail});
+        SDL_PutAudioStreamData(stream_, faded.data(), static_cast<int>(tail));
+    }
     // Push the resampler tail through as well: the whole block is one "buffer".
     SDL_FlushAudioStream(stream_);
     const uint64_t rate = rate_ ? rate_ : kDefaultRate;

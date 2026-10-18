@@ -136,6 +136,53 @@ TEST_CASE("Audio: all 2861 SSND sounds decode (counts and durations vs fmt_sound
     CHECK(loader.load(8000) == nullptr);
 }
 
+TEST_CASE("Audio: fadeOutTail removes the click at the end of a sound") {
+    // The shipped pattern: trailing silence, then one stray byte.
+    std::vector<uint8_t> spike(100, 0x80);
+    spike.back() = 0xCE;
+    fadeOutTail(spike);
+    CHECK(spike == std::vector<uint8_t>(100, 0x80));
+
+    // A loud ending ramps down monotonically over the last kFadeOutSamples, earlier samples untouched.
+    std::vector<uint8_t> loud(100, 0xFF);
+    fadeOutTail(loud);
+    for (size_t i = 0; i < 100 - kFadeOutSamples; ++i) CHECK(loud[i] == 0xFF);
+    CHECK(loud[100 - kFadeOutSamples] == 0xFB);  // gain 31/32: 0x80 + 127 * 31 / 32
+    for (size_t i = 100 - kFadeOutSamples + 1; i < 100; ++i) CHECK(loud[i] <= loud[i - 1]);
+    CHECK(loud.back() == 0x80);
+    std::vector<uint8_t> quiet(100, 0x00);  // the negative side too
+    fadeOutTail(quiet);
+    CHECK(quiet.back() == 0x80);
+    CHECK(quiet[98] > quiet[97]);
+
+    // Shorter than the fade, and empty.
+    std::vector<uint8_t> shortOne{0x80, 0xC0, 0x40};
+    fadeOutTail(shortOne);
+    CHECK(shortOne == std::vector<uint8_t>{0x80, 0x95, 0x80});
+    std::vector<uint8_t> none;
+    fadeOutTail(none);
+    CHECK(none.empty());
+}
+
+TEST_CASE("Audio: shipped sounds end on silence after the playback fade") {
+    TM_REQUIRE_GAME_DATA();
+    ResourceSoundLoader loader(*g->res);
+    size_t strayEnds = 0, checked = 0;
+    for (const auto& e : kDlls)
+        for (int id : g->res->ids(ResType::SSND, e.dll)) {
+            auto s = loader.load(id);
+            REQUIRE(s != nullptr);
+            REQUIRE(s->pcm.size() >= 2);
+            if (s->pcm[s->pcm.size() - 2] == 0x80 && s->pcm.back() != 0x80 && s->pcm.back() != 0x7F) ++strayEnds;
+            std::vector<uint8_t> pcm = s->pcm;
+            fadeOutTail(pcm);
+            CHECK(pcm.back() == 0x80);
+            ++checked;
+        }
+    CHECK(checked == 2861);
+    CHECK(strayEnds > 900);  // the decoded data itself is unchanged (WAV exports stay exact)
+}
+
 TEST_CASE("Audio: WAV export matches tools/assets/ssnd.py byte for byte") {
     TM_REQUIRE_GAME_DATA();
     ResourceSoundLoader loader(*g->res);

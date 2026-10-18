@@ -1,5 +1,7 @@
 #include "audio/sound.h"
 
+#include <algorithm>
+
 #include "res/resource_manager.h"
 #include "res/ssnd.h"
 #include "util/log.h"
@@ -15,6 +17,16 @@ std::optional<Sound> soundFromSsnd(std::span<const uint8_t> resource, int id) {
     const auto pcm = info->pcm(resource);
     s.pcm.assign(pcm.begin(), pcm.end());
     return s;
+}
+
+void fadeOutTail(std::span<uint8_t> pcm) {
+    const size_t n = std::min(pcm.size(), kFadeOutSamples);
+    uint8_t* tail = pcm.data() + (pcm.size() - n);
+    for (size_t i = 0; i < n; ++i) {
+        const int gain = static_cast<int>(n - 1 - i);  // n-1 .. 0, out of n
+        const int v = (static_cast<int>(tail[i]) - 0x80) * gain / static_cast<int>(n);
+        tail[i] = static_cast<uint8_t>(0x80 + v);
+    }
 }
 
 namespace {
