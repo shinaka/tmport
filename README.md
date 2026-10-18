@@ -342,4 +342,6 @@ licence does not require a notice in binaries). Everything else (the PNG and zli
 MIDI sequencer, the CD-image reader, the NE parser) is the project's own code. The
 reverse-engineering work used Ghidra and Python, which are not part of the engine.
 
-The project's own source code has no licence file yet.
+The project's own code and documentation are released under the [MIT licence](LICENSE). The licence
+covers this project only: it grants no rights to *Treasure Mountain!* itself, whose files you
+need to supply from your own copy.
