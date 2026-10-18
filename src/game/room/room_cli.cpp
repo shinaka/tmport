@@ -11,6 +11,7 @@
 #include <sstream>
 #include <vector>
 
+#include "cli/tool_mods.h"
 #include "game/game_state.h"
 #include "game/game_tables.h"
 #include "game/quiz.h"
@@ -61,6 +62,7 @@ struct Args {
     std::string dataPath;
     bool colour16 = false;
     bool verbose = false;
+    std::vector<std::string> modDirs;  // --mods <dir> (repeatable, cli/tool_mods.h)
 };
 
 struct ScriptEnd {
@@ -268,6 +270,8 @@ std::optional<Args> parseArgs(int argc, char** argv, std::string& error) {
             a.dataPath = next("--data");
         } else if (s == "--16") {
             a.colour16 = true;
+        } else if (s == "--mods") {
+            a.modDirs.push_back(next("--mods"));
         } else if (s == "-v" || s == "--verbose") {
             a.verbose = true;
         } else {
@@ -492,7 +496,7 @@ std::string roomUsage() {
     return "tmport --room-run (--record <users.dat> <slot|name> | --new-player <name>) [--seed n]\n"
            "       [--start room x frame facing] [--coins n] [--nets n] [--key 0|1] [--shop-coins n] [--gems n]\n"
            "       [--no-elves] [--quiz correct|wrong|esc] [--keys \"<script>\"] [--keys-file f]\n"
-           "       [--dump-every N dir] [--out dir] [--log] [--ticks N] [--data path] [--16] [-v]\n"
+           "       [--dump-every N dir] [--out dir] [--log] [--ticks N] [--data path] [--16] [--mods dir]... [-v]\n"
            "  script tokens: wait:MS tick:N shot:NAME end enter esc space c tab up down left right\n"
            "                 hold:KEY:MS kd:KEY ku:KEY click:X,Y press:X,Y release:X,Y move:X,Y\n";
 }
@@ -516,6 +520,7 @@ std::optional<int> runRoomCommand(int argc, char** argv) {
         ro.colorMode = a->colour16 ? gfx::ColorMode::Colour16 : gfx::ColorMode::Colour256;
         ro.requireSounds = false;
         GameFiles files = GameFiles::open(*dataPath, ro);
+        cli::applyToolMods(files, a->modDirs);
         return runRoom(*a, files, ro.colorMode);
     } catch (const MissingFileError& e) {
         std::fprintf(stderr, "tmport: missing game file %s: %s\n", e.file().c_str(), e.what());

@@ -213,7 +213,7 @@ void SignInScreen::saveCurrent() {
 void SignInScreen::loadUsers() {
     const save::Paths* paths = io_.ctx().paths;
     if (paths)
-        save::readUsersFile(paths->usersDat, table_);  // missing / short file: empty roster
+        save::loadRoster(paths->usersDat, table_);  // missing: empty roster; damaged: users.dat.bak (REVIEW_1 H-1)
     else
         table_.clear();
     table_.recount();

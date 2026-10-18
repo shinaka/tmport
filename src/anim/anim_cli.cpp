@@ -17,6 +17,7 @@
 #include "anim/anim_player.h"
 #include "anim/dam_script.h"
 #include "cli/contact_sheet.h"
+#include "cli/tool_mods.h"
 #include "data/exe_tables.h"
 #include "platform/engine.h"
 #include "res/game_files.h"
@@ -68,6 +69,7 @@ struct Args {
     };
     std::vector<Also> also;   // --also: channels started before the main one
     int preTicks = 0;         // --pre: ticks of the --also channels before the main script starts
+    std::vector<std::string> modDirs;  // --mods <dir> (repeatable, cli/tool_mods.h)
 };
 
 bool parseInt(std::string_view s, int& v) {
@@ -192,6 +194,9 @@ std::optional<Args> parse(int argc, char** argv, std::string& error) {
         } else if (s == "--fb-dump") {
             if (!need(i, 1)) return a;
             a.fbDump = argv[++i];
+        } else if (s == "--mods") {
+            if (!need(i, 1)) return a;
+            a.modDirs.emplace_back(argv[++i]);
         } else if (s == "--verbose") {
             log::setVerbose(true);
         } else {
@@ -506,6 +511,7 @@ std::optional<int> runAnimCommand(int argc, char** argv) {
         ro.colorMode = a->colour16 ? gfx::ColorMode::Colour16 : gfx::ColorMode::Colour256;
         ro.requireSounds = false;
         GameFiles files = GameFiles::open(*dataPath, ro);
+        cli::applyToolMods(files, a->modDirs);
         switch (a->cmd) {
             case Cmd::Render: return runRender(*a, files, ro.colorMode);
             case Cmd::Info: return runInfo(*a, files);
@@ -531,7 +537,8 @@ std::string animUsage() {
            "        [--frames-only] [--play-clip] [--stop-at <tick>] [--sheet <first> <last>\n"
            "        [--cols <n>]] [--crop <x> <y> <w> <h>] [--buffer] [--fps <n>] [--fb-dump <png>]\n"
            "  --dam-info <scriptId>      disassemble and simulate one DAM script\n"
-           "  --dam-check                parse every DAM script in TMT.DLL\n";
+           "  --dam-check                parse every DAM script in TMT.DLL\n"
+           "  options of all three: --data <path>, --16, --mods <dir> (repeatable), --verbose\n";
 }
 
 }  // namespace tmport::anim

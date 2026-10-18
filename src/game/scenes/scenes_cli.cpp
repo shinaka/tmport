@@ -22,6 +22,7 @@
 #include "audio/midi_player.h"
 #include "audio/sound.h"
 #include "audio/wave_output.h"
+#include "cli/tool_mods.h"
 #include "data/exe_tables.h"
 #include "game/game_state.h"
 #include "game/game_tables.h"
@@ -72,6 +73,7 @@ struct Args {
     int nets = -1;
     std::string name = "Tester";
     bool verbose = false;
+    std::vector<std::string> modDirs;  // --mods <dir> (repeatable, cli/tool_mods.h)
 };
 
 bool parseInt(const std::string& s, long& v) {
@@ -138,6 +140,7 @@ std::optional<Args> parseArgs(int argc, char** argv, std::string& error) {
         else if (o == "--coins") num(a.coins);
         else if (o == "--nets") num(a.nets);
         else if (o == "--name") a.name = need(k);
+        else if (o == "--mods") a.modDirs.push_back(need(k));
         else if (o == "-v" || o == "--verbose") a.verbose = true;
         else if (!a.hasArg && parseInt(o, v)) {
             a.arg = static_cast<int>(v);
@@ -217,20 +220,58 @@ bool keyFor(const std::string& n, Step& s) {
     return false;
 }
 
+bool isMouseHead(const std::string& head) {
+    return head == "click" || head == "rclick" || head == "press" || head == "release" || head == "move";
+}
+
+// The script's tokens. They are separated by white space or by commas (the game's --keys syntax);
+// the comma between X and Y of a mouse token belongs to the token (click:X,Y; click:X:Y also works).
+std::vector<std::string> scriptTokens(const std::string& text) {
+    auto isNumber = [](const std::string& s) {
+        long v = 0;
+        return parseInt(s, v);
+    };
+    // A mouse token that still lacks its Y ("click:10" of "click:10,20").
+    auto wantsY = [&](const std::string& t) {
+        const size_t c = t.find(':');
+        if (c == std::string::npos || !isMouseHead(t.substr(0, c))) return false;
+        const std::string v = t.substr(c + 1);
+        return v.find_first_of(",:") == std::string::npos && isNumber(v);
+    };
+    std::vector<std::string> toks;
+    std::istringstream in(text);
+    std::string word;
+    while (in >> word) {
+        size_t p = 0;
+        for (;;) {
+            const size_t c = word.find(',', p);
+            const std::string piece = word.substr(p, c == std::string::npos ? std::string::npos : c - p);
+            if (!piece.empty()) {
+                if (!toks.empty() && wantsY(toks.back()) && isNumber(piece))
+                    toks.back() += "," + piece;
+                else
+                    toks.push_back(piece);
+            }
+            if (c == std::string::npos) break;
+            p = c + 1;
+        }
+    }
+    return toks;
+}
+
 std::optional<std::vector<Step>> parseScript(const std::string& text, std::string& error) {
     std::vector<Step> steps;
-    std::istringstream in(text);
-    std::string tok;
     uint64_t t = 0;
     auto xy = [&](const std::string& v, Step& s) {
-        const size_t c = v.find(',');
+        size_t c = v.find(',');
+        if (c == std::string::npos) c = v.find(':');
         long x = 0, y = 0;
         if (c == std::string::npos || !parseInt(v.substr(0, c), x) || !parseInt(v.substr(c + 1), y)) return false;
         s.x = static_cast<int>(x);
         s.y = static_cast<int>(y);
         return true;
     };
-    while (in >> tok) {
+    for (const std::string& tok : scriptTokens(text)) {
         Step s;
         s.at = t;
         const size_t colon = tok.find(':');
@@ -249,8 +290,7 @@ std::optional<std::vector<Step>> parseScript(const std::string& text, std::strin
         } else if (head == "code" && parseInt(val, v)) {
             s.kind = Step::Kind::Code;
             s.code = static_cast<uint16_t>(v);
-        } else if ((head == "click" || head == "rclick" || head == "press" || head == "release" || head == "move") &&
-                   xy(val, s)) {
+        } else if (isMouseHead(head) && xy(val, s)) {
             s.kind = Step::Kind::Mouse;
             s.button = head == "move" ? 0 : head == "rclick" ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
             s.phase = head == "press" ? 1 : head == "release" ? 2 : 3;
@@ -618,12 +658,13 @@ std::optional<int> runScenesCommand(int argc, char** argv) {
     r.args = *a;
     auto steps = parseScript(a->keys, error);
     if (!steps) {
-        std::fprintf(stderr, "tmport: %s\n", error.c_str());
+        std::fprintf(stderr, "tmport: %s in --keys\n\n%s", error.c_str(), scenesUsage().c_str());
         return 2;
     }
     r.steps = std::move(*steps);
     try {
         r.files = GameFiles::open(*dataPath);
+        cli::applyToolMods(r.files, a->modDirs);
         r.outDir = pathFromUtf8(a->out);
         std::filesystem::create_directories(r.outDir);
         setupRig(r);
@@ -655,11 +696,21 @@ std::optional<int> runScenesCommand(int argc, char** argv) {
 }
 
 std::string scenesUsage() {
-    return "Scene tools (area scenes):\n"
+    return "Scene tools (headless, scripted input on a simulated clock, silent timed audio):\n"
            "  --scene quiz <q> | hint <n> | cutscene <level> | celebrate <climbs> | rank <total> |\n"
-           "          seerank <total> | castle   [--keys <script>] [--out <dir>] [--shot-every <ms>]\n"
-           "          [--seed n] [--tier t] [--voice 0|1] [--sound 0|1] [--no-audio] [--trace]\n"
-           "          [--slot n --perm 012 --tried 000 --clues n] [--room n] [--total n --points n]\n";
+           "          seerank <total> | castle   [--keys <script>] [--keys-file <f>] [--out <dir>]\n"
+           "          [--shot-every <ms>] [--max-ms <n>] [--seed n] [--tier t] [--voice 0|1] [--sound 0|1]\n"
+           "          [--no-audio] [--trace] [--slot n --perm 012 --tried 000 --clues n] [--room n]\n"
+           "          [--total n --points n] [--coins n] [--nets n] [--name <player>] [--data <path>]\n"
+           "          [--mods <dir>]... [-v]\n"
+           "        script tokens, separated by spaces or commas (times from the start of the scene):\n"
+           "          wait:MS shot:NAME end; enter esc space tab ctrl+s y n c up down left right (a press\n"
+           "          and release in the same instant); hold:KEY:MS (an arrow held for MS ms: walking and\n"
+           "          climbing need it, the 100 ms tick does not see a press); down:KEY up:KEY;\n"
+           "          code:0xNNNN; click:X,Y rclick:X,Y press:X,Y release:X,Y move:X,Y (game coordinates)\n"
+           "        The run ends at `end`, when the scene returns or after --max-ms of simulated time\n"
+           "        (default 600000); it writes <out>/final.png (default out: extracted/scratch/scenes/out\n"
+           "        under the current directory) and, with --shot-every, <out>/NNNN.png.\n";
 }
 
 }  // namespace tmport::game::scenes

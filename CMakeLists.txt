@@ -81,6 +81,7 @@ add_library(tmcore STATIC
     src/cli/contact_sheet.cpp
     src/cli/test_scene.cpp
     src/cli/commands.cpp
+    src/cli/tool_mods.cpp
 )
 # Per-area source lists (each owns one file: target_sources(tmcore PRIVATE ...)).
 include(cmake/sources_text_ui.cmake)
@@ -93,6 +94,7 @@ include(cmake/sources_app.cmake)
 include(cmake/sources_scenes.cmake)
 include(cmake/sources_mods.cmake)
 include(cmake/sources_room.cmake)
+include(cmake/sources_autoplay.cmake)
 target_include_directories(tmcore PUBLIC src)
 target_link_libraries(tmcore PUBLIC SDL3::SDL3-static)
 tm_configure_target(tmcore)
@@ -125,6 +127,7 @@ if(TM_BUILD_TESTS)
         tests/test_resources.cpp
         tests/test_pmap.cpp
         tests/test_exe_tables.cpp
+        tests/test_cli.cpp
     )
     # Per-area test lists (each owns one file: target_sources(tmtests PRIVATE ...)).
     include(cmake/tests_text_ui.cmake)
@@ -137,6 +140,7 @@ if(TM_BUILD_TESTS)
     include(cmake/tests_scenes.cmake)
     include(cmake/tests_mods.cmake)
     include(cmake/tests_room.cmake)
+    include(cmake/tests_autoplay.cmake)
     target_include_directories(tmtests PRIVATE tests)
     target_link_libraries(tmtests PRIVATE tmcore doctest::doctest)
     # Include the standard headers instead of forward-declaring std types (MSVC C5285).

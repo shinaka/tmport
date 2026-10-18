@@ -97,7 +97,8 @@ std::string IniFile::text() const {
 
 bool IniFile::save(const std::filesystem::path& path) const {
     const std::string t = text();
-    return writeWholeFile(path, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(t.data()), t.size()));
+    // Atomic, keeping the replaced file as tmport.ini.bak (REVIEW_1 H-1).
+    return replaceFileKeepingBackup(path, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(t.data()), t.size()));
 }
 
 std::optional<std::string> IniFile::get(std::string_view section, std::string_view key) const {
@@ -275,7 +276,7 @@ ImportResult importOriginalUsersDat(EngineSettings& settings, const std::filesys
         log::warn("users.dat import: cannot read {}", pathToUtf8(source));
         return ImportResult::Failed;
     }
-    if (!writeWholeFile(dest, *data)) {
+    if (!writeFileAtomically(dest, *data)) {
         log::warn("users.dat import: cannot write {}", pathToUtf8(dest));
         return ImportResult::Failed;
     }

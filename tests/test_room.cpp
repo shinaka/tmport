@@ -821,3 +821,78 @@ TEST_CASE("room: visitRoom through the gate: level change, elves respawned on le
     for (int i = 0; i < 6; ++i) CHECK(gameTables().rooms[size_t(r.loop->elves().elves()[size_t(i)].room)].level == 1);
     CHECK(r.state.player.x == gameTables().rooms[23].startX);
 }
+
+// ------------------------------------------------------------------ REVIEW_1 M-2 regressions
+
+TEST_CASE("room (REVIEW_1 M-2): a door to room 255 (a mod's \"no door\") does nothing") {
+    TM_REQUIRE_GAME_DATA();
+    // The mod {"rooms": {"9": {"exitDoor": 255}}} (accepted by the table validator) with room 9's
+    // doorX 270 and typeDoor 1 left as shipped; the player presses Up in front of the old door.
+    Rig r(9, 233, false, kFrontFrame);
+    r.s.rooms[9].exitDoor = 0xFF;
+    REQUIRE(r.s.rooms[9].typeDoor == 1);
+    REQUIRE(r.s.player.x < r.s.rooms[9].doorX);
+    REQUIRE(r.s.rooms[9].doorX < r.s.player.x + r.s.player.w);
+    r.in.up = true;
+    for (int i = 0; i < 5; ++i) {
+        r.tick();
+        CHECK(r.p.doorStep == 0);  // before the fix: doorStep 1, 2, then nextRoom 255
+        CHECK(r.p.nextRoom == 9);
+    }
+    CHECK(r.s.player.room == 9);
+}
+
+TEST_CASE("elves (REVIEW_1 M-2): a fleeing elf in a room with two walls stays in the room") {
+    TM_REQUIRE_GAME_DATA();
+    ElfRig r;
+    const int room = 12;
+    r.s.rooms[room].exitLeft = 0xFF;  // a modded room whose exits are both walls
+    r.s.rooms[room].exitRight = 0xFF;
+    r.s.player.room = uint8_t(room);
+    r.elves.loadSets(nullptr);
+    r.elves.setCount(1);
+    Elf& e = r.elves.elves()[0];
+    e = Elf{0, 0, 1, 200, 181, 0, int16_t(room), 0, 0};
+    r.p.gateWalkStarted = 1;  // the gate walk makes the elves in the player's room flee
+    r.tick();
+    REQUIRE(e.set == kElfSetFlee);
+    REQUIRE(roomTables().elfScripts[size_t(e.behaviour)].frames.back() == -2);
+    r.p.gateWalkStarted = 0;
+    r.s.player.room = 9;
+    bool fled = false;
+    for (int k = 0; k < 400 && !fled; ++k) {
+        r.tick();
+        REQUIRE(RoomTable::valid(e.room));  // before the fix: room 255 at the end of the script
+        fled = e.set != kElfSetFlee;
+    }
+    CHECK(fled);
+    CHECK(e.room == room);
+}
+
+TEST_CASE("room (REVIEW_1 M-2): Room_Run never commits a room that does not exist") {
+    TM_REQUIRE_GAME_DATA();
+    struct Stop {};
+    LoopRig r;
+    initNewPlayer(r.state);
+    r.engine->rng().srand(0x6f38);
+    int maxX = -1000;
+    uint64_t lastTick = 0;
+    RoomHooks h;
+    h.afterTick = [&](uint64_t t) {
+        lastTick = t;
+        maxX = std::max<int>(maxX, r.state.player.x);
+        if (t >= 150) throw Stop{};
+    };
+    r.loop = std::make_unique<RoomLoop>(*r.ctx, r.state, gameTables(), r.engine->rng(), h);
+    r.loop->loadCommon();
+    setupClimb(r.state, gameTables(), r.engine->rng(), r.loop->gameHooks());
+    REQUIRE(r.state.player.room == 9);
+    r.state.rooms[9].exitRight = 200;  // not a room (no validated table can say this; data damage)
+    r.state.rooms[9].typeRight = 0;
+    r.loop->startClimb();
+    r.engine->input().post(WinMsg::keyDown(0x27));  // hold Right: walk out of the right edge
+    CHECK_THROWS_AS(r.loop->run(), Stop);
+    CHECK(lastTick >= 150);
+    CHECK(maxX > kExitRightX);           // the exit was reached (nextRoom = 200) ...
+    CHECK(r.state.player.room == 9);     // ... but never committed
+}

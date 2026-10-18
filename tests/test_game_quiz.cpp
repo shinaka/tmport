@@ -365,3 +365,54 @@ TEST_CASE("quiz: question-screen focus order (1150:0f85 / 0fcb)") {
     CHECK(quizPrevItem(11, slot, true, 4) == 10);
     CHECK(quizPrevItem(10, slot, true, 4) == 2);
 }
+
+TEST_CASE("quiz (REVIEW_1 L-1): a question with more than 10 lines is clamped to the 10 line slots") {
+    // The reviewer's harness H4: 12 non-blank lines, then the terminator and three answers.
+    std::vector<uint8_t> q;
+    for (int i = 0; i < 12; ++i) {
+        q.push_back(uint8_t('A' + i));
+        q.push_back(0x0D);
+    }
+    q.insert(q.end(), {0x0D, 0x0D, 'x', 0x0D, 'y', 0x0D, 'z', 0});
+    auto pq = parseQuestion(q);
+    REQUIRE(pq.has_value());
+    CHECK(pq->lineSlots == 14);
+    CHECK(pq->numLines == kMaxQuestionLines);  // was 12: past lineSlotOf / g_quizLineY (10 entries)
+    for (int k = 0; k < pq->numLines; ++k) {
+        CHECK(pq->lineSlotOf[size_t(k)] == k);
+        CHECK(pq->lineY(k, 17) == k * 17);
+    }
+    // Hot-spot ids 0xA70 + k stay below the play-area id 0xA7F and the answers (0xA80..).
+    CHECK(0xA70 + pq->numLines - 1 < 0xA7F);
+    CHECK(pq->question().size() == 25);  // the whole text (12 lines + the empty one) is still drawn
+    CHECK(pq->answer(0) == "x");
+    CHECK(pq->answer(2) == "z");
+
+    // Blank lines push the 9th text line to slot 10, which has no y: 8 lines remain usable.
+    std::vector<uint8_t> b;
+    for (int i = 0; i < 9; ++i) {
+        b.push_back(uint8_t('a' + i));
+        b.push_back(0x0D);
+        if (i == 2 || i == 5) b.push_back(0x0D);  // an empty line after lines 3 and 6
+    }
+    b.insert(b.end(), {0x0D, 0x0D, 'x', 0x0D, 'y', 0x0D, 'z', 0});
+    auto pb = parseQuestion(b);
+    REQUIRE(pb.has_value());
+    CHECK(pb->blankCount == 3);
+    CHECK(pb->numLines == 8);
+    for (int k = 0; k < pb->numLines; ++k) {
+        CHECK(pb->lineSlotOf[size_t(k)] >= 0);
+        CHECK(pb->lineSlotOf[size_t(k)] < kMaxQuestionLines);
+    }
+    // Exactly 10 lines are kept as they are.
+    std::vector<uint8_t> t;
+    for (int i = 0; i < 10; ++i) {
+        t.push_back(uint8_t('a' + i));
+        t.push_back(0x0D);
+    }
+    t.insert(t.end(), {0x0D, 0x0D, 'x', 0x0D, 'y', 0x0D, 'z', 0});
+    auto pt = parseQuestion(t);
+    REQUIRE(pt.has_value());
+    CHECK(pt->numLines == 10);
+    CHECK(pt->lineSlots == pt->numLines + pt->blankCount + 1);
+}

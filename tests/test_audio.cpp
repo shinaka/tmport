@@ -4,6 +4,7 @@
 
 #include <doctest/doctest.h>
 
+#include <SDL3/SDL_audio.h>
 #include <SDL3/SDL_timer.h>
 
 #include <array>
@@ -508,4 +509,49 @@ TEST_CASE("Audio: AudioSystem::create on the user's files (dummy SDL driver, nul
     CHECK(a->midiPlayer().playing());
     a->music().stopScene();
     CHECK_FALSE(a->midi().isPlaying());
+}
+
+TEST_CASE("Audio (REVIEW_1 L-3): the jingle wait ends when the device stops playing (dummy driver, paused)") {
+    // The reviewer's scenario: the playback device goes away while the praise jingle plays, so the
+    // stream is no longer drained. Pausing the (silent, dummy) device has the same effect.
+    auto out = std::make_unique<SdlWaveOutput>("dummy");
+    if (!out->open()) {
+        MESSAGE("SDL dummy audio driver unavailable: test skipped");
+        return;
+    }
+    SdlWaveOutput* wave = out.get();
+    AudioParts p;
+    p.wave = std::move(out);
+    auto sounds = std::make_unique<MapSoundLoader>();
+    sounds->lengthsMs[7012] = 200;  // Sfx 12, the praise jingle
+    p.sounds = std::move(sounds);
+    p.tracks = std::make_unique<MapTrackLoader>();
+    AudioSystem a(makeTables(), std::move(p));
+
+    struct Timeout {};
+    struct SleepingPort final : InputPort {
+        uint64_t start = SDL_GetTicks();
+        uint16_t peekCode() override { return 0; }
+        uint16_t getCode() override { return 0; }
+        void idle() override {
+            if (SDL_GetTicks() - start > 10000) throw Timeout{};  // the old endless wait
+            SDL_Delay(2);
+        }
+    } port;
+    a.sfxPlay(12);
+    REQUIRE(a.voice().isPlaying());
+    REQUIRE(SDL_PauseAudioDevice(wave->deviceId()));
+    const uint64_t t0 = SDL_GetTicks();
+    CHECK_NOTHROW(a.waitWhilePlaying(port));  // 1150:0602: the wait before the praise speech
+    const uint64_t dt = SDL_GetTicks() - t0;
+    CHECK(dt >= SdlWaveOutput::kDoneMarginMs);  // ended by the deadline, not by playing out
+    CHECK(dt < 200 + SdlWaveOutput::kDoneMarginMs + 2000);
+    CHECK_FALSE(a.voice().isPlaying());
+    // The device works again: the next sound plays out normally.
+    REQUIRE(SDL_ResumeAudioDevice(wave->deviceId()));
+    a.sfxPlay(12);
+    const uint64_t t1 = SDL_GetTicks();
+    port.start = t1;
+    a.waitWhilePlaying(port);
+    CHECK(SDL_GetTicks() - t1 < SdlWaveOutput::kDoneMarginMs);
 }

@@ -1,6 +1,7 @@
 // App area: engine pump hooks and modal hold, the audio/dialog/menu glue, the menu command
 // handlers (1140/1180), the restart point, the game command line, scripted input and the
-// bootstrap (error paths without a window, and one scripted headless run of the demo flow).
+// bootstrap (error paths without a window, and one scripted headless run of the whole game:
+// app::runGame with its default entry, game::gameMain).
 // Headless only: no window, no audible audio (fake / null devices).
 #include <doctest/doctest.h>
 
@@ -13,7 +14,6 @@
 
 #include "app/app_context.h"
 #include "app/bootstrap.h"
-#include "app/demo_flow.h"
 #include "app/engine_glue.h"
 #include "app/game_main.h"
 #include "app/launch_options.h"
@@ -24,6 +24,8 @@
 #include "game/game_state.h"
 #include "game/game_tables.h"
 #include "platform/engine.h"
+#include "save/user_record.h"
+#include "save/users_file.h"
 #include "test_data.h"
 #include "text/font.h"
 #include "text/text_renderer.h"
@@ -474,17 +476,18 @@ TEST_CASE("bootstrap: data path precedence") {
     }
 }
 
-TEST_CASE("bootstrap: scripted headless run of the demo flow with the menu open") {
+TEST_CASE("bootstrap: scripted headless run of the game with the menu open") {
     TM_REQUIRE_GAME_DATA();
     const bool videoBefore = SDL_WasInit(SDL_INIT_VIDEO) != 0;
     const bool audioBefore = SDL_WasInit(SDL_INIT_AUDIO) != 0;
     auto dir = scratchDir("boot_run");
-    const auto shot = dir / "demo_menu_options.png";
-    const auto shot2 = dir / "demo_after_menu.png";
-    const auto dump = dir / "demo_end.png";
+    const auto shot = dir / "game_menu_options.png";
+    const auto shot2 = dir / "game_after_menu.png";
+    const auto dump = dir / "game_end.png";
     std::error_code ec;
     for (const auto& f : {shot, shot2, dump}) std::filesystem::remove(f, ec);  // no stale files
     const auto pref = prefDirFor("boot_run_pref");
+    std::filesystem::remove(pref / "users.dat", ec);  // an empty roster (TM_APP_SHOTS keeps the folder)
     app::LaunchOptions o;
     o.headless = true;
     o.dataPath = *testdata::dataPath();
@@ -493,15 +496,18 @@ TEST_CASE("bootstrap: scripted headless run of the demo flow with the menu open"
     // over the preference directory's (save::Paths::under) and could change the flow.
     o.configPath = pathToUtf8(pref / "tmport.ini");
     // Title: Space ends the pages, Space ends the closing animation; Club Sign-In (empty roster):
-    // typing starts a new player "Test"; climb stand-in: open Options, select Voice, shot, close
-    // (Esc closes the drop-down, Esc leaves the bar); Help > About via the keyboard, close it, shot.
-    // The waits are generous so that a loaded machine still reaches each screen before its keys.
-    o.keys = "space,wait:800,space,wait:2000,t,e,s,t,enter,wait:1500,alt+o,down,down,shot:" + pathToUtf8(shot) +
-             ",esc,esc,alt+h,up,enter,wait:300,enter,wait:300,shot:" + pathToUtf8(shot2);
+    // typing starts a new player "Test"; climb set-up in room 9, where the first two New Player
+    // Messages (hints 0 and 2) wait for Enter while the menu bar is greyed; then open Options,
+    // select Voice, shot, close (Esc closes the drop-down, Esc leaves the bar); Help > About via
+    // the keyboard, close it, shot. The end of the script ends the headless run (QuitGame), and
+    // GameMain's shutdown saves the player. The waits are generous so that a loaded machine
+    // still reaches each screen before its keys.
+    o.keys = "space,wait:800,space,wait:2000,t,e,s,t,enter,wait:1500,enter,wait:800,enter,wait:800,alt+o,down,down,shot:" +
+             pathToUtf8(shot) + ",esc,esc,alt+h,up,enter,wait:300,enter,wait:300,shot:" + pathToUtf8(shot2);
     o.frameDump = pathToUtf8(dump);
     std::vector<std::string> errors;
     apptest::LogCapture logs;
-    const int rc = app::runGame(o, app::demoGameMain, [&](const app::StartupError& e) { errors.push_back(e.what()); });
+    const int rc = app::runGame(o, {}, [&](const app::StartupError& e) { errors.push_back(e.what()); });
     CHECK(rc == 0);
     CHECK(errors.empty());
     for (const auto& e : errors) MESSAGE(e);
@@ -516,6 +522,16 @@ TEST_CASE("bootstrap: scripted headless run of the demo flow with the menu open"
     CHECK(std::filesystem::exists(dump));
     if (!wrote1 || !wrote2 || !std::filesystem::exists(shot2))
         for (const std::string& l : logs.lines()) MESSAGE("log: " << l);
+    // The real game ran: the sign-in created "Test", the climb set-up put the player in room 9
+    // (a player who never reached a climb keeps location 0xFE) and the shutdown saved it.
+    save::UsersTable users;
+    REQUIRE(save::readUsersFile(pref / "users.dat", users));
+    const int slot = users.findByName("Test");
+    REQUIRE(slot >= 0);
+    REQUIRE(slot < users.count);
+    const save::PlayerRecord rec = save::PlayerRecord::fromSlot(users.slots[static_cast<size_t>(slot)]);
+    CHECK(rec.location == 9);
+    CHECK(rec.coins == 10);
     if (!videoBefore) CHECK(SDL_WasInit(SDL_INIT_VIDEO) == 0);
     if (!audioBefore) CHECK(SDL_WasInit(SDL_INIT_AUDIO) == 0);
 }

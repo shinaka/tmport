@@ -14,7 +14,8 @@
 //  * FirstEventPerDrain: exactly the original: a drain dispatches every queued message but keeps
 //    only the first event; later events of the same drain are lost (their side effects stay).
 //    REFERENCE_CAPTURES.md §4.5 observed this for keys < ~5 ms apart.
-//  * Lossless (engine default): every event is kept in order and returned by later fetches.
+//  * Lossless (engine default): every event is kept in order and returned by later fetches; an
+//    arrow key repeat is merged into an identical copy still at the end of the queue.
 //
 // This header keeps the milestone-1 names (push/pop/flush/empty and the public held flags).
 

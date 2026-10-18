@@ -1,5 +1,6 @@
 #include "audio/midi_player.h"
 
+#include <SDL3/SDL_thread.h>
 #include <SDL3/SDL_timer.h>
 
 #include <algorithm>
@@ -100,6 +101,9 @@ void MidiPlayer::run() {
         }
         if (sleepUs) SDL_DelayNS(sleepUs * 1000u);
     }
+    // std::thread is not an SDL thread: free SDL's per-thread data (the waitable timer behind
+    // SDL_DelayNS on Windows) ourselves, or each player leaks a handle (AUTOPLAY_FINDINGS A-2).
+    SDL_CleanupTLS();
 }
 
 }  // namespace tmport::audio

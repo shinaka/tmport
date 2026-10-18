@@ -54,8 +54,10 @@ std::string modsUsage() {
            "  --check-mods [<dir> ...]         convert and check every file of the given mod folders\n"
            "                                   (default: the folders configured in tmport.ini [mods])\n"
            "      --compare                    also compare every override with the game's own data\n"
-           "  --mods <dir>                     (with --headless-frame, --dump-pmap, --dump-sheet, --view and\n"
-           "                                   the game) also load this mod folder; may be repeated\n";
+           "  --mods <dir>                     also load this mod folder; may be repeated (later ones win).\n"
+           "                                   Works with the game and every tool that reads the game\n"
+           "                                   files except --info, --export-mod-kit and the audio\n"
+           "                                   tools; with --check-mods it names a folder to check\n";
 }
 
 std::optional<int> runModsCommand(int argc, char** argv) {

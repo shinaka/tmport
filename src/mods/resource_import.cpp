@@ -142,6 +142,8 @@ ImportResult importOthr(ModFileKind kind, int id, std::span<const uint8_t> bytes
         const int count = static_cast<int16_t>(r.body[0] | (r.body[1] << 8));
         if (count <= 0 || static_cast<size_t>(count) * 38 + 2 > r.body.size())
             throw FormatError(std::format("OTHR {}: the layout table declares {} records of 38 bytes that do not fit", id, count));
+        if (count < 3)  // a climb draws three different records (REVIEW_1 M-3)
+            throw FormatError(std::format("OTHR {}: the layout table has {} records; a climb needs at least 3", id, count));
     }
     return r;
 }

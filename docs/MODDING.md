@@ -42,7 +42,7 @@ Command line:
 
 | Option | Effect |
 |---|---|
-| `--mods <dir>` | adds a mod folder after the configured ones (highest precedence); may be repeated. Works for the game and for `--headless-frame`, `--dump-pmap`, `--dump-sheet`, `--view` |
+| `--mods <dir>` | adds a mod folder after the configured ones (highest precedence); may be repeated. Works for the game and for every tool that reads the game files (`--scene`, `--screen`, `--room-run`, the `--render-*` and `--dump-*` tools, ...), except `--info`, `--export-mod-kit` and the MIDI/sound tools. The tools load only the folders named with `--mods`, not `tmport.ini`'s |
 | `--no-mods` | the game loads no mods |
 
 ## Folder layout
@@ -334,6 +334,8 @@ kit installed as a mod compares identical everywhere).
 
 `--headless-frame <out.png> --mods <dir>` composes a test scene with the mod's pictures without
 opening a window; `--dump-pmap <id> <out.png> --mods <dir>` shows one converted picture.
+`--scene`, `--screen` and `--room-run` take `--mods` too, so a modded scene or room can be rendered
+to PNG frames without playing (see `docs/BUILDING.md`, "Command-line tools").
 
 ## How it works
 

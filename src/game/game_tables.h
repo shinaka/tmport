@@ -114,6 +114,12 @@ struct GameTables {
 
 // OTHR 10550+tier: u16 count, then count x 38-byte records. Records beyond the data are dropped.
 std::vector<LayoutRecord> parseLayoutTable(std::span<const uint8_t> data);
+// A climb draws three different records (one per mountain level, 1100:04b5); with fewer it would
+// re-roll forever (REVIEW_1 M-3).
+inline constexpr int kMinLayoutRecords = 3;
+// parseLayoutTable of OTHR `id`; throws FormatError naming the resource when it holds fewer than
+// kMinLayoutRecords records.
+std::vector<LayoutRecord> loadLayoutTable(int id, std::span<const uint8_t> data);
 // OTHR 10555: up to 128 x {count, size, shape, noun} (the NE padding gives zero entries).
 std::vector<ObjectAttributes> parseObjectTable(std::span<const uint8_t> data);
 

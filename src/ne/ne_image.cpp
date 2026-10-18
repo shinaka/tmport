@@ -11,6 +11,10 @@ namespace tmport::ne {
 
 namespace {
 
+// Alignment shift counts come from the file. Real files use 4..9; anything above 15 would shift a
+// 16-bit field past 32 bits (UB) or point gigabytes into the file (REVIEW_1 L-2).
+constexpr uint16_t kMaxAlignShift = 15;
+
 std::string pascalString(const ByteReader& r, size_t off) {
     const uint8_t n = r.u8(off);
     auto b = r.bytes(off + 1, n);
@@ -54,6 +58,8 @@ NeImage NeImage::open(std::shared_ptr<vfs::File> file, std::string name) {
     const uint16_t impNames = r.u16(0x2A);
     img.alignShift_ = r.u16(0x32);
     if (img.alignShift_ == 0) img.alignShift_ = 9;
+    if (img.alignShift_ > kMaxAlignShift)
+        throw FormatError(std::format("{}: invalid NE segment alignment shift {}", img.name_, img.alignShift_));
     img.targetOs_ = r.u8(0x36);
 
     // Segment table.
@@ -89,6 +95,12 @@ NeImage NeImage::open(std::shared_ptr<vfs::File> file, std::string name) {
     if (rsrcTab != 0 && rsrcTab != resNames) {
         ByteReader rr(std::span<const uint8_t>(hdr).subspan(rsrcTab), img.name_ + " (resource table)");
         img.rsrcShift_ = rr.u16(0);
+        if (img.rsrcShift_ > kMaxAlignShift)
+            throw FormatError(std::format("{}: invalid NE resource alignment shift {}", img.name_, img.rsrcShift_));
+        // A resource may end at most one alignment unit past the end of the file (the last one can
+        // lack its padding); readResource() allocates the declared length, so nothing longer is
+        // accepted (REVIEW_1 L-2: up to 0xFFFF << 15 bytes could otherwise be zero-filled).
+        const uint64_t resourceLimit = fsize + (uint64_t{1} << img.rsrcShift_);
         size_t p = 2;
         for (;;) {
             const uint16_t typeId = rr.u16(p);
@@ -111,6 +123,11 @@ NeImage NeImage::open(std::shared_ptr<vfs::File> file, std::string name) {
                     res.name = pascalString(rr, id);
                 res.fileOffset = static_cast<uint32_t>(off) << img.rsrcShift_;
                 res.length = static_cast<uint32_t>(len) << img.rsrcShift_;
+                if (static_cast<uint64_t>(res.fileOffset) + res.length > resourceLimit)
+                    throw FormatError(std::format("{}: resource {} of type {} ({} bytes at {:#x}) extends past the end of "
+                                                  "the file ({} bytes)",
+                                                  img.name_, id & 0x7FFF, typeId & 0x7FFF, res.length, res.fileOffset,
+                                                  fsize));
                 if (res.integerType() && res.integerId())
                     img.resourceIndex_.emplace(std::make_pair(res.typeId, res.id), img.resources_.size());
                 img.resources_.push_back(std::move(res));

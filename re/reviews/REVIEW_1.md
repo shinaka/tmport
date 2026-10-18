@@ -40,6 +40,15 @@ No window was opened, no audio was played (headless runs and `--no-audio`), DOSB
 
 No critical finding (no crash, UB or hang reachable with the shipped game files was found).
 
+**Resolution (2026-10-18, fixes area):** all seven findings are fixed, each with a regression test that
+reproduces the scenario above; see the **Resolution** line of each finding. The users.dat format
+(11 085 bytes, same bytes) and the save order are unchanged. Still open: the single-instance guard
+suggested under M-1 (app/platform area). Verification: `build_fixes` Release build with 0 warnings;
+`tmtests` 314/314 test cases pass with `TM_DATA` (and 314/314 without it) on the tree of 2026-10-18 04:35;
+the suite under AddressSanitizer (`build_fixes_asan`, 312 cases at the time) passes with no ASan
+report; the reviewer's `harness.cpp` and `harness2.cpp` were rebuilt against the fixed `tmcore.lib`
+(`extracted\scratch\fixes\`).
+
 ---
 
 ## High
@@ -89,6 +98,28 @@ No critical finding (no crash, UB or hang reachable with the shipped game files 
 * In `mergePlayer`, if `sel >= count` after the re-read, write the player at `count` (append) rather
   than behind empty slots.
 
+**Resolution** (fixed). `src/util/file_util.*`: `writeWholeFile` checks the write and the close
+(no unchecked destructor flush); new `writeFileAtomically` (`<file>.tmp`, `SDL_FlushIO` =
+FlushFileBuffers / fdatasync, checked close, `SDL_RenamePath` = `MoveFileExW(MOVEFILE_REPLACE_EXISTING)` /
+`rename`; the target is unchanged on any failure) and `replaceFileKeepingBackup`. `src/save/users_file.*`:
+`writeUsersFile` is atomic and keeps the replaced file as `users.dat.bak` when it was a valid roster
+with at least one player and the contents change; `readUsersFileStatus` tells Ok / Missing / Short /
+Unreadable apart; `loadRoster` uses `users.dat.bak` when `users.dat` exists but is short or unreadable;
+`saveCurrentPlayer` merges into that roster, and refuses to write (`written = false`, `refused`) when
+`users.dat` is damaged and there is no valid backup, so `SignInScreen::saveRecord` shows the existing
+Write Error box (DS:2084). A missing file is still an empty roster. `SignInScreen::loadUsers` uses
+`loadRoster`, so the list shown matches what a save merges into. `tmport.ini` (`IniFile::save`) is
+atomic with `tmport.ini.bak`; the one-time import writes atomically. The deleted-file edge case of
+§6.9 now appends (see M-1); `tests/test_save.cpp` "save with a single player and with a missing file"
+was updated accordingly. Tests: `test_save.cpp` "file_util: checked and atomic writes", "users.dat
+(REVIEW_1 H-1): an interrupted write never costs the other players" (the 5 000-byte truncation with and
+without a backup, an unreadable file, a failed write, a missing file); `test_settings.cpp` "ini (REVIEW_1
+H-1)"; `test_screens.cpp` two sign-in runs (Write Error box shown and the damaged file untouched; roster
+listed and saved from `users.dat.bak`). Harness H1: `after Bob's save: count=2 [0]Ann(50) [1]Bob(31)`
+(was count=0). Headless `tmport-cli` runs: a 5 000-byte `users.dat` without backup, sign in, Esc + Yes:
+the Write Error box is drawn and the file's SHA-1 is unchanged; three sessions with a truncated
+`users.dat`: the sign-in lists the backup roster and Exit rebuilds an 11 085-byte file.
+
 ---
 
 ## Medium
@@ -119,6 +150,15 @@ Cy(40): `[0]Ann(50) [1]Cy(40) [2]Bob(30)`; session 1 saves Bob(32) with its stal
 * Add a single-instance guard (named mutex / lock file in the preference directory) — owner: the
   platform/app area (`main.cpp` / `src/app`).
 
+**Resolution** (fixed in the save code; the single-instance guard is still open, app/platform area).
+`mergePlayer` writes slot `sel` only if it holds the player's name (FarStrCmp semantics); otherwise it
+re-finds the name, or appends at `count`; it refuses (table unchanged, save not written) only when the
+player is not in a roster full of 7 others. The result is identical to the original whenever its
+assumption holds (sel holds the player, or sel == count for a new player). Tests: `test_save.cpp`
+"users.dat (REVIEW_1 M-1): a stale slot index never overwrites another player" (the H2 two-session
+scenario, a save after a failed write, a player removed by another session, a full roster). Harness H2:
+`after session 1 saves Bob(32): [0]Ann(50) [1]Cy(40) [2]Bob(32)` (was `[1]Bob(32) [2]Bob(30)`).
+
 ### M-2 `RoomTable` indexed with room 255, reachable from a mod-validated room table — confirmed (ASan)
 
 **Where** `src/game/room_table.h:46-47` (`operator[]` unchecked). The door path:
@@ -148,6 +188,20 @@ data); `RoomLoop::run` refuses to commit an invalid `nextRoom` (log, stay); the 
 the room when the target is 0xFF; a bounds assert in `RoomTable::operator[]` (debug) or a checked
 accessor. Mods side: when `exitDoor` is 255 require `doorX` −100 or `typeDoor` ∉ {1,2} (mods area).
 
+**Resolution** (fixed). `src/game/room/player.cpp`: the door test also requires
+`RoomTable::valid(r.exitDoor)`, so a door to 255 is inert, which is exactly "no door" (shipped doors to
+255 sit at doorX −100: no change). `src/game/room/room_run.cpp`: `RoomLoop::run` never commits a
+non-existent `nextRoom` (warns once per room/exit pair, stays). `src/game/room/elves.cpp`: the `-2`
+branch keeps the elf's room when the target is 0xFF (and ignores an invalid current room).
+`src/game/room_table.h`: `assert(valid(room))` in `operator[]` (debug builds). No validator change is
+needed, since the engine now gives the 255 door the meaning the validator documents. Tests:
+`test_room.cpp` "room (REVIEW_1 M-2): a door to room 255 ... does nothing", "elves (REVIEW_1 M-2): a
+fleeing elf in a room with two walls stays in the room", "room (REVIEW_1 M-2): Room_Run never commits a
+room that does not exist". `harness2.cpp` under ASan: `doorStep 0 nextRoom 9` on every tick, `committed
+room 9 (valid=1)`, no ASan report. Headless run with the mod `TABLES\nodoor.json` =
+`{"rooms": {"9": {"exitDoor": 255}}}` (`--check-mods`: OK): Up ×10 in front of room 9's door keeps
+the player in room 9; the same keys without the mod go to room 0.
+
 ### M-3 Layout tables with fewer than 3 records hang climb set-up — confirmed
 
 **Where** `src/game/game_tables.cpp:96` rejects only an empty OTHR 10550+tier;
@@ -163,6 +217,15 @@ re-roll loop"). Shipped tables hold 500 records per tier.
 
 **Suggested fix** Require at least 3 records per tier in `GameTables::load` (FormatError naming the
 OTHR id), or fall back deterministically with a warning when `count < 3`.
+
+**Resolution** (fixed). `GameTables::load` reads each tier through the new `loadLayoutTable(id, data)`,
+which throws FormatError "OTHR 1055x (hiding-place layouts) holds N records; a climb needs at least 3"
+(`kMinLayoutRecords`); `pickLayoutRecords` throws FormatError for `count < 3` instead of re-rolling
+forever, so no caller can hang. Minimal additive mods validator check (`src/mods/resource_import.cpp`):
+a layout override with fewer than 3 records is refused, so the game uses its own table. Tests:
+`test_game_layout.cpp` "layout (REVIEW_1 M-3): fewer than 3 layout records is an error, not an endless
+loop" (each call runs on a watchdog thread) and "a mod layout table of 2 records is refused; the game's
+table stays". Harness H3: `pickLayoutRecords(2) threw ... returned within 2 s: yes`.
 
 ---
 
@@ -189,6 +252,13 @@ all 359 questions), so unmodded play is safe.
 **Suggested fix** Clamp `numLines` to 10 when parsing (log), or reject questions with more than 10
 lines in the parser so the screen never sees them.
 
+**Resolution** (fixed). `parseQuestion` clamps `numLines` to the non-blank lines that lie in the first
+10 line slots (`kMaxQuestionLines`, the size of `g_quizLineY`), with a warning. The whole text is still
+drawn, and only those lines can be read out, highlighted and clicked; hot-spot ids stay below 0xA7A. The
+359 shipped questions are unchanged (the parser hash test passes). Test: `test_game_quiz.cpp` "quiz
+(REVIEW_1 L-1): a question with more than 10 lines is clamped to the 10 line slots" (12 lines; 9 lines
+with blank lines pushing one past slot 9; exactly 10). Harness H4: `numLines=10`.
+
 ### L-2 Size and shift fields of the user's files are trusted — plausible
 
 **Where** `src/ne/ne_image.cpp:55,67` (`alignShift`) and `:91,112-113` (`rsrcShift`) are used as shift
@@ -205,6 +275,16 @@ Not executed (it would commit gigabytes on this PC); evidence is the code.
 **Suggested fix** Reject shift values above 15 and resource lengths that end beyond the file size plus
 one alignment unit (FormatError naming the file); clamp ISO directory sizes to the image size.
 
+**Resolution** (fixed). `NeImage::open` refuses segment and resource alignment shifts above 15, and any
+resource that ends more than one alignment unit past the end of the file (FormatError naming the file),
+before the type-15 table is read; `readResource` therefore never allocates more than the file size plus
+32 KB. `IsoFile` clamps the size from a directory record to the sectors the image holds from its LBA on
+(directories and files), with a warning. Tests: `test_ne.cpp` "NE (REVIEW_1 L-2): shift counts and
+resource extents from the file are validated" (synthetic NE files: shifts 16/31/40, a 32 MB declared
+length in a 1 KB file, a last resource without padding still accepted); `test_vfs.cpp` "CD image
+(REVIEW_1 L-2): sizes in directory records are clamped to the image" (a synthetic ISO whose
+TMTWINCD.EXE record claims 0xFFFFFFF0 bytes: size 2048).
+
 ### L-3 `waitWhilePlaying` has no exit if the output device stops consuming — plausible
 
 **Where** `src/audio/audio_system.cpp:173-174` loops `while (voice_.isPlaying())`; `isPlaying()` ends
@@ -219,6 +299,15 @@ removal).
 
 **Suggested fix** Bound the wait by the sound length (`samples / rate` + a margin), or clear the stream
 on `SDL_EVENT_AUDIO_DEVICE_REMOVED`.
+
+**Resolution** (fixed). `SdlWaveOutput::done()` reports the sound finished at the latest its length +
+`kDoneMarginMs` (1 000 ms) after `start()`, clears the stream and warns. Every wave wait polls it through
+`WaveVoice::isPlaying`, so `waitWhilePlaying`, `jingleThenSpeak` and the speech waits always end; the
+fake outputs of the tests are unaffected. Test: `test_audio.cpp` "Audio (REVIEW_1 L-3): the jingle
+wait ends when the device stops playing (dummy driver, paused)": the silent dummy device is paused
+during the 200 ms praise jingle (the stream is no longer drained, as after a device removal), and
+`waitWhilePlaying` returns after the deadline (≥ 1 s, < 3.2 s) instead of never; after a resume the
+next sound plays out normally.
 
 ---
 

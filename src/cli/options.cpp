@@ -21,41 +21,75 @@ bool parseInt(std::string_view s, int& out) {
 
 }  // namespace
 
-std::string usage() {
+std::string toolsOverview() {
     return
-        "tmport - Treasure Mountain! (Windows CD) engine, milestone 1 tools\n"
+        "Tools: tmport <command> [options]. They run without a window (except --view) and without\n"
+        "sound; `tmport --help <topic>` lists the options of a group.\n"
         "\n"
-        "Usage: tmport [--data <dir|cue|bin|iso>] <command> [options]\n"
+        "  Game data (topic: inspect)\n"
+        "    --info                             check the game files, print the inventory\n"
+        "    --dump-pmap <id> <out.png>         one picture (PMAP) as a PNG\n"
+        "    --dump-sheet <first> <last> <out.png>  contact sheet of the pictures in an id range\n"
+        "    --headless-frame <out.png>         compose a test frame through the presenter\n"
+        "    --view [id]                        picture browser (opens a window)\n"
+        "  Text and dialogs (topic: text)\n"
+        "    --render-dialog <name|offset> <out.png>, --render-help <topic> <page> <out.png>,\n"
+        "    --render-text <othrId> <x> <y> <w> <out.png>, --render-font <out.png>,\n"
+        "    --text-metrics <othrId> [<w>]\n"
+        "  Animation (topic: anim)\n"
+        "    --render-dam <script> <bndl> <frameBase> <tick> <out.png>, --dam-info <script>,\n"
+        "    --dam-check\n"
+        "  Screens, scenes and the room loop: scripted input on a simulated clock\n"
+        "    --screen title|signin|attract      title / Club Sign-In (topic: screen)\n"
+        "    --scene quiz <q> | hint <n> | cutscene <level> | celebrate <climbs> | rank <total> |\n"
+        "            seerank <total> | castle   a modal scene of the game (topic: scene)\n"
+        "    --room-run --new-player <name> | --record <users.dat> <slot|name>\n"
+        "                                       climb set-up and the room loop (topic: room)\n"
+        "  Audio, offline (topic: audio)\n"
+        "    --dump-ssnd <id> <out.wav>, --midi-dump <file|tune id>,\n"
+        "    --midi-render <file|tune id> <out.wav> --soundfont <sf2>, --make-test-soundfont <out.sf2>\n"
+        "  Mods (topic: mods; docs/MODDING.md)\n"
+        "    --export-mod-kit <dir>             your game's assets in editable formats\n"
+        "    --check-mods [<dir> ...]           convert and check mod folders\n"
         "\n"
-        "Commands:\n"
-        "  --info                           print the file/resource inventory and validation\n"
-        "  --dump-pmap <id> <out.png>       write one PMAP as an indexed PNG (headless)\n"
+        "  Options of every tool that reads the game:\n"
+        "    --data <path>        game folder or CD image (default: TM_DATA, then auto-detection)\n"
+        "    --mods <dir>         also load this mod folder (repeatable, later ones win); every tool\n"
+        "                         except --info, --export-mod-kit and the audio tools. The tools load\n"
+        "                         only these folders, not the [mods] folders of tmport.ini\n"
+        "    --16                 16-colour art (not --scene and the audio tools)\n"
+        "    --verbose            debug logging\n"
+        "\n"
+        "Help topics: game, inspect, text, anim, screen, scene, room, audio, mods, all.\n"
+        "More: README.md, docs/BUILDING.md (tools and scripts), docs/MODDING.md.\n";
+}
+
+std::string inspectUsage() {
+    return
+        "Game data tools (tmport [--data <path>] <command> [options]):\n"
+        "  --info                           check the game files: inventory, NE resources per DLL,\n"
+        "                                   DGROUP validation, decode check of every PMAP, BNDL and\n"
+        "                                   SSND summary (always the original files, no mods)\n"
+        "  --dump-pmap <id> <out.png>       one PMAP as an indexed PNG\n"
         "  --dump-sheet <first> <last> <out.png>\n"
-        "                                   contact sheet of the PMAPs in [first, last] (headless)\n"
-        "  --headless-frame <out.png>       compose a test frame and write the 640x480 canvas\n"
-        "                                   (no window is created)\n"
-        "  --view [id]                      interactive PMAP browser (Left/Right: previous/next,\n"
-        "                                   PgUp/PgDn: -/+10, Home/End, M: mirror, O: opaque,\n"
-        "                                   T: 16/256 colours, I: integer scale, F12: screenshot,\n"
-        "                                   Esc: quit)\n"
-        "  --help                           this text\n"
-        "\n"
-        "Options:\n"
-        "  --data <path>        game folder (TMTWINCD) or CD image (.cue/.bin/.iso);\n"
-        "                       default: environment variable TM_DATA, then auto-detection\n"
-        "  --16                 use the 16-colour art (TMT16.DLL) and VGA palette\n"
+        "                                   contact sheet of the PMAPs in [first, last]\n"
+        "  --headless-frame <out.png>       compose a test frame through the frame buffer and the\n"
+        "                                   presenter and write the 640x480 canvas (no window)\n"
+        "  --view [id]                      interactive PMAP browser in a window (Left/Right:\n"
+        "                                   previous/next, PgUp/PgDn: -/+10, Home/End, M: mirror,\n"
+        "                                   O: opaque, T: 16/256 colours, I: integer scale,\n"
+        "                                   F12: screenshot, Esc: quit)\n"
+        "  options:\n"
+        "  --data <path>        game folder (TMTWINCD) or CD image (.cue/.bin/.iso); default: the\n"
+        "                       TM_DATA environment variable, then [engine] data in tmport.ini,\n"
+        "                       then auto-detection\n"
+        "  --16                 the 16-colour art (TMT16.DLL) and the VGA palette\n"
         "  --opaque             dumps: do not make the key colour transparent\n"
-        "  --fb-dump <png>      with --headless-frame: also dump the whole 512x1055 buffer\n"
-        "  --integer-scale      window: integer scaling only\n"
-        "  --screenshot-dir <d> F12 screenshot directory (default: the preference directory)\n"
-        "  --config <ini>       engine settings file (default: tmport.ini next to the executable,\n"
-        "                       else in the preference directory)\n"
-        "  --input-mode <m>     lossless (default) or first-event (the original drops all but the\n"
-        "                       first input event of each message drain)\n"
-        "  --tap-latch          arrow taps shorter than one tick are not missed\n"
-        "  --no-pause           keep running while the window is unfocused\n"
+        "  --fb-dump <png>      with --headless-frame: also write the whole 512x1055 frame buffer\n"
         "  --mods <dir>         also load this mod folder (repeatable; later ones win)\n"
-        "  --verbose            debug logging\n";
+        "  --verbose            debug logging\n"
+        "  --view only: --integer-scale, --screenshot-dir <dir>, --config <ini>,\n"
+        "               --input-mode lossless|first-event, --tap-latch (as for the game)\n";
 }
 
 std::optional<Options> parseArgs(int argc, char** argv, std::string& error) {
@@ -88,6 +122,7 @@ std::optional<Options> parseArgs(int argc, char** argv, std::string& error) {
         };
         if (a == "--help" || a == "-h" || a == "/?") {
             if (!setCommand(Command::Help)) return std::nullopt;
+            if (i + 1 < argc && argv[i + 1][0] != '-') o.helpTopic = argv[++i];
         } else if (a == "--data") {
             if (!need(1)) return std::nullopt;
             o.dataPath = argv[++i];
@@ -138,7 +173,7 @@ std::optional<Options> parseArgs(int argc, char** argv, std::string& error) {
         } else if (a == "--tap-latch") {
             o.tapLatch = true;
         } else if (a == "--no-pause") {
-            o.noPause = true;
+            // Accepted like the game's option; the viewer never pauses on focus loss anyway.
         } else if (a == "--mods") {
             if (!need(1)) return std::nullopt;
             o.modDirs.emplace_back(argv[++i]);

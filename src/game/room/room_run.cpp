@@ -9,6 +9,7 @@
 #include "platform/engine.h"
 #include "res/game_files.h"
 #include "text/text_renderer.h"
+#include "util/log.h"
 
 namespace tmport::game::room {
 
@@ -242,6 +243,16 @@ void RoomLoop::run() {
     EnginePlayerInput in(e.input());
     do {
         tick(in);
+        if (p_.nextRoom != pl.room && !RoomTable::valid(p_.nextRoom)) {
+            // Never commit a room that does not exist (damaged room data, REVIEW_1 M-2): stay.
+            static int lastWarned = -1;  // once per (room, exit) pair: the exit is retried every tick
+            if (const int key = pl.room << 8 | p_.nextRoom; key != lastWarned) {
+                lastWarned = key;
+                log::warn("room {}: the exit leads to room {}, which does not exist; staying", int(pl.room),
+                          int(p_.nextRoom));
+            }
+            p_.nextRoom = pl.room;
+        }
     } while (p_.nextRoom == pl.room);
     hot.remove(kHotPlayField);
     hot.remove(kHotEnterClick);

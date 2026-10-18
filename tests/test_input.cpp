@@ -222,10 +222,13 @@ TEST_CASE("queue: held arrow flags change only when messages are dispatched") {
     CHECK(q.getCode() == 0);  // key up produces no code
     CHECK_FALSE(q.upHeld);
     CHECK(q.rightHeld);
-    // Auto-repeat repeats the code.
+    // Auto-repeat repeats the code once the previous copy has been taken; repeats that arrive while
+    // a copy is still queued are merged into it (AUTOPLAY_FINDINGS A-1).
     q.handleEvent(keyEvent(true, SDLK_DOWN, SDL_KMOD_NONE, SDL_SCANCODE_UNKNOWN, true));
     q.handleEvent(keyEvent(true, SDLK_DOWN, SDL_KMOD_NONE, SDL_SCANCODE_UNKNOWN, true));
-    CHECK(drainCodes(q, 3) == std::vector<uint16_t>{0x128, 0x128, 0});
+    CHECK(drainCodes(q, 2) == std::vector<uint16_t>{0x128, 0});
+    q.handleEvent(keyEvent(true, SDLK_DOWN, SDL_KMOD_NONE, SDL_SCANCODE_UNKNOWN, true));
+    CHECK(q.getCode() == 0x128);
     CHECK(q.downHeld);
     // Non-arrow navigation keys do not touch the flags; PgUp key-up is harmless.
     q.handleEvent(keyDown(SDLK_HOME));
@@ -379,6 +382,15 @@ TEST_CASE("queue: lossless mode keeps every event in order; Ctrl+S toggles once 
     CHECK(toggles == 1);
     CHECK(drainCodes(q, 4) == std::vector<uint16_t>{0x8600, 0x13, 0x1B, 0});
     CHECK(toggles == 2);
+}
+
+TEST_CASE("queue: lossless mode does not build an arrow backlog behind Enter") {
+    InputQueue q;
+    for (int i = 0; i < 6; ++i) q.handleEvent(keyEvent(true, SDLK_RIGHT, SDL_KMOD_NONE, SDL_SCANCODE_UNKNOWN, i > 0));
+    q.handleEvent(keyDown(SDLK_RETURN));
+    for (int i = 0; i < 3; ++i) q.handleEvent(keyEvent(true, SDLK_RIGHT, SDL_KMOD_NONE, SDL_SCANCODE_UNKNOWN, true));
+    q.handleEvent(keyDown(SDLK_LEFT));
+    CHECK(drainCodes(q, 5) == std::vector<uint16_t>{input::kRight, input::kEnter, input::kRight, input::kLeft, 0});
 }
 
 TEST_CASE("queue: peek and flush") {

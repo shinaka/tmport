@@ -171,6 +171,9 @@ bool AudioSystem::speakSequence(std::span<const int> soundIds, StopList list, In
 }
 
 void AudioSystem::waitWhilePlaying(InputPort& in) {
+    // Bounded: on the real device SdlWaveOutput::done() reports the sound finished at the latest
+    // its length + SdlWaveOutput::kDoneMarginMs after the start, even if the device stopped
+    // consuming it (REVIEW_1 L-3).
     while (voice_.isPlaying()) in.idle();
 }
 

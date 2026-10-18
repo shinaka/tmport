@@ -164,7 +164,17 @@ namespace {
 
 class IsoFile final : public File {
 public:
-    IsoFile(std::shared_ptr<SectorImage> img, uint32_t lba, uint32_t size) : img_(std::move(img)), lba_(lba), size_(size) {}
+    // The size comes from a directory record; it is clamped to the sectors the image actually holds
+    // from lba on, so a damaged record cannot make readAll() allocate gigabytes (REVIEW_1 L-2).
+    IsoFile(std::shared_ptr<SectorImage> img, uint32_t lba, uint32_t size) : img_(std::move(img)), lba_(lba), size_(size) {
+        const uint64_t sectors = img_->sectorCount();
+        const uint64_t avail = sectors > lba ? (sectors - lba) * kUserSize : 0;
+        if (size_ > avail) {
+            log::warn("CD image: a file at sector {} claims {} bytes but the image holds only {} from there", lba, size,
+                      avail);
+            size_ = static_cast<uint32_t>(avail);
+        }
+    }
     uint64_t size() const override { return size_; }
     size_t read(uint64_t offset, std::span<uint8_t> out) override {
         if (offset >= size_ || out.empty()) return 0;

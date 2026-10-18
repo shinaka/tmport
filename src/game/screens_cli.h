@@ -19,7 +19,7 @@
 //     --voice 0|1 --sound 0|1   initial settings (default 1 / 1); --no-audio: no audio system
 //     --max-ms <n>          stop after n ms of simulated time (default 900000)
 //     --trace               print screen events with the simulated time
-//     --data <path>, --16, -v
+//     --data <path>, --16, -v, --mods <dir> (repeatable, cli/tool_mods.h)
 //   Script tokens (whitespace separated; times are relative to the start of the run):
 //     wait:MS               advance the script time
 //     shot:NAME             write <out>/NAME.png at the current script time

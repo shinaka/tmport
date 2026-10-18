@@ -247,7 +247,11 @@ void PlayerController::freeMovement(bool left, bool right, bool up, int slot, Pl
         moveFrame(pl.facingLeft != 0);
     } else if (up) {
         const RoomDef& r = s_.rooms[pl.room];
-        if (pl.x < r.doorX && r.doorX < pl.x + pl.w && (r.typeDoor == 1 || r.typeDoor == 2)) {
+        // The original does not check the target: a door to 0xFF ("no door", accepted by the mod
+        // validator) would move the player to room 255 (REVIEW_1 M-2). Shipped doors to 0xFF sit
+        // at doorX -100, out of reach, so this changes nothing for them.
+        if (pl.x < r.doorX && r.doorX < pl.x + pl.w && (r.typeDoor == 1 || r.typeDoor == 2) &&
+            RoomTable::valid(r.exitDoor)) {
             p_.doorStep = 1;
         } else if (s_.rooms.spotContent(pl.room, slot) == kSpotGate) {
             const GateOutcome g = tryGate(s_, t_);  // without the key: hint 8

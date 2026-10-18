@@ -103,6 +103,10 @@ int quizBankBase(int bank);
 // The parser edits its copy in place, like the original: leading line breaks become spaces, the
 // third consecutive break of the question becomes NUL, the breaks between answers become NUL.
 // Text is kept as raw bytes (FFNT encoding with FF escapes); views are offsets into `text`.
+// g_quizLineY has 10 entries: only lines in the first 10 line slots can be read out, highlighted
+// and clicked. A longer question (only possible in a mod; the shipped ones have at most 6 lines)
+// gets numLines clamped to those lines (REVIEW_1 L-1); its text is still drawn whole.
+inline constexpr int kMaxQuestionLines = 10;
 struct ParsedQuestion {
     std::vector<uint8_t> text;      // the edited copy (up to and including the first NUL of the resource)
     size_t questionLen = 0;         // question = text[0, questionLen) (ends before the terminator)
@@ -110,9 +114,9 @@ struct ParsedQuestion {
     std::array<size_t, 3> answerLen{};  // answer 2 runs to the first NUL (keeps a trailing CR)
     int answerCount = 0;            // answers found (3 for every shipped question)
     uint8_t lineSlots = 0;          // DS:610e g_quizLineSlots: line breaks seen (incl. terminator)
-    int16_t numLines = 0;           // DS:610f g_quizNumLines: non-blank question lines
-    std::array<uint8_t, 10> blank{};      // blank flag per line slot (first 10)
-    std::array<int8_t, 10> lineSlotOf{};  // k-th non-blank line -> line slot (g_quizLineY[k] = slot*lh)
+    int16_t numLines = 0;           // DS:610f g_quizNumLines: non-blank question lines (<= 10, see above)
+    std::array<uint8_t, kMaxQuestionLines> blank{};      // blank flag per line slot (first 10)
+    std::array<int8_t, kMaxQuestionLines> lineSlotOf{};  // k-th non-blank line -> line slot (g_quizLineY[k] = slot*lh)
     int blankCount = 0;
     bool terminated = false;        // three consecutive breaks found
 

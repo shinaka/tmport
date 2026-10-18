@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "util/log.h"
+
 namespace tmport::game {
 
 namespace {
@@ -281,8 +283,17 @@ std::optional<ParsedQuestion> parseQuestion(std::span<const uint8_t> resource) {
     pq.questionLen = term;
     pq.numLines = static_cast<int16_t>(pq.lineSlots - 1 - pq.blankCount);
     pq.lineSlotOf.fill(-1);
-    for (int i = 0, k = 0; i < 10; ++i)
+    for (int i = 0, k = 0; i < kMaxQuestionLines; ++i)
         if (!pq.blank[static_cast<size_t>(i)]) pq.lineSlotOf[static_cast<size_t>(k++)] = static_cast<int8_t>(i);
+    // The non-blank lines that have a g_quizLineY entry: the question's slots are 0..lineSlots-2.
+    int placed = 0;
+    for (int i = 0; i < std::min(kMaxQuestionLines, pq.lineSlots - 1); ++i)
+        if (!pq.blank[static_cast<size_t>(i)]) ++placed;
+    if (pq.numLines > placed || pq.numLines < 0) {
+        log::warn("quiz: a question with {} lines; only the first {} can be read out, highlighted and clicked",
+                  int(pq.numLines), placed);
+        pq.numLines = static_cast<int16_t>(std::clamp<int>(pq.numLines, 0, placed));
+    }
 
     while (p < n && isBreak(t[p])) ++p;
     pq.answerOff[0] = p;

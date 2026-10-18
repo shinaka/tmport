@@ -1,10 +1,16 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
+#include <cstring>
 #include <map>
+#include <memory>
 #include <string>
+#include <vector>
 
+#include "ne/ne_image.h"
 #include "res/resource_types.h"
 #include "test_data.h"
+#include "util/error.h"
 
 using namespace tmport;
 
@@ -98,4 +104,84 @@ TEST_CASE("NE: resource tables and type-15 name tables of every DLL") {
     CHECK(tmt->findByTypeName("OTHR", 10550)->typeId == 32515);
     CHECK(tmt->findByTypeName("RRGB", 900)->typeId == 32516);
     CHECK(tmt->findByTypeName("PMAP", 1000) == nullptr);
+}
+
+// ------------------------------------------------------------------ REVIEW_1 L-2 regressions
+
+namespace {
+
+class MemFile final : public vfs::File {
+public:
+    explicit MemFile(std::vector<uint8_t> d) : d_(std::move(d)) {}
+    uint64_t size() const override { return d_.size(); }
+    size_t read(uint64_t off, std::span<uint8_t> out) override {
+        if (off >= d_.size()) return 0;
+        const size_t n = std::min(out.size(), static_cast<size_t>(d_.size() - off));
+        std::memcpy(out.data(), d_.data() + off, n);
+        return n;
+    }
+
+private:
+    std::vector<uint8_t> d_;
+};
+
+void put16(std::vector<uint8_t>& b, size_t at, uint16_t v) {
+    b[at] = uint8_t(v);
+    b[at + 1] = uint8_t(v >> 8);
+}
+
+// A minimal synthetic NE file (no game data): MZ stub, NE header at 0x40, no segments, a resource
+// table with one resource of integer type `type` at sector `off` (resource shift units) of `len`
+// units, everything else zero. `fileSize` bytes in all.
+std::shared_ptr<vfs::File> syntheticNe(uint16_t alignShift, uint16_t rsrcShift, uint16_t type, uint16_t off,
+                                       uint16_t len, size_t fileSize) {
+    std::vector<uint8_t> b(std::max<size_t>(fileSize, 0x100), 0);
+    b[0] = 'M';
+    b[1] = 'Z';
+    put16(b, 0x3C, 0x40);
+    const size_t ne = 0x40;
+    b[ne] = 'N';
+    b[ne + 1] = 'E';
+    const uint16_t rsrcTab = 0x40, rsrcLen = 2 + 8 + 12 + 2;
+    put16(b, ne + 0x22, rsrcTab);                     // segment table (empty)
+    put16(b, ne + 0x24, rsrcTab);                     // resource table
+    put16(b, ne + 0x26, uint16_t(rsrcTab + rsrcLen));  // resident names (empty)
+    put16(b, ne + 0x28, uint16_t(rsrcTab + rsrcLen));
+    put16(b, ne + 0x2A, uint16_t(rsrcTab + rsrcLen));
+    put16(b, ne + 0x32, alignShift);
+    const size_t r = ne + rsrcTab;
+    put16(b, r, rsrcShift);
+    put16(b, r + 2, uint16_t(0x8000 | type));
+    put16(b, r + 4, 1);
+    put16(b, r + 10, off);
+    put16(b, r + 12, len);
+    put16(b, r + 16, 0x8001);  // id 1
+    b.resize(fileSize);
+    return std::make_shared<MemFile>(std::move(b));
+}
+
+}  // namespace
+
+TEST_CASE("NE (REVIEW_1 L-2): shift counts and resource extents from the file are validated") {
+    // A sane file: one type-15 resource in the last 512-byte unit, which lacks its padding.
+    {
+        const auto img = ne::NeImage::open(syntheticNe(0, 9, 15, 1, 1, 700), "ok.dll");
+        CHECK(img.alignShift() == 9);  // 0 means 9
+        REQUIRE(img.resources().size() == 1);
+        CHECK(img.resources()[0].length == 512);
+        CHECK(img.readResource(img.resources()[0]).size() == 512);  // zero-padded
+    }
+    // Shifts above 15 (UB for >= 32, garbage for 16..31) are refused with the file's name.
+    CHECK_THROWS_WITH_AS(ne::NeImage::open(syntheticNe(40, 9, 15, 1, 1, 1024), "bad.dll"),
+                         doctest::Contains("bad.dll"), FormatError);
+    CHECK_THROWS_AS(ne::NeImage::open(syntheticNe(16, 9, 15, 1, 1, 1024), "bad.dll"), FormatError);
+    CHECK_THROWS_AS(ne::NeImage::open(syntheticNe(9, 31, 15, 1, 1, 1024), "bad.dll"), FormatError);
+    CHECK_THROWS_AS(ne::NeImage::open(syntheticNe(9, 16, 15, 1, 1, 1024), "bad.dll"), FormatError);
+    // A declared length far past the end of the file: refused at open, before the type-15 table
+    // is read (0xFFFF << 9 = 32 MB here; up to 0xFFFF << 15 = 2 GB was zero-filled before).
+    CHECK_THROWS_WITH_AS(ne::NeImage::open(syntheticNe(9, 9, 15, 1, 0xFFFF, 1024), "big.dll"),
+                         doctest::Contains("past the end"), FormatError);
+    // Other resource types too, even though they are only read on demand.
+    CHECK_THROWS_AS(ne::NeImage::open(syntheticNe(9, 9, 32513, 1, 0x100, 1024), "big.dll"), FormatError);
+    CHECK_THROWS_AS(ne::NeImage::open(syntheticNe(9, 15, 32513, 0xFFFF, 1, 1024), "far.dll"), FormatError);
 }

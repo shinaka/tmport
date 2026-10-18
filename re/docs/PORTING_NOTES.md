@@ -300,6 +300,11 @@ millisecond clock (`SDL_GetTicks`); the 49.7-day wrap of `timeGetTime` is irrele
 * Save points and their order (`sys_resources_saves.md` §6.5) matter for compatibility of the
   stored values (climb-end save before the score is added; Exit saves twice; Remove Player writes
   even after "No").
+* Robustness deviations (`re/reviews/REVIEW_1.md` H-1, M-1; same format, same save order): writes are
+  atomic (`users.dat.tmp` + rename) and keep the replaced valid roster as `users.dat.bak` (`tmport.ini`
+  likewise); a missing file is an empty roster, but a present short/unreadable one is replaced by the
+  backup's roster or, without a valid backup, never overwritten (Write Error box DS:2084); the merge
+  writes slot `sel` only if it holds the player's name, else re-finds it or appends at `count`.
 * The INI keys are start-up check flags only; replace them with an engine config file. Nothing in
   the INI is gameplay state.
 
@@ -404,10 +409,16 @@ DGROUP's relocation records.
 | Stale `WM_MOUSEMOVE` coordinates, VK 0x29–0x2C jump table | 1010 | drop |
 | Missing-DLL behaviour, uninitialised sound ids, scratch/BNDL 327 leaks, celebration leak | 1018, 1038, 10f0 | drop |
 | Tab-stop and substitution measure quirks in the text engine | 10b0 | keep (unused by shipped text; matters only for mods) |
+| A save after a deleted/short/unreadable `users.dat` drops the other players; a stale `sel` overwrites another player's slot | 1160:0f28, 1158:0040 | **drop** (REVIEW_1 H-1 / M-1; see §4.10) |
+| Unchecked data-driven limits: door/elf moves to room 0xFF, layout re-roll with < 3 records, > 10 question lines | 10e0:0447, 1178, 1100:04b5, 1150:0901 | **drop** (REVIEW_1 M-2 / M-3 / L-1; unreachable with shipped data, reachable with mods) |
 
 ---
 
 ## 7. Asset-override and mod layer
+
+> **Implemented** (`src/mods/`): the formats, folder layout, constraints and tools as built are
+> documented for users in [`docs/MODDING.md`](../../docs/MODDING.md); its "Limits" section lists
+> what of the plan below is not done.
 
 The original addresses every asset by a numeric id and every table by a DGROUP offset, which gives
 natural hook points [R]:

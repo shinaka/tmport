@@ -1,8 +1,10 @@
 #include "game/layout.h"
 
 #include <bit>
+#include <format>
 
 #include "game/quiz.h"
+#include "util/error.h"
 
 namespace tmport::game {
 
@@ -51,6 +53,11 @@ void applyLayoutRecord(RoomTable& rooms, int level, const LayoutRecord& r) {
 }
 
 LayoutChoice pickLayoutRecords(int count, BorlandRand& rng) {
+    // The re-roll loops below never end with fewer than 3 records (REVIEW_1 M-3). GameTables::load
+    // refuses such tables; this keeps any other caller from hanging without pumping events.
+    if (count < kMinLayoutRecords)
+        throw FormatError(std::format("a hiding-place layout table holds {} records; a climb needs at least {}", count,
+                                      kMinLayoutRecords));
     LayoutChoice c;
     c.record[0] = rng.random(count);
     do {

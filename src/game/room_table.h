@@ -5,6 +5,7 @@
 // (1160:137d). Specs: re/docs/dgroup_map.md §4.16, ARCHITECTURE.md §5.2-5.3, code_1168-1198.md §7.
 
 #include <array>
+#include <cassert>
 #include <cstdint>
 
 #include "data/exe_tables.h"
@@ -43,8 +44,16 @@ struct RoomTable {
     }
 
     static bool valid(int room) { return room >= 0 && room < kRoomCount; }
-    RoomDef& operator[](int room) { return rooms[static_cast<size_t>(room)]; }
-    const RoomDef& operator[](int room) const { return rooms[static_cast<size_t>(room)]; }
+    // Unchecked in release builds like the original's table; callers check valid() where a room
+    // number can come from data (REVIEW_1 M-2).
+    RoomDef& operator[](int room) {
+        assert(valid(room));
+        return rooms[static_cast<size_t>(room)];
+    }
+    const RoomDef& operator[](int room) const {
+        assert(valid(room));
+        return rooms[static_cast<size_t>(room)];
+    }
 
     // Room +0x1a (0..2 mountain levels, 3 castle) and +0x1b (music zone; 0 = treasure hall).
     // Out-of-range rooms (e.g. the 0xFE sentinel) give 0xFF.

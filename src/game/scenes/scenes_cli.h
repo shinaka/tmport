@@ -24,8 +24,8 @@
 //     --voice 0|1 --sound 0|1   (default 1 / 1); --no-audio
 //     --max-ms <n>        stop after n ms of simulated time (default 600000)
 //     --trace             print scene events with the simulated time
-//     --data <path>, -v
-//   Script tokens (whitespace separated; times relative to the start):
+//     --data <path>, -v, --mods <dir> (repeatable, cli/tool_mods.h)
+//   Script tokens (separated by white space or commas; times relative to the start):
 //     wait:MS  shot:NAME  end
 //     enter esc space tab ctrl+s y n c key press (down + up)
 //     up down left right               key press (down + up) of an arrow

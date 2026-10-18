@@ -154,7 +154,13 @@ int InputQueue::getNextEvent(GameEvent& ev) {
                 events_.push_back(GameEvent{GameEvent::kQuit, evP1_, evP2_});
                 quitRequested_ = false;
             } else if (produced_) {
-                events_.push_back(GameEvent{evType_, evP1_, evP2_});
+                const GameEvent e{evType_, evP1_, evP2_};
+                // A held arrow's key repeats queue the same code faster than the room loop takes
+                // one per tick; keep one pending copy so a later Enter/Space is not delayed
+                // (AUTOPLAY_FINDINGS A-1; the original's one-event drain never built a backlog).
+                const bool arrow = e.what == GameEvent::kKey && e.p1 >= input::kLeft && e.p1 <= input::kDown;
+                if (!(arrow && !events_.empty() && events_.back() == e))
+                    events_.push_back(e);
             }
         }
     }

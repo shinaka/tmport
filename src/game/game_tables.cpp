@@ -45,6 +45,14 @@ std::vector<LayoutRecord> parseLayoutTable(std::span<const uint8_t> data) {
     return out;
 }
 
+std::vector<LayoutRecord> loadLayoutTable(int id, std::span<const uint8_t> data) {
+    auto records = parseLayoutTable(data);
+    if (records.size() < static_cast<size_t>(kMinLayoutRecords))
+        throw FormatError(std::format("OTHR {} (hiding-place layouts) holds {} records; a climb needs at least {}", id,
+                                      records.size(), kMinLayoutRecords));
+    return records;
+}
+
 std::vector<ObjectAttributes> parseObjectTable(std::span<const uint8_t> data) {
     const size_t n = std::min(data.size() / 4, static_cast<size_t>(kObjectTableEntries));
     std::vector<ObjectAttributes> out(n);
@@ -92,9 +100,7 @@ GameTables GameTables::load(const ExeTables& exe, const ResourceManager& res) {
         const int id = kLayoutFirstId + tier;
         auto raw = res.loadRaw(id);
         if (!raw) throw FormatError(std::format("OTHR {} (hiding-place layouts) not found in TMT.DLL", id));
-        t.layouts[static_cast<size_t>(tier)] = parseLayoutTable(*raw);
-        if (t.layouts[static_cast<size_t>(tier)].empty())
-            throw FormatError(std::format("OTHR {} holds no layout records", id));
+        t.layouts[static_cast<size_t>(tier)] = loadLayoutTable(id, *raw);
     }
     auto obj = res.loadRaw(kObjectTableId);
     if (!obj) throw FormatError(std::format("OTHR {} (hiding-place pictures) not found in TMT.DLL", kObjectTableId));

@@ -19,7 +19,8 @@
 //       tick); --sheet <first> <last> [--cols <n>] (contact sheet of ticks first..last);
 //       --crop <x> <y> <w> <h>; --buffer (frame buffer rows instead of the presented window);
 //       --fps <n> (only for the printed times; default 10 = the 100 ms room/title tick);
-//       --fb-dump <png>; --data <path>; --16.
+//       --fb-dump <png>; --data <path>; --16; --mods <dir> (repeatable, all three commands;
+//       cli/tool_mods.h).
 //   --dam-info <scriptId>   disassembly and a tick-by-tick simulation of one script
 //   --dam-check             parses every DAM script in TMT.DLL (OTHR 20000-20399) and prints
 //                           per-script statistics; exit code 1 if any fails

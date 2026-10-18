@@ -255,9 +255,14 @@ void ElfSystem::runScript(int mode, int i, const ElfScript& sc, ElfTick* t, gfx:
             st = 0;
             e.step = 1;
         } else if (f == -2) {
-            const RoomDef& r = s.rooms[e.room];
-            const uint8_t to = ((e.facing == 0 || r.exitLeft == 0xFF) && r.exitRight != 0xFF) ? r.exitRight : r.exitLeft;
-            e.room = to;
+            // With both exits walls the original moves the elf to room 0xFF and a later flee reads
+            // rooms[255]; the elf stays instead (REVIEW_1 M-2; no shipped room an elf flees from
+            // has two walls).
+            if (RoomTable::valid(e.room)) {
+                const RoomDef& r = s.rooms[e.room];
+                const uint8_t to = ((e.facing == 0 || r.exitLeft == 0xFF) && r.exitRight != 0xFF) ? r.exitRight : r.exitLeft;
+                if (RoomTable::valid(to)) e.room = to;
+            }
             resetBehaviour(i);
             st = 0;
         }

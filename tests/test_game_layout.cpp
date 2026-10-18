@@ -6,15 +6,23 @@
 #include <doctest/doctest.h>
 
 #include <array>
+#include <atomic>
+#include <chrono>
 #include <format>
 #include <fstream>
+#include <memory>
+#include <random>
 #include <set>
+#include <string>
+#include <thread>
 #include <vector>
 
 #include "game/game_tables.h"
 #include "game/layout.h"
 #include "game/room_table.h"
+#include "mods/mods.h"
 #include "test_data.h"
+#include "util/error.h"
 #include "util/file_util.h"
 #include "util/hash.h"
 
@@ -260,4 +268,83 @@ TEST_CASE("layout: dump for the reference comparison (TM_GAME_LAYOUT_DUMP)") {
             f << "\n";
         }
     }
+}
+
+// ------------------------------------------------------------------ REVIEW_1 M-3 regressions
+
+namespace {
+
+// Runs f on a thread of its own; true if it finished within `ms`. A regression to the endless
+// re-roll then fails the check instead of hanging the test run (the thread only touches its own
+// copies).
+template <class F>
+bool finishesWithin(int ms, F f) {
+    auto done = std::make_shared<std::atomic<bool>>(false);
+    std::thread([done, f]() mutable {
+        f();
+        *done = true;
+    }).detach();
+    const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
+    while (!*done && std::chrono::steady_clock::now() < until) std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    return *done;
+}
+
+std::vector<uint8_t> layoutBytes(int records) {
+    std::vector<uint8_t> b = {uint8_t(records), uint8_t(records >> 8)};
+    for (int r = 0; r < records; ++r)
+        for (int k = 0; k < kLayoutRecordSize; ++k) b.push_back(uint8_t(r + k));
+    b.resize((b.size() + 511) / 512 * 512, 0);  // NE padding
+    return b;
+}
+
+}  // namespace
+
+TEST_CASE("layout (REVIEW_1 M-3): fewer than 3 layout records is an error, not an endless loop") {
+    for (int count : {0, 1, 2}) {
+        auto threw = std::make_shared<std::atomic<bool>>(false);
+        const bool finished = finishesWithin(2000, [count, threw] {
+            BorlandRand rng;
+            rng.srand(1);
+            try {
+                (void)pickLayoutRecords(count, rng);
+            } catch (const FormatError&) {
+                *threw = true;
+            }
+        });
+        CHECK_MESSAGE(finished, "pickLayoutRecords(", count, ") did not return within 2 s");
+        CHECK(*threw);
+    }
+    // The load-time check names the resource.
+    for (int count : {1, 2}) {
+        try {
+            (void)loadLayoutTable(10551, layoutBytes(count));
+            FAIL("no error for a table of ", count, " records");
+        } catch (const FormatError& e) {
+            const std::string m = e.what();
+            CHECK(m.find("OTHR 10551") != std::string::npos);
+            CHECK(m.find(std::to_string(count) + " records") != std::string::npos);
+        }
+    }
+    CHECK(loadLayoutTable(10551, layoutBytes(3)).size() == 3);
+    CHECK_THROWS_AS(loadLayoutTable(10551, std::vector<uint8_t>{}), FormatError);
+}
+
+TEST_CASE("layout (REVIEW_1 M-3): a mod layout table of 2 records is refused; the game's table stays") {
+    TM_REQUIRE_GAME_DATA();
+    std::random_device rd;
+    const auto dir = std::filesystem::temp_directory_path() / ("tmport_layout_mod_" + std::to_string(rd()));
+    REQUIRE(writeWholeFile(dir / "M" / "OTHR" / "10551.bin", layoutBytes(2)));
+    ResourceManager::Options o;
+    auto files = std::make_unique<GameFiles>(GameFiles::open(pathFromUtf8(*testdata::dataPath()), o));
+    mods::applyMods(*files, {dir / "M"});
+    CHECK(files->res->loadRaw(10551) == files->res->loadOriginal(ResType::OTHR, 10551));
+    const GameTables t = GameTables::load(*files->exe, *files->res);  // no hang, no error
+    CHECK(t.layouts[1].size() == tables().layouts[1].size());
+    std::string all;  // overrides are imported (and refused) on first use
+    for (const auto& f : files->res->mods().failures()) all += f + "\n";
+    INFO(all);
+    CHECK(all.find("OTHR 10551: the layout table has 2 records; a climb needs at least 3") != std::string::npos);
+    files.reset();
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
 }

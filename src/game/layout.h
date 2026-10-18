@@ -51,7 +51,8 @@ struct LayoutChoice {
 // kind per level, then resolves the clue attributes (1100:06cc). Exactly 3+ rand() calls.
 LayoutChoice generateClimbLayout(RoomTable& rooms, ClueState& clues, uint8_t rankTier, const GameTables& t,
                                  BorlandRand& rng);
-// The index draw alone (same rand() calls), for a table of `count` records.
+// The index draw alone (same rand() calls), for a table of `count` records. Throws FormatError when
+// count < kMinLayoutRecords (the original would re-roll forever).
 LayoutChoice pickLayoutRecords(int count, BorlandRand& rng);
 
 // 1100:06cc Clue_ResolveAttributes: the key object's attributes named by the mask, packed in the

@@ -28,6 +28,7 @@ class IniFile {
 public:
     static IniFile parse(std::string_view text);
     static std::optional<IniFile> load(const std::filesystem::path& path);
+    // Atomic replace; the previous file is kept as "<path>.bak".
     bool save(const std::filesystem::path& path) const;
     std::string text() const;
 

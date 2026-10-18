@@ -3,6 +3,7 @@
 #include <SDL3/SDL_audio.h>
 #include <SDL3/SDL_hints.h>
 #include <SDL3/SDL_init.h>
+#include <SDL3/SDL_timer.h>
 
 #include "util/log.h"
 
@@ -70,6 +71,9 @@ void SdlWaveOutput::start(const Sound& s) {
     if (!s.pcm.empty()) SDL_PutAudioStreamData(stream_, s.pcm.data(), static_cast<int>(s.pcm.size()));
     // Push the resampler tail through as well: the whole block is one "buffer".
     SDL_FlushAudioStream(stream_);
+    const uint64_t rate = rate_ ? rate_ : kDefaultRate;
+    deadlineNs_ = SDL_GetTicksNS() + static_cast<uint64_t>(s.pcm.size()) * 1'000'000'000ull / rate +
+                  kDoneMarginMs * 1'000'000ull;
 }
 
 void SdlWaveOutput::stop() {
@@ -78,7 +82,13 @@ void SdlWaveOutput::stop() {
 
 bool SdlWaveOutput::done() {
     if (!stream_) return true;
-    return SDL_GetAudioStreamQueued(stream_) <= 0;
+    if (SDL_GetAudioStreamQueued(stream_) <= 0) return true;
+    if (SDL_GetTicksNS() < deadlineNs_) return false;
+    // The device stopped consuming (removed, driver reset): give the sound up instead of waiting
+    // forever (REVIEW_1 L-3).
+    log::warn("audio: the playback device stopped playing the wave voice; the sound is cut");
+    SDL_ClearAudioStream(stream_);
+    return true;
 }
 
 }  // namespace tmport::audio

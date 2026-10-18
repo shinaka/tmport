@@ -196,16 +196,230 @@ TEST_CASE("users.dat: save with a single player and with a missing file") {
     auto bytes = readWholeFile(file);
     REQUIRE(bytes);
     CHECK(bytes->size() == kFileSize);
-    // The file was deleted while playing: the player is written at the old index; count 1 (edge
-    // case of sys_resources_saves.md §6.9: slot 0 stays empty, so the next load sees nobody).
+    // The file was deleted while playing (sys_resources_saves.md §6.9). The original writes the
+    // player at the old index behind an empty slot 0, where the next load does not see them; the
+    // port appends at count instead (REVIEW_1 H-1 / M-1), so the player stays visible.
     fs::remove(file);
     sel = 3;
-    saveCurrentPlayer(file, player("Late", 4), sel, &out);
+    res = saveCurrentPlayer(file, player("Late", 4), sel, &out);
+    CHECK(res.written);
     CHECK(out.count == 1);
-    CHECK(out.slots[3].name() == "Late");
+    CHECK(out.slots[0].name() == "Late");
+    CHECK(out.slots[3].empty());
+    CHECK(sel == 0);
     UsersTable reread;
-    readUsersFile(file, reread);
-    CHECK(reread.count == 0);
+    REQUIRE(readUsersFile(file, reread));
+    CHECK(names(reread) == std::vector<std::string>{"Late"});
+}
+
+// ------------------------------------------------------------------ REVIEW_1 H-1 / M-1 regressions
+
+namespace {
+
+// [0]Ann(50) [1]Bob(30) [2]Cy(10), written by three saves as in the reviewer's harness.
+void threePlayers(const fs::path& file) {
+    int sel = 0;
+    REQUIRE(saveCurrentPlayer(file, player("Ann", 50), sel).written);
+    sel = 1;
+    REQUIRE(saveCurrentPlayer(file, player("Bob", 30), sel).written);
+    sel = 2;
+    REQUIRE(saveCurrentPlayer(file, player("Cy", 10), sel).written);
+}
+
+std::vector<std::pair<std::string, uint32_t>> roster(const fs::path& file) {
+    UsersTable t;
+    readUsersFile(file, t);
+    std::vector<std::pair<std::string, uint32_t>> v;
+    for (int i = 0; i < t.count; ++i)
+        v.emplace_back(t.slots[static_cast<size_t>(i)].name(), t.slots[static_cast<size_t>(i)].totalTreasures());
+    return v;
+}
+
+using Roster = std::vector<std::pair<std::string, uint32_t>>;
+
+}  // namespace
+
+TEST_CASE("file_util: checked and atomic writes") {
+    const fs::path dir = tempDir("atomic");
+    const fs::path f = dir / "sub" / "a.bin";
+    const std::vector<uint8_t> one(11085, 0x11), two(300, 0x22);
+    CHECK(writeWholeFile(f, one));  // creates the directory; size checked after the close
+    CHECK(fs::file_size(f) == one.size());
+    CHECK(writeFileAtomically(f, two));  // replaces an existing file
+    CHECK(readWholeFile(f) == two);
+    CHECK_FALSE(fs::exists(dir / "sub" / "a.bin.tmp"));
+    CHECK(writeFileAtomically(dir / "new.bin", one));
+    CHECK(readWholeFile(dir / "new.bin") == one);
+    // The temporary file cannot be created (a directory has its name): false, target unchanged.
+    fs::create_directories(dir / "sub" / "a.bin.tmp");
+    CHECK_FALSE(writeFileAtomically(f, one));
+    CHECK(readWholeFile(f) == two);
+    // Backups: the replaced contents are kept when they differ and `keep` accepts them.
+    const fs::path g = dir / "g.txt";
+    const std::vector<uint8_t> v1{'1'}, v2{'2'}, v3{'3'};
+    CHECK(replaceFileKeepingBackup(g, v1));
+    CHECK_FALSE(fs::exists(backupPathFor(g)));  // nothing to keep yet
+    CHECK(replaceFileKeepingBackup(g, v2));
+    CHECK(readWholeFile(backupPathFor(g)) == v1);
+    CHECK(replaceFileKeepingBackup(g, v2));  // identical: the backup keeps the older version
+    CHECK(readWholeFile(backupPathFor(g)) == v1);
+    CHECK(replaceFileKeepingBackup(g, v3, [](std::span<const uint8_t>) { return false; }));
+    CHECK(readWholeFile(g) == v3);
+    CHECK(readWholeFile(backupPathFor(g)) == v1);  // `keep` refused v2
+    CHECK(backupPathFor(g).filename() == "g.txt.bak");
+}
+
+TEST_CASE("users.dat (REVIEW_1 H-1): an interrupted write never costs the other players") {
+    const fs::path dir = tempDir("h1");
+    const fs::path file = dir / "users.dat";
+    threePlayers(file);
+    CHECK(roster(file) == Roster{{"Ann", 50}, {"Bob", 30}, {"Cy", 10}});
+    CHECK(fs::file_size(file) == kFileSize);  // the format is unchanged
+    UsersTable disk;
+    REQUIRE(readUsersFile(file, disk));
+    CHECK(readWholeFile(file) == disk.fileBytes());
+    // users.dat.bak holds the file before the last change: Ann and Bob.
+    CHECK(roster(usersBackupPath(file)) == Roster{{"Ann", 50}, {"Bob", 30}});
+    const auto good = *readWholeFile(file);
+
+    SUBCASE("with a valid users.dat.bak the roster is rebuilt from it") {
+        // The reviewer's scenario: a write interrupted after 5 000 bytes, then Bob (slot 1) saves.
+        auto bytes = good;
+        bytes.resize(5000);
+        REQUIRE(writeWholeFile(file, bytes));
+        UsersTable t;
+        CHECK(readUsersFileStatus(file, t) == UsersFileStatus::Short);
+        const RosterLoad load = loadRoster(file, t);  // what the sign-in shows
+        CHECK(load.fromBackup);
+        CHECK(load.usable());
+        CHECK(names(t) == std::vector<std::string>{"Ann", "Bob"});
+        int sel = 1;
+        const auto r = saveCurrentPlayer(file, player("Bob", 31), sel);
+        CHECK(r.attempted);
+        CHECK(r.written);
+        CHECK(r.fromBackup);
+        CHECK(roster(file) == Roster{{"Ann", 50}, {"Bob", 31}});  // was count=0 before the fix
+        CHECK(fs::file_size(file) == kFileSize);
+        // The damaged file did not replace the backup.
+        CHECK(roster(usersBackupPath(file)) == Roster{{"Ann", 50}, {"Bob", 30}});
+    }
+    SUBCASE("without a valid backup the damaged file is not overwritten") {
+        fs::remove(usersBackupPath(file));
+        auto bytes = good;
+        bytes.resize(5000);
+        REQUIRE(writeWholeFile(file, bytes));
+        int sel = 1;
+        UsersTable merged;
+        const auto r = saveCurrentPlayer(file, player("Bob", 31), sel, &merged);
+        CHECK(r.attempted);
+        CHECK_FALSE(r.written);  // the caller shows the Write Error box (DS:2084)
+        CHECK(r.refused);
+        CHECK(readWholeFile(file) == bytes);  // untouched: nothing of Ann and Cy is destroyed
+        CHECK(names(merged) == std::vector<std::string>{"Bob"});  // the in-memory roster
+        // A backup that is itself short does not help either.
+        REQUIRE(writeWholeFile(usersBackupPath(file), std::vector<uint8_t>(100, 0)));
+        CHECK_FALSE(saveCurrentPlayer(file, player("Bob", 32), sel).written);
+        CHECK(readWholeFile(file) == bytes);
+    }
+    SUBCASE("an unreadable users.dat is treated like a damaged one") {
+        fs::remove(file);
+        fs::create_directories(file);  // exists, but no file can be read there
+        UsersTable t;
+        const UsersFileStatus st = readUsersFileStatus(file, t);
+        CHECK(st != UsersFileStatus::Ok);
+        CHECK(st != UsersFileStatus::Missing);
+        const RosterLoad load = loadRoster(file, t);
+        CHECK(load.fromBackup);
+        CHECK(names(t) == std::vector<std::string>{"Ann", "Bob"});
+        fs::remove(usersBackupPath(file));
+        int sel = 0;
+        CHECK(saveCurrentPlayer(file, player("Ann", 51), sel).refused);
+        CHECK(fs::is_directory(file));
+    }
+    SUBCASE("a failed write leaves users.dat as it was") {
+        fs::create_directories(dir / "users.dat.tmp");  // the temporary file cannot be created
+        int sel = 1;
+        const auto r = saveCurrentPlayer(file, player("Bob", 99), sel);
+        CHECK(r.attempted);
+        CHECK_FALSE(r.written);
+        CHECK(readWholeFile(file) == good);
+        CHECK_FALSE(writeUsersFile(file, UsersTable{}));
+        CHECK(readWholeFile(file) == good);
+    }
+    SUBCASE("a missing users.dat is still an empty roster (the original's rule)") {
+        fs::remove(file);
+        UsersTable t;
+        const RosterLoad load = loadRoster(file, t);
+        CHECK(load.file == UsersFileStatus::Missing);
+        CHECK_FALSE(load.fromBackup);
+        CHECK(load.usable());
+        CHECK(t.count == 0);
+        int sel = 0;
+        CHECK(saveCurrentPlayer(file, player("Dee", 1), sel).written);
+        CHECK(roster(file) == Roster{{"Dee", 1}});
+    }
+}
+
+TEST_CASE("users.dat (REVIEW_1 M-1): a stale slot index never overwrites another player") {
+    const fs::path dir = tempDir("m1");
+    const fs::path file = dir / "users.dat";
+    SUBCASE("two sessions (the reviewer's harness H2)") {
+        threePlayers(file);
+        int selBob = 1;  // session 1 signed in Bob
+        int selCy = 2;   // session 2 signed in Cy
+        REQUIRE(saveCurrentPlayer(file, player("Cy", 40), selCy).written);  // Cy passes Bob
+        CHECK(roster(file) == Roster{{"Ann", 50}, {"Cy", 40}, {"Bob", 30}});
+        CHECK(selCy == 1);
+        REQUIRE(saveCurrentPlayer(file, player("Bob", 32), selBob).written);  // stale index 1
+        // Before the fix: [Ann(50), Bob(32), Bob(30)], Cy's progress gone and Bob duplicated.
+        CHECK(roster(file) == Roster{{"Ann", 50}, {"Cy", 40}, {"Bob", 32}});
+        CHECK(selBob == 2);
+    }
+    SUBCASE("a save after a failed write") {
+        int sel = 0;
+        REQUIRE(saveCurrentPlayer(file, player("Ann", 50), sel).written);
+        sel = 1;
+        REQUIRE(saveCurrentPlayer(file, player("Bob", 30), sel).written);
+        fs::create_directories(dir / "users.dat.tmp");
+        CHECK_FALSE(saveCurrentPlayer(file, player("Bob", 60), sel).written);
+        CHECK(sel == 0);  // the merged order that never reached the disk
+        fs::remove(dir / "users.dat.tmp");
+        REQUIRE(saveCurrentPlayer(file, player("Bob", 61), sel).written);
+        CHECK(roster(file) == Roster{{"Bob", 61}, {"Ann", 50}});  // not [Bob(61), Bob(30)]
+    }
+    SUBCASE("the player was removed by another session: appended, not written behind empty slots") {
+        threePlayers(file);
+        UsersTable t;
+        REQUIRE(readUsersFile(file, t));
+        removeSlot(t, 0);
+        removeSlot(t, 0);  // only Cy is left
+        REQUIRE(writeUsersFile(file, t));
+        int sel = 1;  // Bob, as this session remembers him
+        REQUIRE(saveCurrentPlayer(file, player("Bob", 33), sel).written);
+        CHECK(roster(file) == Roster{{"Bob", 33}, {"Cy", 10}});
+        CHECK(sel == 0);
+    }
+    SUBCASE("mergePlayer: identical to the original while its assumptions hold; a full roster refuses") {
+        UsersTable a;
+        for (int i = 0; i < 7; ++i)
+            a.slots[static_cast<size_t>(i)] = makeSlot("P" + std::to_string(i), 70u - static_cast<uint32_t>(i));
+        a.recount();
+        UsersTable b = a;
+        int sel = 3;
+        CHECK(mergePlayer(b, player("P3", 100), sel));
+        CHECK(sel == 0);
+        CHECK(b.slots[0].name() == "P3");
+        CHECK(b.count == 7);
+        int selNew = 7;  // a new eighth player cannot exist in the original (the list is full)
+        UsersTable c = b;
+        CHECK_FALSE(mergePlayer(c, player("Zed", 1), selNew));
+        CHECK(c == b);
+        // Out-of-range indices re-find the name.
+        int neg = -5;
+        CHECK(mergePlayer(c, player("P6", 64), neg));
+        CHECK(c.slots[static_cast<size_t>(neg)].name() == "P6");
+        CHECK(c.count == 7);
+    }
 }
 
 TEST_CASE("users.dat: Remove Player") {

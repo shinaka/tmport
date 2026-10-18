@@ -1,5 +1,8 @@
 #pragma once
-// Command-line options of tmport.
+// Command-line options of tmport's data-inspection tools (--info, --dump-pmap, --dump-sheet,
+// --headless-frame, --view) and of --help. The game (app/launch_options.h) and the other tool
+// groups (text/UI, DAM, screens, scenes, room loop, audio, mods) have their own parsers; cli::run
+// (cli/commands.h) dispatches between them.
 
 #include <optional>
 #include <string>
@@ -11,6 +14,7 @@ enum class Command { Help, Info, DumpPmap, DumpSheet, View, HeadlessFrame };
 
 struct Options {
     Command command = Command::Help;
+    std::string helpTopic;       // --help [topic]: empty = the overview (see helpTopics())
     std::string dataPath;        // --data <dir|cue|bin|iso>; default: TM_DATA, then auto-detect
     bool colour16 = false;       // --16: use TMT16.DLL art and the VGA 16-colour palette
     bool opaque = false;         // --opaque: dumps keep the key colour opaque
@@ -25,12 +29,15 @@ struct Options {
     std::string configPath;      // --config <ini>: tmport.ini to use (default: next to the exe, else the pref dir)
     std::string inputMode;       // --input-mode lossless|first-event (empty: tmport.ini)
     bool tapLatch = false;       // --tap-latch
-    bool noPause = false;        // --no-pause: keep running while the window is unfocused
     std::vector<std::string> modDirs;  // --mods <dir> (repeatable): mod folders to load (area mods)
 };
 
 // Parses argv. Returns nullopt and sets error on invalid input.
 std::optional<Options> parseArgs(int argc, char** argv, std::string& error);
-std::string usage();
+
+// Help texts. toolsOverview(): one line per tool command, grouped, with the options common to the
+// tools; inspectUsage(): the options of the data-inspection tools (tmport --help inspect).
+std::string toolsOverview();
+std::string inspectUsage();
 
 }  // namespace tmport::cli

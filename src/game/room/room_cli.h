@@ -37,7 +37,7 @@
 //     hold:KEY:MS                     key down now, key up MS later (does not advance the time)
 //     kd:KEY ku:KEY                   key down / key up (KEY = up down left right)
 //     click:X,Y press:X,Y release:X,Y move:X,Y   mouse at game coordinates
-//     --data <path>, --16, -v
+//     --data <path>, --16, -v, --mods <dir> (repeatable, cli/tool_mods.h)
 
 #include <optional>
 #include <string>

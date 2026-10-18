@@ -13,9 +13,9 @@
 namespace tmport::app {
 
 // The game's main program (GameMain 1118:0000). The bootstrap calls it once with a fully set-up
-// context; returning or throwing QuitGame ends the program. TODO(integration): the game area
-// provides the real one (title, restart point, sign-in, climb loop); until then the bootstrap runs
-// the temporary demo flow (app/demo_flow.h).
+// context; returning or throwing QuitGame ends the program. The game's entry is game::gameMain
+// (game/game_main.h: title, restart point, sign-in, climb loop), the bootstrap's default; tests
+// may pass their own.
 using GameMainFn = std::function<void(AppContext&)>;
 
 // The setjmp at 1118:004c as a loop: calls body(0); each RestartToSignIn thrown out of body calls

@@ -170,3 +170,24 @@ TEST_CASE("settings -> EngineConfig") {
     // A missing explicit ini gives the defaults.
     CHECK(loadEngineSettings(tempDir("noini") / "tmport.ini") == EngineSettings{});
 }
+
+TEST_CASE("ini (REVIEW_1 H-1): tmport.ini is replaced atomically and the previous file kept as .bak") {
+    const fs::path dir = tempDir("ini_atomic");
+    const fs::path path = dir / "tmport.ini";
+    IniFile a = IniFile::parse("; mine\n[engine]\nfullscreen = true\n");
+    REQUIRE(a.save(path));
+    CHECK_FALSE(fs::exists(backupPathFor(path)));
+    IniFile b = a;
+    b.set("engine", "fullscreen", "false");
+    REQUIRE(b.save(path));
+    CHECK(IniFile::load(path)->get("engine", "fullscreen") == "false");
+    const auto bak = IniFile::load(backupPathFor(path));
+    REQUIRE(bak);
+    CHECK(bak->get("engine", "fullscreen") == "true");
+    CHECK_FALSE(fs::exists(dir / "tmport.ini.tmp"));
+    // A failed save leaves the file as it was.
+    fs::create_directories(dir / "tmport.ini.tmp");
+    b.set("engine", "window_scale", "3");
+    CHECK_FALSE(b.save(path));
+    CHECK_FALSE(IniFile::load(path)->get("engine", "window_scale"));
+}

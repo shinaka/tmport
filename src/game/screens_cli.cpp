@@ -13,6 +13,7 @@
 
 #include "audio/audio_system.h"
 #include "audio/engine_input_port.h"
+#include "cli/tool_mods.h"
 #include "game/game_state.h"
 #include "game/game_tables.h"
 #include "game/rules.h"
@@ -55,6 +56,7 @@ struct Args {
     bool trace = false;
     bool verbose = false;
     uint64_t maxMs = 900000;
+    std::vector<std::string> modDirs;  // --mods <dir> (repeatable, cli/tool_mods.h)
 };
 
 // ------------------------------------------------------------------------- scripted input
@@ -264,6 +266,8 @@ std::optional<Args> parseArgs(int argc, char** argv, std::string& error) {
             a.dataPath = next("--data");
         } else if (s == "--16") {
             a.colour16 = true;
+        } else if (s == "--mods") {
+            a.modDirs.push_back(next("--mods"));
         } else if (s == "-v" || s == "--verbose") {
             a.verbose = true;
         } else {
@@ -410,6 +414,7 @@ std::optional<int> runScreensCommand(int argc, char** argv) {
         ro.colorMode = a->colour16 ? gfx::ColorMode::Colour16 : gfx::ColorMode::Colour256;
         ro.requireSounds = false;
         GameFiles files = GameFiles::open(*dataPath, ro);
+        cli::applyToolMods(files, a->modDirs);
         return runScreens(*a, files, ro.colorMode);
     } catch (const MissingFileError& e) {
         std::fprintf(stderr, "tmport: missing game file %s: %s\n", e.file().c_str(), e.what());
@@ -424,7 +429,7 @@ std::string screensUsage() {
     return "Title / Club Sign-In screens (headless, scripted input on a manual clock):\n"
            "  --screen <title|signin|attract> [--keys \"<script>\"] [--keys-file <f>] [--out <dir>]\n"
            "        [--users <users.dat>] [--restart] [--player <name>] [--voice 0|1] [--sound 0|1]\n"
-           "        [--no-audio] [--max-ms <n>] [--trace]\n"
+           "        [--no-audio] [--max-ms <n>] [--trace] [--data <path>] [--16] [--mods <dir>]... [-v]\n"
            "        script: wait:MS shot:NAME enter esc space tab bs ctrl+r ctrl+s up down left right\n"
            "                char:C text:STR code:0xNNNN click:X,Y rclick:X,Y press:X,Y release:X,Y move:X,Y end\n";
 }

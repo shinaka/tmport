@@ -45,7 +45,9 @@ tables from the user's own copy of the game at runtime. Behaviour is specified i
 | `game/` | game modules (main state machine, title, sign-in, room, player, HUD, layout, elves, quiz, hints, net shop, coin pile, hall, cut-scenes, castle, celebration, help) |
 | `rtl/` | Borland `rand`/`srand`/`R(n)`, `sprintf` subset |
 | `platform/` | SDL3 app, window, event pump, audio device |
-| `cli/` | command-line tools of `tmport` (`--info`, PMAP dumps, test frame, PMAP viewer) |
+| `mods/` | the mod layer: mod folders, override formats (PNG, WAV, text, DAM assembler, JSON, MIDI), table overrides, mod-kit exporter, `--check-mods` (`docs/MODDING.md`) |
+| `app/` | start-up (`bootstrap`: paths, settings, data, engine, audio, menus, `AppContext`), the game's command line, menu command handlers, scripted input (`--keys`) |
+| `cli/` | the tool dispatcher and `--help` (`commands`, `options`), the data tools (`--info`, PMAP dumps, test frame, PMAP viewer), the text/UI renders, `--mods` for the tools (`tool_mods`); the other areas keep their own tools (`*_cli.cpp`) |
 
 Namespace `tmport` (a global namespace `tm` is impossible: it collides with the C library's
 `struct tm`, which `<ctime>` declares globally and `<format>`/`<chrono>` pull in). Files
@@ -92,11 +94,16 @@ comment at each ported routine (e.g. `// 1110:00aa CoinPile_Update`).
 * Saves and settings in `SDL_GetPrefPath("TMPort", "TMPort")`; `users.dat` byte-compatible with
   the original, optional import from `C:\TLCWIN\TMTWINCD\users.dat`.
 
-## Mod layer (hook points, implemented incrementally)
+## Mod layer
 
-`ResourceManager::find(type, id)` checks `mods/<TYPE>/<id>.<ext>` first (PMAP → PNG, SSND → WAV,
-OTHR → raw bytes, BNDL → JSON, MIDI → `.mid`); `ExeTables` accepts JSON table overrides. See
-`PORTING_NOTES.md` §7.
+Implemented in `src/mods/` on the hook points of `PORTING_NOTES.md` §7: the resource manager asks
+the installed mod folders (`res/mod_overrides.h`) before it reads a DLL resource (PMAP → PNG,
+SSND → WAV, OTHR → text or raw bytes, DAM → assembler text, BNDL → JSON, FFNT, RRGB), table files
+(`TABLES/*.json`) are applied to the mutable copy of the `ExeTables`, and MIDI overrides sit in
+front of the game's `SOUNDS` folder (`mods/mod_data_source.h`). `mods::applyMods` installs them
+right after `GameFiles::open` (the game in `app/bootstrap.cpp`, the tools through
+`cli/tool_mods.h`). The user documentation (folder layout, formats, constraints, tools) is
+[`MODDING.md`](MODDING.md).
 
 ## Testing
 

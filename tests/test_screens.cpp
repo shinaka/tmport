@@ -30,6 +30,7 @@
 #include "timing/clock.h"
 #include "timing/deadline_timers.h"
 #include "ui/game_dialog.h"
+#include "util/file_util.h"
 
 using namespace tmport;
 using namespace tmport::game;
@@ -668,4 +669,71 @@ TEST_CASE("Title run: a page times out after 60 s; Space ends the loop; Esc + Ye
         CHECK(t.run() == TitleResult::Quit);
         CHECK(r.clock.nowMs() - r.start < 2000);
     }
+}
+
+TEST_CASE("Sign-in run (REVIEW_1 H-1): a damaged users.dat without a backup is kept; the Write Error box shows") {
+    TM_REQUIRE_GAME_DATA();
+    const auto dir = tempDir("damaged_users");
+    Rig r(*g, dir);
+    writeRoster(r.paths.usersDat, {{"Lpha", 10}, {"Bravo", 5}});
+    REQUIRE_FALSE(std::filesystem::exists(save::usersBackupPath(r.paths.usersDat)));
+    auto bytes = *readWholeFile(r.paths.usersDat);
+    bytes.resize(5000);  // an interrupted write
+    REQUIRE(writeWholeFile(r.paths.usersDat, bytes));
+    int modals = 0;
+    r.dialogs.hooks().menuIsEnabled = [&] {
+        ++modals;
+        return false;
+    };
+    r.state.player.setName("Tester");  // Start Another Game: the signed-in player is saved first
+    initNewPlayer(r.state);
+    SignInScreen s(r.ctx);
+    s.setUserSel(2);
+    r.wait(300);
+    r.chr(0x0D);  // OK on the Write Error box (DS:2084)
+    r.wait(400);
+    r.vk(0x28);   // the roster in memory holds the player only
+    r.wait(100);
+    r.chr(0x0D);
+    const SignInResult res = s.run(true);
+    CHECK(modals == 1);
+    CHECK(res.name == "Tester");
+    CHECK(res.userSel == 0);
+    CHECK(readWholeFile(r.paths.usersDat) == bytes);  // Lpha and Bravo's bytes are not destroyed
+}
+
+TEST_CASE("Sign-in run (REVIEW_1 H-1): a damaged users.dat is listed and saved from users.dat.bak") {
+    TM_REQUIRE_GAME_DATA();
+    const auto dir = tempDir("damaged_users_bak");
+    Rig r(*g, dir);
+    writeRoster(r.paths.usersDat, {{"Lpha", 10}, {"Bravo", 5}});
+    writeRoster(r.paths.usersDat, {{"Lpha", 12}, {"Bravo", 5}});  // the first file becomes users.dat.bak
+    auto bytes = *readWholeFile(r.paths.usersDat);
+    bytes.resize(5000);
+    REQUIRE(writeWholeFile(r.paths.usersDat, bytes));
+    int modals = 0;
+    r.dialogs.hooks().menuIsEnabled = [&] {
+        ++modals;
+        return false;
+    };
+    r.wait(300);
+    r.vk(0x28);  // Lpha
+    r.wait(100);
+    r.vk(0x28);  // Bravo
+    r.wait(100);
+    r.chr(0x0D);
+    SignInScreen s(r.ctx);
+    const SignInResult res = s.run(false);
+    CHECK(res.name == "Bravo");  // the roster came from the backup (the original would list nobody)
+    CHECK(res.userSel == 1);
+    r.state.rank.totalTreasures = 50;
+    s.saveCurrent();  // e.g. the end of a climb
+    CHECK(modals == 0);
+    CHECK(std::filesystem::file_size(r.paths.usersDat) == save::kFileSize);
+    const save::UsersTable t = readRoster(r.paths.usersDat);
+    REQUIRE(t.count == 2);
+    CHECK(t.slots[0].name() == "Bravo");
+    CHECK(t.slots[0].totalTreasures() == 50);
+    CHECK(t.slots[1].name() == "Lpha");
+    CHECK(t.slots[1].totalTreasures() == 10);
 }

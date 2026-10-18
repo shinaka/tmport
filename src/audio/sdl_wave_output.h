@@ -5,6 +5,9 @@
 // device format. A new sound clears the stream (cut) and queues the whole PCM block, like the
 // original's single WAVEHDR. Other streams may join the device (deviceId()): the SoundFont music
 // stream does, and SDL mixes them.
+// done() is bounded: a sound counts as finished at the latest kDoneMarginMs after its length has
+// elapsed, even if the device stopped consuming the stream (device removed, driver reset), so
+// waits such as AudioSystem::waitWhilePlaying always end (REVIEW_1 L-3).
 
 #include <string>
 
@@ -33,6 +36,9 @@ public:
     // The SDL logical playback device (SDL_AudioDeviceID) while open, else 0.
     uint32_t deviceId() const { return device_; }
 
+    // How long past its nominal length a sound may still be queued before done() gives up on it.
+    static constexpr uint64_t kDoneMarginMs = 1000;
+
     bool available() const override { return stream_ != nullptr; }
     void start(const Sound& s) override;
     void stop() override;
@@ -44,6 +50,7 @@ private:
     uint32_t device_ = 0;
     bool sdlInit_ = false;
     uint32_t rate_ = 0;
+    uint64_t deadlineNs_ = 0;  // SDL_GetTicksNS() by which the current sound must be done
 };
 
 }  // namespace tmport::audio

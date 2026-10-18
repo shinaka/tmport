@@ -9,6 +9,7 @@
 #include <string_view>
 #include <vector>
 
+#include "cli/tool_mods.h"
 #include "data/exe_tables.h"
 #include "gfx/frame_buffer.h"
 #include "platform/engine.h"
@@ -54,6 +55,7 @@ struct Args {
         int x, y, w, h, ega;
     };
     std::vector<Fill> fills;  // --fill: solid rectangles drawn after the background
+    std::vector<std::string> modDirs;  // --mods <dir> (repeatable, cli/tool_mods.h)
 };
 
 bool parseInt(std::string_view s, int& v) {
@@ -156,6 +158,9 @@ std::optional<Args> parse(int argc, char** argv, std::string& error) {
         } else if (s == "--fb-dump") {
             if (!need(i, 1)) return a;
             a.fbDump = argv[++i];
+        } else if (s == "--mods") {
+            if (!need(i, 1)) return a;
+            a.modDirs.emplace_back(argv[++i]);
         } else if (s == "--verbose") {
             log::setVerbose(true);
         } else {
@@ -434,7 +439,7 @@ std::string textUiUsage() {
         "  --text-metrics <othrId> [<w>]               print the measured extent and line count\n"
         "  options: --bg <512x384 P6 PPM> | --bg-pmap <id> [--bg-at <x> <y>], --fill <x> <y> <w> <h> <ega>,\n"
         "           --sel <n> (-1: no button highlighted), --arg <text> (%s of a sign-in dialog),\n"
-        "           --colour <ega>, --fb-dump <png>, --16\n";
+        "           --colour <ega>, --fb-dump <png>, --16, --mods <dir>, --data <path>, --verbose\n";
 }
 
 std::optional<int> runTextUiCommand(int argc, char** argv) {
@@ -455,6 +460,7 @@ std::optional<int> runTextUiCommand(int argc, char** argv) {
         ro.colorMode = a->colour16 ? gfx::ColorMode::Colour16 : gfx::ColorMode::Colour256;
         ro.requireSounds = false;
         GameFiles files = GameFiles::open(*dataPath, ro);
+        applyToolMods(files, a->modDirs);
         const text::Font font = text::Font::load(*files.res);
         if (a->cmd == Cmd::Metrics) return runMetrics(*a, files, font);
         Engine engine(files, ro.colorMode);  // headless: no window is opened

@@ -1,6 +1,8 @@
 #include "save/users_file.h"
 
 #include <cstring>
+#include <string>
+#include <system_error>
 
 #include "util/file_util.h"
 #include "util/log.h"
@@ -43,20 +45,23 @@ void UsersTable::clear() {
     count = 0;
 }
 
-int UsersTable::findByName(std::string_view name) const {
-    for (int i = 0; i < count; ++i) {
-        // FarStrCmp: unsigned byte compare up to the first NUL of either string.
-        const auto& b = slots[static_cast<size_t>(i)].bytes;
-        size_t k = 0;
-        for (;; ++k) {
-            const uint8_t a = k < kSlotSize ? b[k] : 0;
-            const uint8_t c = k < name.size() ? static_cast<uint8_t>(name[k]) : 0;
-            if (a != c || a == 0) {
-                if (a == c) return i;
-                break;
-            }
-        }
+namespace {
+
+// FarStrCmp (1160:009f) == 0: unsigned byte compare up to the first NUL of either string.
+bool nameEquals(const UserSlot& s, std::string_view name) {
+    for (size_t k = 0;; ++k) {
+        const uint8_t a = k < kSlotSize ? s.bytes[k] : 0;
+        const uint8_t c = k < name.size() ? static_cast<uint8_t>(name[k]) : 0;
+        if (a != c) return false;
+        if (a == 0) return true;
     }
+}
+
+}  // namespace
+
+int UsersTable::findByName(std::string_view name) const {
+    for (int i = 0; i < count; ++i)
+        if (nameEquals(slots[static_cast<size_t>(i)], name)) return i;
     return count;
 }
 
@@ -82,36 +87,87 @@ bool parseUsersFile(std::span<const uint8_t> file, UsersTable& out) {
     return true;
 }
 
-bool readUsersFile(const std::filesystem::path& path, UsersTable& out) {
-    auto data = readWholeFile(path);
-    if (!data) {
-        out.clear();
-        return false;
+std::string_view describe(UsersFileStatus s) {
+    switch (s) {
+        case UsersFileStatus::Ok: return "valid";
+        case UsersFileStatus::Missing: return "missing";
+        case UsersFileStatus::Short: return "too short";
+        default: return "unreadable";
     }
-    return parseUsersFile(*data, out);
+}
+
+UsersFileStatus readUsersFileStatus(const std::filesystem::path& path, UsersTable& out) {
+    out.clear();
+    std::error_code ec;
+    if (std::filesystem::status(path, ec).type() == std::filesystem::file_type::not_found)
+        return UsersFileStatus::Missing;
+    const auto data = readWholeFile(path);
+    if (!data) return UsersFileStatus::Unreadable;  // exists (or cannot even be examined) but no read
+    return parseUsersFile(*data, out) ? UsersFileStatus::Ok : UsersFileStatus::Short;
+}
+
+bool readUsersFile(const std::filesystem::path& path, UsersTable& out) {
+    return readUsersFileStatus(path, out) == UsersFileStatus::Ok;
+}
+
+std::filesystem::path usersBackupPath(const std::filesystem::path& path) { return backupPathFor(path); }
+
+RosterLoad loadRoster(const std::filesystem::path& path, UsersTable& out) {
+    RosterLoad r;
+    r.file = readUsersFileStatus(path, out);
+    if (r.file == UsersFileStatus::Ok || r.file == UsersFileStatus::Missing) return r;
+    const auto bak = usersBackupPath(path);
+    UsersTable b;
+    const UsersFileStatus bs = readUsersFileStatus(bak, b);
+    if (bs == UsersFileStatus::Ok) {
+        log::warn("users.dat: {} is {}; using the roster saved in {} ({} players)", pathToUtf8(path), describe(r.file),
+                  pathToUtf8(bak), b.count);
+        out = b;
+        r.fromBackup = true;
+    } else {
+        log::error("users.dat: {} is {} and {} is {}: the roster cannot be read, and the file is not overwritten",
+                   pathToUtf8(path), describe(r.file), pathToUtf8(bak), describe(bs));
+    }
+    return r;
 }
 
 bool writeUsersFile(const std::filesystem::path& path, const UsersTable& table) {
     const auto bytes = table.fileBytes();
-    if (!writeWholeFile(path, bytes)) {
-        log::error("users.dat: writing {} failed", pathToUtf8(path));
+    // The replaced file becomes users.dat.bak if it is a valid roster with at least one player.
+    const auto keep = [](std::span<const uint8_t> old) {
+        UsersTable t;
+        return parseUsersFile(old, t) && t.count > 0;
+    };
+    if (!replaceFileKeepingBackup(path, bytes, keep)) {
+        log::error("users.dat: writing {} failed (the file is unchanged)", pathToUtf8(path));
         return false;
     }
     return true;
 }
 
-void mergePlayer(UsersTable& table, const PlayerRecord& player, int& sel) {
-    if (sel < 0 || sel >= kSlotCount) {
-        // Cannot happen in the original (the list is full at 7 players); keep the table intact.
-        log::warn("users.dat: player index {} out of range", sel);
-        return;
+bool mergePlayer(UsersTable& table, const PlayerRecord& player, int& sel) {
+    const std::string name = player.name.substr(0, kMaxNameLength);
+    int at = sel;
+    if (at < 0 || at >= table.count || !nameEquals(table.slots[static_cast<size_t>(at)], name)) {
+        // The original writes slot[sel] unconditionally. sel == count is a new player; anything else
+        // means the file changed since sel was set (another instance, a deleted file, a failed write).
+        const int found = table.findByName(name);  // count when absent
+        if (at != table.count)
+            log::warn("users.dat: slot {} does not hold {}; saving to slot {}", at, name, found);
+        at = found;
     }
-    player.writeTo(table.slots[static_cast<size_t>(sel)]);
-    if (table.count <= sel) ++table.count;
+    if (at >= kSlotCount) {
+        log::error("users.dat: the roster is full; {} cannot be saved", name);
+        return false;
+    }
+    player.writeTo(table.slots[static_cast<size_t>(at)]);
+    if (table.count <= at) ++table.count;  // appended at count
+    sel = at;
     if (table.count > 1) {
         table.sortByTotal();
-        sel = table.findByName(player.name.substr(0, kMaxNameLength));
+        sel = table.findByName(name);
     }
+    return true;
 }
 
 SaveOutcome saveCurrentPlayer(const std::filesystem::path& path, const PlayerRecord& player, int& sel,
@@ -120,10 +176,15 @@ SaveOutcome saveCurrentPlayer(const std::filesystem::path& path, const PlayerRec
     if (!player.name.empty() && player.name[0] == kNoPlayerChar) return r;  // nobody signed in
     r.attempted = true;
     UsersTable table;
-    readUsersFile(path, table);  // a missing/short file is an empty roster
-    mergePlayer(table, player, sel);
-    r.written = writeUsersFile(path, table);
+    const RosterLoad load = loadRoster(path, table);  // a missing file is an empty roster
+    r.fromBackup = load.fromBackup;
+    const bool placed = mergePlayer(table, player, sel);
     if (tableOut) *tableOut = table;
+    if (!load.usable() || !placed) {
+        r.refused = true;  // never replace a roster that could not be read with one that lacks it
+        return r;
+    }
+    r.written = writeUsersFile(path, table);
     return r;
 }
 

@@ -10,8 +10,11 @@
 #include <map>
 #include <set>
 #include <string>
+#include <string_view>
+#include <utility>
 
 #include "anim/anim_cli.h"
+#include "app/launch_options.h"
 #include "game/room/room_cli.h"
 #include "game/screens_cli.h"
 #include "game/scenes/scenes_cli.h"
@@ -19,13 +22,14 @@
 #include "cli/contact_sheet.h"
 #include "cli/test_scene.h"
 #include "cli/text_ui_commands.h"
+#include "cli/tool_mods.h"
 #include "data/dgroup_offsets.h"
 #include "gfx/image_export.h"
-#include "mods/mods.h"
 #include "mods/mods_cli.h"
 #include "platform/engine.h"
 #include "platform/engine_setup.h"
 #include "res/game_files.h"
+#include "tools/autoplay/autoplay.h"
 #include "util/error.h"
 #include "util/file_util.h"
 #include "util/log.h"
@@ -51,14 +55,10 @@ ResourceManager::Options resOptions(const Options& o, bool requireSounds) {
     return r;
 }
 
-// GameFiles plus the mod folders of --mods (area mods, docs/MODDING.md).
+// GameFiles plus the mod folders of --mods (docs/MODDING.md, cli/tool_mods.h).
 GameFiles openWithMods(const std::filesystem::path& dataPath, const Options& o) {
     GameFiles files = GameFiles::open(dataPath, resOptions(o, false));
-    if (!o.modDirs.empty()) {
-        std::vector<std::filesystem::path> dirs;
-        for (const auto& d : o.modDirs) dirs.push_back(pathFromUtf8(d));
-        mods::applyMods(files, dirs);
-    }
+    applyToolMods(files, o.modDirs);
     return files;
 }
 
@@ -406,40 +406,90 @@ int runView(const Options& o, const std::filesystem::path& dataPath) {
     return 0;
 }
 
+// ------------------------------------------------------------------------------------- --help
+
+namespace {
+
+// One help block without its leading and trailing blank lines, then one blank line.
+void putBlock(const std::string& text) {
+    const size_t b = text.find_first_not_of('\n');
+    if (b == std::string::npos) return;
+    const size_t e = text.find_last_not_of('\n');
+    const std::string block = text.substr(b, e - b + 1) + "\n\n";
+    std::fwrite(block.data(), 1, block.size(), stdout);
+}
+
+struct HelpTopic {
+    const char* name;
+    std::string (*text)();
+};
+
+// The option lists of the parsers: the game's (app/launch_options.h) and every tool group's.
+constexpr HelpTopic kHelpTopics[] = {
+    {"game", app::launchUsage},           {"inspect", inspectUsage},       {"text", textUiUsage},
+    {"anim", anim::animUsage},            {"screen", game::screensUsage},  {"scene", game::scenes::scenesUsage},
+    {"room", game::room::roomUsage},      {"audio", audio::audioCliUsage}, {"mods", mods::modsUsage},
+};
+
+constexpr char kHelpHeader[] =
+    "tmport - an engine re-implementation of Super Solvers Treasure Mountain! (Windows CD edition).\n"
+    "It plays your own copy of the game (the TMTWINCD folder or the CD image); it contains no game data.\n";
+
+}  // namespace
+
+int printHelp(const std::string& topicArg) {
+    std::string topic = toLowerAscii(topicArg);
+    while (topic.starts_with("-")) topic.erase(0, 1);  // "--scene" -> "scene"
+    static constexpr std::pair<std::string_view, std::string_view> kAliases[] = {
+        {"play", "game"},   {"data", "inspect"}, {"info", "inspect"}, {"view", "inspect"}, {"dam", "anim"},
+        {"screens", "screen"}, {"scenes", "scene"}, {"room-run", "room"}, {"midi", "audio"}, {"mod", "mods"}};
+    for (const auto& [alias, name] : kAliases)
+        if (topic == alias) topic = name;
+    if (topic.empty() || topic == "all") {
+        putBlock(kHelpHeader);
+        if (topic.empty()) {
+            putBlock(app::launchUsage());
+            putBlock(toolsOverview());
+        } else {
+            for (const HelpTopic& t : kHelpTopics) putBlock(t.text());
+        }
+        return 0;
+    }
+    for (const HelpTopic& t : kHelpTopics)
+        if (topic == t.name) {
+            putBlock(t.text());
+            return 0;
+        }
+    std::string names;
+    for (const HelpTopic& t : kHelpTopics) names += std::string(names.empty() ? "" : ", ") + t.name;
+    std::fprintf(stderr, "tmport: no help topic '%s' (topics: %s, all)\n", topicArg.c_str(), names.c_str());
+    return 2;
+}
+
 // -------------------------------------------------------------------------------------- main
 
 int run(int argc, char** argv) {
-    // Text/UI render commands (milestone 2, area text_ui) have their own parser.
+    // Each tool group has its own parser and runs when argv names one of its commands:
+    // text/UI renders (--render-dialog/-help/-text/-font, --text-metrics), audio (--dump-ssnd,
+    // --midi-dump, --midi-render, --make-test-soundfont), mods (--export-mod-kit, --check-mods),
+    // DAM (--render-dam, --dam-info, --dam-check), screens (--screen), scenes (--scene) and the
+    // room loop (--room-run). Otherwise the data-inspection tools and --help (cli/options.h).
     if (auto rc = runTextUiCommand(argc, argv)) return *rc;
-    // Audio tools (area audio: --dump-ssnd, --midi-dump) have their own parser.
     if (int audioRc = 0; audio::runAudioCli(argc, argv, audioRc)) return audioRc;
-    // Mod tools (area mods: --export-mod-kit, --check-mods) have their own parser.
     if (auto rc = mods::runModsCommand(argc, argv)) return *rc;
-    // DAM animation tools (area anim: --render-dam, --dam-info, --dam-check) have their own parser.
     if (auto rc = anim::runAnimCommand(argc, argv)) return *rc;
-    // Title / sign-in screen runs (area screens: --screen) have their own parser.
     if (auto rc = game::runScreensCommand(argc, argv)) return *rc;
-    // Modal scene runs (area scenes: --scene quiz/hint/cutscene/celebrate/rank/castle).
     if (auto rc = game::scenes::runScenesCommand(argc, argv)) return *rc;
-    // Headless room-loop runs (area room: --room-run).
     if (auto rc = game::room::runRoomCommand(argc, argv)) return *rc;
+    if (auto rc = autoplay::runAutoplayCommand(argc, argv)) return *rc;  // --autoplay (area autoplay)
     std::string error;
     auto opts = parseArgs(argc, argv, error);
     if (!opts) {
-        std::fprintf(stderr, "tmport: %s\n\n%s", error.c_str(), usage().c_str());
+        std::fprintf(stderr, "tmport: %s\nRun `tmport --help` for the game options and the tools.\n", error.c_str());
         return 2;
     }
     log::setVerbose(opts->verbose);
-    if (opts->command == Command::Help) {
-        std::fputs(usage().c_str(), stdout);
-        std::fputs(("\n" + textUiUsage()).c_str(), stdout);
-        std::fputs(audio::audioCliUsage().c_str(), stdout);
-        std::fputs(anim::animUsage().c_str(), stdout);
-        std::fputs(game::screensUsage().c_str(), stdout);
-        std::fputs(game::room::roomUsage().c_str(), stdout);
-        std::fputs(mods::modsUsage().c_str(), stdout);
-        return 0;
-    }
+    if (opts->command == Command::Help) return printHelp(opts->helpTopic);
     const auto dataPath = resolveDataPath(*opts);
     if (!dataPath) {
         std::fprintf(stderr,

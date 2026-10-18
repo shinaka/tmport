@@ -19,7 +19,8 @@ namespace tmport::cli {
 // capture), --bg-pmap <id> [--bg-at <x> <y>] (PMAP drawn opaque, default at (0,20)),
 // --fill <x> <y> <w> <h> <ega> (solid rectangle after the background, repeatable),
 // --sel <n> (dialog default button; -1 = none highlighted), --arg <text> (fills the %s of a
-// sign-in dialog body), --colour <n> (text pen, EGA number), --fb-dump <png> (whole buffer).
+// sign-in dialog body), --colour <n> (text pen, EGA number), --fb-dump <png> (whole buffer),
+// --mods <dir> (repeatable; cli/tool_mods.h).
 std::optional<int> runTextUiCommand(int argc, char** argv);
 std::string textUiUsage();
 
