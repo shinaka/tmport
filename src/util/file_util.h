@@ -36,6 +36,10 @@ std::filesystem::path backupPathFor(const std::filesystem::path& p);
 bool replaceFileKeepingBackup(const std::filesystem::path& p, std::span<const uint8_t> data,
                               const std::function<bool(std::span<const uint8_t>)>& keep = {});
 
+// The only regular file directly in `dir` whose extension is `ext` (e.g. ".sf2", compared without
+// regard to case); nullopt if there is none, several, or `dir` cannot be read.
+std::optional<std::filesystem::path> findSingleFileWithExtension(const std::filesystem::path& dir, std::string_view ext);
+
 std::string toUpperAscii(std::string_view s);
 std::string toLowerAscii(std::string_view s);
 bool iequalsAscii(std::string_view a, std::string_view b);

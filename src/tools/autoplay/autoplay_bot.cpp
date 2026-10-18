@@ -981,7 +981,7 @@ Bot::Act Bot::moveTowardRange(const std::vector<Range>& ranges, bool& inside) {
         if (x >= r.lo && x <= r.hi) {
             // Inside but facing the other way: one step in the range's direction turns the player
             // round; take it when it stays inside (walk tables: the frame after the current one).
-            const int f = p.frame >= 0 && p.frame < game::room::kPlayerFrameSlots ? p.frame : 0;
+            const int f = p.frame < game::room::kPlayerFrameSlots ? p.frame : 0;  // frame is unsigned
             const int nf = rt_.nextFrame[static_cast<size_t>(f)];
             const int step = nf < game::room::kPlayerFrameSlots
                                  ? (r.facingLeft ? rt_.dxLeft[static_cast<size_t>(nf)] : rt_.dxRight[static_cast<size_t>(nf)])

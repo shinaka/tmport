@@ -189,13 +189,17 @@ void App::init() {
         ac.waveDevice = !(o.headless || o.noAudio);
         ac.midiBackend = midiBackendFrom(o, p.settings);
         ac.musicSet = musicSetFrom(o, p.settings);
-        // SoundFont: --soundfont, else [audio] soundfont (a relative path is relative to tmport.ini).
+        // SoundFont: --soundfont, else [audio] soundfont (a relative path is relative to tmport.ini),
+        // else a single .sf2 next to the executable (a ready-to-play copy, scripts/package.cmake).
         if (!o.soundFont.empty()) {
             ac.soundFontPath = o.soundFont;
         } else if (!p.settings.soundFont.empty()) {
             std::filesystem::path sf = pathFromUtf8(p.settings.soundFont);
             if (sf.is_relative() && !p.paths.iniPath.empty()) sf = p.paths.iniPath.parent_path() / sf;
             ac.soundFontPath = pathToUtf8(sf);
+        } else if (auto sf = findSingleFileWithExtension(exeDirectory(), ".sf2")) {
+            ac.soundFontPath = pathToUtf8(*sf);
+            log::info("audio: SoundFont next to the executable: {}", ac.soundFontPath);
         }
         ac.musicVolume = static_cast<float>(p.settings.musicVolume) / 100.0f;
         p.audio = audio::AudioSystem::create(p.files, ac);

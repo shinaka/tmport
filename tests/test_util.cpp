@@ -1,11 +1,13 @@
 #include <doctest/doctest.h>
 
 #include <cstring>
+#include <filesystem>
 #include <string>
 #include <vector>
 
 #include "util/byte_reader.h"
 #include "util/error.h"
+#include "util/file_util.h"
 #include "util/png_writer.h"
 #include "vfs/data_source.h"
 
@@ -143,4 +145,22 @@ TEST_CASE("splitPath") {
     CHECK(vfs::splitPath("SOUNDS\\eopen1.mid") == std::vector<std::string>{"SOUNDS", "eopen1.mid"});
     CHECK(vfs::splitPath("/a//b/./c/") == std::vector<std::string>{"a", "b", "c"});
     CHECK(vfs::splitPath("").empty());
+}
+
+TEST_CASE("findSingleFileWithExtension") {
+    namespace fs = std::filesystem;
+    const fs::path d = fs::temp_directory_path() / "tmport_tests" / "single_ext";
+    std::error_code ec;
+    fs::remove_all(d, ec);
+    fs::create_directories(d / "sub.sf2");  // a folder with the extension does not count
+    CHECK_FALSE(findSingleFileWithExtension(d, ".sf2"));
+    REQUIRE(writeWholeFile(d / "GM.SF2", bytesOf("x")));
+    REQUIRE(writeWholeFile(d / "notes.txt", bytesOf("x")));
+    const auto one = findSingleFileWithExtension(d, ".sf2");
+    REQUIRE(one);
+    CHECK(one->filename() == "GM.SF2");
+    REQUIRE(writeWholeFile(d / "other.sf2", bytesOf("x")));
+    CHECK_FALSE(findSingleFileWithExtension(d, ".sf2"));  // ambiguous
+    CHECK_FALSE(findSingleFileWithExtension(d / "missing", ".sf2"));
+    fs::remove_all(d, ec);
 }

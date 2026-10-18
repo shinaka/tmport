@@ -25,5 +25,6 @@ cmake -S "%REPO%" -B "%BUILD_DIR%" -G Ninja -DCMAKE_BUILD_TYPE=Release %* || exi
 cmake --build "%BUILD_DIR%" || exit /b 1
 
 echo.
-echo Built: "%BUILD_DIR%\tmport.exe" and "%BUILD_DIR%\tmtests.exe"
+echo Built: "%BUILD_DIR%\tmport.exe"
+if exist "%BUILD_DIR%\tmtests.exe" echo        "%BUILD_DIR%\tmtests.exe"
 endlocal

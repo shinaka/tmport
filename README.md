@@ -70,6 +70,11 @@ There are no prebuilt releases at the moment: build the engine from source.
       folder, next to `tmport.exe`, or in a parent of either.
 3. **Start** `tmport` (on Windows a double-click on `tmport.exe` is enough).
 
+**Or let a script do it all:** `scripts\package.bat` (Windows) or `scripts/package.sh <game data>`
+(Linux, macOS) builds the engine and puts it next to a copy of your game data in `dist/`
+(`TMPort.app` on macOS), so it starts with no arguments. That copy contains your copy of the
+game, so keep it to yourself. See "A ready-to-play copy" in [`docs/BUILDING.md`](docs/BUILDING.md).
+
 If the game files cannot be found, or a file is missing or damaged, `tmport` says which file and
 how to point it at the data, and exits. File names are matched without regard to case, so the
 upper-case names of the CD work on every platform.
@@ -243,6 +248,9 @@ The first configure downloads SDL, TinySoundFont and doctest (pinned versions, c
 SHA-256). [`docs/BUILDING.md`](docs/BUILDING.md) lists the requirements (on Linux, the development
 packages SDL needs), the build outputs (`tmport`, and on Windows also the console program
 `tmport-cli` for scripts), the tests and continuous integration.
+
+`scripts\package.bat` / `scripts/package.sh` make a ready-to-play copy with your game data next
+to the engine (see [Getting started](#getting-started)).
 
 ## Command-line tools
 

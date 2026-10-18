@@ -85,6 +85,42 @@ Without `--data` the engine uses the environment variable `TM_DATA`. Without tha
 the current directory and the executable's directory (and their parents) for a `TMTWINCD`
 folder, or a single `.cue`/`.iso` file. File names are matched case-insensitively.
 
+## A ready-to-play copy
+
+`scripts\package.bat` (Windows) and `scripts/package.sh` (Linux, macOS) build the engine and put
+it next to a copy of your game data, so the game starts with no arguments:
+
+```
+scripts\package.bat                                  (Windows)
+scripts/package.sh ~/Games/TMTWINCD                  (Linux, macOS)
+scripts/package.sh ~/Games/tm.cue --soundfont ~/sf2/GeneralUser.sf2
+```
+
+| Platform | Result | Start it with |
+|---|---|---|
+| Windows | `dist\TMPort\tmport.exe` + `TMTWINCD\` | a double-click on `tmport.exe` |
+| Linux | `dist/TMPort/tmport` + `TMTWINCD/` | `dist/TMPort/tmport` |
+| macOS | `dist/TMPort.app` (data in `Contents/Resources`) | a double-click, or `open dist/TMPort.app` |
+
+* **Game data** (first argument, or `--data`): the `TMTWINCD` folder (or a folder that contains
+  it), or a CD image (`.cue` with its `.bin` files, or `.iso`), which is copied as it is. Without
+  an argument the script uses `TM_DATA`, then the repository's `extracted/wincd/TMTWINCD` or
+  `TMTWINCD/`, then a single `.cue`/`.iso` under `TM-WIN/`.
+* `--soundfont <sf2>` copies a SoundFont next to the engine; a single `.sf2` there is used for
+  the music when none is configured, so Linux and macOS copies play music without setup.
+* `--out <dir>` writes somewhere other than `dist/`; `--zip` also writes `TMPort-<platform>.zip`.
+* The build goes to `build-package/` (`BUILD_DIR` changes it), without the tests. On Windows the
+  C runtime is linked in (`CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded`), so the copy also runs on
+  PCs without the Visual C++ runtime.
+* Saves and settings stay in the preference folder (see "Usage"), so they carry over between
+  rebuilt copies and the development build. `--data`, `TM_DATA` and `data =` in `tmport.ini`
+  still win over the copy's own data.
+* The macOS bundle is signed ad hoc for local use. It has no icon of its own (the game window
+  takes its icon from the game's files).
+
+The copy contains your copy of the game: it is for your own use, not for sharing. `dist/` is in
+`.gitignore`.
+
 ## Usage: playing the game
 
 ```

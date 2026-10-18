@@ -113,6 +113,18 @@ bool replaceFileKeepingBackup(const std::filesystem::path& p, std::span<const ui
     return writeFileAtomically(p, data);
 }
 
+std::optional<std::filesystem::path> findSingleFileWithExtension(const std::filesystem::path& dir, std::string_view ext) {
+    std::optional<std::filesystem::path> found;
+    std::error_code ec;
+    for (std::filesystem::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
+        std::error_code ec2;
+        if (!it->is_regular_file(ec2) || !iequalsAscii(pathToUtf8(it->path().extension()), ext)) continue;
+        if (found) return std::nullopt;
+        found = it->path();
+    }
+    return ec ? std::nullopt : found;
+}
+
 std::string toUpperAscii(std::string_view s) {
     std::string out(s);
     for (char& c : out)
