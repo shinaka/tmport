@@ -176,6 +176,8 @@ void App::init() {
     if (o.windowed) cfg.fullscreen = false;
     if (o.noPause) cfg.pauseOnFocusLoss = false;
     if (o.tapLatch) cfg.tapLatch = true;
+    if (o.debugKeys || o.showTreasure) cfg.debugKeys = true;
+    if (o.showTreasure) cfg.showTreasure = true;
     if (!o.inputMode.empty()) cfg.inputMode = parseInputMode(o.inputMode, cfg.inputMode);
     cfg.screenshotDir = !o.screenshotDir.empty() ? pathFromUtf8(o.screenshotDir) : p.paths.screenshotDir;
     cfg.title = kAppTitle;

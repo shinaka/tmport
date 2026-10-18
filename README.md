@@ -187,6 +187,10 @@ import_from = C:\TLCWIN\TMTWINCD\users.dat
 [mods]
 enabled = true
 paths = mods                ; mod folders, ';'-separated (see docs/MODDING.md)
+
+[debug]
+show_treasure = false       ; true: box the hiding places that hold a treasure (gold) or the key (cyan)
+keys = false                ; true: F9 switches the treasure boxes on and off (show_treasure implies it)
 ```
 
 The most useful command-line options (`tmport --help` lists them all):
@@ -205,6 +209,8 @@ The most useful command-line options (`tmport --help` lists them all):
 | `--mods <folder>`, `--no-mods` | load another mod folder / no mods at all |
 | `--screenshot-dir <folder>` | where F12 saves screenshots |
 | `--no-pause` | keep running while the window is in the background |
+| `--show-treasure` | debug: box the hiding places that hold a treasure (gold) or the key (cyan); F9 switches the boxes off and on |
+| `--debug` | debug keys only: F9 switches the treasure boxes on and off |
 | `--verbose` | detailed log |
 
 **Music.** `auto` uses the Windows MIDI synthesizer on Windows. On Linux and macOS there is no

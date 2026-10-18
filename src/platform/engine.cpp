@@ -275,6 +275,13 @@ void Engine::handleEvent(const SDL_Event& e) {
                 if (!e.key.repeat) screenshot();
                 break;
             }
+            if (e.key.key == SDLK_F9 && config_.debugKeys && (e.key.mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_SHIFT)) == 0) {
+                if (!e.key.repeat) {
+                    setShowTreasure(!showTreasure());
+                    log::info("debug: treasure boxes {}", showTreasure() ? "on" : "off");
+                }
+                break;
+            }
             input_.handleEvent(e);
             break;
         default: input_.handleEvent(e); break;

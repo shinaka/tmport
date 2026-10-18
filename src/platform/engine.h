@@ -58,6 +58,8 @@ struct EngineConfig {
     Clock* clock = nullptr;         // nullptr: SDL clock (tests pass a ManualClock)
     std::filesystem::path screenshotDir;  // empty: <pref path>/screenshots
     std::string title = "Treasure Mountain! (TM Port)";
+    bool debugKeys = false;         // F9 toggles showTreasure ([debug] keys, --debug)
+    bool showTreasure = false;      // boxes around hiding places with a treasure or the key ([debug] show_treasure)
 };
 
 class Engine {
@@ -172,6 +174,9 @@ public:
     DeadlineTimers& timers() { return timers_; }
     BorlandRand& rng() { return rng_; }
     const EngineConfig& config() const { return config_; }
+    // Debug: the room loop boxes the hiding places that hold a treasure or the key (F9 with debugKeys).
+    bool showTreasure() const { return config_.showTreasure; }
+    void setShowTreasure(bool on) { config_.showTreasure = on; }
 
 private:
     bool handleHotkey(const SDL_Event& e);

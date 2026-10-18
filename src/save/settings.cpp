@@ -202,6 +202,8 @@ EngineSettings EngineSettings::fromIni(const IniFile& ini) {
     intKey("audio", "music_volume", s.musicVolume, 0, 100);
     boolKey("saves", "imported_original", s.importedOriginal);
     if (auto v = ini.get("saves", "import_from")) s.importFrom = *v;
+    boolKey("debug", "keys", s.debugKeys);
+    boolKey("debug", "show_treasure", s.showTreasure);
     return s;
 }
 
@@ -222,6 +224,8 @@ void EngineSettings::toIni(IniFile& ini) const {
     ini.set("audio", "music_volume", std::to_string(musicVolume));
     ini.set("saves", "imported_original", b(importedOriginal));
     ini.set("saves", "import_from", importFrom);
+    ini.set("debug", "keys", b(debugKeys));
+    ini.set("debug", "show_treasure", b(showTreasure));
 }
 
 // ------------------------------------------------------------------------------------- Paths

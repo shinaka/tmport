@@ -168,6 +168,7 @@ Game options (any other argument selects the command-line tools below; `tmport -
 | `--midi-set E\|B`, `--midi auto\|winmm\|soundfont\|null`, `--no-audio` | music files (General MIDI `E*.MID` by default), MIDI output (see "Music" below), no sound at all |
 | `--soundfont <file.sf2>` | General MIDI SoundFont for the `soundfont` MIDI output (default: `soundfont =` in `[audio]` of `tmport.ini`); selects that output unless `--midi` is given |
 | `--screenshot-dir <dir>` | where F12 writes PNG screenshots of the game area |
+| `--show-treasure`, `--debug` | debug: boxes around the hiding places that hold a treasure (gold) or the key (cyan), drawn over the picture by the presenter (the game's own frame is unchanged); `--debug` only enables F9, which switches them on and off (`[debug] show_treasure` / `keys` in `tmport.ini`). `--room-run` takes `--show-treasure` too |
 | `--verbose` | debug logging |
 | `--headless` | no window, no message boxes, no sound (automation); errors go to stderr; the run ends when the `--keys` script is used up |
 | `--keys <script>` | scripted input: comma-separated steps `enter`, `esc`, `space`, arrows, `f1`..`f12`, `alt`, letters/digits, `alt+o`/`ctrl+s`/`shift+a`, `click:<x>:<y>`, `move:<x>:<y>` (canvas coordinates), `wait:<ms>`, `shot:<file.png>` (writes the 640x480 canvas), `quit` |

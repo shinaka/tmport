@@ -297,6 +297,9 @@ bool MenuBar::dispatch(uint16_t commandId) {
     enableAll(false);
     inHandler_ = true;
     Guard guard{*this};
+    // A command may draw a dialog or a whole screen over the room: drop the debug treasure boxes
+    // (the room loop puts them back on its next tick).
+    engine_.presenter().setDebugMarks({});
     if (item->command != MenuCommand::None) {
         const Handler& h = handlers_[static_cast<size_t>(item->command)];
         if (h) h();

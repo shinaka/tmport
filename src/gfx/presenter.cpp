@@ -40,7 +40,43 @@ void Presenter::renderRect(int x, int y, int w, int h) {
         uint32_t* dst = canvas_.data() + static_cast<size_t>(kGameY + y + r) * kCanvasWidth + kGameX + x;
         for (int c = 0; c < w; ++c) dst[c] = lut[src[c]];
     }
+    if (!marks_.empty()) paintDebugMarks(kGameX + x, kGameY + y, w, h);
     changed_ = true;
+}
+
+void Presenter::paintDebugMarks(int x, int y, int w, int h) {
+    const int x1 = x + w, y1 = y + h;
+    constexpr int t = kDebugMarkThickness;
+    for (const DebugMark& m : marks_) {
+        const int mx = kGameX + m.x, my = kGameY + m.y;
+        const int r0 = std::max({y, my, kGameY}), r1 = std::min({y1, my + m.h, kGameY + kGameHeight});
+        for (int r = r0; r < r1; ++r) {
+            const bool band = r < my + t || r >= my + m.h - t;  // top or bottom edge: the whole row
+            uint32_t* dst = canvas_.data() + static_cast<size_t>(r) * kCanvasWidth;
+            const uint32_t* ov = overlay_.empty() ? nullptr : overlay_.data() + static_cast<size_t>(r) * kCanvasWidth;
+            auto fill = [&](int c0, int c1) {
+                c0 = std::max({c0, x, kGameX});
+                c1 = std::min({c1, x1, kGameX + kGameWidth});
+                for (int c = c0; c < c1; ++c)
+                    if (!ov || (ov[c] & 0xFF000000u) == 0) dst[c] = m.rgba;
+            };
+            if (band) {
+                fill(mx, mx + m.w);
+            } else {
+                fill(mx, mx + t);
+                fill(mx + m.w - t, mx + m.w);
+            }
+        }
+    }
+}
+
+void Presenter::setDebugMarks(std::vector<DebugMark> marks) {
+    if (marks == marks_) return;
+    std::vector<DebugMark> old = std::move(marks_);
+    marks_ = std::move(marks);
+    // Recompose where the old marks were (now without them), then paint the new ones.
+    for (const DebugMark& m : old) composeCanvasRect(kGameX + m.x, kGameY + m.y, m.w, m.h);
+    for (const DebugMark& m : marks_) composeCanvasRect(kGameX + m.x, kGameY + m.y, m.w, m.h);
 }
 
 void Presenter::composeCanvasRect(int x, int y, int w, int h) {
@@ -66,6 +102,7 @@ void Presenter::composeCanvasRect(int x, int y, int w, int h) {
             }
         }
     }
+    if (!marks_.empty()) paintDebugMarks(x, y, w, h);
     changed_ = true;
 }
 

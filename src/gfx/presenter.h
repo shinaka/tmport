@@ -64,6 +64,20 @@ public:
     void clearOverlay();
     bool hasOverlay() const { return !overlay_.empty(); }
 
+    // --- Debug marks (tmport --show-treasure) ----------------------------------------------------
+    // Rectangle outlines (kDebugMarkThickness px, inside x/y/w/h) in game-area coordinates, drawn
+    // over the game area and under the overlay. Like the overlay they leave the window picture
+    // alone, so nothing the game draws or reads back changes. Setting different marks recomposes
+    // the areas of the old and the new ones.
+    struct DebugMark {
+        int x = 0, y = 0, w = 0, h = 0;
+        uint32_t rgba = 0;  // packed like the canvas: bytes R,G,B,A
+        bool operator==(const DebugMark&) const = default;
+    };
+    static constexpr int kDebugMarkThickness = 2;
+    void setDebugMarks(std::vector<DebugMark> marks);
+    const std::vector<DebugMark>& debugMarks() const { return marks_; }
+
     // --- SDL output (interactive mode only) ----------------------------------------------------
     // Creates the streaming texture and sets logical presentation. Returns false on failure.
     bool attach(SDL_Renderer* renderer, bool integerScale);
@@ -76,11 +90,13 @@ public:
 private:
     void renderRect(int x, int y, int w, int h);
     void composeCanvasRect(int x, int y, int w, int h);  // canvas coordinates, with the overlay
+    void paintDebugMarks(int x, int y, int w, int h);    // canvas coordinates, under the overlay
 
     Palette palette_;
     std::vector<uint8_t> window_;   // 512x384 indices as last presented
     std::vector<uint32_t> canvas_;  // 640x480 packed RGBA (little-endian bytes R,G,B,A)
     std::vector<uint32_t> overlay_;  // 640x480 packed RGBA, alpha 0 = transparent (empty: none)
+    std::vector<DebugMark> marks_;
     bool changed_ = true;
     SDL_Renderer* renderer_ = nullptr;
     SDL_Texture* texture_ = nullptr;

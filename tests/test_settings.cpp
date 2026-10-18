@@ -165,6 +165,16 @@ TEST_CASE("settings -> EngineConfig") {
     CHECK(c.inputMode == InputMode::FirstEventPerDrain);
     CHECK(c.tapLatch);
     CHECK(engineConfigFromSettings(EngineSettings{}).inputMode == InputMode::Lossless);
+    // [debug]: show_treasure starts with the boxes on and enables F9; keys only enables F9.
+    CHECK_FALSE(c.debugKeys);
+    CHECK_FALSE(c.showTreasure);
+    const EngineSettings dbg = EngineSettings::fromIni(IniFile::parse("[debug]\nshow_treasure = true\n"));
+    CHECK(dbg.showTreasure);
+    CHECK(engineConfigFromSettings(dbg).showTreasure);
+    CHECK(engineConfigFromSettings(dbg).debugKeys);
+    const EngineSettings keys = EngineSettings::fromIni(IniFile::parse("[DEBUG]\nKeys = true\n"));
+    CHECK(engineConfigFromSettings(keys).debugKeys);
+    CHECK_FALSE(engineConfigFromSettings(keys).showTreasure);
     CHECK(parseInputMode("first-event", InputMode::Lossless) == InputMode::FirstEventPerDrain);
     CHECK(parseInputMode("bogus", InputMode::FirstEventPerDrain) == InputMode::FirstEventPerDrain);
     // A missing explicit ini gives the defaults.

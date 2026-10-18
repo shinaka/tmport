@@ -19,6 +19,7 @@ constexpr Flag kFlags[] = {
     {"--no-audio", 0},     {"--verbose", 0},     {"--headless", 0},    {"--keys", 1},
     {"--frame-dump", 1},   {"--fullscreen", 0},  {"--windowed", 0},
     {"--mods", 1},         {"--no-mods", 0},
+    {"--debug", 0},        {"--show-treasure", 0},
 };
 
 const Flag* findFlag(std::string_view a) {
@@ -63,6 +64,8 @@ std::optional<LaunchOptions> parseLaunchArgs(int argc, char** argv, std::string&
         else if (a == "--windowed") o.windowed = true, o.fullscreen = false;
         else if (a == "--no-pause") o.noPause = true;
         else if (a == "--tap-latch") o.tapLatch = true;
+        else if (a == "--debug") o.debugKeys = true;
+        else if (a == "--show-treasure") o.showTreasure = true;
         else if (a == "--no-audio") o.noAudio = true;
         else if (a == "--verbose") o.verbose = true;
         else if (a == "--headless") o.headless = true;
@@ -120,6 +123,9 @@ std::string launchUsage() {
            "  --no-audio           no sound at all\n"
            "  --screenshot-dir <d> F12 screenshot directory\n"
            "  --verbose            debug logging\n"
+           "  --show-treasure      debug: box the hiding places that hold a treasure (gold) or the\n"
+           "                       key (cyan); F9 toggles ([debug] show_treasure in tmport.ini)\n"
+           "  --debug              debug keys: F9 toggles the treasure boxes ([debug] keys)\n"
            "  --mods <dir>         also load this mod folder (repeatable; after the [mods] folders of\n"
            "                       tmport.ini, later ones win); --no-mods: load no mods (docs/MODDING.md)\n"
            "  --headless           no window, no message boxes, no sound (automation); the run ends\n"

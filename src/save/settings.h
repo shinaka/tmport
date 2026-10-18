@@ -12,6 +12,7 @@
 //             soundfont = <General MIDI .sf2 file>  music_volume = 0..100 (SoundFont output)
 //             (midi = ... is accepted as another name of midi_backend and wins when both are set)
 //   [saves]   imported_original = false          import_from = C:\TLCWIN\TMTWINCD\users.dat
+//   [debug]   keys = false (F9 toggles the treasure boxes)   show_treasure = false (start with them on)
 //
 // IniFile keeps comments, unknown keys and the order of the user's file when values are updated.
 
@@ -67,6 +68,8 @@ struct EngineSettings {
     int musicVolume = 100;           // 0..100, SoundFont MIDI output
     bool importedOriginal = false;
     std::string importFrom;          // empty: the platform default (Windows: C:\TLCWIN\TMTWINCD\users.dat)
+    bool debugKeys = false;          // [debug] keys: F9 toggles the treasure boxes
+    bool showTreasure = false;       // [debug] show_treasure: start with the treasure boxes on
 
     // Reads known keys; malformed values keep their defaults (a warning is logged).
     static EngineSettings fromIni(const IniFile& ini);

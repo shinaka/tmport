@@ -19,6 +19,8 @@ EngineConfig engineConfigFromSettings(const save::EngineSettings& s) {
     c.cursorScale = s.cursorScale;
     c.inputMode = s.inputMode == save::InputModeSetting::FirstEvent ? InputMode::FirstEventPerDrain : InputMode::Lossless;
     c.tapLatch = s.tapLatch;
+    c.showTreasure = s.showTreasure;
+    c.debugKeys = s.debugKeys || s.showTreasure;
     return c;
 }
 

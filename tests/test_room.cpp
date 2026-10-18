@@ -789,6 +789,43 @@ TEST_CASE("room: a headless Room_Run session: hints, walking, exit through a doo
     CHECK(r.engine->frame().dirtyEnabled() == false);
 }
 
+TEST_CASE("room: --show-treasure boxes the hiding places with a treasure or the key while the room runs") {
+    TM_REQUIRE_GAME_DATA();
+    LoopRig r;
+    initNewPlayer(r.state);
+    r.engine->rng().srand(0x6f38);
+    r.loop->loadCommon();
+    setupClimb(r.state, gameTables(), r.engine->rng(), r.loop->gameHooks());
+    // A level-0 room that hides a treasure.
+    int room = -1;
+    for (int rm = 10; rm <= 22 && room < 0; ++rm)
+        for (int i = 0; i < 3; ++i)
+            if (r.state.rooms.spotContent(rm, i) == kContentTreasure) room = rm;
+    REQUIRE(room >= 0);
+    r.state.player.room = uint8_t(room);
+    std::vector<gfx::Presenter::DebugMark> expected;
+    for (int i = 0; i < 3; ++i) {
+        const uint8_t c = r.state.rooms.spotContent(room, i);
+        if (c != kContentTreasure && c != kContentKey) continue;
+        expected.push_back({r.loop->tables().slotX[size_t(i)] - 3, kSlotY - 3, kSlotW + 6, kSlotH + 6,
+                            c == kContentKey ? 0xFFFFFF00u : 0xFF00D7FFu});
+    }
+    r.loop->startClimb();
+    struct Stop {};
+    std::vector<std::vector<gfx::Presenter::DebugMark>> seen;
+    r.loop->hooks().afterTick = [&](uint64_t t) {
+        seen.push_back(r.engine->presenter().debugMarks());
+        if (t == 1) r.engine->setShowTreasure(true);
+        if (t == 2) r.engine->setShowTreasure(false);
+        if (t == 3) throw Stop{};
+    };
+    CHECK_THROWS_AS(r.loop->run(), Stop);
+    REQUIRE(seen.size() == 3);
+    CHECK(seen[0].empty());  // off by default
+    CHECK(seen[1] == expected);
+    CHECK(seen[2].empty());  // F9 off again
+}
+
 TEST_CASE("room: visitRoom through the gate: level change, elves respawned on level 1, key cleared") {
     TM_REQUIRE_GAME_DATA();
     LoopRig r;

@@ -1,5 +1,7 @@
 #include "game/room/room_run.h"
 
+#include <vector>
+
 #include "anim/anim_engine.h"
 #include "anim/anim_player.h"
 #include "audio/audio_system.h"
@@ -142,6 +144,23 @@ void RoomLoop::replayClues() {
     }
 }
 
+void RoomLoop::updateTreasureMarks(bool show) {
+    constexpr uint32_t kGold = 0xFF00D7FFu, kCyan = 0xFFFFFF00u;  // packed R,G,B,A: (255,215,0), (0,255,255)
+    constexpr int kPad = 3;                                         // outside the 118x133 picture
+    std::vector<gfx::Presenter::DebugMark> marks;
+    const int room = s_.player.room;
+    if (show && ctx_.engine.showTreasure() && RoomTable::valid(room)) {
+        for (int i = 0; i < 3; ++i) {
+            if (s_.rooms.spotKind(room, i) >= kSpotShop) continue;  // no picture in this slot
+            const uint8_t c = s_.rooms.spotContent(room, i);
+            if (c != kContentTreasure && c != kContentKey) continue;
+            marks.push_back({rt_.slotX[static_cast<size_t>(i)] - kPad, kSlotY - kPad, kSlotW + 2 * kPad,
+                             kSlotH + 2 * kPad, c == kContentKey ? kCyan : kGold});
+        }
+    }
+    ctx_.engine.presenter().setDebugMarks(std::move(marks));
+}
+
 // One tick of the Room_Run loop body.
 void RoomLoop::tick(PlayerInput& in) {
     Engine& e = ctx_.engine;
@@ -156,15 +175,20 @@ void RoomLoop::tick(PlayerInput& in) {
     } else {
         p_.inputEvent = getCode();
     }
-    if (p_.inputEvent == 0x1B && hooks_.exitPrompt) hooks_.exitPrompt();  // 1140:0098 MenuCmd_Exit
+    if (p_.inputEvent == 0x1B && hooks_.exitPrompt) {
+        updateTreasureMarks(false);
+        hooks_.exitPrompt();  // 1140:0098 MenuCmd_Exit
+    }
     if (p_.inputEvent == 'c' || p_.inputEvent == 'C' || p_.inputEvent == 0x2063) replayClues();
     if (elves_.caughtElf != 0) {
         const int slot = elves_.caughtElf + 3 * s_.currentLevel() - 1;
+        updateTreasureMarks(false);
         sc_.elfQuizResult = static_cast<uint8_t>(hooks_.askQuestion ? hooks_.askQuestion(slot) : 0);
         elves_.caughtElf = 0;
         sc_.redrawRequest = 1;
     } else if (s_.hints.pending != -1) {
         const int event = s_.hints.pending;
+        updateTreasureMarks(false);
         if (hooks_.showHint) hooks_.showHint(event);  // 1130:0068 Hint_Show
         s_.hints.pending = -1;
         if (sc_.redrawRequest == 0) sc_.redrawRequest = 2;
@@ -205,6 +229,7 @@ void RoomLoop::tick(PlayerInput& in) {
         sc_.redrawRequest = 0;
     }
     anim_->flushUpdateRects();
+    updateTreasureMarks(true);
     for (;;) {
         e.flushDirtyRects();
         if (e.timerExpired(DeadlineTimers::kFrameSlot)) break;
@@ -254,6 +279,7 @@ void RoomLoop::run() {
             p_.nextRoom = pl.room;
         }
     } while (p_.nextRoom == pl.room);
+    updateTreasureMarks(false);
     hot.remove(kHotPlayField);
     hot.remove(kHotEnterClick);
     hot.remove(kHotLeftEdge);

@@ -47,6 +47,7 @@ struct Args {
     int startRoom = 9, startX = 0, startFrame = 0, startFacing = 0;
     int coins = -1, nets = -1, key = -1, shopCoins = -1, gems = -1;
     bool noElves = false;
+    bool showTreasure = false;
     std::vector<std::array<int, 6>> elves;  // --elf set:room:x:facing:step[:item]
     std::string quiz = "esc";
     int clueBoxMode = -1;
@@ -230,6 +231,8 @@ std::optional<Args> parseArgs(int argc, char** argv, std::string& error) {
             a.gems = nextInt("--gems");
         } else if (s == "--no-elves") {
             a.noElves = true;
+        } else if (s == "--show-treasure") {
+            a.showTreasure = true;
         } else if (s == "--elf") {
             std::array<int, 6> e{0, 0, 0, 0, 1, 0};
             std::istringstream es(next("--elf"));
@@ -310,6 +313,7 @@ int runRoom(const Args& a, GameFiles& files, gfx::ColorMode mode) {
     ManualClock clock(1000);
     EngineConfig cfg;
     cfg.clock = &clock;
+    cfg.showTreasure = a.showTreasure;
     Engine engine(files, mode, cfg);  // headless: no window, no audio
     const text::Font font = text::Font::load(*files.res);
     text::TextRenderer text(font, &engine.frame(), &engine.presenter());
@@ -497,6 +501,7 @@ std::string roomUsage() {
            "       [--start room x frame facing] [--coins n] [--nets n] [--key 0|1] [--shop-coins n] [--gems n]\n"
            "       [--no-elves] [--quiz correct|wrong|esc] [--keys \"<script>\"] [--keys-file f]\n"
            "       [--dump-every N dir] [--out dir] [--log] [--ticks N] [--data path] [--16] [--mods dir]... [-v]\n"
+           "       [--show-treasure]\n"
            "  script tokens: wait:MS tick:N shot:NAME end enter esc space c tab up down left right\n"
            "                 hold:KEY:MS kd:KEY ku:KEY click:X,Y press:X,Y release:X,Y move:X,Y\n";
 }

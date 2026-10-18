@@ -1,5 +1,7 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
+#include <cstring>
 #include <vector>
 
 #include "gfx/frame_buffer.h"
@@ -264,4 +266,38 @@ TEST_CASE("Presenter: window picture and 640x480 canvas") {
     CHECK(px(0, 0)[3] == 255);
     const auto area = pr.gameAreaRgba();
     CHECK(area.size() == 512u * 384u * 4u);
+}
+
+TEST_CASE("Presenter: debug marks are outlines over the game area, under the overlay") {
+    const Palette p = testPalette();
+    FrameBuffer fb;
+    fb.clear(200);
+    Presenter pr;
+    pr.setPalette(p);
+    pr.blitAll(fb);
+    const std::vector<uint8_t> before(pr.canvas().begin(), pr.canvas().end());
+    auto px = [&](int x, int y) {
+        uint32_t v;
+        std::memcpy(&v, pr.canvas().data() + (static_cast<size_t>(y) * 640 + x) * 4, 4);
+        return v;
+    };
+    constexpr uint32_t kGold = 0xFF00D7FFu;
+    pr.setDebugMarks({{100, 50, 20, 10, kGold}});
+    CHECK(px(64 + 100, 48 + 50) == kGold);  // top-left corner
+    CHECK(px(64 + 119, 48 + 59) == kGold);  // bottom-right corner (inside w x h)
+    CHECK(px(64 + 101, 48 + 55) == kGold);  // left edge, 2 px thick
+    CHECK(px(64 + 102, 48 + 55) != kGold);  // the inside shows the game
+    CHECK(px(64 + 120, 48 + 55) != kGold);  // outside
+    // Presenting the game area again keeps the mark (it is not part of the window picture).
+    pr.blitAll(fb);
+    CHECK(px(64 + 100, 48 + 50) == kGold);
+    // The overlay (menu bar) wins over a mark.
+    pr.overlayPixels()[static_cast<size_t>(48 + 50) * 640 + 64 + 100] = 0xFF0000FFu;
+    pr.overlayChanged(64 + 100, 48 + 50, 1, 1);
+    CHECK(px(64 + 100, 48 + 50) == 0xFF0000FFu);
+    pr.clearOverlay();
+    CHECK(px(64 + 100, 48 + 50) == kGold);
+    // Removing the marks restores the canvas exactly.
+    pr.setDebugMarks({});
+    CHECK(std::equal(before.begin(), before.end(), pr.canvas().begin()));
 }

@@ -160,6 +160,9 @@ private:
     uint16_t getCode();
     void flushInput();
     void tick(PlayerInput& in);
+    // Debug (--show-treasure, F9): presenter boxes around this room's hiding places that hold a
+    // treasure or the key; show = false removes them before anything else draws over the room.
+    void updateTreasureMarks(bool show);
 
     AppContext& ctx_;
     GameState& s_;

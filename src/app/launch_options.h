@@ -26,6 +26,8 @@ struct LaunchOptions {
     std::string soundFont;      // --soundfont <file.sf2> (selects the soundfont output unless --midi is given)
     bool noAudio = false;       // --no-audio: no wave device, null MIDI
     bool verbose = false;       // --verbose
+    bool debugKeys = false;     // --debug: F9 toggles the treasure boxes
+    bool showTreasure = false;  // --show-treasure: start with the treasure boxes on (implies --debug)
     // Verification / automation:
     bool headless = false;      // --headless: no window, no message boxes, silent audio; the run
                                 // ends when the --keys script is used up
