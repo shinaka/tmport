@@ -212,6 +212,15 @@ else()
     endif()
 endif()
 
+# A copy that is running cannot have its executable replaced: find out before deleting anything.
+if(EXISTS "${bin_dir}/${exe_name}")
+    file(COPY_FILE "${exe}" "${bin_dir}/${exe_name}" RESULT rc)
+    if(NOT rc EQUAL 0)
+        message(FATAL_ERROR "Cannot replace ${bin_dir}/${exe_name} (${rc}).\n"
+                            "Is TM Port still running from there? Close it and run the script again. "
+                            "Nothing was changed.")
+    endif()
+endif()
 file(REMOVE_RECURSE "${package}")
 file(MAKE_DIRECTORY "${bin_dir}" "${data_dir}")
 file(COPY "${exe}" DESTINATION "${bin_dir}")
