@@ -1,0 +1,116 @@
+11a0:0000	xx_GetCtorCountPtr	uint32_t far* far xx_GetCtorCountPtr(void)	[Borland RTL, EH internal] returns far ptr to the 32-bit constructed-subobject counter (ctx+0 -> DGROUP:0010 in the EXE)
+11a0:0028	xx_GetFrameChainHeadPtr	uint16_t far* far xx_GetFrameChainHeadPtr(void)	[Borland RTL, EH internal] returns far ptr to the head word of the EH registration-frame chain (ctx+4 -> DGROUP:0014)
+11a0:0052	__InitExceptBlock	void far __InitExceptBlock(/*AX:BX = far ctx table, BP = caller frame*/)	[Borland RTL] build registration frame at BP+table[4], handler 11a0:26f3, push onto frame chain
+11a0:00c3	__ExitExceptBlock	void far pascal __ExitExceptBlock(uint16_t savedNext)	[Borland RTL] pop registration frame: *chainHead = savedNext (RETF 2)
+11a0:00da	xx_DefaultTerminate	void far xx_DefaultTerminate(void)	[Borland RTL; no Ghidra function] default terminate handler (DGROUP:31bc): calls abort() 1000:0186
+11a0:00e4	set_terminate	void (far* far set_terminate(void (far* f)(void)))(void)	[Borland RTL] return old terminate handler (vars+0Ah); install f only if non-NULL; no callers
+11a0:019d	terminate	void far terminate(void)	[Borland RTL] flush streams (1000:10b8), call terminate handler (vars+0Ah, DS=vars+12h) under EH frame, then abort()
+11a0:02b8	xx_DefaultUnexpected	void far xx_DefaultUnexpected(void)	[Borland RTL; no Ghidra function] default unexpected handler (DGROUP:31c0): calls terminate()
+11a0:02c1	set_unexpected	void (far* far set_unexpected(void (far* f)(void)))(void)	[Borland RTL] return old unexpected handler (vars+0Eh); install f only if non-NULL; no callers
+11a0:0350	unexpected	void far unexpected(void)	[Borland RTL] call unexpected handler (vars+0Eh, DS=vars+14h), then abort()
+11a0:043b	__GetPolymorphicDTC	uint16_t far __GetPolymorphicDTC(void far* obj, uint16_t vptrOffs)	[Borland RTL] dtor count (tpid+1Ah) of obj's dynamic type via near vptr; 0 if obj NULL; no callers
+11a0:048f	__GetPolymorphicDTC_far	uint16_t far __GetPolymorphicDTC_far(void far* obj, uint16_t vptrOffs)	[Borland RTL] same as 043b but vptr is a far pointer; no callers
+11a0:04e7	_ExceptInit	void far _ExceptInit(void)	[Borland RTL] startup (called from entry 1000:0006): cache SS in 3672, locate EH ctx (1000:2e99) into 3674, vars+20h = &vars+A8h, 31c4=31c6=DS
+11a0:058e	xx_JumpToHandler	void far xx_JumpToHandler(/*DX:AX target, BX new SP, CX new BP, DS/SI preset*/)	[Borland RTL; no Ghidra function] SP=BX, BP=CX, far-jump to DX:AX (enter catch / __except block)
+11a0:059a	__TypeIDName	const char far* far __TypeIDName(tpid far* t)	[Borland RTL] t ? (char far*)t + t->nameOffs : "<notype>" (DGROUP:35b0)
+11a0:05c1	__isSameTypeID	int far __isSameTypeID(tpid far* a, tpid far* b)	[Borland RTL] 1 if same pointer, or same size+mask (no TM_LOCALTYPE 0x80) and equal names
+11a0:065e	xx_isPublicBase	int near xx_isPublicBase(tpid far* derived, tpid far* base, void far* ctx, int needPublic)	[Borland RTL, xxtype] recursive search of base list (+0Ch) then vbase list (+0Ah) for base
+11a0:07af	xx_isCompatType	int near xx_isCompatType(tpid far* from, tpid far* to, int deref, void far* ctx)	[Borland RTL, xxtype] type compatibility walk through pointer (0x10) / member-pointer (0x400) levels incl. cv bits 0x3300
+11a0:091f	xx_AllocExceptRecord	void far* far xx_AllocExceptRecord(uint16_t size)	[Borland RTL] malloc(size); on failure use 128-byte emergency buffer (vars+20h) if size<=80h and free, else abort()
+11a0:09f3	xx_FreeExceptRecord	void far xx_FreeExceptRecord(void far* p)	[Borland RTL] if p is emergency buffer clear vars+4 bit0, else free(p)
+11a0:0a7d	xx_CatchTypeMatches	int near xx_CatchTypeMatches(tpid far* thrown, void far* ctx, tpid far* catchType, uint8_t throwFlags)	[Borland RTL] does catch(catchType) accept thrown type (refs 0x20, pointers 0x10, null-pointer flag)
+11a0:0b7c	xx_CallCopyCtor	void near xx_CallCopyCtor(void far* dst, void far* src, void far* fn, uint16_t mask)	[Borland RTL] invoke copy-ctor fn with calling convention from mask (24-way switch, tables 0e85/0eb5)
+11a0:0ee5	xx_CallDestructor	void near xx_CallDestructor(void far* obj, void far* dtor, uint16_t mask, int destroyVbases)	[Borland RTL] invoke dtor fn(obj, flags= vb?2:0) with calling convention from mask (table 107c)
+11a0:10ac	xx_CallDeleteOp	void near xx_CallDeleteOp(void far* p, void far* fn, uint16_t mask)	[Borland RTL] invoke class operator delete / delete[] fn(p) per mask (table 1181)
+11a0:11e5	xx_ThrowExceptionCore	void far xx_ThrowExceptionCore(tpid far* type, void far* obj, void far* a, void far* cctor, uint16_t ccMask, uint16_t flags, uint16_t line, const char far* file, void far* throwPC, int rethrow)	[Borland RTL] record name/file/line, alloc record (size+3Ah), copy object (+cctor), dtor original, RaiseException(0EEFFACEh,1,3,args)
+11a0:1689	_ThrowException	void far _ThrowException(tpid far* type, void far* obj, void far* a, void far* cctor, uint16_t ccMask, uint16_t flags, uint16_t line, const char far* file)	[Borland RTL] compiler 'throw' entry: core(...,return address,rethrow=0)
+11a0:16e1	_ReThrowException	void far _ReThrowException(uint16_t line, const char far* file)	[Borland RTL] 'throw;' : re-raise current record (vars+0); terminate() if none; no callers
+11a0:17b0	xx_DispatchDebugHook	void far xx_DispatchDebugHook(void)	[Borland RTL] empty hook (push/pop si,di) called before frame dispatch; debugger breakpoint target
+11a0:17b5	xx_DispatchException16	int far xx_DispatchException16(EXC_RECORD near* rec, CONTEXT16 far* ctx, uint16_t stopFrame)	[Borland RTL, Win16 SEH emulation] walk frame chain calling handlers; 0 if a handler returned 0, else 1
+11a0:18ba	xx_UnwindFrames16	void far xx_UnwindFrames16(uint16_t stopFrame, EXC_RECORD near* rec)	[Borland RTL, RtlUnwind analogue] flags|=2 and dispatch up to stopFrame (default record code 26h)
+11a0:1901	xx_RaiseDebugHook	void far xx_RaiseDebugHook(void near* ctx)	[Borland RTL; no Ghidra function] empty hook called at start of 1906
+11a0:1906	xx_RaiseException16	void far xx_RaiseException16(uint32_t code, uint32_t flags, uint32_t nArgs, const uint32_t far* args)	[Borland RTL; no Ghidra function] Win16 RaiseException emulation: build CONTEXT+record, dispatch, unwind, terminate/resume
+11a0:1da5	xx_DestroyObjectGuarded	void near xx_DestroyObjectGuarded(void far* obj, void far* dtor, uint16_t mask)	[Borland RTL] xx_CallDestructor(obj,dtor,mask,1) inside its own EH frame (table 1d93)
+11a0:1df1	xx_DestroyRecordObjects	void near xx_DestroyRecordObjects(EXC_REC far* r)	[Borland RTL] destroy thrown copy (r+3Ah) if r+38h, destroy catch param (r+36h) if r+39h; clear flags
+11a0:1ec7	_CatchCleanup	void far _CatchCleanup(void)	[Borland RTL] end of catch: unlink current record, restore frame state, destroy objects, free record via r+1Ah; no callers
+11a0:1f94	xx_LocateBaseInList	int near xx_LocateBaseInList(BASELIST far* l, int isVirtual, tpid far* want, void far* far* pObj)	[Borland RTL, xxtype] find base subobject in a base list, adjusting *pObj
+11a0:205d	xx_FindBaseSubobject	void far* far xx_FindBaseSubobject(void far* obj, tpid far* objType, tpid far* baseType)	[Borland RTL, xxtype] adjust obj to its baseType subobject via bases then vbases; NULL if none
+11a0:20dd	xx_InitCatchParam	void near xx_InitCatchParam(CATCH_ENTRY far* e, uint16_t frame, EXC_REC far* r, TRYBLOCK far* tb, uint16_t funcBP)	[Borland RTL] construct catch variable (copy/cctor/pointer/base adjust); may destroy thrown copy
+11a0:237e	xx_UnwindLocals	void near xx_UnwindLocals(uint16_t frame, uint16_t targetState)	[Borland RTL] walk context entries from frame state to target: type0 __finally call, type4 end-catch, type5 destroy locals (jump table 25a8)
+11a0:25b4	xx_UnwindTopFrameToState	void far xx_UnwindTopFrameToState(uint16_t state)	[Borland RTL] xx_UnwindLocals(*chainHead, state); called by longjmp 1000:3349
+11a0:25f5	xx_UnwindAndPopTopFrame	void far xx_UnwindAndPopTopFrame(void)	[Borland RTL] unwind top frame to state 0 and unlink it; no callers
+11a0:266a	xx_FindCatchHandler	CATCH_ENTRY far* near xx_FindCatchHandler(TRYBLOCK far* tb, EXC_REC far* r)	[Borland RTL] scan 16-byte catch entries (from tb+4) for first catch(...) or matching type
+11a0:26f3	_ExceptionHandler	int far _ExceptionHandler(EXC_RECORD near* rec, uint16_t frame, CONTEXT16 far* ctx, uint32_t dispCtx)	[Borland RTL; no Ghidra function; preceded by "**BCCxh1" at 26eb] per-frame handler: exception specs, try/catch, __try/__except, unwind
+11a0:2b7f	xx_DestroyByType	void far xx_DestroyByType(void far* obj, tpid far* t, int destroyVbases)	[Borland RTL] call t's dtor (t+1Eh/+22h) on obj inside an EH frame (table 2b61)
+11a0:2beb	xx_DestroyBasesReverse	void far xx_DestroyBasesReverse(void far* obj, BASEENT far* end, BASEENT far* begin, uint16_t count, int isVirtual, uint16_t seg)	[Borland RTL] destroy base subobjects in reverse list order
+11a0:2c6a	xx_DestroyPartialObject	void far xx_DestroyPartialObject(void far* obj, tpid far* t, uint32_t constructedCount, int destroyVbases, uint16_t seg)	[Borland RTL] destroy only the first N constructed subobjects (members @t+24h, bases, vbases)
+11a0:2f28	xx_DestroyPartialArray	void far xx_DestroyPartialArray(void far* arr, tpid far* arrType, uint32_t constructedCount, uint16_t seg)	[Borland RTL] destroy constructed elements of an array in reverse (uses 1000:02e0/031d long math)
+11a0:302e	xx_GetMostDerived	void far* far xx_GetMostDerived(void far* obj, tpid far* far* pType)	[Borland RTL] via vptr: obj -= vtbl[-4]; *pType = far tpid at (vtbl - vtbl[-2]) - 8
+11a0:30df	xx_DestroyLocalsList	uint16_t near xx_DestroyLocalsList(DTVAR far* list, uint32_t count, uint16_t frame, uint16_t funcBP)	[Borland RTL] destroy local/heap objects of a 10-byte dtor-variable list; call operator delete/[] (1000:01ca/01e4) or class op
+11a0:34e7	xx_GetBCCFrameState	uint16_t far xx_GetBCCFrameState(uint16_t frame)	[Borland RTL] if frame's handler is preceded by "**BCCxh1" (DGROUP:35b9) return frame+0Ch state else FFFFh; used by setjmp/longjmp
+11a0:3539	__ThrowFileName	const char far* far __ThrowFileName(void)	[Borland RTL; no Ghidra function] return vars+16h
+11a0:3572	__ThrowLineNumber	uint16_t far __ThrowLineNumber(void)	[Borland RTL; no Ghidra function] return vars+1Ah
+11a0:35a7	__ThrowExceptionName	const char far* far __ThrowExceptionName(void)	[Borland RTL; no Ghidra function] return vars+1Ch (-> name buffer vars+28h)
+11a0:35e0	typeinfo__typeinfo_copy	typeinfo far* far typeinfo__typeinfo_copy(typeinfo far* this, const typeinfo far& src)	[Borland RTL] private copy ctor: alloc 8 if this NULL, vptr=11a0:3bd4, then throws (typeinfo*)0 (tpid 11a0:3bb7)
+11a0:3648	typeinfo__operator_assign	typeinfo far& far typeinfo__operator_assign(typeinfo far* this, const typeinfo far& src)	[Borland RTL] returns this unchanged
+11a0:3659	typeinfo__dtor	void far typeinfo__dtor(typeinfo far* this, uint16_t flags)	[Borland RTL] virtual dtor: vptr=11a0:3bd4; if flags&1 operator delete(this)
+11a0:3690	typeinfo__operator_eq	int far typeinfo__operator_eq(const typeinfo far* this, const typeinfo far& o)	[Borland RTL] __isSameTypeID(this->tpp, o.tpp)
+11a0:36b8	typeinfo__operator_ne	int far typeinfo__operator_ne(const typeinfo far* this, const typeinfo far& o)	[Borland RTL] !operator==
+11a0:36db	typeinfo__before	int far typeinfo__before(const typeinfo far* this, const typeinfo far& o)	[Borland RTL] this->tpp NULL ->0; o.tpp NULL ->1; else strcmp(names)<0
+11a0:3753	typeinfo__name	const char far* far typeinfo__name(const typeinfo far* this)	[Borland RTL] __TypeIDName(this->tpp)
+11a0:3770	__GetTypeInfo	typeinfo far* far __GetTypeInfo(void far* obj, void far* vtbl, uint16_t, uint16_t, typeinfo far* result)	[Borland RTL] typeid(*obj): throw Bad_typeid (DGROUP:668e) if obj NULL; result->tpp = tpid from vtbl; no callers
+11a0:37ee	xx_DynCastSearch	void far* near xx_DynCastSearch(...)	[Borland RTL, xxtype] recursive base-graph search used by __DynamicCast (unique accessible target)
+11a0:3a31	__DynamicCast	void far* far __DynamicCast(void far* obj, void far* vtbl, tpid far* srcType, tpid far* dstType, int isReference)	[Borland RTL] dynamic_cast; NULL or throw Bad_cast (DGROUP:668f, tpid 11a0:3b8d) when isReference; no callers
+11a8:0000	string__string_copy	string far* far string__string_copy(string far* this, const string far& s)	[Borland RTL cstring] alloc 4 if this NULL; p = s.p; ++p->refs
+11a8:00e8	string__string_cstr	string far* far string__string_cstr(string far* this, const char far* cp)	[Borland RTL cstring] p = new TStringRef(cp, cp?strlen(cp):0, 0, 0, 0)
+11a8:0304	string__dtor	void far string__dtor(string far* this, uint16_t flags)	[Borland RTL cstring] if --p->refs==0 delete p (TStringRef dtor flags 3); if flags&1 operator delete(this)
+11a8:0389	string__assert_element	void far string__assert_element(const string far* this, uint16_t pos)	[Borland RTL cstring] throw string::outofrange("String reference out of range" DGROUP:35ce) unless pos < p->nchars
+11a8:0441	string__assert_index	void far string__assert_index(const string far* this, uint16_t pos)	[Borland RTL cstring] throw outofrange (msg DGROUP:35ec) unless pos <= p->nchars
+11a8:04f9	TSubString__assert_element	void far TSubString__assert_element(const TSubString far* this, uint16_t pos)	[Borland RTL cstring] throw outofrange (msg DGROUP:360a) unless pos < this->extent (+6)
+11a8:05ae	TStringRef__TStringRef	TStringRef far* far TStringRef__TStringRef(TStringRef far* this, const char far* s1, uint16_t n1, const char far* s2, uint16_t n2, uint16_t extra)	[Borland RTL cstring] refs=1, flags=0, nchars=n1+n2, capacity=round_capacity(nchars+extra), array=malloc(cap+1) (xalloc on fail), copy s1,s2, NUL
+11a8:0694	TStringRef__dtor	void far TStringRef__dtor(TStringRef far* this, uint16_t flags)	[Borland RTL cstring] free(array); if flags&1 operator delete(this)
+11a8:06f6	TStringRef__reserve	void far TStringRef__reserve(TStringRef far* this, uint16_t ic)	[Borland RTL cstring] flags|=1; nc=round_capacity(ic+1); if capacity-nc > freeboard: array=realloc(nc+1), capacity=nc
+11a8:0764	TStringRef__check_freeboard	void far TStringRef__check_freeboard(TStringRef far* this)	[Borland RTL cstring] nc=round_capacity(nchars); if capacity-nc > freeboard: shrink via realloc
+11a8:07cc	TStringRef__grow_to	void far TStringRef__grow_to(TStringRef far* this, uint16_t n)	[Borland RTL cstring] capacity=n; array=realloc(n+1); xalloc (1000:2151 on DGROUP:302c) if NULL
+11a8:082e	string__round_capacity	uint16_t far string__round_capacity(uint16_t nc)	[Borland RTL cstring] ((nc - initial_capac + resize_inc - 1)/resize_inc)*resize_inc + initial_capac
+11a8:086d	TStringRef__splice	void far TStringRef__splice(TStringRef far* this, uint16_t start, uint16_t extent, const char far* dat, uint16_t n)	[Borland RTL cstring] replace [start,start+extent) by n chars of dat (spaces if dat NULL), growing/shrinking buffer
+11a8:0a2a	string__set_case_sensitive	int far string__set_case_sensitive(int tf)	[Borland RTL cstring] old=DGROUP:35c2; 35c2=tf; return old
+11a8:0a47	string__set_paranoid_check	int far string__set_paranoid_check(int ck)	[Borland RTL cstring] old=DGROUP:35c4; set; return old
+11a8:0a64	string__skip_whitespace	int far string__skip_whitespace(int sk)	[Borland RTL cstring] old=DGROUP:35c6; set; return old
+11a8:0a81	string__initial_capacity	uint16_t far string__initial_capacity(uint16_t ic)	[Borland RTL cstring] old=DGROUP:35c8; set; return old
+11a8:0a9e	string__resize_increment	uint16_t far string__resize_increment(uint16_t ri)	[Borland RTL cstring] old=DGROUP:35ca; set (0 forced to 1); return old
+11a8:0ac8	string__max_waste	uint16_t far string__max_waste(uint16_t mw)	[Borland RTL cstring] old=DGROUP:35cc; set; return old
+11a0:0173	eh_tables_terminate	data (code seg) 0173-019c	EH context/dtor tables for terminate(); table entry point 11a0:018b
+11a0:0e85	jt_CallCopyCtor	uint16_t[48]	two 24-entry near jump tables for 11a0:0b7c (0e85 with 0x1000 mask bit, 0eb5 without)
+11a0:107c	jt_CallDestructor	uint16_t[24]	jump table for 11a0:0ee5
+11a0:1181	jt_CallDeleteOp	uint16_t[11]	jump table for 11a0:10ac
+11a0:1197	eh_tables_ThrowCore	data (code seg) 1197-11e4	EH tables for 11a0:11e5 (entry 11a0:11c7)
+11a0:1d7b	eh_tables_DestroyGuarded	data (code seg) 1d7b-1da4	EH tables for 11a0:1da5 (entry 11a0:1d93)
+11a0:25a8	jt_UnwindLocals	uint16_t[6]	jump table for 11a0:237e context-entry types 0..5
+11a0:26eb	bcc_handler_signature	char[8]	"**BCCxh1" immediately before _ExceptionHandler (frame ownership signature)
+11a0:2b25	jt_ExceptionHandler	uint16_t[6]	jump table for 11a0:26f3 context-entry types 0..5
+11a0:2b31	eh_tables_DestroyByType	data (code seg) 2b31-2b7e	EH tables for 11a0:2b7f (entry 11a0:2b61)
+11a0:3b8d	tpid_Bad_cast	tpid (14 bytes + name)	type descriptor 'Bad_cast' (size 1, mask 1)
+11a0:3ba1	tpid_Bad_typeid	tpid	type descriptor 'Bad_typeid' (size 1, mask 1)
+11a0:3bb7	tpid_typeinfo_ptr	tpid	type descriptor 'typeinfo *' (mask 2010h, base -> 11a0:3bd8)
+11a0:3bcc	vtbl_typeinfo	vtable header + 1 far slot	[-8] far tpid -> 3bd8, [-4] 0, [-2] 0, vptr value 11a0:3bd4: slot0 = typeinfo__dtor 11a0:3659
+11a0:3bd8	tpid_typeinfo	tpid	type descriptor 'typeinfo' (size 8, vptr at +0, dtor 11a0:3659)
+11a8:006d	tpid_xalloc_a	tpid	'xalloc' (size 6, base xmsg 11a8:00af, dtor 1000:2695)
+11a8:00af	tpid_xmsg_a	tpid	'xmsg' (size 4, dtor 1000:2466)
+11a8:01b0	tpid_TStringRef_ptr	tpid	'TStringRef *' (mask 2090h, base 11a8:028f)
+11a8:01c7	tpid_lengtherror_a	tpid	'string::lengtherror' (size 4, base xmsg 11a8:0257, dtor 1000:2719)
+11a8:0215	tpid_xalloc_b	tpid	'xalloc' (base 11a8:0257, dtor 1000:2768)
+11a8:0257	tpid_xmsg_b	tpid	'xmsg' (dtor 1000:2466)
+11a8:028f	tpid_TStringRef	tpid	'TStringRef' (size 12, base TReference 11a8:02d5, dtor 11a8:0694)
+11a8:02d5	tpid_TReference	tpid	'TReference' (size 2, no dtor)
+11a8:0ae5	tpid_lengtherror_b	tpid	'string::lengtherror' (base 11a8:0b75, dtor 1000:291e)
+11a8:0b33	tpid_xalloc_c	tpid	'xalloc' (base 11a8:0b75, dtor 1000:296d)
+11a8:0b75	tpid_xmsg_c	tpid	'xmsg' (dtor 1000:2466)
+11a8:0bad	tpid_string	tpid	'string' (size 4, dtor 11a8:0304)
+11a8:0be7	tpid_outofrange	tpid	'string::outofrange' (size 4, base xmsg 11a8:0b75, dtor 1000:29bc); thrown by 11a8:0389/0441/04f9 with cctor 1000:28e7 mask 5
+11b8:31bc	eh_Vars_terminate	void (far*)(void)	= vars+0Ah, initialised (reloc) to 11a0:00da
+11b8:31c0	eh_Vars_unexpected	void (far*)(void)	= vars+0Eh, initialised (reloc) to 11a0:02b8
+11b8:31c4	eh_Vars_terminateDS	uint16_t	= vars+12h, DS loaded for terminate handler; set to DGROUP by _ExceptInit
+11b8:31c6	eh_Vars_unexpectedDS	uint16_t	= vars+14h, DS loaded for unexpected handler; set to DGROUP by _ExceptInit
+11b8:35ec	s_strref_range_2	char[30]	same text (assert_index)
+11b8:360a	s_strref_range_3	char[30]	same text (TSubString::assert_element)

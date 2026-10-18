@@ -1,0 +1,57 @@
+1150:0000	Quiz_SetTierRange	void near Quiz_SetTierRange(void)	Set question index range [g_quizRangeLo,g_quizRangeHi] from tier g_quizTier via table 11b8:1de7 (tier>=4 -> 0..358)
+1150:0057	Quiz_CountStatusInRange	void near Quiz_CountStatusInRange(void)	Count questions in range with status 0/1/2/3 into g_quizCount[4] (11b8:60f2..60f8)
+1150:00a7	Quiz_PickByStatus	void near cdecl Quiz_PickByStatus(uint8_t status, int n, int far *out)	Randomly pick n unpicked questions of a status (marks 0x80), falls back to next status 0->1->2->3->0 recursively
+1150:01d5	Quiz_FillSlots	void near Quiz_FillSlots(void)	Pick 3 unseen + 3 missed + 3 retried questions, shuffle into the 9 elf slots, random answer permutation per slot
+1150:0314	Quiz_ResetHistory	void far Quiz_ResetHistory(void)	Clear all 359 question status bytes (new player)
+1150:0327	Quiz_NewRound	void far Quiz_NewRound(void)	Start of a climb: clear 0x80 marks, promote tier if >=80% first-try correct, then Quiz_FillSlots
+1150:0375	Quiz_CarryMissedToNextLevel	void far cdecl Quiz_CarryMissedToNextLevel(int level)	For level<2: copy slots of that level whose question was last answered wrong into slot+3 (next level)
+1150:0403	Quiz_JudgeAnswer	int near cdecl Quiz_JudgeAnswer(int displayPos)	Grade chosen answer; update status/tried flags; show correct (and add clue) or wrong screen; return 1 if correct
+1150:049a	Quiz_ShowCorrectScreen	void near Quiz_ShowCorrectScreen(void)	Correct-answer screen: effect 7012, picture 2011, random praise text + clue word, narration, wait for click
+1150:06ac	Quiz_NarratePraise	int far cdecl Quiz_NarratePraise(int voice, int msgIdx, int clueSnd)	Play voice-bank praise sound then clue-word sound (7300/7400/7500 + n); returns 1 if interrupted
+1150:0748	Quiz_ShowWrongScreen	void near Quiz_ShowWrongScreen(void)	Wrong-answer screen: effect 7008, picture 2011, random "try again" text, narration, wait for click
+1150:0891	Quiz_NarrateSorry	int far cdecl Quiz_NarrateSorry(int voice, int msgIdx)	Play voice-bank "sorry" sound (bank+4+msgIdx); returns 1 if interrupted
+1150:0901	Quiz_ParseQuestion	void near cdecl Quiz_ParseQuestion(char far *text)	Split OTHR question text in place into question part (ends at 3rd consecutive CR) and 3 answers; line metrics
+1150:0a97	Quiz_DrawQuestionScreen	void near Quiz_DrawQuestionScreen(void)	Lay out and draw background 2000, question, 3 permuted answers, speaker button; register hotspots 0xa7f/0xa80-2/0xa70+/0xa88
+1150:0d2d	Quiz_HighlightItem	void near cdecl Quiz_HighlightItem(int item, int frame)	Item<10 answer row: frame (2 red rects) or reading highlight; item>=10 question line: colour-remap highlight
+1150:0e30	Quiz_UnhighlightItem	void near cdecl Quiz_UnhighlightItem(int item)	Restore answer row / question line rect from the back page (y+384) and present it
+1150:0ed6	Quiz_DrawSpeakerFocus	void far cdecl Quiz_DrawSpeakerFocus(int focused)	Draw or erase the focus frame around the speaker button and redraw icon 2001
+1150:0f85	Quiz_NextItem	int near cdecl Quiz_NextItem(int item)	Next keyboard-selectable item (untried answers 0..2, then question lines 10.. when voice on)
+1150:0fcb	Quiz_PrevItem	int near cdecl Quiz_PrevItem(int item)	Previous keyboard-selectable item (reverse of Quiz_NextItem)
+1150:100a	Quiz_AskQuestion	int far cdecl Quiz_AskQuestion(int slot)	Modal elf question for slot (level*3+elf-1): load, draw, input loop, grade, award coins, cleanup; returns 1 if correct
+1150:139e	Quiz_KeyTable	uint16_t[10] codes + uint16_t[10] near targets	switch table of Quiz_AskQuestion: 0x0d,0x1b,0x125..0x128,0x2125..0x2128
+1150:13c6	Quiz_FreeResources	void far Quiz_FreeResources(void)	Free question text resource (60ea) and speaker icon resource (6139)
+1150:1409	Quiz_SpeakLine	void far cdecl Quiz_SpeakLine(int line)	If voice on: play narration sound base[q]+line, interruptible; sets g_quizInterrupted
+1150:1449	Quiz_SpeakAll	void far Quiz_SpeakAll(void)	Read whole question: each line highlighted+spoken, 250 ms pause, each untried answer after 500 ms; stops on interrupt
+1150:14d7	Quiz_SpeakAnswer	void far cdecl Quiz_SpeakAnswer(int displayPos)	Unless answers are silent for this question: play base[q]+nLines+perm[pos]
+1158:0000	FarMemFill	void far cdecl FarMemFill(void far *p, int n, uint8_t value)	Byte fill of n bytes (memset equivalent, game-local)
+1158:0027	Users_MakeDirs	void far Users_MakeDirs(void)	mkdir c:\tlcwin and c:\tlcwin\tmtwincd (errors ignored)
+1158:0040	Users_ReadFile	int far cdecl Users_ReadFile(void far *buf, int size)	Read users.dat: skip 4-byte header, read size bytes; on any failure zero buf; return 1 on success
+1158:00bb	Users_WriteFile	void far cdecl Users_WriteFile(void far *buf, int size)	Create users.dat, write magic "USR\x1a" + size bytes; on failure show Write Error box (11b8:2084)
+1160:0000	ULongToDec	void far cdecl ULongToDec(uint32_t v, char far *out)	Unsigned 32-bit to decimal ASCII (caller passes an ignored 3rd arg 10)
+1160:009f	FarStrCmp	int far cdecl FarStrCmp(const char far *a, const char far *b)	Case-sensitive byte compare (strcmp semantics, far strings)
+1160:00ee	SignIn_Run	void far cdecl SignIn_Run(int restart)	Club Sign-In screen: save current player, load users, draw backdrop, loop until a player is chosen/created
+1160:029c	SignIn_Step	void near SignIn_Step(void)	Restore panel; if no players go to name entry, else draw list and run list loop
+1160:02e0	SignIn_EnterNewName	void near SignIn_EnterNewName(void)	"Enter New Player Name" dialog loop with blinking caret; ends on new player created or cancel
+1160:046c	SignIn_NameKeyTable	uint16_t[7] codes + uint16_t[7] near targets	switch table of SignIn_EnterNewName: 0x1b/0x4af/0x24af cancel; 0x44af,0x44b0,0x84af,0x84b0 ignored
+1160:0488	SignIn_DrawCaret	void near cdecl SignIn_DrawCaret(int colour)	Draw 8x10 caret block after typed part of name in given colour
+1160:04f6	SignIn_ConfirmExit	void near SignIn_ConfirmExit(void)	"Exit" Yes/No box (11b8:2234); Yes -> free art and longjmp quit
+1160:051b	SignIn_DrawList	void near SignIn_DrawList(void)	Draw all player rows + "Start New Player" row; register hotspots 0x4ae (rows) and 0x4ad (new row)
+1160:0595	SignIn_ListLoop	void near SignIn_ListLoop(void)	Player list input loop (arrows, Enter, Ctrl-R remove, Esc exit, mouse, type-to-create)
+1160:07b8	SignIn_ListKeyTable	uint16_t[31] codes + uint16_t[31] near targets	switch table of SignIn_ListLoop (Enter, Ctrl-R, Esc, Up, Down, hotspots 0x4a9..0x4af with flags)
+1160:0834	SignIn_ClearPanel	void near SignIn_ClearPanel(void)	Fill bottom panel (0,288,512,96) black and present
+1160:0869	SignIn_DrawBottomPanel	void near SignIn_DrawBottomPanel(void)	Draw BNDL 322 entry 3 (PMAP 2183) at (0,288) and present
+1160:089f	SignIn_RemovePlayer	void near cdecl SignIn_RemovePlayer(int index)	Confirm (11b8:21e6) then delete record, shift later records up, decrement count; always rewrite users.dat
+1160:0957	SignIn_NameKey	void near cdecl SignIn_NameKey(int key)	Name entry key handler: Backspace, Enter/OK (trim, duplicate check, create), printable chars (max 8)
+1160:0ab0	SignIn_DrawNameBox	void near SignIn_DrawNameBox(void)	White box (140,182,192,36) with black frame; capitalise first char; draw name at (152,191)
+1160:0b1b	SignIn_DrawRow	void near cdecl SignIn_DrawRow(uint8_t row, uint8_t normal)	Draw one list row (bar, name, Trainee/stars/Champion, treasure total) or the "Start New Player" row
+1160:0cdb	SignIn_DrawNumberRight	void near cdecl SignIn_DrawNumberRight(int rightX, int y, uint32_t v)	Format v with thousands commas (<=7 digits) and draw right-aligned at rightX
+1160:0dc8	SignIn_CommaJumpTable	uint16_t[7]	switch on strlen 1..7 in SignIn_DrawNumberRight
+1160:0dd6	Users_Load	void near Users_Load(void)	Allocate table if needed, read users.dat, count leading non-empty records into g_userCount
+1160:0e2d	SignIn_DrawBackground	void near SignIn_DrawBackground(void)	Draw panel PMAP 2180 at (27,54), copy screen to back page, present full screen
+1160:0e97	SignIn_LoadArt	void near SignIn_LoadArt(void)	Load BNDL 322; cache row bar pointers and row width/height
+1160:0f00	SignIn_FreeArt	void near SignIn_FreeArt(void)	Free BNDL 322 and stop music
+1160:0f1f	SignIn_FreeArtAndFlush	void near SignIn_FreeArtAndFlush(void)	SignIn_FreeArt then Input_Flush
+1160:0f28	Users_SaveCurrent	void far Users_SaveCurrent(void)	Copy game state into current record, append if new, sort by treasure total desc, relocate index, write users.dat
+1160:137d	Users_LoadSelected	void near Users_LoadSelected(void)	Copy record g_userSel into game globals (name, options, counters, quiz state, room state)
+1160:1632	Users_InitNewPlayer	void near Users_InitNewPlayer(void)	Default game state for a new player; sets g_nameDone=1
+11b8:1f59	s_quizPeriod	char[2]	"." drawn after the clue word on the correct-answer screen

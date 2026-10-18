@@ -1,0 +1,91 @@
+1058:0000	PixMap_PackRUND	int32_t far PixMap_PackRUND(const PixMap far* src, uint8_t far* dst)	RLE-compress a raw 8bpp PixMap into RUND form (hdr w,h + "RUND" + packets); returns packed byte count incl. 8-byte header [only reached from dead code]
+1058:0400	PixMap_UnpackRUND	int32_t far PixMap_UnpackRUND(const uint8_t far* src, PixMap far* dst)	decode RUND packets into raw 8bpp PixMap (copies 4-byte w,h header); returns source bytes consumed
+1058:0566	PixMap_IsRUND	int16_t far PixMap_IsRUND(const PixMap far* pm)	_fmemcmp(pm+4, "RUND" @DGROUP 0x997, 4)==0
+1058:058a	Rect_SetXYWH	void far Rect_SetXYWH(RECT far* r, int16_t x, int16_t y, int16_t w, int16_t h)	r = {x, y, x+w, y+h}
+1058:05bc	Gfx_BlitToWindow	void far Gfx_BlitToWindow(int16_t x, int16_t y, int16_t w, int16_t h)	clip to 512x384, then present offscreen rect: WinG path (1008:02b6) or [16-col: pack->planar 1050:09e7] BitBlt(hdcWin @x+0x86e,y+0x870 <- hdcMem @x,y, SRCCOPY)
+1058:068e	Gfx_AddDirtyRect	void far Gfx_AddDirtyRect(int16_t x, int16_t y, int16_t w, int16_t h)	if g_dirtyEnabled && count<256: clip to 512x384 and append {x,y,w,h} to g_dirtyRects
+1058:0731	Gfx_FlushDirtyRects	void far Gfx_FlushDirtyRects(void)	Gfx_BlitToWindow every queued dirty rect, then clear the list
+1058:076f	Gfx_ClearDirtyRects	void far Gfx_ClearDirtyRects(void)	g_dirtyCount = 0
+1058:0776	Gfx_BlitFullScreen	void far Gfx_BlitFullScreen(void)	[no Ghidra function; unreferenced] Gfx_BlitToWindow(0,0,512,384)
+1058:0788	Gfx_BlitRectToWindow	void far Gfx_BlitRectToWindow(const RECT far* r)	Gfx_BlitToWindow(l, t, r-l, b-t); used by WM_PAINT (1010:0274)
+1058:07d0	Gfx_FillRectColor	void far Gfx_FillRectColor(const RECT far* r, int16_t colorIdx)	fill rect in offscreen with logical colour 0..15: WinG 1008:0418 / 256: GDI FillRect PALETTEINDEX(nearest) / 16: 1050:097c nibble fill
+1058:08d8	Gfx_DrawPixel	void far Gfx_DrawPixel(int16_t x, int16_t y)	Gfx_FillRectColor({x,y,1,1}, current colour)
+1058:090f	Gfx_DrawHLine	void far Gfx_DrawHLine(int16_t x, int16_t y, int16_t w)	Gfx_FillRectColor({x,y,w,1}, current colour)
+1058:0947	Gfx_DrawVLine	void far Gfx_DrawVLine(int16_t x, int16_t y, int16_t h)	Gfx_FillRectColor({x,y,1,h}, current colour)
+1058:097f	Gfx_FillRect	void far Gfx_FillRect(int16_t x, int16_t y, int16_t w, int16_t h)	Gfx_FillRectColor({x,y,w,h}, current colour)
+1058:09b8	Gfx_FrameRectColor	void far Gfx_FrameRectColor(const RECT far* r, int16_t colorIdx)	1-px outline: WinG 1008:050b / 256: GDI FrameRect / 16: four 1050:097c lines (top/left lines 1 px longer)
+1058:0b31	Gfx_FrameRect	void far Gfx_FrameRect(int16_t x, int16_t y, int16_t w, int16_t h)	Gfx_FrameRectColor({x,y,w,h}, current colour)
+1058:0b6a	Gfx_CopyOffscreenRect	void far Gfx_CopyOffscreenRect(int16_t sx, int16_t sy, int16_t w, int16_t h, int16_t dx, int16_t dy)	AddDirty(dx,dy,w,h); copy w x h block inside the offscreen buffer (1050:0899 8bpp / 1050:0732 4bpp); used for layer copies (back page y+384, pristine play-field y 788)
+1058:0bbc	PixMap_GetWidth	int16_t far PixMap_GetWidth(const PixMap far* pm)	return pm->width (u16 @+0); exported far accessor
+1058:0bd4	PixMap_GetHeight	int16_t far PixMap_GetHeight(const PixMap far* pm)	return pm->height (u16 @+2); exported far accessor
+1058:0bed	PixMap_Width_	int16_t far PixMap_Width_(const PixMap far* pm)	identical copy of 0bbc used only inside 1058
+1058:0c05	PixMap_Height_	int16_t far PixMap_Height_(const PixMap far* pm)	identical copy of 0bd4 used only inside 1058
+1058:0c1e	PixMap_UnpackedSize	int32_t far PixMap_UnpackedSize(const PixMap far* pm)	(int32)w*h + 4 (F_LXMUL@)
+1058:0c4e	PixMap_SaveBufSize	int32_t far PixMap_SaveBufSize(int16_t w, int16_t h)	(w+2)*h + 4 = buffer size for Gfx_SaveRect
+1058:0c78	PixMap_DrawOpaque	void far PixMap_DrawOpaque(int16_t x, int16_t y, const PixMap far* pm)	unclipped opaque copy into offscreen: 16-col 1050:0029; 256 RUND 1050:03e7(key=-1); 256 raw 1050:00c9
+1058:0cf3	PixMap_DrawOpaqueOrFlippedWhiteKey	void far PixMap_DrawOpaqueOrFlippedWhiteKey(int16_t x, int16_t y, const PixMap far* pm, int16_t flag)	flag==0: PixMap_DrawOpaque; else key:=white, PixMap_DrawSprite(x,y,pm,flip=1), key:=default
+1058:0d43	PixMap_DrawKeyed	void far PixMap_DrawKeyed(int16_t x, int16_t y, const PixMap far* pm)	transparent (key g_transColor) draw clipped to g_clip; RUND fully inside clip drawn directly, else unpacked to temp
+1058:0f7e	PixMap_DrawShadow	void far PixMap_DrawShadow(int16_t x, int16_t y, const PixMap far* pm)	[dead] like DrawKeyed but 256-col replaces dest pixels under opaque src with shadowTable[dest] (DGROUP 0x876); 16-col = normal keyed draw
+1058:114c	PixMap_DrawKeyedFlipped	void far PixMap_DrawKeyedFlipped(int16_t x, int16_t y, const PixMap far* pm)	horizontally mirrored transparent draw clipped to g_clip (1050:04e4 / 1050:06a7)
+1058:1320	PixMap_DrawSprite	void far PixMap_DrawSprite(int16_t x, int16_t y, const PixMap far* pm, int16_t flipH)	Gfx_AddDirtyRect(x,y,w,h); flipH ? DrawKeyedFlipped : DrawKeyed (44 call sites)
+1058:1379	PixMap_DrawShadowSprite	void far PixMap_DrawShadowSprite(int16_t x, int16_t y, const PixMap far* pm)	[dead] Gfx_AddDirtyRect + PixMap_DrawShadow
+1058:13be	PixMap_ReplaceColor	void far PixMap_ReplaceColor(PixMap far* pm, uint8_t from, uint8_t to)	[dead] replace one pixel value in a PixMap (RUND: unpack, replace 1050:0bc9, repack in place; 16-col 1050:0b6f)
+1058:1493	Gfx_CreateSysMemBitmap	HBITMAP far Gfx_CreateSysMemBitmap(int16_t w, int16_t h, int16_t planes, int16_t bpp)	CreateBitmap repeatedly until GetFreeSpace shows the bits came from the global heap; delete the earlier ones; return the last
+1058:1525	Gdi_GetBitmapBitsHandle	HGLOBAL far Gdi_GetBitmapBitsHandle(uint16_t gdiHeapSel, HBITMAP hbm)	GDI-internal hack: *(gdiHeap:*(gdiHeap:hbm) + 0x14) = global handle of the DDB bits
+1058:153b	Gfx_AllocPacked4bpp	uint16_t far Gfx_AllocPacked4bpp(int32_t w, int32_t h)	GlobalAlloc(GMEM_MOVEABLE|GMEM_ZEROINIT, w*h/2), lock, return selector (0 on failure)
+1058:1578	Gfx_PaintWindowBorders	void far Gfx_PaintWindowBorders(void)	fill the 4 client-area bands around the 512x384 game rect (offset 0x86e/0x870) with BLACK_BRUSH on hdcWin
+1058:1643	Gfx_SaveRect	void far Gfx_SaveRect(int16_t x, int16_t y, int16_t w, int16_t h, PixMap far* out)	align x down / w up to even, copy offscreen rect into out (writes w,h header) via 1050:0c6e / 1050:0c0b
+1058:1695	Gfx_RestoreRect	void far Gfx_RestoreRect(int16_t x, int16_t y, const PixMap far* saved)	PixMap_DrawOpaque(x & ~1, y, saved)
+1058:16b5	Remap_BuildTable	void far Remap_BuildTable(const uint8_t far* spec, uint8_t far* table)	table[i]=i; for n=spec[0] pairs (new,old): table[old]=new [reached only from dead code]
+1058:1712	Remap_ApplyToBytes	void far Remap_ApplyToBytes(uint8_t far* p, int16_t n, const uint8_t far* spec)	build table from spec, p[i]=table[p[i]] for n bytes (1050:0ccf) [dead]
+1058:174b	PixMap_RemapColors	void far PixMap_RemapColors(PixMap far* pm, const uint8_t far* spec)	[dead] remap pixel values of a PixMap through a spec (RUND: unpack, remap, repack in place)
+1058:1825	Gfx_RemapRect	void far Gfx_RemapRect(int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t far* spec)	remap offscreen rect through spec table (1050:0db5 / 1050:0cfa) [only caller is dead 187f]
+1058:187f	Gfx_InvertRect16	void far Gfx_InvertRect16(int16_t x, int16_t y, int16_t w, int16_t h)	[dead] swap logical colours i <-> 15-i inside rect (Mac InvertRect emulation)
+1058:19b2	Gfx_HighlightRect	void far Gfx_HighlightRect(int16_t x, int16_t y, int16_t w, int16_t h)	recolour rect: everything->yellow(14), black(0)->blue(1), red(4)->brown(6), yellow(14)->blue(1); used by 1150 text highlight
+1058:1c1b	PixMap_RemapRUND	void far PixMap_RemapRUND(PixMap far* pm)	in-place: run values and literal bytes of RUND packets := g_palRemap[v] (DGROUP 0x4193)
+1058:1d28	PixMap_RemapToSystem	void far PixMap_RemapToSystem(PixMap far* pm)	RUND ? PixMap_RemapRUND : 1050:0b36 (raw bytes via g_palRemap); applied to every PMAP loaded in 256-colour mode
+1060:0000	Font_BlitGlyph4bpp	int16_t far Font_BlitGlyph4bpp(uint16_t x, uint16_t y, uint8_t ch)	[asm] draw set bits of glyph ch in pen nibble (g_penPixel) into packed 4bpp offscreen; returns glyph width
+1060:01ef	Font_BlitGlyph8bpp	int16_t far Font_BlitGlyph8bpp(uint16_t x, uint16_t y, uint8_t ch)	[asm] same for 8bpp offscreen (row pitch dword @DGROUP 0x99c = 512); returns glyph width
+1060:02e4	Font_GlyphWidth_	int16_t far Font_GlyphWidth_(uint8_t ch)	[asm] return g_fontWidths[ch]
+1068:0000	Font_Load	void far Font_Load(int16_t resId, int16_t slot)	g_fonts[slot] = Res_LoadCopy("FFNT", resId)
+1068:0024	Font_Init	void far Font_Init(void)	Font_Load(999, 0); Font_Select(0)  (called from 1010:00af)
+1068:0039	Font_Free	void far Font_Free(int16_t slot)	DisposePtrDeep(g_fonts[slot]); g_fonts[slot]=NULL
+1068:006b	Font_Shutdown	void far Font_Shutdown(void)	Font_Free(0)  (called from 1010:00b9)
+1068:0073	Font_Select	void far Font_Select(int16_t slot)	cache FFNT table pointers: height, widths, offLo, offHi, bitmap base
+1068:00d5	Font_GetCurrent	int16_t far Font_GetCurrent(void)	[no Ghidra function; unreferenced] return g_curFont
+1068:00d9	Font_GetHeight	int16_t far Font_GetHeight(void)	return g_fontHeight (FFNT byte 2)
+1068:00dd	Font_CharWidth	int16_t far Font_CharWidth(uint8_t ch)	return g_fontWidths[ch]
+1068:00f6	Font_DrawChar	int16_t far Font_DrawChar(int16_t x, int16_t y, uint8_t ch)	dispatch to 1060:0000 (16-col) / 1060:01ef (256); returns advance width
+1070:0000	Screen_Clear	void far Screen_Clear(void)	SetForeColor(0 black); Gfx_FillRect(0,0,512,768); Gfx_BlitToWindow(0,0,512,384)
+1070:002d	Screen_DissolveCopy	void far Screen_DissolveCopy(int16_t sx, int16_t sy, int16_t w, int16_t h, int16_t dx, int16_t dy)	16-pass ordered-dither dissolve of an offscreen rect onto another (2x2 cells, tables @0x9ae/0x9be), blit after each pass
+1070:011c	Fx_FadeIn_Stub	int16_t far Fx_FadeIn_Stub(int16_t arg)	returns 1; no-op stand-in (inferred: Mac palette fade-in); args -1, -2, 0x7ffe
+1070:0120	Fx_FadeOut_Stub	int16_t far Fx_FadeOut_Stub(int16_t arg)	returns 1; no-op stand-in (inferred: Mac palette fade-to-black); args -1, -2, 0x7ffe
+1078:0000	Menu_SetMenuBar	void far Menu_SetMenuBar(MenuBarDef far* def)	destroy old HMENU, build popup menus from def (NULL = no menu), SetMenu+DrawMenuBar, g_menuDef=def
+1078:0135	Menu_OnCommand	void far Menu_OnCommand(uint16_t cmd)	WM_COMMAND: if !g_inResourceLoad: disable menus, call handler[cmd&0xff] of menu cmd>>8, re-enable
+1078:01b1	Menu_IsEnabled	int16_t far Menu_IsEnabled(void)	return g_menusEnabled
+1078:01b5	Menu_EnableAll	void far Menu_EnableAll(int16_t enable)	EnableMenuItem(MF_BYPOSITION | (enable?MF_ENABLED:MF_GRAYED|MF_DISABLED)) on every top-level menu; DrawMenuBar
+1080:0000	WinDlg_RunModal	int16_t far WinDlg_RunModal(LPCSTR templateName, FARPROC dlgProc)	g_inDialog=1; Sound_Suspend; DialogBox(hInst, name, hwndMain, MakeProcInstance(proc)); Sound_Restore; g_inDialog=0
+1080:005f	Dlg_CenterOnScreen	void far Dlg_CenterOnScreen(HWND h)	MoveWindow to centre of SM_CXSCREEN x SM_CYSCREEN (no repaint)
+1080:00c1	Dlg_CenterOverMain	void far Dlg_CenterOverMain(HWND h)	[dead] centre over main window (or desktop), clamped to desktop, repaint
+1080:01b9	OkDialogProc	BOOL far pascal OkDialogProc(HWND, UINT, WPARAM, LPARAM)	exported OKDIALOGPROC: WM_INITDIALOG centre; IDOK/IDCANCEL -> EndDialog(0)
+1080:0201	NoMidiProc	BOOL far pascal NoMidiProc(HWND, UINT, WPARAM, LPARAM)	exported NOMIDIPROC: 0xFA Continue -> EndDialog(checkbox 0xFC ? 1 : 0); 2/0xFB Exit -> EndDialog(-1)
+1080:026c	DesignedFor640x480Proc	BOOL far pascal DesignedFor640x480Proc(HWND, UINT, WPARAM, LPARAM)	exported; same logic as NoMidiProc via jump table (ids 2,0xFA,0xFB,0xFC)
+1080:02fa	RunIn16ColorProc	BOOL far pascal RunIn16ColorProc(HWND, UINT, WPARAM, LPARAM)	exported (ordinal 3) but never referenced (name only in resident-name table); same logic as NoMidiProc
+1088:0000	Wave_Init	int16_t far Wave_Init(void)	g_waveAvail = waveOutGetNumDevs()!=0; returns it (AX)
+1088:0014	Wave_Play	void far Wave_Play(const SSND far* snd, int32_t startSample)	stop current; waveOutOpen(WAVE_MAPPER, PCM 8-bit mono @snd->rate, CALLBACK_WINDOW hwndMain); prepare+write one WAVEHDR at snd+12+start
+1088:0114	Wave_Stop	void far Wave_Stop(void)	waveOutReset/Unprepare/Close if open; drain pending MM_WOM_DONE messages; g_waveState=-1
+1088:0175	Wave_IsPlaying	int16_t far Wave_IsPlaying(void)	if an MM_WOM_DONE is queued: remove it and Wave_Stop; return g_waveState != -1
+1088:01a9	Wave_PlayResUntilEvent	int16_t far Wave_PlayResUntilEvent(int16_t sndId, const uint16_t far* stopEvents)	lock SSND resource, play, poll input: stop early on an event in the 0-terminated list (compared as code&0xfff) or 0x13 = Ctrl+S (event left queued); other events discarded; returns 1 if interrupted
+1088:023a	Wave_PlaySync	void far Wave_PlaySync(const SSND far* snd)	[dead] Wave_Play(snd,0); busy-wait Wave_IsPlaying; Wave_Stop
+1090:0000	Midi_Init	int16_t far Midi_Init(void)	choose B/E MIDI set from midimap.cfg setup name, open MCI "sequencer", verify the sequencer port is the MIDI Mapper; returns 1 if music usable
+1090:023d	Midi_GetSoundsDir	void far Midi_GetSoundsDir(char far* buf)	if buf empty: GetModuleFileName, truncate after last '\' or ':', append "SOUNDS\"
+1090:02af	Midi_Shutdown	void far Midi_Shutdown(void)	if MIDI ok: MCI_CLOSE the open track and the sequencer device
+1090:02e9	Midi_OpenTrack	void far Midi_OpenTrack(int16_t musicId)	map id 9000..9009 -> file, patch 'B'/'E' prefix, MCI_OPEN element <exe>\SOUNDS\[B|E]name.mid; g_trackDev = id; g_savedPos=0
+1090:0388	Midi_PlayTrack	void far Midi_PlayTrack(int16_t musicId)	close current track, open new; if open and app active (DGROUP 0x49a): g_curMusic=id, MCI_PLAY with MCI_NOTIFY to hwndMain (called from 1128:0098, 1128:00e7)
+1090:03e6	Midi_OnPlayDone	void far Midi_OnPlayDone(void)	[no Ghidra function; hand-decoded] MM_MCINOTIFY/SUCCESSFUL handler (1010:052e): loop pos -1 -> Midi_Stop, else paused=1, savedPos=loopPos, Midi_Resume
+1090:0413	Midi_Stop	void far Midi_Stop(void)	MCI_STOP + MCI_CLOSE the track device; g_curMusic = -1
+1090:044b	Midi_Pause	void far Midi_Pause(void)	if not paused: non-looping track -> Midi_Stop; else save MCI_STATUS position, MCI_STOP, paused=1
+1090:04bf	Midi_Resume	void far Midi_Resume(void)	if paused and open: MCI_SEEK(MCI_WAIT|MCI_TO, saved pos); MCI_PLAY notify; paused=0
+1090:0519	Midi_IsPlaying	int16_t far Midi_IsPlaying(void)	g_curMusic!=-1 && g_trackDev!=0 && g_midiOk
+1090:0536	Sound_PauseAll	void far Sound_PauseAll(void)	Wave_Stop(); Midi_Pause()  (from 1010:05c8 app-deactivate and 10d0)
+1090:0540	Sound_ResumeAll	void far Sound_ResumeAll(void)	Midi_Resume()  (from 1010:05db app-activate and 10d0)

@@ -1,0 +1,55 @@
+10f8:0000	NetShop_Tick	void far NetShop_Tick(int16_t layerDy)	Per-frame net-shop door state machine (g_netShopState 0..7); does nothing unless layerDy==0; draws PMAP 1320/1322/1324 (door open, net inside) or 1321/1323/1325 (empty) at the room's niche, restores closed door from layer 2
+10f8:0231	NetShop_Tick_jtab	uint16_t[8]	Code-segment switch table of NetShop_Tick: states 0..7 -> {001f,0022,001f,00d8,018e,018e,018e,0195}
+10f8:0241	NetShop_OnNetTaken	void far NetShop_OnNetTaken(void)	Player picked up the net: state=3, playerHidden=0, player frame=60 (+w/h), inputLocked=0, shopCoinsLeft=4, Inv_AddNets(+10)
+10f8:0285	NetShop_DrawSign	void far NetShop_DrawSign(int16_t layerDy)	Rooms 13/24/36 only: if layerDy==0 restore sign rect from layer 2; draw BNDL 302 frame (4-shopCoinsLeft) at (signX[level], 24+layerDy)
+1100:0000	Layout_ApplyRecord	void near Layout_ApplyRecord(int16_t level, const LayoutRec far* rec)	Copy the 18 spot (kind,content) pairs of a 0x26-byte layout record into fixed room slots of mountain level 0/1/2, plus gate (0xFE) and net-shop (0xFD) marker slots
+1100:04b5	Layout_GenerateClimb	void far Layout_GenerateClimb(void)	Clear all 50x3 spot slots to 0xFF; load OTHR 10550+rankTier; pick 3 distinct random records (one per level), apply them, remember key-object flags/kind; then Clue_ResolveAttributes
+1100:0638	Spots_LoadRoomPictures	void far Spots_LoadRoomPictures(void)	For the current room's 3 slots: kind<0xFD -> g_spotPict[i]=GetResource(1400+kind) else NULL
+1100:068a	Spots_FreeRoomPictures	void far Spots_FreeRoomPictures(void)	DisposePtrDeep and clear the 3 g_spotPict pointers
+1100:06cc	Clue_ResolveAttributes	void near Clue_ResolveAttributes(void)	Load OTHR 10555 (112 x {count,size,shape,noun}); per level copy the attributes selected by flag bits 8/4/2/1 into g_clueAttr[level][0..2]; g_cluePlural[level]=(count>1)
+1100:0793	Clue_BuildTexts	void far Clue_BuildTexts(void)	g_clueText[level][k] = far ptr to word string: count(10f9) / size(1119) / shape(112d) / noun singular(1079) or plural(10b9)
+1100:08ae	Clue_BuildVoiceIds	void far Clue_BuildVoiceIds(void)	g_clueVoice[level][k] = word id (count+37, size+44, shape+48, noun+7 singular / +22 plural); spoken as SSND 7300+id
+1108:0000	RoomExtra_Load	void far RoomExtra_Load(void)	Empty stub (retf); called at end of 1198:0103 (room treasure load)
+1108:0001	RoomExtra_Draw	void far RoomExtra_Draw(void)	Empty stub (retf); called every frame by Room_Run (10e0:0213) and by 1198:04f0
+1108:0002	RoomExtra_Free	void far RoomExtra_Free(void)	Empty stub (retf); called at end of 1198:01e1 (room treasure free)
+1110:0000	CoinPile_Load	void far CoinPile_Load(void)	g_coinPilePmap=GetResource(1699); cache its width/height in 5ed5/5ed7
+1110:0037	CoinPile_Free	void far CoinPile_Free(void)	DisposePtrDeep(g_coinPilePmap) if loaded
+1110:0059	CoinPile_Erase	void far CoinPile_Erase(void)	If pile is in this room: Gfx_RestoreFromLayer(x,230,w,h,0x180)
+1110:007d	CoinPile_Draw	void far CoinPile_Draw(int16_t layerDy)	If pile is in this room: DrawSprite(x, 230+layerDy, pile, 0)
+1110:00aa	CoinPile_Update	void far CoinPile_Update(void)	Rescue coins: when coins==0 and nets==0 place PMAP 1699 at random x 50..461 in the next mountain room; touching it gives +10 coins and sound 7007
+1118:0000	GameMain	int16_t far GameMain(void)	Program body called by WinMain: palette, cursors, title, setjmp restart point, sign-in, per-climb setup (layout, clues, music) and per-room loop; returns 0 on exit
+1120:0000	GameMenu_Install	void far GameMenu_Install(void)	Menu_SetMenuBar(&g_gameMenuBar 11b8:13bf) (File/Options/Help)
+1120:000d	GameMenu_Remove	void far GameMenu_Remove(void)	Menu_SetMenuBar(NULL)
+1128:0000	Music_PlayZone	void far Music_PlayZone(int16_t zone)	Map zone (0..7, -98..-94) to music id 9000..9009 (code switch table 1128:00a2); g_musicZone=zone, g_musicActive=1; if g_soundOn Midi_PlayTrack(id)
+1128:002d	Music_PlayZone_cases	(code block)	Switch-case targets of Music_PlayZone (not a Ghidra function): mov [13ca],id; jmp 007b
+1128:0035	Music_PlayZone_case12	(code block)	Music_PlayZone switch case for zones 1 and 2: g_musicId = 9003 (0x232b), join 1128:007b
+1128:007b	Music_PlayZone_start	(code block)	Common tail of the Music_PlayZone cases: g_musicZone = zone, g_musicActive = 1, g_music5efd = 0; if g_soundOn: Midi_PlayTrack(g_musicId); return
+1128:00a2	Music_PlayZone_jtab	int16_t keys[13]; uint16_t targets[13]	Keys {0,1,2,3,4,5,6,7,-98,-97,-96,-95,-94} -> targets {2d,35,35,3d,3d,45,45,4d,6d,75,65,55,5d}
+1128:00d6	Music_Halt	void far Music_Halt(void)	Midi_Stop() (keeps g_musicActive/g_musicId so Music_Resume can restart)
+1128:00dc	Music_Resume	void far Music_Resume(void)	If g_soundOn: Midi_PlayTrack(g_musicId)
+1128:00ee	Music_Nop	void far Music_Nop(void)	Empty stub (retf); called 4x from sign-in code 1160
+1128:00ef	Music_StopScene	void far Music_StopScene(void)	If g_musicActive: Midi_Stop, g_musicActive=0, g_musicZone=0
+1128:010c	Music_IsZonePlaying	int16_t far Music_IsZonePlaying(int16_t zone)	Midi_IsPlaying() && g_musicZone==zone
+1128:012f	Audio_ToggleSound	void far Audio_ToggleSound(void)	Toggle g_soundOn; off: Wave_Stop+Midi_Stop; on: Music_Resume
+1128:0151	Audio_ToggleAll	void far Audio_ToggleAll(void)	Ctrl+S (WM_CHAR 0x13; not the Pause key, ARCHITECTURE.md C3): if sound or voice on -> both off, Sfx_Stop (1170:005b), Midi_Stop; else both on, Music_Resume
+1130:0000	QueueHint	void far QueueHint(int16_t event)	New-player hint request: if none pending, look up bit=g_hintBit[event]; bit<0 -> always queue; else queue only if bit set in g_hintUnseen (and clear it)
+1130:0068	Hint_Show	void far Hint_Show(int16_t event)	Modal hint box: disable menus, panel PMAP 2011 at (33,60), butterfly PMAP 2010 at (430,230), text = entry [event] of BNDL 327 at (83,92) w321, halt music, wait, resume
+1130:0166	Hint_WaitDismiss	void far Hint_WaitDismiss(int16_t event)	If voice on play SSND 7100+event (interruptible by Enter/Esc/click); then wait for Enter, Esc, or click (codes 0x0d,0x409,0x1b,0x4b0,0x24b0)
+1138:0000	Title_LoadAnims	void far Title_LoadAnims(void)	Load title animation BNDLs 400 (frames from image slot 0) and 401 (frames after them) via 10d8:0000
+1138:0037	Title_FreeAnims	void far Title_FreeAnims(void)	DisposePtrDeep both title BNDLs
+1138:007a	Title_Run	int16_t far Title_Run(void)	Title/story attract loop: title PMAP 2100 + anim 400, story pages OTHR 20105..20108 with voice 7150..7159, final anim 401; returns 0 = quit confirmed, 1 = continue
+1138:0279	Title_Run_jtab	uint16_t[5]	Code-segment switch table of Title_Run page cases 0..4 -> {011e,0160,0160,0160,0160}
+1138:0283	Title_WaitStep	int16_t far Title_WaitStep(uint16_t voiceId, int16_t isLast)	Optionally play a voice clip; tick animations every 100 ms; return 1 Enter/click, 2 Space, 3 Esc+quit confirmed, else 0 on timeout/clip end/anim end
+1138:043d	Title_WaitPage	int16_t far Title_WaitPage(int16_t page)	Arm 60 s page timer and 100 ms anim timer; play the page's voice clip sequence (pages 1..4) via Title_WaitStep; return its result
+1140:0000	MenuCmd_AboutTM	int16_t far MenuCmd_AboutTM(void)	Help > About Treasure Mountain!: About_Show(); return 0
+1140:0008	About_Show	void far About_Show(void)	GameDlg_RunModal(11b8:1919) (info box, caption "About Treasure Mountain!")
+1140:0015	MenuCmd_NewPlayerMessages	int16_t far MenuCmd_NewPlayerMessages(void)	Options > New Player Messages: yes/no dialog 11b8:15cc preset to g_hintsOn; yes -> g_hintUnseen=0xFFFFFFFF; no -> g_hintPending=-1, g_hintUnseen=0
+1140:0062	MenuCmd_StartAnotherGame	int16_t far MenuCmd_StartAnotherGame(void)	File > Start Another Game: dialog 11b8:14d6; yes -> g_hintPending=-1, Music_StopScene, longjmp(g_restartJmp,1)
+1140:008c	Game_ExitNow	void far Game_ExitNow(int16_t unused)	longjmp(g_restartJmp, 2) (GameMain then shuts down); called by MenuCmd_Exit and SignIn_ConfirmExit (1160:050c)
+1140:0098	MenuCmd_Exit	int16_t far MenuCmd_Exit(void)	File > Exit, Esc/close in room loop, rank screen, castle climb, and onEsc callback of Anim_PlayModal in Climb_Celebrate: dialog 11b8:1533; yes -> Scene_FreeCommon, Treasures_Free, Users_SaveCurrent, Game_ExitNow
+1140:00c2	Game_ExitNow2	int16_t far Game_ExitNow2(void)	[unreferenced, not a Ghidra function] Game_ExitNow(0); return 0
+1140:00cc	MenuCmd_MusicAndSound	int16_t far MenuCmd_MusicAndSound(void)	Options > Music and Sound: dialog 11b8:1625 preset to g_soundOn; if answer>=0 and differs -> Audio_ToggleSound
+1140:00f7	MenuCmd_Voice	int16_t far MenuCmd_Voice(void)	Options > Voice: dialog 11b8:163f preset to g_voiceOn; if answer>=0 -> g_voiceOn=answer
+1148:0000	Seg1148_Stub	void far Seg1148_Stub(void)	[dead segment, no references] retf
+1148:0001	Seg1148_NearStub	void near Seg1148_NearStub(int16_t a, int16_t b)	[dead] near ret (empty)
+1148:0002	Seg1148_GateHook	void far Seg1148_GateHook(void)	[dead] gate rooms 11/25 -> stub(0,0), 38 -> stub(0x72,0); then g_playerHidden=0

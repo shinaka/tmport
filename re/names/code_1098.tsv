@@ -1,0 +1,53 @@
+1098:0000	Hotspot_ClearAll	void far Hotspot_ClearAll(void)	id=0 for all 50 hot-spot records at 11b8:4b7a (geometry left as is)
+1098:0016	Hotspot_Set	void far Hotspot_Set(uint16_t id, int16_t x, int16_t y, int16_t w, int16_t h)	update the record already holding id, else the first free (id==0) slot; if none free writes slot 50 = 11b8:4d6e (overflow into backup table)
+1098:0089	Hotspot_Remove	void far Hotspot_Remove(uint16_t id)	clear id of the first record holding id (no-op if absent)
+1098:00b8	Hotspot_HitTest	uint16_t far Hotspot_HitTest(int16_t px, int16_t py)	scan records 49..0, return id of first with id!=0 && x<=px<x+w && y<=py<y+h, else 0 (higher slot wins)
+1098:0130	Hotspot_SaveAll	void far Hotspot_SaveAll(void)	[no Ghidra function; no callers/relocs = dead] F_SCOPY@ 50 x 10 bytes 11b8:4b7a -> 11b8:4d6e
+1098:0157	Hotspot_RestoreAll	void far Hotspot_RestoreAll(void)	[no Ghidra function; no callers/relocs = dead] F_SCOPY@ 50 x 10 bytes 11b8:4d6e -> 11b8:4b7a
+1098:017e	Hotspot_PollMouseDown	uint16_t far Hotspot_PollMouseDown(void)	if Mouse_IsButtonDown(): Mouse_GetPos, return Hotspot_HitTest(x,y)|0x8000 (0x8000 alone if no hit); else 0
+10a0:0000	Input_WaitCode	uint16_t far Input_WaitCode(void)	busy-loop Input_GetCode (1028:0131) until non-zero; return it
+10a8:0000	Delay_ms	void far Delay_ms(uint32_t ms)	busy-wait until timeGetTime() >= start+ms (unsigned)
+10a8:002a	Timer_Set	void far Timer_Set(int16_t slot, int32_t ms)	g_timerDeadline[slot] = timeGetTime() + ms
+10a8:0049	Timer_Wait	void far Timer_Wait(int16_t slot)	busy-wait until timeGetTime() >= g_timerDeadline[slot]
+10a8:0066	Timer_Expired	int16_t far Timer_Expired(int16_t slot)	return timeGetTime() >= g_timerDeadline[slot] (unsigned 32-bit compare)
+10b0:0000	Text_Draw	void far Text_Draw(int16_t x, int16_t y, const char far* s)	Text_DrawBox(x, y, 512, s, NULL, 0)
+10b0:0023	Text_DrawBox	void far Text_DrawBox(int16_t x, int16_t y, int16_t wrapW, const char far* s, char far* far* subst, int16_t flush)	Text_Render(..., outW=NULL, outH=NULL, draw=1)
+10b0:0050	Text_Measure	void far Text_Measure(const char far* s, char far* far* subst, int16_t wrapW, int16_t far* outW, int16_t far* outH)	Text_Render at (0,0) with draw=0, flush=0
+10b0:0080	Text_Width	int16_t far Text_Width(const char far* s)	0 if *s==0, else outW of Text_Measure(s, NULL, 512)
+10b0:00b5	Text_Render	void near Text_Render(int16_t x0, int16_t y0, int16_t wrapW, const char far* s, char far* far* subst, int16_t flush, int16_t far* outW, int16_t far* outH, int16_t draw)	word-wrapping text renderer/measurer with control codes 09/0A/0D/20/FE and FF-escapes 1..6 (jump tables 10b0:0524, 10b0:0518)
+10b0:053c	Text_MeasureRun	int16_t near Text_MeasureRun(uint8_t stop, const char far* p, char far* far* subst, int16_t inSubst, const char far* substP)	sum of glyph widths up to stop/0/0A/0D, following FF 01 n FF substitutions and skipping other FF..FF escapes
+10b0:0662	Text_DrawChar	int16_t near Text_DrawChar(int16_t x, int16_t y, int16_t lineH, uint8_t ch, int16_t underline, int16_t flush)	draw glyph ('_' under underline draws only the line), underline at y+lineH-1, optional present; returns advance
+10b8:0000	Anim_RestoreBgRect	void far Anim_RestoreBgRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t bgYOff)	clip to g_clip rect, then Gfx_CopyOffscreenRect(x, y+bgYOff, w, h, x, y)
+10b8:0082	Anim_PresentRect	void far Anim_PresentRect(int16_t x, int16_t y, int16_t w, int16_t h)	clip to g_clip rect, then Gfx_BlitToWindow(x,y,w,h)
+10b8:00fd	Anim_ResetAll	void far Anim_ResetAll(void)	cursor=NULL for all 16 channels (no callbacks)
+10b8:0119	Anim_Start	int16_t far Anim_Start(uint8_t layer, int16_t x, int16_t y, int16_t frameBase, const uint8_t far* script, int16_t user0, int16_t user1, uint8_t flags, void (far* onEnd)(void))	claim first free channel; cursor=script+4, loops=-1, stop=0; returns channel index or 0 if none free (ambiguous); all callers pass flags=1, onEnd=NULL
+10b8:020a	Anim_IsRunning	int16_t far Anim_IsRunning(int16_t ch, const uint8_t far* script)	1 if 0<=ch<16 && ch.base==script && ch.cursor!=NULL
+10b8:024e	Anim_Stop	void far Anim_Stop(int16_t ch, const uint8_t far* script)	if running with that script: ch.stop=1 (next Anim_Step executes END)
+10b8:029d	Anim_EraseSprites	void far Anim_EraseSprites(int16_t bgYOff)	Anim_RestoreBgRect for every rect saved by the last Anim_DrawSprites (dirty tracking off for DOP entries); clear list
+10b8:0312	Anim_Step	void far Anim_Step(void)	run every active channel's DAM script up to its next FE (frame end) or FF (END); FA n=0 loops forever; builds sprite list 11b8:5666 and update-rect list 11b8:5bde
+10b8:06e4	Anim_DrawSprites	void far Anim_DrawSprites(uint8_t layer, int16_t yOff, int16_t bgYOff)	draw queued sprites of one layer; record erase rects / stamp into background page
+10b8:090a	Anim_FlushUpdateRects	void far Anim_FlushUpdateRects(void)	Anim_PresentRect for every F9-opcode rect; clear list
+10c0:0000	Dlg_Layout	void near Dlg_Layout(const DlgDesc far* d)	compute box/button/label geometry into 11b8:5c3e..5c6e from descriptor type 0..9
+10c0:046e	Dlg_DrawButton	void near Dlg_DrawButton(int16_t i, int16_t highlighted)	rounded black-outlined button; fill white/black, label black/white; g_btnState[i]=highlighted
+10c0:0640	Dlg_ToggleButton	void far Dlg_ToggleButton(int16_t i)	Dlg_DrawButton(i, !state[i]) then present the button rect
+10c0:06a4	Dlg_FlashButton	void far Dlg_FlashButton(int16_t i)	4 x {Dlg_ToggleButton(i); Delay_ms(62)}
+10c0:06ca	Dlg_SaveUnder	void near Dlg_SaveUnder(void)	g_dlgSaveBuf = NewPtr(PixMap_SaveBufSize(W+2,H+2)); Gfx_SaveRect(X,Y,W,H,buf)
+10c0:0712	Dlg_RestoreUnder	void far Dlg_RestoreUnder(void)	if buf: Gfx_RestoreRect(X,Y,buf), free, present box rect
+10c0:0764	Dlg_Draw	void far Dlg_Draw(const DlgDesc far* d, int16_t saveUnder)	layout, optional save-under, white box, picture, 3px black frame, grey shadow, title, body, footer, buttons; present
+10c0:0a1c	Dlg_AddHotspots	void far Dlg_AddHotspots(const DlgDesc far* d)	0x44f full screen; type 8: 0x44d=btn0, 0x44c=btn1; footer: 0x44e
+10c0:0aaa	Dlg_RemoveHotspots	void far Dlg_RemoveHotspots(const DlgDesc far* d)	remove the hot spots added by Dlg_AddHotspots
+10c0:0ae5	GameDlg_RunModal	int16_t far GameDlg_RunModal(const DlgDesc far* d)	modal message (type 1) / Yes-No (type 8) box; returns 0/1 or -1; never returns for other types
+10c0:0cde	Dlg_RunPager	int16_t far Dlg_RunPager(const PagerDesc far* p)	[no Ghidra function] multi-page help box (types 4-7); keys Tab/arrows/Enter/Esc/PgUp/PgDn, 0x44C-0x44F hot spots (0x244E not handled); returns 1 when finished via last page, 0 if cancelled
+10c8:0000	Dlg_PagerFromBndl	int16_t far Dlg_PagerFromBndl(int16_t bndlId, int16_t pages, const char far* title, const int16_t far* textIds)	[dead: no relocs] build pager from BNDL triples (text,dx,dy) + PMAP bndlId+1+i into 11b8:0b78, run Dlg_RunPager, free
+10d0:0000	Music_PauseNested	void far Music_PauseNested(void)	Sound_PauseAll (1090:0536: Wave_Stop + Midi_Pause); ++g_musicPauseDepth
+10d0:000e	Music_ResumeNested	void far Music_ResumeNested(void)	if --g_musicPauseDepth < 1: depth=0, Sound_ResumeAll (1090:0540)
+10d0:0025	Music_ResumeForce	void far Music_ResumeForce(void)	depth=0; Sound_ResumeAll (1090:0540); called by 1118:006c
+10d8:0000	Anim_LoadBundle	int16_t far Anim_LoadBundle(int16_t bndlId, int16_t frameBase, void far* far* outBndl, uint8_t far* far* outScript)	GetResource(BNDL); *outScript=entry0; g_animFrames[frameBase+i]=entry[i+1]; returns count-1
+10d8:0082	Anim_PlayModal	int16_t far Anim_PlayModal(const uint8_t far* script, int16_t frameBase, int16_t user0, int16_t user1, int16_t skippable, void (far* onEsc)(void), int16_t x, int16_t y, int16_t fps)	play one script on layer 0 at fps (timer slot 7, 1000/fps ms) until it ends; Enter->1, Space->2 (if skippable, via Anim_Stop), Esc calls onEsc; returns 0 if played out
+11b8:0b31	s_FooterClickGoOn	char[]	footer text kind 2 ("Click to Go On")
+11b8:0b40	s_BtnGoBackPage	char[]	button label "Go Back a Page"
+11b8:0b4f	s_BtnSeeNextPage	char[]	button label "See Next Page"
+11b8:0b5d	s_BtnDone	char[]	button label "Done"
+11b8:0b62	s_BtnCancel	char[]	button label "Cancel"
+11b8:0b69	s_BtnYes	char[]	button label "Yes"
+11b8:0b6d	s_BtnNo	char[]	button label "No"

@@ -1,0 +1,175 @@
+1000:0000	c0w_startup	void far entry(void) /* regs from loader */	Borland C0W Windows startup: _ExceptInit(0), InitTask, zero BSS 11b8:3880-66a1, WaitEvent, InitApp, DOS version, GetWinFlags, run #pragma startup table, call WinMain (1010:0000), exit(result)
+1000:00bc	_cleanup	void far _cleanup(void)	Runs the #pragma exit table (11b8:387a-387f) highest priority first via c0_ExitRun
+1000:00ce	_restorezero	void far _restorezero(void)	Empty stub (DOS interrupt-vector restore not needed under Windows)
+1000:00cf	_checknull	void far _checknull(void)	Empty stub (null-pointer-assignment check disabled)
+1000:00d0	_terminate	void far _terminate(int code)	INT 21h AH=4Ch with AL=code (process termination); 1000:00d9 is the startup-failure path exit(255)
+1000:00e5	_GetSS	unsigned far _GetSS(void)	Returns SS in AX (used by exception runtime 11a0:0052)
+1000:00e8	c0_StartupRun	near (ES:SI=table start, ES:DI=table end)	Calls every 6-byte startup record in ascending priority order, marking each 0xFF when done
+1000:012c	c0_ExitRun	near (ES:SI=table start, ES:DI=table end)	Calls every 6-byte exit record in descending priority order, marking each 0xFF when done
+1000:016e	_abort	void far _abort(void)	Shows 'Abnormal program termination' (11b8:2de2) in a message box and _exit(3)
+1000:0186	abort	void far abort(void)	raise(SIGABRT=22) then _abort()
+1000:0198	atexit	int far atexit(void (far *fn)(void))	Appends fn to _atexittbl (11b8:6600, max 32); returns 0 ok, 1 if full
+1000:01ca	operator_delete	void far operator delete(void far *p)	free(p)
+1000:01e4	operator_delete_array	void far operator delete[](void far *p)	operator delete(p)
+1000:01fe	_ErrorMessage	void far _ErrorMessage(const char far *msg)	Far wrapper around __ErrorMessage (message box with program name caption)
+1000:0218	_dummy_exitproc	void far _dummy_exitproc(void)	Empty default for _exitbuf/_exitfopen/_exitopen hooks
+1000:021d	__exit	void near __exit(int code, int dontexit, int quick) /* [bp+4]=code,[bp+6]=dontexit,[bp+8]=quick; ret 6 */	Common exit path: atexit fns (LIFO), _cleanup, _exitbuf, then _exitfopen/_exitopen and _terminate(code) as selected
+1000:0299	exit	void far exit(int code)	__exit(code, dontexit=0, quick=0)
+1000:02ae	_exit	void far _exit(int code)	__exit(code, dontexit=0, quick=1): no atexit/flush, terminates
+1000:02c3	_cexit	void far _cexit(void)	__exit(0, dontexit=1, quick=0): full cleanup without terminating
+1000:02d1	_c_exit	void far _c_exit(void)	__exit(0, dontexit=1, quick=1)
+1000:02e0	F_LXMUL	far: DX:AX = DX:AX * CX:BX (low 32 bits)	Borland F_LXMUL@ 32x32->32 multiply helper
+1000:02f7	F_SCOPY	far: (void far *src [bp+6], void far *dst [bp+0xa]); CX=bytes; retf 8	Borland F_SCOPY@ struct assignment copy (rep movsw/movsb)
+1000:0313	N_LDIV	near-call entry of F_LDIV@	Borland N_LDIV@: converts near call to far and falls into F_LDIV@
+1000:0316	F_LDIV	far: long dividend, long divisor on stack; retf 8; result DX:AX	Borland F_LDIV@ signed 32-bit divide (truncate toward zero)
+1000:031a	N_LUDIV	near-call entry of F_LUDIV@	Borland N_LUDIV@
+1000:031d	F_LUDIV	far: unsigned long dividend, divisor on stack; retf 8	Borland F_LUDIV@ unsigned 32-bit divide
+1000:0322	N_LMOD	near-call entry of F_LMOD@ (not a Ghidra function)	Borland N_LMOD@
+1000:0325	F_LMOD	far: long % long; retf 8 (not a Ghidra function)	Borland F_LMOD@ signed remainder (sign of dividend)
+1000:032a	N_LUMOD	near-call entry of F_LUMOD@ (not a Ghidra function)	Borland N_LUMOD@
+1000:032d	F_LUMOD	far: unsigned long % unsigned long; retf 8 (not a Ghidra function)	Borland F_LUMOD@ unsigned remainder; common body at 1000:0330
+1000:03c1	N_SPUSH	near-call entry: DX:AX=src, CX=bytes	Borland N_SPUSH@ (push struct by value)
+1000:03c7	F_SPUSH	far: DX:AX=src, CX=bytes	Borland F_SPUSH@: reserves CX bytes on caller stack and copies the struct there
+1000:03e8	__IOerror	int near pascal __IOerror(int dosErr)	Maps DOS error (or -errno) to errno (11b8:0030) / _doserrno (11b8:2fd0) via _dosErrorToSV; returns -1
+1000:0426	__DOSerror	int near pascal __DOSerror(int dosErr)	__IOerror(dosErr) and returns dosErr
+1000:043a	isatty	int far isatty(int h)	INT 21h AX=4400h; returns DX & 0x80 (character device)
+1000:0452	__longtoa	char far * near pascal __longtoa(long v, char far *buf, int radix, char maybeSigned, char hexBase)	Integer to ASCII (radix 2..36) used by __vprinter/__utoa
+1000:04d2	__utoa	char far * near pascal __utoa(unsigned v, char far *buf)	__longtoa(v, buf, 10, 0, 'a')
+1000:04f2	lseek	long far lseek(int h, long off, int whence)	Clears _openfd EOF bit 0x200, INT 21h AH=42h; -1L on error
+1000:0522	mkdir	int far mkdir(const char far *path)	INT 21h AH=39h; 0 ok, -1 + errno on error (called by 1040:0000)
+1000:055c	__default_new_handler	void far __default_new_handler(void)	Default _new_handler: throws a copy of the static xalloc __xalloc (11b8:302c), type descriptor 1000:0762
+1000:05c3	set_new_handler	void (far *far set_new_handler(void (far *h)(void)))(void)	Swaps _new_handler (11b8:3032) and returns the previous one
+1000:05f1	operator_new	void far * far operator new(unsigned size)	size 0->1; loop malloc(size); on NULL call _new_handler if set and retry; returns NULL if no handler
+1000:0642	xalloc__copy_ctor_new	xalloc far * far xalloc::xalloc(xalloc far *this, const xalloc far &src)	Copy ctor (NEW module copy): xmsg copy + siz (+4); bumps live-object counter
+1000:06ad	__xalloc_static_init	void far __xalloc_static_init(void)	#pragma startup (prio 0x20): constructs __xalloc at 11b8:302c = xalloc(string(11b8:3036 'Out of memory'), 0)
+1000:0703	__xalloc_static_cleanup	void far __xalloc_static_cleanup(void)	#pragma exit (prio 0x20): destroys __xalloc (xmsg::~xmsg on 11b8:302c)
+1000:07a4	xalloc__dtor_new	int far xalloc::~xalloc(xalloc far *this, int flags)	Destructor (NEW module copy): xmsg::~xmsg, operator delete if flags&1
+1000:082b	N_LXMUL	near: DX:AX = DX:AX * CX:BX	Borland N_LXMUL@ (near variant of F_LXMUL@)
+1000:0842	srand	void far srand(unsigned seed)	Sets 32-bit rand seed (11b8:3044) = seed (high word 0)
+1000:0859	rand	int far rand(void)	seed = seed*0x015A4E35 + 1; returns (seed >> 16) & 0x7FFF
+1000:0882	_rtl_read	int far _rtl_read(int h, void far *buf, unsigned n)	Raw read: EACCES if handle write-only; console read hook (11b8:370a) if set and isatty; else INT 21h AH=3Fh
+1000:08dc	_read	int far _read(int h, void far *buf, unsigned n)	Obsolete alias -> _rtl_read
+1000:08fa	_setupio	void near _setupio(void)	#pragma startup (prio 2, near): resets _openfd/_streams for handles 5..19, sets up stdin/stdout buffering via setvbuf
+1000:0998	toupper	int far toupper(int c)	-1 -> -1; if _ctype[c+1] & _IS_LOW(8) return c-0x20 else c (low byte)
+1000:09ca	__vp_hex4	near: DX=value, ES:DI=dest	__vprinter helper: writes DX as 4 uppercase hex digits (via 09d1/09da)
+1000:09d1	__vp_hex2	near: AL=value, ES:DI=dest	__vprinter helper: writes AL as 2 hex digits
+1000:09da	__vp_hex1	near: AL=nibble, ES:DI=dest	__vprinter helper: nibble to '0'-'9'/'A'-'F' (DAA trick), stosb
+1000:09e2	__vprinter	int near pascal __vprinter(putter_fn near *put, void far *outP, const char far *fmt, void near *args)	printf engine entry: locals count=0, room=80, error=0, then falls into 1000:0a46
+1000:09fc	__vp_strlen	near: ES:DI=string -> CX=length	__vprinter helper strlen
+1000:0a09	__vp_putc	near: AL=char	__vprinter helper: append to 80-byte stack buffer, flush via __vp_flush when full
+1000:0a12	__vp_flush	near	__vprinter helper: calls put(buf, n, outP); put()==0 sets error flag; resets buffer
+1000:0a46	__vprinter_body	(continuation of __vprinter)	Format parser/formatter: flags - + space # 0, width/precision (* or digits), h l L N F, conversions d i u o x X c s n p e f g E G; %% literal
+1000:0ea4	_xclose	void far _xclose(void)	Exit hook (_exitopen): close(h) for h = 2 .. _nfile-1
+1000:0ece	atol	long far atol(const char far *s)	Skips _IS_SP whitespace, optional +/-, decimal digits; no overflow check
+1000:0f45	atoi	int far atoi(const char far *s)	(int)atol(s)
+1000:0f5e	_rtl_chmod	int far _rtl_chmod(const char far *path, int func, int attrib)	INT 21h AH=43h AL=func; returns attributes (CX) or -1
+1000:0f82	close	int far close(int h)	EBADF if h >= _nfile; clears _openfd[h]; _rtl_close(h) (called by 1040:00a2)
+1000:0fae	_rtl_close	int far _rtl_close(int h)	INT 21h AH=3Eh; clears _openfd[h]; 0 or -1
+1000:0fd2	_close	int far _close(int h)	Alias -> _rtl_close
+1000:0fe6	fflush	int far fflush(FILE far *fp)	NULL -> flushall; validates token; writes pending output buffer; 0 or EOF
+1000:10b8	flushall	int far flushall(void)	fflush on every stream with _F_READ|_F_WRIT; returns number of streams
+1000:1106	fputs	int far fputs(const char far *s, FILE far *fp)	__fputn(fp, strlen(s), s); returns last char or EOF (0 for NULL/empty)
+1000:115c	__fseek_displacement	int near pascal __fseek_displacement(FILE far *fp)	Bytes buffered in fp, counting extra CR for each LF in text mode (helper of fseek/ftell)
+1000:11e3	fseek	int far fseek(FILE far *fp, long off, int whence)	fflush; adjust SEEK_CUR by buffered data; reset buffer; lseek
+1000:1268	ftell	long far ftell(FILE far *fp)	lseek(fd,0,SEEK_CUR) adjusted by buffered data (O_APPEND aware)
+1000:1344	memcmp	int far memcmp(const void far *a, const void far *b, unsigned n)	Byte compare; returns a[i]-b[i] at first difference (0 if n==0) (9 game call sites)
+1000:136e	memcpy	void far * far memcpy(void far *d, const void far *s, unsigned n)	rep movsw + movsb; returns d
+1000:1394	setmem	void far setmem(void far *d, unsigned n, char c)	Fill (word-aligned stosw)
+1000:13bc	memset	void far * far memset(void far *d, int c, unsigned n)	setmem(d, n, c); returns d
+1000:13e0	movmem	void far movmem(const void far *s, void far *d, unsigned n)	Overlap-safe copy (backwards when s < d)
+1000:1439	memmove	void far * far memmove(void far *d, const void far *s, unsigned n)	movmem(s, d, n); returns d
+1000:1460	__creat	int near pascal __creat(int attrib, const char far *path)	INT 21h AH=3Ch; handle or -1
+1000:147f	__trunc	int near pascal __trunc(int h)	INT 21h AH=40h with CX=0 (truncate at current position)
+1000:1495	open	int far open(const char far *path, int access, unsigned mode)	Borland open(): O_CREAT/O_TRUNC/O_EXCL/O_BINARY/O_TEXT handling, sets _openfd, installs _xclose (called by 1040:0015/0039)
+1000:1620	_rtl_open	int far _rtl_open(const char far *path, int oflag)	INT 21h AH=3Dh with access (1/2/4 -> 0/1/2) | sharing bits 0xF0; _openfd = (oflag & 0xB8FF)|0x8000
+1000:1673	_open	int far _open(const char far *path, int oflag)	Alias -> _rtl_open
+1000:168e	perror	void far perror(const char far *s)	Writes 's: ' + _sys_errlist[errno] (or 'Unknown error') + newline to stderr (11b8:2e3a)
+1000:1718	_fputc	int far _fputc(char c, FILE far *fp)	putc() slow path: --fp->level; fputc(c, fp)
+1000:173a	fputc	int far fputc(int c, FILE far *fp)	Buffered/unbuffered char output with LF->CRLF in text mode; static char at 11b8:6684
+1000:18c2	fputchar	int far fputchar(int c)	fputc(c, stdout 11b8:2e26)
+1000:18db	__fputn	unsigned near pascal __fputn(FILE far *fp, unsigned n, const char far *s)	Writes n chars to stream; returns n or 0
+1000:1ae2	read	int far read(int h, void far *buf, unsigned n)	_rtl_read plus text-mode CR stripping and ^Z (0x1A) end-of-file handling
+1000:1baf	read_thunk	jmp 1000:1ae2	Alias entry (jmp read) used by 1040:005a
+1000:1bb2	setvbuf	int far setvbuf(FILE far *fp, char far *buf, int type, unsigned size)	type 0=_IOFBF 1=_IOLBF 2=_IONBF, size<0x8000; mallocs buffer if NULL; installs _xfflush in _exitbuf
+1000:1cd4	__strputn	unsigned near pascal __strputn(const char far *s, unsigned n, char far * far *outP)	sprintf putter: memcpy(*outP,s,n); *outP+=n; **outP=0; returns n
+1000:1d19	sprintf	int far sprintf(char far *buf, const char far *fmt, ...)	*buf=0; __vprinter(__strputn, &buf, fmt, &args) (game uses %s and %lu)
+1000:1d40	vsprintf	int far vsprintf(char far *buf, const char far *fmt, void near *ap)	Same as sprintf with explicit va_list
+1000:1d66	strcmp	int far strcmp(const char far *a, const char far *b)	Byte compare including terminator; returns a[i]-b[i]
+1000:1d98	strcpy	char far * far strcpy(char far *d, const char far *s)	Copies including NUL; returns d
+1000:1dc4	strlen	unsigned far strlen(const char far *s)	Length; returns 0 for a NULL far pointer
+1000:1de8	strrchr	char far * far strrchr(const char far *s, int c)	Last occurrence of (char)c (terminator searchable); NULL if none
+1000:1e36	strstr	char far * far strstr(const char far *s, const char far *sub)	First occurrence; returns s if sub is empty; NULL if none
+1000:1ea4	write	int far write(int h, const void far *buf, unsigned n)	O_APPEND seek-to-end; binary -> _rtl_write; text -> LF->CRLF via 128-byte stack buffer
+1000:2006	_rtl_write	int far _rtl_write(int h, const void far *buf, unsigned n)	EACCES if read-only; console write hook (11b8:370e) if set and isatty; else INT 21h AH=40h; sets _openfd |= 0x1000
+1000:2070	_write	int far _write(int h, const void far *buf, unsigned n)	Obsolete alias -> _rtl_write
+1000:208e	write_thunk	jmp 1000:1ea4	Alias entry (jmp write) used by 1040:007e
+1000:2092	_xfflush	void far _xfflush(void)	Exit hook (_exitbuf): fflush the first 4 streams (stdin..stdaux) if open
+1000:20d2	xalloc__ctor	xalloc far * far xalloc::xalloc(xalloc far *this, const string far &msg, unsigned size)	this==NULL -> operator new(6); xmsg::xmsg(msg); siz(+4)=size; bumps live-object counter
+1000:2151	xalloc__raise	void far xalloc::raise(xalloc far *this)	throw *this (copy via 1000:21c6, type descriptor 1000:220b) through 11a0:1689
+1000:21c6	xalloc__copy_ctor	xalloc far * far xalloc::xalloc(xalloc far *this, const xalloc far &src)	Copy ctor (XALLOC module copy)
+1000:224d	xalloc__dtor	int far xalloc::~xalloc(xalloc far *this, int flags)	Destructor (XALLOC module copy); delete if flags&1
+1000:22f8	xmsg__ctor	xmsg far * far xmsg::xmsg(xmsg far *this, const string far &msg)	this==NULL -> new(4); str = new string(msg) (11a8:0000)
+1000:23bf	xmsg__copy_ctor	xmsg far * far xmsg::xmsg(xmsg far *this, const xmsg far &src)	this==NULL -> new(4); str = new string(*src.str)
+1000:2466	xmsg__dtor	void far xmsg::~xmsg(xmsg far *this, int flags)	Deletes str (string dtor 11a8:0304 flags 3); operator delete(this) if flags&1
+1000:24d3	xmsg__raise	void far xmsg::raise(xmsg far *this)	throw *this (type descriptor 1000:25fc)
+1000:2547	xmsg__operator_assign	xmsg far & far xmsg::operator=(xmsg far *this, const xmsg far &src)	If different object: delete str; str = new string(*src.str)
+1000:2682	rtl_empty_stub_2682	void far (void)	Empty function (push si/di; pop; retf); no known callers
+1000:2695	xalloc__dtor_str1	int far xalloc::~xalloc(xalloc far *this, int flags)	Destructor copy referenced by RTTI descriptor 11a8:006d
+1000:26e4	rtl_empty_stub_26e4	void far (void)	Empty function; no known callers
+1000:2719	string_lengtherror__dtor1	int far string::lengtherror::~lengtherror(this, int flags)	Destructor referenced by RTTI descriptor 11a8:01c7
+1000:2768	xalloc__dtor_str2	int far xalloc::~xalloc(xalloc far *this, int flags)	Destructor copy referenced by RTTI descriptor 11a8:0215
+1000:27b8	rtl_empty_stub_27b8	void far (void)	Empty function; no known callers
+1000:28e7	string_xmsg_derived__copy_ctor	xmsg far * far Derived::Derived(this, const Derived far &src)	Copy ctor of a 4-byte xmsg-derived class (string::outofrange/lengtherror) passed to throws in 11a8 (11a8:03cb/0483/0538)
+1000:291e	string_lengtherror__dtor	int far string::lengtherror::~lengtherror(this, int flags)	Destructor referenced by RTTI descriptor 11a8:0ae5
+1000:296d	xalloc__dtor_str3	int far xalloc::~xalloc(xalloc far *this, int flags)	Destructor copy referenced by RTTI descriptor 11a8:0b33
+1000:29bc	string_outofrange__dtor	int far string::outofrange::~outofrange(this, int flags)	Destructor referenced by RTTI descriptor 11a8:0be7
+1000:2a0c	_fmemcpy	void far * far _fmemcpy(void far *d, const void far *s, unsigned n)	Duplicate of memcpy (used by heap/task-table code)
+1000:2a32	_fsetmem	void far _fsetmem(void far *d, unsigned n, char c)	Duplicate of setmem
+1000:2a5a	_fmemset	void far * far _fmemset(void far *d, int c, unsigned n)	Duplicate of memset (used by calloc)
+1000:2a7e	__fpformat_stub	near (via __realcvt hook 11b8:385a)	printf %e/%f/%g stub: 'printf : floating point formats not linked', _ErrorExit(...,3); 1000:2a8b is the scanf variant
+1000:2a9a	__GlobalAllocZero	void far * far __GlobalAllocZero(unsigned size)	GlobalAlloc(GMEM_ZEROINIT 0x40, size) + GlobalLock
+1000:2ab7	__allocTaskTable	void far * far __allocTaskTable(void)	GlobalAlloc(0x2040 GMEM_SHARE|GMEM_ZEROINIT, capacity(11b8:3670)*6) + GlobalLock
+1000:2ae8	__newExceptGlobals	void far * far __newExceptGlobals(void)	Allocates 0x128-byte exception-globals block; +0x0A=11a0:00DA, +0x0E=11a0:02B8 handler far ptrs
+1000:2b28	__freeGlobalPtr	void far __freeGlobalPtr(void far *p)	GlobalHandle(seg) -> GlobalUnlock -> GlobalFree
+1000:2b5b	__newTaskData	void far * far __newTaskData(void)	Allocates 0x18-byte per-task exception data block (sig 0xFEED at +0x16)
+1000:2c22	__growTaskTable	void far * far __growTaskTable(int extra)	Grows task table by extra entries (copy + free old); returns pointer to first new entry
+1000:2c9f	__registerTask	int far __registerTask(unsigned ss, void far *blk)	Stores (ss, blk) in task table (reuses free/dead slots, grows by 10)
+1000:2dae	__getTaskData	void far * far __getTaskData(unsigned ss)	Finds/creates per-task exception data for SS; caches in 11b8:3672/3674 (47 callers in 11a0)
+1000:2e99	__initExeTaskData	void far * far __initExeTaskData(void)	EXE case: points 11b8:3658/365c/3660 at SS:0010/0014/0016, initialises them, sets SS:001A=0xFEED; returns DS:3658
+1000:2eee	__taskHasWindowProc	BOOL far pascal __taskHasWindowProc(HWND h, LONG far *lParam)	EnumTaskWindows callback: *lParam=1; return FALSE (stop)
+1000:2f05	__msgBoxModality	unsigned far __msgBoxModality(void)	MB_TASKMODAL (0x2000) if current task owns a window, else MB_SYSTEMMODAL (0x1000)
+1000:2f3c	__ErrorMessage	void far __ErrorMessage(const char far *msg)	MessageBox(NULL, msg, basename(_argv0), modality|MB_ICONHAND)
+1000:2f94	_ErrorExit	void far _ErrorExit(const char far *msg, int code)	__ErrorMessage(msg); _exit(code)
+1000:2fb4	__realcvt_thunk	near: jmp word ptr [11b8:385a]	Float-format hook dispatch used by __vprinter for e/f/g
+1000:2fb8	_setargv	void far _setargv(void)	#pragma startup (prio 10): builds _argc/_argv from module path + lpCmdLine (space/tab separated, quotes, backslash-quote escape)
+1000:319c	__argcopychar	void far __argcopychar(char far * far *dst, char far * far *src)	Copies one char; a backslash-quote pair becomes a quote
+1000:31eb	__addarg	void far __addarg(char far *arg, int copy)	Appends arg to _argv (grows by 16); copy!=0 -> malloc+strcpy
+1000:32aa	_setargv0	void far _setargv0(void)	#pragma startup (prio 9): _argv0 = malloc(0x51); GetModuleFileName(hInstance, _argv0, 0x50)
+1000:32e5	setjmp	int far setjmp(jmp_buf jb)	Saves SS:[0014] into jb+0x14, jb+0x16=0, then KERNEL.Catch(jb) (used once at 1118:0050 with jb=11b8:5eda, 0x18 bytes; result 2 => game shutdown path 1118:03eb)
+1000:3309	longjmp	void far longjmp(jmp_buf jb, int val)	Unwinds exception context to jb+0x14 (11a0:18ba/34e7/25b4), val 0->1, KERNEL.Throw(jb, val) (only caller 1140:008c: longjmp(11b8:5eda, 2) = quit game from any depth)
+1000:3362	__heapDescESDI	near: -> ES:DI = &heap descriptor	Helper: ES:DI = DS:669c
+1000:3370	__heapReset	void far __heapReset(void)	Zeroes the 6-byte heap descriptor (11b8:669c); no known callers
+1000:3385	__heapFreeAll	void far __heapFreeAll(void)	Frees every heap segment in the descriptor list and zeroes the descriptor
+1000:33c7	__farmalloc_core	far: DX:AX=size -> DX:AX (ES:DI)=ptr	Sub-allocator: small blocks from 4 KB (or rounded) GlobalAlloc segments, large via direct GlobalAlloc
+1000:34c9	__segAllocBlock	near: AX=size, ES:DI=segment header -> CF set on success, ES:DI=user ptr	First-fit search of a heap segment free list (merges following free blocks, carves the block from the tail)
+1000:3531	__blockSize	far: ES:DI=ptr -> DX:AX size	Usable size of a block ([ptr-4]-4, or GlobalSize for direct blocks)
+1000:3547	__farfree_core	far: ES:DI=ptr	Returns block to its segment free list; frees empty segments (keeps last); offset 0 -> GlobalFree
+1000:3608	_mallocflags	void far * far _mallocflags(unsigned long size, unsigned gflags)	Allocates with temporary GlobalAlloc flags (11b8:0045); NULL for size 0
+1000:364f	_callocflags	void far * far _callocflags(unsigned long n, unsigned long size, unsigned gflags)	n*size with GMEM_ZEROINIT; explicitly zero-fills totals < 0xFFFF
+1000:36c9	_freeflags	void far _freeflags(void far *p, unsigned gflags)	Frees p (NULL ignored)
+1000:36fb	_reallocflags	void far * far _reallocflags(void far *p, unsigned long size, unsigned gflags)	NULL->malloc, size 0->free, direct block->GlobalReAlloc, else malloc+copy+free
+1000:37f6	__sigindex	int far __sigindex(int sig)	Index of sig in {2,4,8,11,15,22} (11b8:372a) or -1
+1000:381d	signal	void (far *far signal(int sig, void (far *h)(int,int)))(int,int)	Installs handler in 11b8:3712[idx]; unknown sig -> errno=EINVAL(0x13), returns SIG_ERR
+1000:3874	_fperror	void far _fperror(int code)	Default SIGFPE action: 'Floating Point: <reason>' (11b8:3736) and _ErrorExit(...,3); code 0x81..0x8c
+1000:38fe	__sigdefault	void far __sigdefault(int sig)	Default action table at 1000:3965: SIGINT->INT 23h; others message box + _exit(1) (SIGABRT exit 3)
+1000:397d	raise	int far raise(int sig)	Dispatches signal: SIG_IGN ignore, SIG_DFL default action, else reset to SIG_DFL and call handler(sig, subcode 11b8:3730[idx])
+1000:3a01	__fpsignal	void far __fpsignal(int code)	SIGFPE dispatch for FP exceptions; default -> _fperror(code); no known callers
+1000:3a58	__GlobalAllocLock	near (DX:AX=size) -> DX:AX far ptr	GlobalAlloc(GMEM_MOVEABLE | (SS!=DS ? GMEM_SHARE : 0), size) + GlobalLock
+1000:3a92	__GlobalFreeSel	far: ES=selector	GlobalHandle -> GlobalUnlock -> GlobalFree
+1000:3aa9	__GlobalSizeSel	far: ES=selector -> DX:AX	GlobalHandle -> GlobalSize (0 if no handle)
+1000:3abe	malloc	void far * far malloc(unsigned size)	_mallocflags(size, _WinAllocFlag 11b8:0045)
+1000:3ada	realloc	void far * far realloc(void far *p, unsigned size)	_reallocflags(p, size, _WinAllocFlag)
+1000:3afc	calloc	void far * far calloc(unsigned n, unsigned size)	_callocflags(n, size, _WinAllocFlag)
+1000:3b1d	free	void far free(void far *p)	_freeflags(p, _WinAllocFlag)
+1000:3b3a	ioctl	int far ioctl(int h, int func, unsigned dx, unsigned cx)	INT 21h AH=44h; VERR-checks buffer selector for buffer functions in protected mode; func 0 returns DX
+1000:3bca	__getHeapDesc	void far * far __getHeapDesc(void)	Returns DS:669c (heap descriptor)

@@ -1,0 +1,84 @@
+#include "audio/sdl_wave_output.h"
+
+#include <SDL3/SDL_audio.h>
+#include <SDL3/SDL_hints.h>
+#include <SDL3/SDL_init.h>
+
+#include "util/log.h"
+
+namespace tmport::audio {
+
+namespace {
+constexpr uint32_t kDefaultRate = 22050;  // every shipped SSND (fmt_sound.md §3.2)
+}
+
+SdlWaveOutput::SdlWaveOutput(std::string driver) : driver_(std::move(driver)) {}
+
+SdlWaveOutput::~SdlWaveOutput() { close(); }
+
+bool SdlWaveOutput::open() {
+    if (stream_) return true;
+    if (!driver_.empty()) SDL_SetHintWithPriority(SDL_HINT_AUDIO_DRIVER, driver_.c_str(), SDL_HINT_OVERRIDE);
+    if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
+        log::warn("audio: SDL audio initialisation failed ({}); sounds are disabled", SDL_GetError());
+        return false;
+    }
+    sdlInit_ = true;
+    // A logical device of our own (not SDL_OpenAudioDeviceStream's "simplified" one, which takes
+    // no further streams), so the music stream can join it.
+    device_ = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr);
+    if (!device_) {
+        log::warn("audio: no playback device ({}); sounds are disabled", SDL_GetError());
+        close();
+        return false;
+    }
+    const SDL_AudioSpec spec{SDL_AUDIO_U8, 1, static_cast<int>(kDefaultRate)};
+    stream_ = SDL_CreateAudioStream(&spec, nullptr);
+    if (!stream_ || !SDL_BindAudioStream(device_, stream_)) {
+        log::warn("audio: cannot attach the wave voice to the playback device ({}); sounds are disabled", SDL_GetError());
+        close();
+        return false;
+    }
+    rate_ = kDefaultRate;
+    SDL_ResumeAudioDevice(device_);
+    log::debug("audio: wave voice on SDL driver '{}'", driverName());
+    return true;
+}
+
+void SdlWaveOutput::close() {
+    if (stream_) SDL_DestroyAudioStream(stream_);
+    stream_ = nullptr;
+    if (device_) SDL_CloseAudioDevice(device_);  // other streams on it are unbound, not destroyed
+    device_ = 0;
+    if (sdlInit_) SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    sdlInit_ = false;
+}
+
+std::string SdlWaveOutput::driverName() const {
+    if (!sdlInit_) return {};
+    const char* n = SDL_GetCurrentAudioDriver();
+    return n ? n : "";
+}
+
+void SdlWaveOutput::start(const Sound& s) {
+    if (!stream_) return;
+    SDL_ClearAudioStream(stream_);
+    if (s.sampleRate != rate_ && s.sampleRate != 0) {
+        const SDL_AudioSpec src{SDL_AUDIO_U8, 1, static_cast<int>(s.sampleRate)};
+        if (SDL_SetAudioStreamFormat(stream_, &src, nullptr)) rate_ = s.sampleRate;
+    }
+    if (!s.pcm.empty()) SDL_PutAudioStreamData(stream_, s.pcm.data(), static_cast<int>(s.pcm.size()));
+    // Push the resampler tail through as well: the whole block is one "buffer".
+    SDL_FlushAudioStream(stream_);
+}
+
+void SdlWaveOutput::stop() {
+    if (stream_) SDL_ClearAudioStream(stream_);
+}
+
+bool SdlWaveOutput::done() {
+    if (!stream_) return true;
+    return SDL_GetAudioStreamQueued(stream_) <= 0;
+}
+
+}  // namespace tmport::audio

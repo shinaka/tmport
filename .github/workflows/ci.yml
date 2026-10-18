@@ -1,0 +1,57 @@
+# Builds the engine and runs the unit tests on Windows, Linux and macOS.
+#
+# The repository contains no game data, and neither does CI: the tests that need the user's copy
+# of the game (TM_DATA) skip themselves, every data-free test runs. SDL 3 and doctest are fetched by
+# CMake at configure time (pinned by URL and SHA-256, see CMakeLists.txt).
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      # SDL 3 needs the X11/Wayland, audio and input development headers on Linux
+      # (SDL's docs/README-linux.md). Windows (MSVC) and macOS (Xcode) need nothing extra.
+      - name: Install SDL build dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev libpulse-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev \
+            libxtst-dev libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev \
+            libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev \
+            libdbus-1-dev libibus-1.0-dev libudev-dev
+
+      # The "ci" presets (CMakePresets.json) use the platform's default generator: Visual Studio on
+      # Windows (multi-config, Release), Unix Makefiles elsewhere (CMAKE_BUILD_TYPE=Release).
+      - name: Configure
+        run: cmake --preset ci
+
+      - name: Build
+        run: cmake --build --preset ci --parallel 4
+
+      - name: Test (no game data)
+        run: ctest --preset ci

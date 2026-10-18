@@ -1,0 +1,77 @@
+1038:0000	Res_DisposeCachedTree	void far Res_DisposeCachedTree(void)	[no function in Ghidra; unreferenced] if g_resCachedTree!=NULL: DisposePtrDeep(g_resCachedTree), set NULL
+1038:0022	Res_AllocScratch	void far Res_AllocScratch(void)	g_resScratch = NewPtr(280000)
+1038:0038	Res_FreeScratch	void far Res_FreeScratch(void)	if scratch allocated and not a locked resource: DisposePtrDeep(scratch); scratch = NULL
+1038:0061	Bndl_GetEntry	uint32_t far Bndl_GetEntry(const BNDL far* b, int16_t i)	return u32 at b+8+4*i (resource id before expansion, far pointer / size after)
+1038:0088	Bndl_GetCount	int16_t far Bndl_GetCount(const BNDL far* b)	return u16 at b+4 (number of entries)
+1038:00a1	Bndl_SetEntry	void far Bndl_SetEntry(BNDL far* b, int16_t i, uint32_t v)	store u32 v at b+8+4*i
+1038:00c9	Res_GetSize	uint32_t far Res_GetSize(const char far* type4, int16_t id)	SizeofResource in the DLL chosen by type/id (NE-rounded); doubled when type=="BNDL"; 0 for unmapped SSND ids (<4000, 6800-6999, >=8000)
+1038:038a	Res_TypeForId	const char far* far Res_TypeForId(int16_t id)	id<900 BNDL, <950 RRGB, <1000 FFNT, <4000 PMAP, <10000 SSND, else OTHR (DGROUP strings 0x741..0x75a)
+1038:03da	Res_LoadCopy	void far* far Res_LoadCopy(const char far* type4, int16_t id)	Find/Load/Lock resource, remap PMAP colours (256-col), copy into NewPtr buffer of Res_GetSize bytes, free resource, pump messages
+1038:076f	Res_GetResourceTree	void far* far Res_GetResourceTree(int16_t id)	Res_LoadCopy(Res_TypeForId(id),id); if data starts "BNDL" recursively load every entry and store {ptr in entry[i], size in entry[n+i]}
+1038:082d	Res_GetResourceIntoImpl	uint32_t far Res_GetResourceIntoImpl(int16_t id, void far* dst)	load tree, BlockMove Res_GetSize bytes into dst, DisposePtr temp (shallow); return size
+1038:088a	Res_LoadToScratch	uint32_t far Res_LoadToScratch(int16_t id)	Res_GetResourceIntoImpl(id, g_resScratch); track high-water size in g_resScratchMax
+1038:08c5	GetResource	void far* far GetResource(int16_t id)	far-callable wrapper of Res_GetResourceTree (31 call sites)
+1038:08d4	GetResourceInto	uint32_t far GetResourceInto(int16_t id, void far* dst)	far-callable wrapper of Res_GetResourceIntoImpl (used for palette 900 -> DGROUP 0x3d90)
+1038:08eb	Res_LoadFlatToScratch	uint32_t far Res_LoadFlatToScratch(int16_t id)	load into scratch+6 and prefix 6-byte header {'F',0,u32 size}; return size+6
+1038:093a	Flat_GetSize	uint32_t far Flat_GetSize(const void far* flat)	return u32 at flat+2
+1038:0956	Res_LoadFlatCopy	void far* far Res_LoadFlatCopy(int16_t id)	[unreferenced] Res_LoadFlatToScratch then copy scratch to new NewPtr block
+1038:09a9	Res_LoadFlatInto	void far Res_LoadFlatInto(int16_t id, void far* dst)	[unreferenced] Res_LoadFlatToScratch then copy scratch to dst
+1038:09e4	Flat_Unflatten	void far* far Flat_Unflatten(const void far* flat)	[unreferenced] copy payload of flat buffer into new block; if BNDL duplicate each child one level
+1038:0ad2	Flat_UnflattenInto	void far Flat_UnflattenInto(const void far* flat, void far* dst)	[unreferenced] same as Flat_Unflatten but into caller buffer
+1038:0ba8	Res_LockInPlace	uint32_t far Res_LockInPlace(uint16_t id)	free scratch, Load+Lock resource and use the locked bytes as g_resScratch (no copy); remember HGLOBAL; return Res_GetSize (callers pass SSND speech ids for Wave_Play)
+1038:0ef8	Res_UnlockInPlace	void far Res_UnlockInPlace(void)	GlobalUnlock+FreeResource the locked resource, then Res_AllocScratch
+1040:0000	File_MkDir	int far File_MkDir(const char far* path)	RTL mkdir (DOS 39h); 0 ok, -1 error
+1040:0015	File_Create	int far File_Create(const char far* path)	RTL open(path, O_BINARY|O_TRUNC|O_CREAT|O_WRONLY (0x8302), S_IREAD|S_IWRITE (0x180))
+1040:0039	File_OpenRead	int far File_OpenRead(const char far* path)	RTL open(path, O_BINARY|O_RDONLY (0x8001))
+1040:005a	File_Read	int far File_Read(int fd, void far* buf, unsigned n)	RTL read
+1040:007e	File_Write	int far File_Write(int fd, const void far* buf, unsigned n)	RTL write
+1040:00a2	File_Close	int far File_Close(int fd)	RTL close
+1048:0000	Pal_CreateBlack	HPALETTE far Pal_CreateBlack(void)	CreatePalette of 256 zeroed entries (version 0x300)
+1048:0034	Pal_CreateSystemCopy	HPALETTE far Pal_CreateSystemCopy(void)	CreatePalette from GetSystemPaletteEntries(GetDC(NULL),0,256)
+1048:008b	Pal_ResetTransparentKey	void far Pal_ResetTransparentKey(void)	g_transparentIndex = nearest system index to RGB(0,0,170) (256-col) or 3 (16-col)
+1048:00b7	Pal_SetTransparentKeyRGB	void far Pal_SetTransparentKeyRGB(uint8_t r, uint8_t g, uint8_t b)	g_transparentIndex = nearest system index to RGB(r,g,b) (256-col) or 15 (16-col)
+1048:010a	Pal_SetFromRGB	void far Pal_SetFromRGB(const uint8_t far* rgb768)	one-shot (g_paletteFirstLoad): SetPaletteEntries+RealizePalette, build g_logToPhys, reset key, translate remap table 0x876
+1048:0247	Pal_LoadById	void far Pal_LoadById(int16_t id)	[unreferenced] if id != g_curPaletteId: load RRGB id from TMT.DLL in place and Pal_SetFromRGB
+1048:02b2	Pal_Init	void far Pal_Init(void)	256-col: create black palette, select into screen DC (and memory DC when not WinG); 16-col: key=3
+1048:02fd	Pal_SetForeColor	void far Pal_SetForeColor(int16_t ega)	g_foreColorPhys = nearest(g_egaRGB[ega]) or g_vga16Index[ega]; g_foreColorIndex = ega
+1048:036f	Pal_SetForeColorRGB	void far Pal_SetForeColorRGB(uint8_t r, uint8_t g, uint8_t b)	[unreferenced] 256-col only: g_foreColorPhys = nearest system index to RGB
+1048:03bb	Pal_GetForeColor	int16_t far Pal_GetForeColor(void)	return g_foreColorIndex
+1048:03bf	Pal_TranslateRemapTable	void far Pal_TranslateRemapTable(uint8_t far* t256)	rewrite a logical->logical colour table as physical->physical through g_logToPhys
+1050:0000	Cpu_Is386	int far Cpu_Is386(void)	[no function in Ghidra; unreferenced] 1 if EFLAGS.AC (bit 18) cannot be set (386), 0 on 486+
+1050:0029	Blit4_DrawPixmap	void far Blit4_DrawPixmap(uint16_t x, uint16_t y, const PIXMAP far* pm)	opaque copy of a whole 4bpp pixmap to the 4bpp framebuffer (stride 256)
+1050:00c9	Blit8_DrawPixmap	void far Blit8_DrawPixmap(uint16_t x, uint16_t y, const PIXMAP far* pm)	opaque copy of a whole 8bpp pixmap to the 8bpp framebuffer (stride 512)
+1050:0120	Blit4_DrawPixmapKeyed	void far Blit4_DrawPixmapKeyed(uint16_t dx, uint16_t dy, uint16_t w, uint16_t h, const PIXMAP far* pm, uint32_t sx, uint32_t sy)	4bpp sub-rectangle blit skipping pixels == (g_transparentIndex & 15)
+1050:02e3	Blit8_DrawPixmapKeyed	void far Blit8_DrawPixmapKeyed(uint16_t dx, uint16_t dy, uint16_t w, uint16_t h, const PIXMAP far* pm, uint16_t srcSkip, uint32_t srcOfs)	8bpp sub-rectangle blit skipping pixels == g_transparentIndex
+1050:035f	Blit8_DrawMaskRemap	void far Blit8_DrawMaskRemap(uint16_t dx, uint16_t dy, uint16_t w, uint16_t h, const PIXMAP far* pm, uint16_t srcSkip, uint32_t srcOfs, const uint8_t far* table)	[dead: only caller chain is unreferenced 1058 code] where source pixel != key: dst = table[dst] (source colour ignored)
+1050:03e7	Blit8_DrawRund	void far Blit8_DrawRund(uint16_t x, uint16_t y, uint16_t w, uint16_t h, int16_t key, const PIXMAP far* pm)	decode RUND RLE pixmap straight into 8bpp framebuffer; key -1 = opaque, else skip pixels == key
+1050:04e4	Blit4_DrawPixmapKeyedMirror	void far Blit4_DrawPixmapKeyedMirror(uint16_t dx, uint16_t dy, uint16_t w, uint16_t h, const PIXMAP far* pm, uint32_t sx, uint32_t sy)	as 1050:0120 but horizontally mirrored (writes right to left)
+1050:06a7	Blit8_DrawPixmapKeyedMirror	void far Blit8_DrawPixmapKeyedMirror(uint16_t dx, uint16_t dy, uint16_t w, uint16_t h, const PIXMAP far* pm, uint16_t srcSkip, uint32_t srcOfs)	as 1050:02e3 but horizontally mirrored
+1050:0732	Blit4_CopyRect	void far Blit4_CopyRect(uint16_t sx, uint16_t sy, uint16_t w, uint16_t h, uint16_t dx, uint16_t dy)	framebuffer-to-framebuffer opaque copy, 4bpp, top-down/left-right
+1050:0899	Blit8_CopyRect	void far Blit8_CopyRect(uint16_t sx, uint16_t sy, uint16_t w, uint16_t h, uint16_t dx, uint16_t dy)	framebuffer-to-framebuffer opaque copy, 8bpp
+1050:08fb	Pix4_CopyData	void far Pix4_CopyData(const PIXMAP far* src, PIXMAP far* dst)	[unreferenced] copy ceil(dst.w/2)*dst.h pixel bytes (headers untouched)
+1050:093b	Pix8_CopyData	void far Pix8_CopyData(const PIXMAP far* src, PIXMAP far* dst)	[unreferenced] copy dst.w*dst.h pixel bytes
+1050:097c	Blit4_FillRect	void far Blit4_FillRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color)	fill 4bpp framebuffer rectangle with nibble color&15
+1050:09e7	Blit4_ToPlanar	void far Blit4_ToPlanar(uint16_t x, uint16_t y, uint16_t w, uint16_t h)	convert 4bpp chunky framebuffer rect (8-px aligned) to 4-plane DDB bits (selector g_planarSel)
+1050:0b36	Pix8_RemapToPhysical	void far Pix8_RemapToPhysical(PIXMAP far* pm)	in place: every pixel = g_logToPhys[pixel] (uncompressed 8bpp pixmap)
+1050:0b6f	Pix4_ReplaceColor	void far Pix4_ReplaceColor(PIXMAP far* pm, uint8_t from, uint8_t to)	[dead: only caller chain is unreferenced 1058 code] in place: every nibble == from becomes to
+1050:0bc9	Pix8_ReplaceColor	void far Pix8_ReplaceColor(PIXMAP far* pm, uint8_t from, uint8_t to)	[dead: only caller chain is unreferenced 1058 code] in place: every byte == from becomes to
+1050:0c0b	Blit4_CaptureRect	void far Blit4_CaptureRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, PIXMAP far* dst)	copy framebuffer rect into a pixmap {w,h, rows of w/2 bytes} (x,w must be even)
+1050:0c6e	Blit8_CaptureRect	void far Blit8_CaptureRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, PIXMAP far* dst)	copy framebuffer rect into a pixmap {w,h, rows of w bytes} (w even)
+1050:0ccf	Mem_RemapBytes	void far Mem_RemapBytes(uint8_t far* buf, uint32_t n, const uint8_t far* table)	[dead: only caller chain is unreferenced 1058 code] in place buf[i] = table[buf[i]] (loop counter is 16-bit)
+1050:0cfa	Blit4_RemapRect	void far Blit4_RemapRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint8_t far* table)	4bpp framebuffer rect: nibble = table[nibble]&15 (edge handling assumes even x and w); live caller only 1058:19b2 Gfx_HighlightRect
+1050:0db5	Blit8_RemapRect	void far Blit8_RemapRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint8_t far* table)	8bpp framebuffer rect: pixel = table[pixel]; live caller only 1058:19b2 Gfx_HighlightRect
+1050:0e10	BlockMove	void far BlockMove(const void far* src, void far* dst, uint32_t n)	forward byte copy with 32-bit count and offsets (Mac BlockMove emulation)
+11b8:0741	s_typeBNDL	char[5]	"BNDL" returned by Res_TypeForId
+11b8:0746	s_typeRRGB	char[5]	"RRGB"
+11b8:074b	s_typeFFNT	char[5]	"FFNT"
+11b8:0750	s_typePMAP	char[5]	"PMAP"
+11b8:0755	s_typeSSND	char[5]	"SSND"
+11b8:075a	s_typeOTHR	char[5]	"OTHR"
+11b8:075f	s_outOfMemory1	char[]	MessageBox text used by Res_LoadCopy
+11b8:0776	s_memAllocFailed1	char[]	MessageBox caption used by Res_LoadCopy
+11b8:078f	s_BNDL_cmp1	char[5]	"BNDL" (Res_LoadCopy)
+11b8:0794	s_BNDL_cmp2	char[5]	"BNDL" (Res_GetResourceTree)
+11b8:0799	s_BNDL_cmp3	char[5]	"BNDL" (Flat_Unflatten)
+11b8:079e	s_BNDL_cmp4	char[5]	"BNDL" (Flat_UnflattenInto)
+11b8:07a3	s_outOfMemory2	char[]	MessageBox text used by Res_LockInPlace
+11b8:07ba	s_memAllocFailed2	char[]	MessageBox caption used by Res_LockInPlace

@@ -1,0 +1,669 @@
+11b8:0000	win16_instanceHeader	bytes	Win16 reserved instance-data header (KERNEL: +06 pLocalHeap, +08 pAtomTable, +0A pStackTop, +0C pStackMin, +0E pStackBottom); zero in image; size 0x10; owner seg KERNEL
+11b8:0010	eh_CtorCount	u32	Borland EH: constructed-object counter (SS:0010; SS==DS in the EXE); size 0x4; owner seg 1000,11a0; [code_1000] Live-object counter incremented by RTL/compiler ctors and decremented by dtors (pointed to by per-task block +0); [code_11a0] constructed-subobject counter (++ after each completed ctor, -- at dtor start); ctx[0] points here; snapshotted in frame+1Ah
+11b8:0014	eh_FrameChainHead	u16	Borland EH: head of registration-frame chain; set to FFFF by entry 1000:001b; size 0x2; owner seg 1000,11a0; [code_1000] Current exception registration/context word; 0xFFFF at startup; saved/restored by setjmp/longjmp
+11b8:0016	eh_VarsPtr	far	Borland EH: far pointer to EH globals (set to 11b8:31b2 by 1000:2e99); size 0x4; owner seg 1000,11a0; [code_1000] -> exception-globals block (EXE: DS:31B2); [code_11a0] far ptr to EH globals block (11b8:31b2); ctx[8] points here (double indirection)
+11b8:001a	eh_Magic	u16	Borland EH: 0xFEED when SS:0010..0017 are valid; size 0x2; owner seg 1000; [code_11a0] FEEDh marker written by 1000:2e99 / checked by 1000:2b79
+11b8:001c	rtl_reserved001c	bytes	zero; no reference found; size 0x14
+11b8:0030	errno	i16	C errno; size 0x2; refs 1000:03e8 1000:1495 1000:168e 1000:381d
+11b8:0032	_protected	u16	8 if GetWinFlags()&WF_PMODE; size 0x2; refs 1000:0000 1000:3b3a; [code_1000] 8 if GetWinFlags&WF_PMODE, else 0 (enables VERR checks in ioctl)
+11b8:0034	_cpuType	u16	2/3/4 = 286/386/486 (GetWinFlags); size 0x2; refs 1000:0000
+11b8:0036	_8087	u16	1 if coprocessor present; size 0x2; refs 1000:0000
+11b8:0038	_pszCmdLineSeg	u16	selector of lpCmdLine (InitTask ES); size 0x2; refs 1000:0000
+11b8:003a	_hInstance	u16	instance handle (InitTask DI); size 0x2; refs 1000:0000 1000:021d
+11b8:003c	_hPrevInstance	u16	previous instance (InitTask SI); size 0x2; refs 1000:0000
+11b8:003e	_pszCmdLineOff	u16	offset of lpCmdLine (InitTask BX); size 0x2; refs 1000:0000
+11b8:0040	_cmdShow	i16	nCmdShow (InitTask DX); size 0x2; refs 1000:0000
+11b8:0042	_osversion	u16	DOS version (INT 21h AH=30h); size 0x2; refs 1000:0000
+11b8:0044	rtl_unk0044	u8	zero; no reference found; size 0x1
+11b8:0045	_WinAllocFlag	u16	extra GlobalAlloc flags for malloc family (init 0); size 0x2; refs 1000:33c7 1000:3608 1000:364f 1000:36c9 1000:36fb 1000:3abe 1000:3ada 1000:3afc 1000:3b1d
+11b8:0047	rtl_unk0047	u16	init 1; no reference found (Borland RTL); size 0x2
+11b8:0049	s_BorlandCopyright	cstr	"Borland C++ - Copyright 1993 Borland Intl." (RTL signature); size 0x2b
+11b8:0074	g_useWinG	i16	1 = WinG back buffer, 0 = GDI DDB path (init 1; INI UseWinG); size 0x2; refs 1010:0000 1018:0281 1018:0563 1018:086d 1048:010a 1048:02b2 1058:05bc 1058:07d0 1058:09b8
+11b8:0076	g_bufWidth	i16	back-buffer width (512 at run time); size 0x2; refs 1008:00ee 1008:0418 1008:050b; [code_1008] Back-buffer width (512); row pitch used by WinG pixel routines
+11b8:0078	g_bufHeight	i16	back-buffer height (1055 at run time); size 0x2; refs 1008:00ee
+11b8:007a	unused007a	i16	zero; no reference found; size 0x2
+11b8:007c	g_hdcWindow	u16	HDC of main window used by the WinG path; size 0x2; refs 1008:0267 1008:02ec 1018:0115; [code_1008] GetDC(main window) from InitInstance; WinG blit destination, identity palette selected here
+11b8:007e	g_hdcWinG	u16	WinG DC; size 0x2; refs 1008:00ee 1008:0230 1008:0267 1008:02ec; [code_1008] WinG device context
+11b8:0080	g_wingBits	far	pointer to WinG DIB bits; size 0x4; refs 1008:00ee 1008:0418 1008:050b
+11b8:0084	g_dibOrientation	i16	init -1 (top-down DIB: biHeight = -height); size 0x2; refs 1008:00ee
+11b8:0086	g_hbmWinGOld	u16	bitmap originally selected into the WinG DC; size 0x2; refs 1008:00ee 1008:0230
+11b8:0088	g_hWinGLib	u16	WING.DLL module handle; size 0x2; refs 1008:0000 1008:00d7
+11b8:008a	g_logPalTemplate	LOGPALETTE	LOGPALETTE {palVersion 0x300, palNumEntries 256, PALETTEENTRY[256]=0} template; size 0x404; refs 1008:02ec 1188:0267 1198:0305; [code_1008] palVersion 0x300, 256 entries; template copied by WinG_BuildIdentityPalette
+11b8:048e	s_WING_DLL	cstr	"WING.DLL" (LoadLibrary); size 0x9; refs 1008:0000; [code_1008] "WING.DLL" (LoadLibrary name in WinG_Load)
+11b8:0497	pad0497	bytes	alignment; size 0x1
+11b8:0498	g_initDone	i16	set at end of InitGraphicsAndData; size 0x2; refs 1018:0563; [code_1008] Set at end of InitGraphicsAndData; enables WM_PAINT presenting
+11b8:049a	g_appActive	i16	init 1; 0 while deactivated / in menu or dialog; size 0x2; refs 1010:05c8 1010:05db 1028:004f 1090:0388
+11b8:049c	g_quitRequested	i16	set by WM_CLOSE / WM_QUERYENDSESSION; size 0x2; refs 1028:004f; [code_1008] Set by WM_CLOSE/WM_QUERYENDSESSION; converted to quit event by Evt_GetNextEvent
+11b8:049e	g_holdMainLoop	i16	init 1; cleared by WM_CREATE; size 0x2; refs 1010:0000; [code_1008] Init 1, cleared by WM_CREATE; WinMain pumps while it or IsIconic(hwnd)
+11b8:04a0	g_unused04a0	i16	init 1; cleared by WM_CREATE, never read; size 0x2; owner seg 1010
+11b8:04a2	g_noResumeOnMenuExit	i16	init 0, never written; size 0x2; owner seg 1010; [code_1008] Init 0, never written; WM_EXITMENULOOP resumes only if 0
+11b8:04a4	g_isWin40	i16	result of IsWindows40 (1018:07ff); size 0x2; refs 1018:0281 1018:086d
+11b8:04a6	strs_initApp	strs	window class "RMPDEClass" (04a6, 04b1), title (04bc), INI dir (04cf) / file (04e3), dialog template names (04f0..05d9), INI section/keys/values, DLL names TMT256/TMT16/TMT/TM0..8SOUND (05eb..0670); size 0x23c; refs 1018:00a8 1018:0115 1018:01f5 1018:0281 1018:043a 1018:04d8 1018:0563 1018:07ff 1018:086d 1100:0638; [code_1008] Window class name used by RegisterMainWindowClass (second copy at 11b8:04b1 used by CreateWindow)
+11b8:06e2	g_cursorForced	u8	1 = force arrow cursor; size 0x1; refs 1088:01a9 10c0:0ae5 10e0:0000 10e0:0063; [code_10e0] 1 = force standard arrow cursor (set by SetCursorForced)
+11b8:06e3	g_mouseButtonDown	u16	left button held; size 0x2; refs 1020:0106; [code_1008] 1 between WM_LBUTTONDOWN and WM_LBUTTONUP; [code_10e0] Left mouse button held (written by window proc 1010:03c9/03f7; read via 1020:0106)
+11b8:06e5	g_mouseMoveHook	far	callback after WM_MOUSEMOVE; size 0x4; refs 1020:00be; [code_1008] Hook called after WM_MOUSEMOVE (installed by 10e0:0116 -> 10e0:0000)
+11b8:06e9	g_curCursorIndex	i16	last selected cursor (init -1); size 0x2; refs 1020:008b
+11b8:06eb	pad06eb	bytes	alignment; size 0x1
+11b8:06ec	g_pendingInputCode	u16	one-slot input look-ahead; size 0x2; refs 1028:0126 1028:0131 1028:01f6
+11b8:06ee	g_keyUpHeld	i16	arrow-key held flags (WM_KEYDOWN/UP); size 0x2; refs 10e0:0447 1168:05b5 1168:0c04; [code_10e0] Up-arrow held flag (window proc 1010:04b1/0510)
+11b8:06f0	g_keyDownHeld	i16	size 0x2; refs 10e0:0447 1168:05b5 1168:0c04; [code_1008] Down arrow held; [code_10e0] Down-arrow held flag (1010:04c3/0518)
+11b8:06f2	g_keyLeftHeld	i16	size 0x2; refs 10e0:0447 1168:05b5 1168:0c04; [code_1008] Left arrow held; [code_10e0] Left-arrow held flag (1010:048d/0500)
+11b8:06f4	g_keyRightHeld	i16	size 0x2; refs 10e0:0447 1168:05b5 1168:0c04; [code_1008] Right arrow held; [code_10e0] Right-arrow held flag (1010:049f/0508)
+11b8:06f6	g_mouseX	i16	mouse x in 512x384 game coordinates; size 0x2; refs 1020:010a 10e0:0000 10e0:0447 1168:05b5 1168:0c04
+11b8:06f8	g_mouseY	i16	mouse y in game coordinates; size 0x2; refs 1020:010a 10e0:0000 10e0:0447 1168:05b5 1168:0c04
+11b8:06fa	unused06fa	i16	zero; no reference found; size 0x2
+11b8:06fc	strs_1030	strs	NewPtr failure message box text/caption (06fc, 0713), "BNDL" x2 (072c, 0731); size 0x3a; refs 1030:0000 1030:0082; [code_1008] NewPtr MessageBox text (caption at 11b8:0713)
+11b8:0736	g_resCachedTree	far	only touched by unreferenced 1038:0000; size 0x4; owner seg 1038
+11b8:073a	g_resLockedHandle	u16	resource handle locked by Res_LockInPlace; size 0x2; refs 1038:0038 1038:0ba8 1038:0ef8; [code_1038] resource handle currently locked in place by Res_LockInPlace; 0 = scratch is a NewPtr block
+11b8:073c	strs_1038	strs	Mac resource type names BNDL/RRGB/FFNT/PMAP/SSND/OTHR (073c..075a), out-of-memory messages (075f, 0776, 07a3, 07ba), "BNDL" compares (078f..079e); size 0x98; refs 1038:00c9 1038:038a 1038:03da 1038:076f 1038:09e4 1038:0ad2 1038:0ba8; [code_1038] "BNDL" compared in Res_GetSize
+11b8:07d4	g_hPalette	u16	game logical palette; size 0x2; refs 1008:02ec 1008:0418 1008:050b 1010:0000 1048:010a 1048:02b2 1058:07d0 1058:09b8; [code_1008] Current game palette (also written by seg 1048); [code_1038] game logical palette (created black by Pal_Init); 0 initially
+11b8:07d6	g_curPaletteId	i16	last RRGB id loaded (init -1); size 0x2; refs 1048:0247; [code_1038] last RRGB id loaded by Pal_LoadById; 0xFFFF initially
+11b8:07d8	g_egaRGB	u16[16][3]	16 EGA colours {r,g,b} 0..255; size 0x60; refs 1008:0418 1008:050b 1048:02fd 1058:07d0 1058:09b8 1058:187f 1058:19b2; [code_1008] Standard VGA 16-colour table used for fills/frames; [code_1038] 16 EGA/CGA colours (values 0..255) for Pal_SetForeColor and 1058 fill/frame
+11b8:0838	g_vga16Index	u16[16]	16-colour-mode pixel value per EGA colour; size 0x20; refs 1048:02fd 1058:07d0 1058:09b8 1058:187f 1058:19b2
+11b8:0858	g_paletteFirstLoad	u16	init 1; Pal_SetFromRGB acts once; size 0x2; refs 1048:010a; [code_1038] 1 initially; Pal_SetFromRGB acts only while set, then clears it
+11b8:085a	s_RRGB	cstr	"RRGB"; size 0x5; refs 1048:0247; [code_1038] "RRGB" used by Pal_LoadById
+11b8:085f	pad085f	bytes	alignment; size 0x1
+11b8:0860	g_gfxConst4	i16	init 4, never written (fade stubs run only if 3 or 4); size 0x2; refs 1160:00ee 1160:0e2d 1198:0527; [code_1058] initialised 4, never written; 1160/1198 run the (stubbed) fade transition only when it is 3 or 4 (meaning unknown)
+11b8:0862	g_dirtyEnabled	i16	1 = record dirty rects; size 0x2; refs 1058:068e 10b8:029d 10b8:06e4 10c0:0ae5 10d8:0082 10e0:007d 10f0:0487 1138:043d 1150:100a 1168:0442 1168:0a6d; [code_1058] 1 = Gfx_AddDirtyRect records rects (set/cleared by scene code around drawing batches); [code_10e0] 1 = blits are recorded in the dirty-rect list (1058:068e)
+11b8:0864	g_clipTop	i16	inclusive clip rectangle (init 0,0x180,0,0x200); size 0x2; refs 1058:0d43 1058:0f7e 1058:114c 10b8:0000 10b8:0082 10c8:0000 10e0:036b 10e0:0391 10e0:03a6 10f0:0702; [code_1058] inclusive clip rect for PixMap_DrawKeyed*/Shadow (init 0)
+11b8:0866	g_clipBottom	i16	size 0x2; refs 1058:0d43 1058:0f7e 1058:114c 10b8:0000 10b8:0082 10c8:0000 10e0:036b 10e0:0391 10e0:03a6 10f0:0702; [code_1058] inclusive bottom (init 0x180; scenes set 0x17f, 0x11e+off, 0x2ff); [code_10e0] Graphics clip rect bottom (inclusive)
+11b8:0868	g_clipLeft	i16	size 0x2; refs 1058:0d43 1058:0f7e 1058:114c 10b8:0000 10b8:0082 10c8:0000 10e0:036b 10e0:0391 10e0:03a6; [code_1058] inclusive left (init 0); [code_10e0] Graphics clip rect left (inclusive)
+11b8:086a	g_clipRight	i16	size 0x2; refs 1058:0d43 1058:0f7e 1058:114c 10b8:0000 10b8:0082 10c8:0000 10e0:036b 10e0:0391 10e0:03a6; [code_1058] inclusive right (init 0x200; scenes set 0x1ff); [code_10e0] Graphics clip rect right (inclusive)
+11b8:086c	g_paletteDevice	i16	1 = 256-colour path (TMT256), 0 = 16-colour (TMT16); init 1; size 0x2; refs 1018:0563 1038:03da 1038:0ba8 1048:008b 1048:00b7 1048:010a 1048:0247 1048:02b2 1048:02fd 1048:036f 1058:05bc 1058:07d0 +12 more; [code_1008] Init 1; RC_PALETTE bit (0x100/0) of memory DC on GDI path; selects TMT256 vs TMT16
+11b8:086e	g_viewOriginX	i16	client x of game pixel (0,0); size 0x2; refs 1008:02b6 1018:0115 1020:010a 1058:05bc 1058:1578; [code_1058] x of the 512x384 game area in the client (set 1018:0188, aligned to 4)
+11b8:0870	g_viewOriginY	i16	client y of game pixel (0,0); size 0x2; refs 1008:02b6 1018:0115 1020:010a 1058:05bc 1058:1578; [code_1058] y of the game area in the client (set 1018:0196)
+11b8:0872	g_hGfxLib	u16	TMT256.DLL or TMT16.DLL handle; size 0x2; refs 1010:0000 1018:0563 1038:00c9 1038:03da 1038:0ba8; [code_1008] TMT256.DLL (palette devices) or TMT16.DLL (16-colour); [code_1058] LoadLibrary("TMT256.DLL" 0x5eb or "TMT16.DLL" 0x5f6) (set 1018:06c0)
+11b8:0874	g_dirtyCount	i16	entries in g_dirtyRects; size 0x2; refs 1058:068e 1058:0731 1058:076f; [code_1058] number of entries in g_dirtyRects (max 256)
+11b8:0876	g_shadowTable	u8[256]	colour remap for shadow / masked blits (logical indices, converted once by 1048:010a); size 0x100; refs 1048:010a 1058:0f7e; [code_1038] (owned by 1058; alias g_shadowTable) remap table for the unreferenced 1058:0f7e shadow draw via Blit8_DrawMaskRemap; converted to physical by Pal_SetFromRGB; [code_1058] colour lookup used by PixMap_DrawShadow; remapped to system palette by 1048:03bf
+11b8:0976	g_invertSpecTemplate	u8[33]	{0x10, 32 x 0}: remap spec template of Gfx_InvertRect16; size 0x21; refs 1058:187f
+11b8:0997	s_RUND	cstr	"RUND" PMAP compression tag; size 0x5; refs 1058:0566; [code_1058] "RUND" tag compared by PixMap_IsRUND
+11b8:099c	g_rowPitch	u32	512 (offscreen row width in pixels); size 0x4; refs 1060:0000 1060:01ef; [code_1058] 512 = offscreen row width in pixels; used by the 1060 glyph blitters (4bpp pitch = (512+1)>>1)
+11b8:09a0	g_tmAveCharWidth	i16	WM_CREATE text metrics (unused); size 0x2; owner seg 1010; [code_1008] WM_CREATE text metric (unused); 09a2 max width, 09a4 height+extleading, 09a6 height
+11b8:09a2	g_tmMaxCharWidth	i16	size 0x2; owner seg 1010
+11b8:09a4	g_tmHeightExt	i16	size 0x2; owner seg 1010
+11b8:09a6	g_tmHeight	i16	size 0x2; owner seg 1010
+11b8:09a8	s_FFNT	cstr	"FFNT"; size 0x5; refs 1068:0000; [code_1058] "FFNT" resource type for Font_Load
+11b8:09ad	pad09ad	bytes	alignment; size 0x1
+11b8:09ae	g_dissolveColOrder	u8[16]	Screen_DissolveCopy column phase per pass; size 0x10; refs 1070:002d; [code_1058] per-pass column phase for Screen_DissolveCopy: 0b 0d 05 0e 07 01 0f 02 00 03 08 04 09 0c 06 0a
+11b8:09be	g_dissolveRowShift	u8[16]	Screen_DissolveCopy column shift per row (y%16); size 0x10; refs 1070:002d; [code_1058] per-row (y%16) column shift for Screen_DissolveCopy: 0d 0b 06 0a 03 01 0f 00 0c 05 07 02 04 0e 09 08
+11b8:09ce	g_menuDef	far	current MenuBarDef (NULL none); size 0x4; refs 1078:0000 1078:0135 1078:01b5; [code_1058] current menu-bar definition (NULL = none)
+11b8:09d2	g_menusEnabled	i16	size 0x2; refs 1078:0000 1078:01b1 1078:01b5; [code_1058] 1 when the menu bar items are enabled
+11b8:09d4	g_inResourceLoad	i16	nonzero while resource loading pumps messages; size 0x2; refs 1038:03da 1038:0ba8 1078:0135; [code_1038] set to 1 while 1038 pumps messages after a load; makes 1078:0135 ignore dispatch
+11b8:09d6	s_fmt_s1	cstr	"%s"; size 0x3; refs 1078:0000; [code_1058] "%s" (menu title sprintf)
+11b8:09d9	s_fmt_s2	cstr	"%s"; size 0x3; refs 1078:0000; [code_1058] "%s" (menu item sprintf)
+11b8:09dc	g_inDialog	i16	1 inside DialogBox; size 0x2; refs 1080:0000; [code_1058] 1 while WinDlg_RunModal is inside DialogBox
+11b8:09de	g_hSoundLib	u16[9]	TM0..TM8SOUND.DLL handles; size 0x12; refs 1010:0000 1018:0563 1038:00c9 1038:03da 1038:0ba8; [code_1008] TM0SOUND..TM8SOUND.DLL handles (09de..09ee)
+11b8:09f0	g_hTmtLib	u16	TMT.DLL handle; size 0x2; refs 1010:0000 1018:0563 1038:00c9 1038:03da 1038:0ba8 1048:0247
+11b8:09f2	g_waveAvail	i16	waveOutGetNumDevs()!=0; size 0x2; refs 1088:0000 1088:0014 1088:0114
+11b8:09f4	g_waveFmtPtr	far	-> 4ac2 while a wave device is open; size 0x4; refs 1088:0014 1088:0114
+11b8:09f8	g_waveState	i16	1 playing, -1 idle (init -1); size 0x2; refs 1088:0014 1088:0114 1088:0175
+11b8:09fa	g_musicIds	i16[10]	music ids 9000..9009; size 0x14; refs 1090:02e9; [code_1058] 9000..9009 music ids (castle, clubhse, finale, level1, level2, level3, open1, open2, throne, title)
+11b8:0a0e	g_musicLoopPos	i16[10]	restart position at end of track; -1 = play once; size 0x14; refs 1090:044b; [code_1058] restart position after end-of-track; -1 = do not loop (only index 6 open1 = -1, others 0)
+11b8:0a22	g_musicFiles	far[10]	-> " castle.mid".." title.mid"; byte 0 patched to 'B' or 'E'; size 0x28; refs 1090:02e9
+11b8:0a4a	g_midiOk	i16	1 after Midi_Init; size 0x2; refs 1090:0000 1090:02af 1090:0519
+11b8:0a4c	g_curMusic	i16	playing music id, -1 none (init -1); size 0x2; refs 1090:0388 1090:0413 1090:0519
+11b8:0a4e	g_midiPaused	i16	size 0x2; refs 1090:044b 1090:04bf; [code_1058] 1 while paused (Midi_Pause / end-of-track restart)
+11b8:0a50	g_seqDev	u16	MCI "sequencer" device id; size 0x2; refs 1090:0000 1090:02af 1090:02e9; [code_1058] MCI device id of the "sequencer" device opened by Midi_Init
+11b8:0a52	g_trackDev	u16	MCI element device id; size 0x2; refs 1090:0000 1090:02af 1090:02e9 1090:0388 1090:0413 1090:044b 1090:04bf 1090:0519; [code_1058] MCI device id of the open .mid element (0 = none)
+11b8:0a54	g_midiSavedPos	i16	saved/loop position (16-bit); size 0x2; refs 1090:02e9 1090:044b 1090:04bf; [code_1058] position saved by Midi_Pause / loop point (16-bit truncated)
+11b8:0a56	strs_musicFiles	strs	10 MIDI file names, each with a leading placeholder byte; size 0x76; refs 1090:02e9 1150:0a97 1150:100a; pointed to from 11b8:0a22..0a46 (10 ptrs)
+11b8:0acc	s_midimapCfg	cstr	"\system\midimap.cfg"; size 0x14; refs 1090:0000; [code_1058] "\system\midimap.cfg" appended to the Windows directory
+11b8:0ae0	strs_fmSynthNames	strs	6 driver-name substrings that select the B (base/FM) MIDI set; size 0x2c; refs 1090:0000; [code_1058] "ADLIB","AD LIB","MVI PRO","BAS","BASE","THUNDER BOARD": substrings selecting the B (base) MIDI set
+11b8:0b0c	s_sequencer	cstr	"sequencer"; size 0xa; refs 1090:0000; [code_1058] "sequencer" MCI device type
+11b8:0b16	s_SOUNDS	cstr	"SOUNDS\"; size 0x8; refs 1090:023d; [code_1058] "SOUNDS\" sub-directory
+11b8:0b1e	g_animEraseCount	i16	entries in g_animEraseRects; size 0x2; refs 10b8:029d 10b8:06e4; [code_1098] number of entries in g_animEraseRects (11b8:52e2)
+11b8:0b20	g_animSpriteCount	i16	entries in g_animSprites; size 0x2; refs 10b8:0312 10b8:06e4; [code_1098] number of entries in g_animSprites (11b8:5666); reset by Anim_Step
+11b8:0b22	g_animUpdateCount	i16	entries in g_animUpdateRects; size 0x2; refs 10b8:0312 10b8:090a; [code_1098] number of entries in g_animUpdateRects (11b8:5bde)
+11b8:0b24	strs_dialogButtons	strs	dialog footers (0b24 glyph 0x86 "to Go Back", 0b31 "Click to Go On") and button labels (0b40 Go Back a Page, 0b4f See Next Page, 0b5d Done, 0b62 Cancel, 0b69 Yes, 0b6d No); size 0x4c; refs 10c0:0000; [code_1098] footer text kind 1 (starts with font glyph 0x86, "... to Go Back")
+11b8:0b70	g_dlgSaveBuf	far	save-under pixmap of the open dialog; size 0x4; refs 10c0:06ca 10c0:0712; [code_1098] save-under buffer of the current dialog box (NULL when none)
+11b8:0b74	unused0b74	bytes	zero; no reference found; size 0x4; [code_1098] unreferenced 4 bytes between g_dlgSaveBuf and g_bndlPagerDesc (no instruction touches them)
+11b8:0b78	g_bndlPagerDesc	PagerDesc	static PagerDesc (dead code 10c8:0000), arrays -> 5c74/5c90/5cac/5cba; size 0x1e; refs 10c8:0000; [code_1098] static pager descriptor used by Dlg_PagerFromBndl (x=11,y=14,w=285,lines=11; arrays -> 5c74/5c90/5cac/5cba)
+11b8:0b96	g_soundOn	u8	music+sound effects enabled (init 1; user record +0x0e); size 0x1; refs 1128:00dc 1128:012f 1128:0151 1160:0f28 1160:1632 1170:0000; [code_10f8] Music-and-sound enabled flag (MIDI music and sound effects); toggled by Audio_ToggleSound/Audio_ToggleAll/Options menu
+11b8:0b97	g_voiceOn	u8	voice narration enabled (init 1; user record +0x0f); size 0x1; refs 10e8:01ef 1128:0151 1130:0166 1138:0283 1138:043d 1140:00f7 1150:049a 1150:06ac 1150:0748 1150:0891 1150:100a 1150:1409 +2 more; [code_10f8] Voice enabled flag (hint voice, title narration, clue speech)
+11b8:0b98	g_gateWalkStarted	u8	auto-walk to the gate started (elves leave); size 0x1; refs 10e0:007d 10e0:0447 1178:048d; [code_10e0] Set when auto-walk to the locked gate starts; consumed by elf AI 1178:048d (elves in room leave); cleared every frame
+11b8:0b99	g_inputLocked	u8	player input ignored (auto-walk); size 0x1; refs 10e0:007d 10e0:0447 10f8:0241
+11b8:0b9a	g_jumping	u8	player in jump (frames 12..21); size 0x1; refs 10e0:0447 1118:0000 1168:0442 1168:05b5
+11b8:0b9b	g_unused0b9b	u8	cleared each frame, never set; size 0x1; refs 10e0:007d; [code_10e0] Cleared each frame by Room_Run, never set (dead)
+11b8:0b9c	g_rankPromoted	u8	rank changed during this climb; size 0x1; refs 10e0:007d 10f0:030d 10f0:07f5 1118:0000; [code_10e0] Set by Rank_AddClimbPoints when rank changed; cleared each room frame
+11b8:0b9d	g_redrawRequest	u8	0 none, 1 rebuild room, 2 restore play area; size 0x1; refs 10e0:007d
+11b8:0b9e	g_coinTargetSlot	u8	slot hit by coin toss; 0xFF none (init 0xFF); size 0x1; refs 10e0:007d 10e0:0447 1118:0000 1198:0305 1198:0499
+11b8:0b9f	g_elfQuizResult	u8	result of the elf question; size 0x1; refs 10e0:007d 1178:0b1d; [code_10e0] Return value of elf question 1150:100a
+11b8:0ba0	g_netSwingFrames	u8[12]	player frame for net-swing step 1..11 (index 0 unused); size 0xc; refs 10e0:0447 1168:05b5; [code_10e0] Frames for net swing steps 1..11 (24..34)
+11b8:0bac	g_emptySwingFrames	u8[12]	player frame for empty-hand swing step 1..11; size 0xc; refs 10e0:0447 1168:05b5
+11b8:0bb8	g_coinTossFrames	u8[14]	player frame for coin-toss step 1..13; size 0xe; refs 10e0:0447 1168:05b5; [code_10e0] Player frames for coin toss steps 1..13 (46..53 then 0)
+11b8:0bc6	g_coinFxFrames	u8[14]	FX sprite frame for coin-toss step (0 = none); size 0xe; refs 10e0:0447 1168:05b5; [code_10e0] FX sprite frames for coin toss steps (54..59 at steps 7..12)
+11b8:0bd4	g_doorFrames	u8[3]	door-entry frame for step 1..2; size 0x3; refs 10e0:0447; [code_10e0] Door-entry frames steps 1..2 (9,10)
+11b8:0bd7	g_bumpFrames	u8[13]	bump/fall-back frame for step 1..12; size 0xd; refs 10e0:0447; [code_10e0] Bump/fall-back frames steps 1..12 (68..63..68)
+11b8:0be4	g_bumpDxRight	i16[13]	bump x delta (facing right) per step; size 0x1a; refs 10e0:0447
+11b8:0bfe	g_bumpDxLeft	i16[13]	bump x delta (facing left, subtracted) per step; size 0x1a; refs 10e0:0447
+11b8:0c18	g_obstacleMinXRight	i16[7]	room 36 obstacle: min x per jump frame 15..21 (facing right); size 0xe; refs 10e0:0447
+11b8:0c26	g_obstacleMaxXLeft	i16[7]	room 36 obstacle: max x per jump frame 15..21 (facing left); size 0xe; refs 10e0:0447
+11b8:0c34	g_nextFrame	u8[85]	player walk/jump successor frame (85 frames of BNDL 300 incl. extras); size 0x55; refs 10e0:0447 1168:05b5
+11b8:0c89	g_frameDxRight	i16[85]	x delta when entering frame (facing right); size 0xaa; refs 10e0:0447 1168:05b5
+11b8:0d33	g_frameDxLeft	i16[85]	x delta when entering frame (facing left, subtracted); size 0xaa; refs 10e0:0447 1168:05b5
+11b8:0ddd	g_frameY	i16[85]	absolute player y per frame; size 0xaa; refs 10e0:0447 1168:0442 1168:05b5
+11b8:0e87	g_mouseWalkLatched	u16	mouse-driven movement latched; size 0x2; refs 10e0:0447; [code_10e0] Set when a play-area hotspot drove movement; while set and button held, movement continues
+11b8:0e89	g_shopWalkX	i16[3]	auto-walk x to the net shop per level; size 0x6; refs 10e0:0447
+11b8:0e8f	g_room9RankHints	i16[8]	hint event per rank shown in room 9 on later climbs; size 0x10; refs 10e0:10b2
+11b8:0e9f	pad0e9f	bytes	alignment; size 0x1
+11b8:0ea0	g_rankThresholds	u32[8]	treasure-point thresholds of ranks 0..7; size 0x20; refs 10e8:07a6; [code_10e0] {0,5,25,70,115,170,230,300}
+11b8:0ec0	g_clueBoxMode	u8	0 clue list, 1 answer prompt, 2 CONTINUE; size 0x1; refs 10e8:0040 10e8:0658
+11b8:0ec1	g_showCoins	u8	init 1, never changed; size 0x1; refs 10e8:02cf; [code_10e0] Draw coin count (init 1, never changed)
+11b8:0ec2	g_showNets	u8	init 1, never changed; size 0x1; refs 10e8:034d; [code_10e0] Draw net count (init 1, never changed)
+11b8:0ec3	g_gemsNeeded	u8[4]	treasures per climb by rank tier; size 0x4; refs 10e8:03cb 1198:0103; [code_1168] Chest treasures per level by g_rankTier: 2,3,4,5 (owner name g_gemsNeeded)
+11b8:0ec7	g_gemX	i16[4][5]	HUD gem icon x by tier/slot; size 0x28; refs 10e8:03cb
+11b8:0eef	g_gemY	i16[4][5]	HUD gem icon y by tier/slot; size 0x28; refs 10e8:03cb
+11b8:0f17	str_AnswerPrompt	cstr	FF 05 FF "Click on / an answer / to choose it." (clue box mode 1); size 0x24; refs 10e8:00dd
+11b8:0f3b	str_ClickToGoOn	cstr	FF 05 FF "Click mouse / to go on." (unreferenced); size 0x19
+11b8:0f54	g_clueAbortKeys	u16[3]	{0x0d,0x1b,0}; size 0x6; refs 10e8:01ef
+11b8:0f5a	tmpl_Coins	bytes	FF 05 FF "00" NUL - coin counter template; size 0x6; refs 10e8:02cf; [code_10e0] FF 05 FF '0' '0' 0 (coins)
+11b8:0f60	tmpl_Nets	bytes	FF 05 FF "00" NUL - net counter template; size 0x6; refs 10e8:034d; [code_10e0] FF 05 FF '0' '0' 0 (nets)
+11b8:0f66	tmpl_Points	bytes	FF 05 FF "00000" NUL - treasure points template; size 0x9; refs 10e8:04b2
+11b8:0f6f	pad0f6f	bytes	alignment; size 0x1
+11b8:0f70	g_celebBndl323	far	BNDL 323 (celebration); size 0x4; refs 10f0:0000 10f0:037e
+11b8:0f74	g_celebScript20301	far	OTHR 20301 animation script; size 0x4; refs 10f0:0000 10f0:037e
+11b8:0f78	g_treasureBndl	far	BNDL 330+((treasuresFound-1)%43); size 0x4; refs 10f0:0000 10f0:037e
+11b8:0f7c	g_celebScript20302	far	OTHR 20302 animation script; size 0x4; refs 10f0:0000 10f0:037e
+11b8:0f80	g_celebBndl324	far	BNDL 324 (champion); size 0x4; refs 10f0:0000 10f0:037e
+11b8:0f84	g_celebBndl325	far	BNDL 325 (final); size 0x4; refs 10f0:0000 10f0:037e
+11b8:0f88	g_rankImage	far	PMAP 2381 (rank screen); size 0x4; refs 10f0:037e 10f0:054b 10f0:0702
+11b8:0f8c	g_rankThresholdLabels	far[7]	-> "5".."300" (rank screen labels); size 0x1c; refs 10f0:06af; [code_10e0] -> "5","25","70","115","170","230","300"
+11b8:0fa8	g_rankNames	far[8]	-> rank names (FF 05 FF prefix) Trainee, 1..6 stars, Champion; size 0x20; refs 10f0:0702
+11b8:0fc8	g_rankPromoHints	i16[8]	hint event when promoted to rank r (-1 none); size 0x10; refs 10f0:07f5; [code_10e0] {-1,12,15,18,21,24,27,30}
+11b8:0fd8	g_rankStayHints	i16[8]	hint event when the climb ends without promotion at rank r; size 0x10; refs 10f0:07f5; [code_10e0] {10,14,17,20,23,26,29,32}
+11b8:0fe8	fmt_Name	cstr	FF 05 FF "%s"; size 0x6; refs 10f0:054b
+11b8:0fee	fmt_TotalTreasures	cstr	FF 05 FF "Total Treasures %lu"; size 0x17; refs 10f0:054b
+11b8:1005	strs_rankThresholds	strs	"5","25","70","115","170","230","300"; size 0x18; refs 1030:0000 1038:03da 1038:0ba8; pointed to from 11b8:0f8c..0fa4 (7 ptrs)
+11b8:101d	strs_rankNames	strs	8 rank name strings; size 0x46; pointed to from 11b8:0fa8..0fc4 (8 ptrs); owner seg 10f0
+11b8:1063	pad1063	bytes	alignment; size 0x1
+11b8:1064	g_netShopState	i16	NetShop_Tick state 0..7; size 0x2; refs 10e0:0447 10f8:0000 10f8:0241; [code_10f8] NetShop_Tick state 0..7 (0 idle closed, 1 open request, 2 open, 3 taken, 4-6 wait, 7 close); init 0
+11b8:1066	g_netSignX	i16[3]	net-shop sign x per level; size 0x6; refs 10f8:0285; [code_10f8] Net-shop sign x per mountain level {207,99,365} (copied to stack by NetShop_DrawSign)
+11b8:106c	g_spotPict	far[3]	pictures (PMAP 1400+kind) of the 3 hiding places of the current room; size 0xc; refs 1100:0638 1100:068a 1198:0234 1198:0305 1198:0499; [code_10f8] Spot object pictures of the current room (PMAP 1400+kind), drawn at x {26,197,368} y 90
+11b8:1078	g_numClues	u8	clue words collected on the current level (0..3); size 0x1; refs 10e8:019f 10e8:0228 10e8:06e7 1118:0000 1150:049a 1160:0f28
+11b8:1079	g_strNoun	far[16]	noun strings, index 1..15 ([0] = ""); size 0x40; refs 1100:0793; [code_10f8] Singular noun strings, index 1..15 (tree,bush,flower,flag,mushroom,sign,berry,acorn,nest,pinecone,rock,beehive,snail,shovel,woodpecker hole); [0]=""
+11b8:10b9	g_strNounPlural	far[16]	plural noun strings, index 1..15; size 0x40; refs 1100:0793
+11b8:10f9	g_strCount	far[8]	count words index 1..7; size 0x20; refs 1100:0793
+11b8:1119	g_strSize	far[5]	size words index 1..4; size 0x14; refs 1100:0793; [code_10f8] Size words index 1..4 (big,small,tall,short); [0]=""
+11b8:112d	g_strShape	far[5]	shape words index 1..4; size 0x14; refs 1100:0793; [code_10f8] Shape words index 1..4 (round,triangle,square,rectangle); [0]=""
+11b8:1141	strs_clueWords	strs	"" + 15 nouns + 15 plurals + 7 counts + 4 sizes + 4 shapes; size 0x13d; pointed to from 11b8:1079..113d (50 ptrs); owner seg 1100
+11b8:127e	unk127e	i16	init -1; no reference found (tail of module 1100); size 0x2
+11b8:1280	unk1280	bytes	zero; no reference found; size 0x8
+11b8:1288	g_coinPileRoom	u8	room of the rescue coin pile; 0xFF none, 0xFE armed (init 0xFF); size 0x1; refs 1110:0059 1110:007d 1110:00aa
+11b8:1289	g_coinPilePmap	far	PMAP 1699; size 0x4; refs 1110:0000 1110:0037 1110:007d; [code_10f8] PMAP 1699 (gold coin pile, 52x25)
+11b8:128d	pad128d	bytes	alignment; size 0x1
+11b8:128e	g_elfCountByTier	u8[4]	elves per level by rank tier; size 0x4; refs 1118:0000; [code_10f8] {6,8,10,12} indexed by g_rankTier, passed to 1178:0251 at climb/level start
+11b8:1292	g_cursorIds	u16[4]	EXE cursor resource ids for Cursor_LoadSet, 0xFFFF-terminated; size 0x8; refs 1118:0000
+11b8:129a	strs_menuHelp	strs	"&Help" + 5 items separated by LF (modified in place); size 0x63; pointed to from 11b8:13ab..13b3 (2 ptrs); owner seg 1120; [code_10f8] Menu titles and '\n'-separated item lists (&Help, &File, &Options ...)
+11b8:12fd	g_menuHelpCmds	far[5]	Help item handlers; size 0x14; pointed to from 11b8:13b7; owner seg 1120; [code_10f8] Help items: 1180:0117,1180:0128,1180:0139,1180:014a,1140:0000
+11b8:1311	strs_menuFile	strs	"&File" + 3 items; size 0x27; pointed to from 11b8:1383..138b (2 ptrs); owner seg 1120
+11b8:1338	g_menuFileCmds	far[3]	File item handlers; size 0xc; pointed to from 11b8:138f; owner seg 1120; [code_10f8] File items: 10f0:0487 (See Rank),1140:0062,1140:0098
+11b8:1344	strs_menuOptions	strs	"&Options" + 3 items; size 0x33; pointed to from 11b8:1397..139f (2 ptrs); owner seg 1120
+11b8:1377	g_menuOptionCmds	far[3]	Options item handlers; size 0xc; pointed to from 11b8:13a3; owner seg 1120; [code_10f8] Options items: 1140:0015,1140:00cc,1140:00f7
+11b8:1383	g_menuPopups	MenuPopupDef[3]	3 popup records (0x14 bytes); size 0x3c; pointed to from 11b8:13c1; owner seg 1120; [code_10f8] 0x14-byte popup records (File, Options, Help)
+11b8:13bf	g_gameMenuBar	MenuBarDef	{i16 count=3; far popups}; size 0x6; refs 1120:0000; [code_10f8] {int16 count=3; MenuPopupDef far* popups=11b8:1383}
+11b8:13c5	pad13c5	bytes	alignment; size 0x1
+11b8:13c6	g_musicActive	u32	1 after Music_PlayZone; size 0x4; refs 1128:00ef
+11b8:13ca	g_musicId	i16	tune id chosen by Music_PlayZone (init -1); size 0x2; refs 1128:00dc; [code_10f8] Music id (9000..9009) chosen by the last Music_PlayZone; init -1
+11b8:13cc	unk13cc	u8	zero; no reference found; size 0x1; [code_10f8] Init 0; no reference found (padding/unused variable of module 1128)
+11b8:13cd	g_unk13cd	u8	written 0/1/0xFF, never read (init 0xFF); size 0x1; refs 1150:100a 1160:02e0; [code_10f8] Init 0xFF; set to 0/1 by sign-in (1160:0343/045b) before Music_Nop and to 0xFF by 1150:137c before Music_Resume; never read (stubbed music cue); [code_1150] Write-only (raw byte search of all code): 0 at name-entry start, 1 at its end, 0xff at quiz end
+11b8:13ce	g_hintPending	i16	queued hint event, -1 none (init -1); size 0x2; refs 10e0:007d 10f0:07f5 1130:0000 1140:0015; [code_10f8] Queued hint event id, -1 none; consumed by Room_Run (10e0:01ea) via Hint_Show
+11b8:13d0	g_hintBit	i16[34]	hint event -> bit in g_hintUnseen, -1 = always shown; size 0x44; refs 1130:0000
+11b8:1414	g_hintVoiceStopKeys	u16[4]	{0x0d,0x1b,0x4b0,0}; size 0x8; refs 1130:0166; [code_10f8] {0x0d,0x1b,0x4b0,0} input codes that cut a hint voice clip short
+11b8:141c	g_titleVoiceFirst	i16[4]	first narration SSND per story page 1..4 (code base 141a, 1-based); size 0x8; refs 1138:043d; [code_10f8] First narration SSND id per story page, indexed page-1: {7150,7153,7156,7158} (code addresses it as 0x141a+2*page)
+11b8:1424	g_titleVoiceCount	i16[4]	narration clip count per page 1..4 (code base 1422); size 0x8; refs 1138:043d; [code_10f8] Narration clip count per story page, indexed page-1: {3,3,2,2} (code addresses it as 0x1422+2*page)
+11b8:142c	s_textStartAnother	cstr	body of "Start Another Game" dialog; size 0xaa; pointed to from 11b8:14dd; owner seg 1140
+11b8:14d6	g_dlgStartAnother	DlgDesc	yes/no dialog; size 0x1a; owner seg 1140; [code_10f8] Yes/No dialog "Start Another Game" (caption 1933, text 142c); +0x0b preset
+11b8:14f0	s_textExitGame	cstr	body of "Exit" (in-game); size 0x43; pointed to from 11b8:153a; owner seg 1140
+11b8:1533	g_dlgExitGame	DlgDesc	yes/no dialog; size 0x1a; refs 1140:0098; [code_10f8] Yes/No dialog "Exit" (caption 1946, text 14f0)
+11b8:154d	s_textNewPlayerMsgs	cstr	body of "New Player Messages"; size 0x7f; pointed to from 11b8:15d3; owner seg 1140
+11b8:15cc	g_dlgNewPlayerMsgs	DlgDesc	yes/no; +0x0b preset with g_hintsOn; size 0x1a; refs 1140:0015; [code_10f8] Yes/No dialog "New Player Messages" (caption 194b, text 154d); preset byte 15d7
+11b8:15e6	s_textMusicSound	cstr	body of "Music and Sound"; size 0x24; pointed to from 11b8:162c; owner seg 1140
+11b8:160a	s_textVoice	cstr	body of "Voice"; size 0x1b; pointed to from 11b8:1646; owner seg 1140
+11b8:1625	g_dlgMusicSound	DlgDesc	yes/no; +0x0b preset with g_soundOn; size 0x1a; owner seg 1140; [code_10f8] Yes/No dialog "Music and Sound" (caption 195f, text 15e6); preset byte 1630
+11b8:163f	g_dlgVoice	DlgDesc	yes/no; +0x0b preset with g_voiceOn; size 0x1a; refs 1140:00f7; [code_10f8] Yes/No dialog "Voice" (caption 196f, text 160a); preset byte 164a
+11b8:1659	s_textAbout	cstr	product blurb of "About Treasure Mountain!"; size 0x2c0; pointed to from 11b8:1920; owner seg 1140
+11b8:1919	g_dlgAbout	DlgDesc	info box (kind 1) with fixed geometry; size 0x1a; owner seg 1140; [code_10f8] Info dialog "About Treasure Mountain!" (kind 1, caption 1975, text 1659)
+11b8:1933	strs_dialogCaptions	strs	captions of the 6 dialogs above; size 0x5b; pointed to from 11b8:14d8..191b (6 ptrs); owner seg 1140
+11b8:198e	g_quizReadingAll	i16	set when Quiz_SpeakAll starts; size 0x2; refs 1150:100a 1150:1449; [code_1150] Write-only: 0 at question start, 1 when Quiz_SpeakAll starts
+11b8:1990	g_quizVoiceBase	u16[360]	first narration SSND per question 0..358; [359]=6616 end sentinel; size 0x2d0; refs 1150:1409 1150:14d7; [code_1150] Per-question first narration sound id (4000..6608)
+11b8:1c60	g_quizVoiceBank	u8[359]	narrator bank (1..3) per question -> 7300/7400/7500; size 0x167; refs 1150:049a 1150:06ac 1150:0748
+11b8:1dc7	g_quizSilentAnswers	i16[16]	questions whose answers are never spoken; size 0x20; refs 1150:100a; [code_1150] Question indices whose answers are never read aloud
+11b8:1de7	g_quizTierStart	i16[5]	question tier start indices; size 0xa; refs 1150:0000; [code_1150] Tier start indices {0,63,179,302,359}
+11b8:1df1	g_quizPraiseText	far[4]	correct-answer texts; size 0x10; refs 1150:049a; [code_1150] Correct-answer messages (11b8:1e69,1ea1,1ed3,1f21)
+11b8:1e01	g_quizResultStopKeys	u16[3]	{0x1b,0x0d,0}; size 0x6; refs 1150:06ac; [code_1150] {0x1b,0x0d,0} interrupt list for result narration
+11b8:1e07	g_quizSorryText	far[4]	wrong-answer texts; size 0x10; refs 1150:0748; [code_1150] Wrong-answer messages (11b8:1f5b,1f94,1fe0,200f)
+11b8:1e17	g_quizSorryStopKeys	u16[3]	{0x1b,0x0d,0}; size 0x6; refs 1150:0891
+11b8:1e1d	g_quizLineStopKeys	u16[19]	input codes that interrupt question narration; size 0x26; refs 1150:1409; [code_1150] Interrupt list for question narration (arrows, Enter, 0x409, Esc, 0xa80-2, 0xa70-6, 0xa88, 0)
+11b8:1e43	g_quizAnswerStopKeys	u16[19]	same list, used for answers; size 0x26; refs 1150:14d7; [code_1150] Same contents as 1e1d, used for answers
+11b8:1e69	strs_quizResults	strs	4 praise + 4 sorry texts (FF 05 FF prefix) and "." (1f59); size 0x1df; refs 1150:049a; pointed to from 11b8:1df1..1e13 (8 ptrs)
+11b8:2048	s_textWriteError	cstr	body of "Write Error"; size 0x3c; pointed to from 11b8:208b; owner seg 1158; [code_1150] body of g_dlgWriteError (disk write failed, game not saved)
+11b8:2084	g_dlgWriteError	DlgDesc	info box; size 0x1a; refs 1158:00bb; [code_1150] 26-byte dialog descriptor: type 1, footer 2, title 209e "Write Error", body 2048
+11b8:209e	s_capWriteError	cstr	"Write Error"; size 0xc; pointed to from 11b8:2086; owner seg 1158
+11b8:20aa	s_dirTlcwin	cstr	"c:\tlcwin"; size 0xa; refs 1158:0027
+11b8:20b4	s_dirTmtwincd	cstr	"c:\tlcwin\tmtwincd"; size 0x13; refs 1158:0027
+11b8:20c7	s_usersDatR	cstr	users.dat path (read); size 0x1d; refs 1158:0040; [code_1150] users.dat path used for reading
+11b8:20e4	s_usersDatW	cstr	users.dat path (write); size 0x1d; refs 1158:00bb; [code_1150] users.dat path used for writing
+11b8:2101	g_usersMagic	bytes	"USR" 0x1A + NUL: users.dat signature; size 0x5; refs 1158:00bb; [code_1150] "USR\x1a" file header
+11b8:2106	s_fmtAlreadyOnList	cstr	printf format "%s ... already on the list"; size 0x23; refs 1160:0957; pointed to from 11b8:2130
+11b8:2129	g_dlgAlreadyOnList	DlgDesc	OK box; body pointer patched at 2130; size 0x1a; refs 1160:0957; [code_1150] type 1, footer 2, no title; body pointer (11b8:2130) patched to a sprintf buffer
+11b8:2143	s_fmtRemoveConfirm	cstr	printf format for the remove confirmation; size 0xa3; refs 1160:089f; pointed to from 11b8:21ed
+11b8:21e6	g_dlgRemovePlayer	DlgDesc	yes/no; body pointer patched at 21ed; size 0x1a; refs 1160:089f; [code_1150] type 8 Yes/No, footer 1, title 225a; body pointer (11b8:21ed) patched to a sprintf buffer
+11b8:2200	g_dlgListFull	DlgDesc	OK box; size 0x1a; refs 1160:0595; [code_1150] type 1, footer 2, no title, body 2271 ("The list is full...")
+11b8:221a	g_dlgEnterName	DlgDesc	non-modal name-entry box; size 0x1a; refs 1160:02e0 1160:0957; [code_1150] type 0 (non-modal), footer 1, title 22f4, body 230a; drawn with Dlg_Draw(d,1)
+11b8:2234	g_dlgTitleExit	DlgDesc	yes/no "Exit" on title / sign-in; size 0x1a; refs 1138:0283 1160:04f6; [code_10f8] Yes/No dialog "Exit" used on the title (caption 233c, text 2341); [code_1150] type 8 Yes/No, footer 1, title 233c "Exit", body 2341; also used by 1138:0372
+11b8:224e	g_playerName	bytes	current player name, '_' = empty cell; size 0x9; refs 10f0:054b 1160:00ee 1160:02e0 1160:0488 1160:0957 1160:0ab0 1160:0f28; [code_1150] Current player name; '_' placeholders; name[0]=='_' means nobody signed in
+11b8:2257	g_rowH	i16	sign-in row height (init 25); size 0x2; refs 1160:051b 1160:0b1b 1160:0e97
+11b8:2259	g_signInBackdrop	u8	backdrop 2100 drawn; size 0x1; refs 1160:00ee; [code_1150] Write-only: 1 if SignIn_Run drew backdrop 2100 (restart), 0 if it restored the back page
+11b8:225a	s_capRemovePlayer	cstr	"Remove A Player's Name"; size 0x17; pointed to from 11b8:21e8; owner seg 1160
+11b8:2271	s_textListFull	cstr	"The list is full..."; size 0x83; pointed to from 11b8:2207; owner seg 1160; [code_1150] body of g_dlgListFull (uses key-cap glyphs 0x82, 0x83, 0x8c)
+11b8:22f4	s_capEnterName	cstr	"Enter New Player Name"; size 0x16; pointed to from 11b8:221c; owner seg 1160
+11b8:230a	s_textEnterName	cstr	"Type your name in the box below..."; size 0x32; pointed to from 11b8:2221; owner seg 1160; [code_1150] body of g_dlgEnterName (2 text lines incl. Enter glyph 0x8b, 3 empty lines for the name box)
+11b8:233c	s_capExit	cstr	"Exit"; size 0x5; pointed to from 11b8:2236; owner seg 1160
+11b8:2341	s_textTitleExit	cstr	"You are about to exit the program..."; size 0x4f; pointed to from 11b8:223b; owner seg 1160; [code_1150] body of g_dlgTitleExit (5 lines)
+11b8:2390	s_nameBlank	cstr	"________"; size 0x9; refs 1160:00ee
+11b8:2399	s_nameBlank2	cstr	"________"; size 0x9; owner seg 1160; [code_1150] "________" (used on cancel)
+11b8:23a2	s_startNewPlayer	cstr	"Start New Player" (measured); size 0x11; refs 1160:0b1b
+11b8:23b3	s_startNewPlayer2	cstr	"Start New Player" (drawn); size 0x11; refs 1160:0b1b
+11b8:23c4	s_rankTrainee	cstr	"Trainee"; size 0x8; refs 1160:0b1b
+11b8:23cc	s_rankStar	cstr	"*"; size 0x2; refs 1160:0b1b
+11b8:23ce	s_rankChampion	cstr	"Champion"; size 0x9; refs 1160:0b1b
+11b8:23d7	pad23d7	bytes	alignment; size 0x1
+11b8:23d8	g_rooms	RoomDef[50]	50 room records of 28 bytes; slot fields set at run time (1100), hall rooms 0..8 exits/bg rebuilt by 1190:0000; size 0x578; refs 10e0:007d 10e0:0447 10e8:019f 10e8:0228 10e8:026e 10e8:03cb 10e8:074a 10f8:0285 1100:0000 1100:04b5 1100:0638 1110:00aa +16 more; [code_10e0] 28-byte room records (see doc)
+11b8:2950	cl_layouts	i16[4][4][5]	ladder layouts [tier][screen][column]: 0 none, 1 full, 2 lower half; size 0xa0; refs 1168:0047
+11b8:29f0	cl_colX	i16[5]	ladder column centre x; size 0xa; refs 1168:0299 1168:03d6 1168:0a6d 1168:0c04 1168:1143; [code_1168] Ladder column centre x: 82,169,256,343,430
+11b8:29fa	cl_climbFrames	i16[4]	climb cycle frames (phase 0..3); size 0x8; refs 1168:0c04
+11b8:2a02	cl_climbDx	i16[4]	climb x offset per phase; size 0x8; refs 1168:0c04
+11b8:2a0a	cl_climbUpDy	i16[4]	climb-up dy per phase; size 0x8; refs 1168:0c04; [code_1168] Climb-up dy per phase (12,20,12,20)
+11b8:2a12	cl_climbDownDy	i16[4]	climb-down dy per phase; size 0x8; refs 1168:0c04; [code_1168] Climb-down dy per phase (20,12,20,12)
+11b8:2a1a	cl_jumpFrames	i16[5]	sideways jump frames (index 0..4); size 0xa; refs 1168:0c04
+11b8:2a24	cl_jumpDxLeft	i16[4]	left jump |dx| (index 0..3); size 0x8; refs 1168:0c04; [code_1168] Left jump |dx| (indexed 4-step)
+11b8:2a2c	cl_jumpDxRight	i16[5]	right jump dx (index 1..4; [0] = 0); size 0xa; refs 1168:0c04
+11b8:2a36	cl_jumpDy	i16[5]	jump dy (index 0..4); size 0xa; refs 1168:0c04
+11b8:2a40	cl_fallFrames	i16[7]	fall frames, steps 1..7 (code base 2a3e); size 0xe; refs 1168:0c04
+11b8:2a4e	cl_fallDx	i16[7]	fall dx, steps 1..7 (code base 2a4c); size 0xe; refs 1168:0c04
+11b8:2a5c	cl_fallDy	i16[7]	fall dy before +32, steps 1..7 (code base 2a5a); size 0xe; refs 1168:0c04
+11b8:2a6a	cl_landFrames	i16[6]	landing frames, steps 1..6 (code base 2a68); size 0xc; refs 1168:0c04
+11b8:2a76	cl_landDx	i16[6]	landing dx, steps 1..6 (code base 2a74); size 0xc; refs 1168:0c04
+11b8:2a82	cl_landY	i16[6]	landing absolute y, steps 1..6 (code base 2a80); size 0xc; refs 1168:0c04
+11b8:2a8e	cl_creatSeq	i16[12]	creature frame per tick 1..12, -1 hidden (code base 2a8c); size 0x18; refs 1168:1143
+11b8:2aa6	cl_walkMouseFollow	i16	size 0x2; refs 1168:05b5; [code_1168] Walk mode: keep steering toward held mouse
+11b8:2aa8	cl_climbMouseFollow	i16	size 0x2; refs 1168:0c04; [code_1168] Climb mode: keep steering toward held mouse
+11b8:2aaa	cl_creatSpawnPermille	i16[4]	creature spawn chance per tick (per mille) by tier; size 0x8; refs 1168:1143; [code_1168] Wall-creature spawn chance per tick by g_rankTier: 0,50,100,200 permille
+11b8:2ab2	sfx_current	far	currently loaded SSND; size 0x4; refs 1170:0000 1170:005b
+11b8:2ab6	g_caughtElf	u8	1-based index of the elf caught in the net; size 0x1; refs 10e0:007d 1118:0000 1178:0b1d; [code_1168] Caught item-carrying elf index+1 (consumed by 10e0:007d to ask question)
+11b8:2ab7	elf_count	i16	active elves; size 0x2; refs 1178:01ac 1178:0251 1178:0364 1178:0453 1178:048d 1178:051f; [code_1168] Number of active elves
+11b8:2ab9	unk2ab9	bytes	zero; no reference found; size 0x8
+11b8:2ac1	elf_confined	u8	elves may not change rooms (after gate unlock); size 0x1; refs 1178:0251 1178:048d 1178:0565
+11b8:2ac2	elf_netBusy	i16	an elf is in the net; size 0x2; refs 1178:0251 1178:03bb 1178:0b1d
+11b8:2ac4	elf_throwState	i16	projectile (sparkle/coin, BNDL 310) throw state 0..13; size 0x2; refs 1178:0251 1178:0766 1178:0cb0
+11b8:2ac6	elf_projFrame	i16	projectile frame (BNDL 310); size 0x2; refs 1178:0cb0
+11b8:2ac8	elf_levelStartRoom	u8[3]	first room of each level for elf placement; size 0x3; refs 1178:00d7; [code_1168] Elf random-walk start room per level: 0x0b,0x19,0x26
+11b8:2acb	elf_beh0Frames	i8[17]	behaviour 0 frame script, -1 terminated; size 0x11; refs 1178:0a6d
+11b8:2adc	elf_beh0Dx	i16[16]	behaviour 0 dx per step; size 0x20; refs 1178:0a6d
+11b8:2afc	elf_beh0Y	i16[16]	behaviour 0 y per step; size 0x20; refs 1178:0a6d
+11b8:2b1c	elf_beh1Frames	i8[17]	behaviour 1 frame script; size 0x11; refs 1178:0a90; [code_1168] Behaviour 1 frame script; dx @2b2d, y @2b4d
+11b8:2b2d	elf_beh1Dx	i16[16]	size 0x20; refs 1178:0a90
+11b8:2b4d	elf_beh1Y	i16[16]	size 0x20; refs 1178:0a90
+11b8:2b6d	elf_beh2Frames	i8[11]	behaviour 2 frame script; size 0xb; refs 1178:0ab3; [code_1168] Behaviour 2 frame script; dx @2b78, y @2b8c
+11b8:2b78	elf_beh2Dx	i16[10]	size 0x14; refs 1178:0ab3
+11b8:2b8c	elf_beh2Y	i16[10]	size 0x14; refs 1178:0ab3
+11b8:2ba0	elf_beh3Frames	i8[17]	behaviour 3 frame script; size 0x11; refs 1178:0ad6; [code_1168] Behaviour 3 frame script; dx @2bb1, y @2bd1
+11b8:2bb1	elf_beh3Dx	i16[16]	size 0x20; refs 1178:0ad6
+11b8:2bd1	elf_beh3Y	i16[16]	size 0x20; refs 1178:0ad6
+11b8:2bf1	elf_beh4Frames	i8[10]	behaviour 4 (flee) frame script, -2 = leave room; size 0xa; refs 1178:0af9; [code_1168] Behaviour 4 frame script (-2 = leave room); dx @2bfb, y @2c0d, sfx @2c1f
+11b8:2bfb	elf_beh4Dx	i16[9]	size 0x12; refs 1178:0af9
+11b8:2c0d	elf_beh4Y	i16[9]	size 0x12; refs 1178:0af9
+11b8:2c1f	elf_beh4Sfx	i16[9]	sound effect per step (0 none); size 0x12; refs 1178:0af9
+11b8:2c31	elf_netFrames	i8[10]	net-ride frame per net step, -1 release; size 0xa; refs 1178:0b1d
+11b8:2c3b	elf_netDx	i16[9]	size 0x12; refs 1178:0b1d; [code_1168] Net-ride dx by g_netAnim
+11b8:2c4d	elf_netY	i16[9]	size 0x12; refs 1178:0b1d; [code_1168] Net-ride y by g_netAnim
+11b8:2c5f	elf_throwDxR	i16[5]	thrower dx facing right per throw step; size 0xa; refs 1178:0cb0
+11b8:2c69	elf_throwDxL	i16[5]	thrower |dx| facing left; size 0xa; refs 1178:0cb0; [code_1168] Thrower draw |dx| facing left by step
+11b8:2c73	elf_throwY	i16[5]	thrower y; size 0xa; refs 1178:0cb0; [code_1168] Thrower draw y by step
+11b8:2c7d	elf_projY	i16[9]	projectile y per projectile frame; size 0x12; refs 1178:0cb0; [code_1168] Projectile (sparkle/coin) y by projectile frame
+11b8:2c8f	elf_behHandlers	far[6]	behaviour handler table; size 0x18; refs 1178:0453 1178:048d 1178:051f; [code_1168] Behaviour handler table (1178:0a6d,0a90,0ab3,0ad6,0af9,0cb0)
+11b8:2ca7	elf_projSteps	i16	projectile flight step counter; size 0x2; owner seg 1178
+11b8:2ca9	pad2ca9	bytes	alignment; size 0x1
+11b8:2caa	help_pages	far[7]	loaded help page texts (OTHR); size 0x1c; refs 1180:0000; pointed to from 11b8:2d03
+11b8:2cc6	help_pics	far[7]	per-page pictures (PagerDesc.pics, freed after); size 0x1c; refs 1180:0000; pointed to from 11b8:2d10; [code_1168] PagerDesc.pics[7]: always NULL in this build (cleared, freed defensively)
+11b8:2ce2	help_picDx	u16[7]	per-page picture dx; size 0xe; pointed to from 11b8:2d14; owner seg 1180
+11b8:2cf0	help_picDy	u16[7]	per-page picture dy; size 0xe; pointed to from 11b8:2d18; owner seg 1180
+11b8:2cfe	help_desc	PagerDesc	help page viewer descriptor; size 0x1e; refs 1180:0000; [code_1168] Help pager descriptor {title, footer=0, texts->2caa, count, x=8, y=22, w=480, lines=11, pics->2cc6, picDx->2ce2, picDy->2cf0}
+11b8:2d1c	strs_helpTitles	strs	4 help topic titles; size 0x44; owner seg 1180; [code_1168] Help topic titles at 2d1c/2d2b/2d3e/2d4e
+11b8:2d60	gate_unlocking	u8	gate unlock animation flag; size 0x1; refs 10e0:0447 1188:0000 1188:0267; [code_1168] Gate is opening (lock frame 2; open lock baked into bg layer); set by 10e0:0447 on arrival at gate, cleared by 1188:0000
+11b8:2d61	cut_bndl	far	level cut-scene BNDL; size 0x4; refs 1188:0000 1188:01aa
+11b8:2d65	cut_script1	far	cut-scene script (BNDL entry 0); size 0x4; refs 1188:0000
+11b8:2d69	cut_script2	far	second cut-scene script; size 0x4; refs 1188:0000 1188:01aa; [code_1168] Second cut-scene script OTHR 20201/20205
+11b8:2d6d	cut_bndlIds	u16[2]	cut-scene BNDL ids; size 0x4; refs 1188:0000
+11b8:2d71	cut_script2Ids	u16[2]	second script OTHR ids; size 0x4; refs 1188:0000
+11b8:2d75	cut_bgIds	u16[2]	cut-scene background PMAP ids; size 0x4; refs 1188:0000
+11b8:2d79	gate_lockBndl	far	BNDL 415 lock frames; size 0x4; refs 1188:01ed 1188:01fe 1188:0267
+11b8:2d7d	pad2d7d	bytes	alignment; size 0x1
+11b8:2d7e	hall_pedTreasure	i8[6]	treasure index per hall pedestal (-1 empty); size 0x6; refs 1190:009b 1190:01c5 1190:03a3
+11b8:2d84	hall_pedAnim	i16[6]	animation channel per pedestal; size 0xc; refs 1190:01c5 1190:02a0 1190:03a3; [code_1168] AnimObj handle per pedestal (-1 none)
+11b8:2d90	hall_pedX	i16[6]	pedestal x; size 0xc; refs 1190:02a0 1190:03a3
+11b8:2d9c	hall_pedY	i16[6]	pedestal y; size 0xc; refs 1190:02a0 1190:03a3
+11b8:2da8	hall_pedFrameBase	i16[6]	base index into g_animFrames; size 0xc; refs 1190:009b 1190:02a0; [code_1168] Base index into global frame table 5152[]
+11b8:2db4	g_playerBndl	far	BNDL 300 player frames; size 0x4; refs 10e0:0ff4 10e0:1079 1198:0000 1198:00b1
+11b8:2db8	unused2db8	bytes	zero; no reference found; size 0x4
+11b8:2dbc	scene_levelTreasures	far[5]	treasure BNDLs of this level's chests; size 0x14; refs 1198:0103 1198:01e1 1198:0305
+11b8:2dd0	scene_fountainBndl	far	BNDL 328 room-36 fountain-with-frogs animation (PMAP 1380-1383); size 0x4; refs 1198:0000 1198:00b1 1198:06d5; [code_1168] BNDL 328 room-0x24 fountain-with-frogs animation (PMAP 1380-1383)
+11b8:2dd4	scene_slotX	i16[3]	hiding-place picture x; size 0x6; refs 1198:0234 1198:0305 1198:0499; [code_1168] Slot object x: 26,197,368
+11b8:2dda	scene_revealX	i16[3]	revealed treasure/key x; size 0x6; refs 1198:0305; [code_1168] Revealed treasure/key x: 49,220,391
+11b8:2de0	scene_fountainFrame	i16	room-36 fountain animation frame; size 0x2; refs 1198:06d5; [code_1168] Room-0x24 fountain animation frame index
+11b8:2de2	s_AbnormalTermination	cstr	RTL abort message; size 0x20; owner seg 1000; [code_1000] 'Abnormal program termination' CRLF (used by _abort)
+11b8:2e02	_atexitcnt	i16	size 0x2; refs 1000:0198 1000:021d; [code_1000] Number of registered atexit functions
+11b8:2e04	_exitbuf	far	RTL exit hook (init 1000:0218); size 0x4; refs 1000:021d; [code_1000] Exit hook (default 1000:0218; setvbuf sets 1000:2092 _xfflush)
+11b8:2e08	_exitfopen	far	RTL exit hook (init 1000:0218); size 0x4; refs 1000:021d; [code_1000] Exit hook for fopen'd streams (default 1000:0218)
+11b8:2e0c	_exitopen	far	RTL exit hook (init 1000:0218); size 0x4; refs 1000:021d 1000:1495; [code_1000] Exit hook for open handles (default 1000:0218; open() sets 1000:0ea4 _xclose)
+11b8:2e10	__exitCleanupDone	i16	size 0x2; refs 1000:021d; [code_1000] Set to 1 when __exit has started the atexit/cleanup phase
+11b8:2e12	_streams	FILE[20]	Borland FILE[20] (20 bytes each); size 0x190; refs 1000:10b8 1000:2092; [code_1000] stdin=2e12, stdout=2e26, stderr=2e3a, stdaux=2e4e, stdprn=2e62
+11b8:2fa2	_nfile	u16	20; size 0x2; refs 1000:0ea4 1000:0f82 1000:10b8 1000:1ae2 1000:1ea4; [code_1000] Number of handles/streams = 20
+11b8:2fa4	_openfd	u16[20]	per-handle open flags; size 0x28; refs 1000:04f2 1000:0882 1000:0f82 1000:0fae 1000:1268 1000:1495 1000:1620 1000:173a 1000:18db 1000:1ae2 1000:1ea4 1000:2006; [code_1000] Per-handle open flags (O_RDONLY 1, O_WRONLY 2, O_RDWR 4, 0x100 writable, EOF 0x200, O_APPEND 0x800, changed 0x1000, O_DEVICE 0x2000, O_TEXT 0x4000, O_BINARY 0x8000)
+11b8:2fcc	_fmode	u16	0x4000 O_TEXT; size 0x2; refs 1000:1495; [code_1000] Default text/binary mode = 0x4000 (O_TEXT)
+11b8:2fce	_notUmask	u16	0xFFFF; size 0x2; refs 1000:1495; [code_1000] Permission mask applied by open(O_CREAT) = 0xFFFF
+11b8:2fd0	_doserrno	i16	size 0x2; refs 1000:03e8 1000:1495; [code_1000] Last DOS error code
+11b8:2fd2	_dosErrorToSV	i8[89]	DOS error -> errno; size 0x59; refs 1000:03e8
+11b8:302b	pad302b	bytes	alignment; size 0x1
+11b8:302c	__xalloc	bytes	static xalloc 'Out of memory'; size 0x6; refs 11a8:05ae 11a8:07cc 11a8:086d; [code_1000] Static 'Out of memory' xalloc thrown by the default new handler; [code_11a0] static xalloc object thrown (via 1000:2151) when TStringRef malloc/realloc fails; message text 'Out of memory' at 11b8:3036 (owned by seg 1000)
+11b8:3032	_new_handler	far	init 1000:055c; size 0x4; refs 1000:05c3 1000:05f1; [code_1000] Current new handler (initial 1000:055c)
+11b8:3036	s_OutOfMemory	cstr	size 0xe; owner seg 1000; [code_1000] 'Out of memory' (message of __xalloc)
+11b8:3044	__randSeed	u32	rand() state, init 1; size 0x4; refs 1000:0842 1000:0859
+11b8:3048	_ctype	u8[257]	Borland ctype table (index c+1); size 0x101; refs 1000:0998 1160:02e0 1160:0595 1160:0957; [code_1000] Borland ctype table indexed by c+1 (bits: 1 space, 2 digit, 4 upper, 8 lower, 0x10 hex, 0x20 ctrl, 0x40 punct, 0x80 blank); read directly by 1160 code with mask 0xDE
+11b8:3149	pad3149	bytes	alignment; size 0x1
+11b8:314a	s_null	cstr	"(null)"; size 0x7; refs 1000:0a46; [code_1000] '(null)' printed for NULL %s
+11b8:3151	__vprinterClass	u8[96]	printf char-class table; size 0x60; refs 1000:0a46; [code_1000] printf character-class table for chars 0x20..0x7F (classes 0..0x17)
+11b8:31b1	pad31b1	bytes	alignment; size 0x1
+11b8:31b2	eh_Vars	bytes	Borland EH globals; +0A terminate (11a0:00da), +0E unexpected (11a0:02b8); size 0x128; refs 11a0:04e7; [code_1000] Static exception-runtime globals for the EXE; +0x0A terminate handler (11a0:00DA), +0x0E unexpected handler (11a0:02B8); [code_11a0] EH globals: +0 current exception record list, +4 flags, +0A terminate fn, +0E unexpected fn, +16 file, +1A line, +1C name, +20 emergency buf ptr, +28 name[128], +A8 emergency buf[128]
+11b8:32da	_sys_errlist	far[48]	errno message pointers; size 0xc0; refs 1000:168e
+11b8:339a	_sys_nerr	i16	48; size 0x2; refs 1000:03e8 1000:168e; [code_1000] Number of _sys_errlist entries (0x30)
+11b8:339c	strs_sysErrList	strs	errno messages, "Unknown error", ": ", "\n", "\r"; size 0x210; refs 1000:168e 1000:173a; pointed to from 11b8:32da..3396 (48 ptrs)
+11b8:35ac	__stdinBufSet	i16	size 0x2; owner seg 1000; [code_1000] setvbuf has been called on stdin
+11b8:35ae	__stdoutBufSet	i16	size 0x2; owner seg 1000; [code_1000] setvbuf has been called on stdout
+11b8:35b0	s_notype	cstr	"<notype>"; size 0x9; refs 11a0:059a; [code_11a0] "<notype>" returned by __TypeIDName(NULL)
+11b8:35b9	s_BCCxh1	cstr	"**BCCxh1" EH frame signature; size 0x9; refs 11a0:34e7; [code_11a0] "**BCCxh1" compared (8 bytes) by xx_GetBCCFrameState
+11b8:35c2	string_case_sensitive	i16	string::case_sensitive (1); size 0x2; refs 11a8:0a2a
+11b8:35c4	string_paranoid_check	i16	(0); size 0x2; refs 11a8:0a47; [code_11a0] string::paranoid_check, initial 0
+11b8:35c6	string_skip_white	i16	(1); size 0x2; refs 11a8:0a64; [code_11a0] string::skip_white, initial 1
+11b8:35c8	string_initial_capac	u16	(63); size 0x2; refs 11a8:082e 11a8:0a81; [code_11a0] string::initial_capac, initial 63
+11b8:35ca	string_resize_inc	u16	(64); size 0x2; refs 11a8:082e 11a8:0a9e; [code_11a0] string::resize_inc, initial 64
+11b8:35cc	string_freeboard	u16	(63); size 0x2; refs 11a8:06f6 11a8:0764 11a8:086d 11a8:0ac8; [code_11a0] string::freeboard (max waste), initial 63
+11b8:35ce	strs_stringRange	strs	3 x "String reference out of range"; size 0x5a; refs 11a8:0389 11a8:0441 11a8:04f9
+11b8:3628	s_fpFormatsNotLinked	cstr	printf/scanf "floating point formats not linked" (3628, 362d); size 0x30; refs 1000:2a7e
+11b8:3658	eh_InstanceCtx	far[3]	EH context table {&SS:0010,&SS:0014,&SS:0016}; size 0xc; refs 1000:2e99; [code_1000] EXE per-task exception pointers: ->SS:0010, ->SS:0014, ->SS:0016
+11b8:3664	unk3664	bytes	zero; no reference found; size 0xc
+11b8:3670	eh_TaskTableCap	u16	30; size 0x2; refs 1000:2ab7 1000:2c22 1000:2c9f 1000:2dae; [code_1000] Task-table capacity (initial 30, grows by 10); [code_11a0] = 1Eh (30) entries in per-task context table (multi-SS/DLL mode only)
+11b8:3672	eh_CachedSS	u16	size 0x2; refs 1000:2b5b 1000:2dae 11a0:0000 11a0:0028 11a0:00e4 11a0:019d 11a0:02c1 11a0:0350 11a0:04e7 11a0:091f 11a0:09f3 11a0:0b7c +9 more; [code_1000] SS for which eh_CurCtx is valid
+11b8:3674	eh_CurCtx	far	size 0x4; refs 1000:2b5b 1000:2dae 11a0:0000 11a0:0028 11a0:00e4 11a0:019d 11a0:02c1 11a0:0350 11a0:04e7 11a0:091f 11a0:09f3 11a0:0b7c +9 more; [code_1000] Cached per-task exception data pointer; [code_11a0] far ptr to current EH context table (= 11b8:3658 in the EXE)
+11b8:3678	unk3678	u16	zero; no reference found; size 0x2
+11b8:367a	strs_setargv	strs	_setargv out-of-memory messages; size 0x6f; refs 1000:31eb
+11b8:36e9	pad36e9	bytes	alignment; size 0x1
+11b8:36ea	_argv0	far	program path; size 0x4; refs 1000:2f3c; [code_1000] Program path (GetModuleFileName); after _setargv = argv[0]
+11b8:36ee	s_OutOfMemSetargv0	cstr	"Out of memory in _setargv0"; size 0x1b; owner seg 1000
+11b8:3709	pad3709	bytes	alignment; size 0x1
+11b8:370a	_ReadHook	far	console read hook (NULL); size 0x4; refs 1000:0882; [code_1000] Console read hook for tty handles (NULL)
+11b8:370e	_WriteHook	far	console write hook (NULL); size 0x4; refs 1000:2006; [code_1000] Console write hook for tty handles (NULL)
+11b8:3712	__sigHandlers	far[6]	signal() handlers; size 0x18; refs 1000:381d 1000:3a01; [code_1000] signal() handler table, parallel to __sigNumbers
+11b8:372a	__sigNumbers	u8[6]	{2,4,8,11,15,22}; size 0x6; refs 1000:37f6; [code_1000] {2 SIGINT, 4 SIGILL, 8 SIGFPE, 11 SIGSEGV, 15 SIGTERM, 22 SIGABRT}
+11b8:3730	__sigSubcode	u8[6]	size 0x6; owner seg 1000; [code_1000] Second argument passed to handlers by raise(): {0,0x15,0x8C,0x0B,0,0}
+11b8:3736	strs_fpErrors	strs	"Floating Point: " + reasons, signal messages; size 0x124; refs 1000:3874; [code_1000] 'Floating Point: ' + reason buffer (reason part at 11b8:3746)
+11b8:385a	__realcvt	near	printf float hook (1000:2a7e); size 0x2; refs 1000:2fb4
+11b8:385c	__scanfFloatHooks	near[3]	size 0x6; owner seg 1000; [code_1000] scanf float hooks (1000:2a8b stub)
+11b8:3862	__startupTable	bytes	#pragma startup records {u8 kind, u8 prio, far fn}; size 0x18; refs 1000:0000; [code_1000] #pragma startup records: 06ad (0x20), 08fa near (2), 2fb8 (10), 32aa (9)
+11b8:387a	__exitTable	bytes	#pragma exit records; size 0x6; refs 1000:0000; [code_1000] #pragma exit record: 0703 (0x20)
+11b8:3880	g_wingRect	i16[4]	_BSS starts here. RECT {0,0,w,h} of WinG buffer; size 0x8; refs 1000:0000 1008:00ee; [code_1000] Start of zero-initialised data (cleared up to 11b8:66a1 at startup)
+11b8:3888	g_wingRect2	i16[4]	copy (no reader); size 0x8; refs 1008:00ee; [code_1008] Copy of g_wingRect (no reader found)
+11b8:3890	g_wingStride	u16	DWORD-aligned row bytes (no reader); size 0x2; refs 1008:00ee
+11b8:3892	g_wingBmi	bytes	BITMAPINFOHEADER of the WinG DIB; size 0x28; refs 1008:00ee; [code_1008] WinG DIB header (40 bytes), followed by colour table
+11b8:38ba	g_wingColorTable	bytes	RGBQUAD[256]; size 0x400; refs 1008:02ec; [code_1008] WinG DIB colour table (copy of system palette)
+11b8:3cba	p_WinG	far[8]	WING.DLL ordinals 1001,1002,1003,1004,1005,1006,1010,1009; size 0x20; refs 1008:0000 1008:00ee 1008:0267 1008:02ec
+11b8:3cda	g_hInstance	u16	size 0x2; refs 1018:0115 1018:01f5 1020:0000 1080:0000 1090:023d; [code_1008] Application instance
+11b8:3cdc	g_hwndMain	u16	main window; size 0x2; refs 1010:0000 1010:05db 1018:0115 1018:0563 1020:010a 1058:1578 1078:0000 1078:01b5 1080:0000 1080:00c1 1088:0014 1090:0388 +1 more; [code_1008] Main window (set after ShowWindow/UpdateWindow)
+11b8:3cde	g_iniPath	bytes	"C:\TLCWIN\TMTWINCD\TMTWIN.INI"; size 0x82; refs 1018:0115 1018:043a 1018:04d8 1018:07ff 1018:086d
+11b8:3d60	g_lpfnEnumProc	far	size 0x4; refs 1018:0000; [code_1008] MakeProcInstance thunk for FIND_PREV_WND
+11b8:3d64	g_cursors	u16[15]	loaded HCURSORs; size 0x1e; refs 1020:0000 1020:005c 1020:008b; [code_1008] Loaded cursor set (ids 128,129,130 from 11b8:1292)
+11b8:3d82	g_evType	i16	pending event: 0 none,1 quit,2 key,3 Ldown,4 Lup,5 Rdown,6 Rup; size 0x2; refs 1028:0000 1028:0013 1028:004f
+11b8:3d84	g_evP1	i16	key code or x; size 0x2; refs 1028:0000 1028:004f; [code_1008] Pending event key code or game x
+11b8:3d86	g_evP2	i16	y; size 0x2; refs 1028:004f; [code_1008] Pending event game y
+11b8:3d88	g_resScratchMax	i32	largest Res_LoadToScratch size; size 0x4; refs 1038:088a; [code_1038] largest size ever loaded via Res_LoadToScratch
+11b8:3d8c	g_resScratch	far	280000-byte scratch buffer; size 0x4; refs 1038:0022 1038:0038 1038:088a 1038:08eb 1038:0956 1038:09a9 1038:0ba8 1088:01a9 10f0:0000 10f0:054b 10f8:0000 1100:04b5 +11 more; [code_1038] 280000-byte scratch buffer (NewPtr) or a locked resource (Res_LockInPlace)
+11b8:3d90	g_paletteRGB	bytes	RRGB 900 loaded by GameMain (GetResourceInto) and passed to Pal_SetFromRGB; 768 bytes used; size 0x400; refs 1118:0000
+11b8:4190	g_transparentIndex	u8	sprite colour key; size 0x1; refs 1048:008b 1048:00b7 1048:02b2 1050:0120 1050:02e3 1050:035f 1050:04e4 1050:06a7 1058:0d43; [code_1038] colour key for sprite blits: physical index of RGB(0,0,170) (256-col) or 3 (16-col)
+11b8:4191	g_foreColorPhys	u16	size 0x2; refs 1048:02fd 1048:036f 1060:0000 1060:01ef; [code_1038] physical colour used by the 1060 glyph renderer (set by Pal_SetForeColor)
+11b8:4193	g_logToPhys	u8[256]	logical -> physical palette index; size 0x100; refs 1048:010a 1048:03bf 1050:0b36 1050:0bc9 1058:1c1b
+11b8:4293	g_foreColorIndex	u16	size 0x2; refs 1048:02fd 1048:03bb; [code_1038] EGA colour index last passed to Pal_SetForeColor
+11b8:4295	pad4295	bytes	size 0x1
+11b8:4296	g_hdcScreen	u16	size 0x2; refs 1008:02ec 1010:0000 1018:0563 1048:010a 1048:02b2 1058:05bc 1058:1578; [code_1008] GetDC(main window) from InitGraphicsAndData; palette realize, GetSystemPaletteEntries; [code_1058] GetDC(hwndMain) (set by 1018)
+11b8:4298	g_hdcMem	u16	size 0x2; refs 1010:0000 1018:0563 1048:02b2 1058:05bc 1058:07d0 1058:09b8; [code_1008] GDI path: memory DC holding back-buffer DDB; [code_1058] CreateCompatibleDC; holds the 512x1055 offscreen bitmap
+11b8:429a	g_hbmBack	u16	size 0x2; refs 1010:0000 1018:0563; [code_1008] GDI path: 512x1055 DDB; [code_1058] 512x1055 DDB from Gfx_CreateSysMemBitmap
+11b8:429c	g_selPlanarBits	u16	size 0x2; refs 1018:0563 1050:09e7; [code_1008] 16-colour path: selector of DDB bits
+11b8:429e	g_selPixels	u16	size 0x2; refs 1008:00ee 1018:0563 1050:0029 1050:00c9 1050:0120 1050:02e3 1050:035f 1050:03e7 1050:04e4 1050:06a7 1050:0732 1050:0899 +8 more; [code_1008] Selector of 8-bit back buffer (WinG bits / DDB bits / 4bpp shadow in 16-colour mode); [code_1058] selector of the linear offscreen pixel buffer (8bpp DDB bits / WinG DIB / packed 4bpp GlobalAlloc)
+11b8:42a0	g_hGdiHeap	u16	size 0x2; refs 1018:0563; [code_1008] SYSHEAPINFO.hGDISegment (used to read bitmap bits handle); [code_1058] SYSHEAPINFO.hGDISegment (for Gdi_GetBitmapBitsHandle)
+11b8:42a2	g_dirtyRects	bytes	DirtyRect[256] {i16 x,y,w,h}; size 0x800; refs 1058:068e 1058:0731; [code_1058] {int16 x,y,w,h} x256 (0x42a2..0x4aa1)
+11b8:4aa2	g_fonts	far[3]	size 0xc; refs 1068:0000 1068:0039 1068:0073; [code_1058] loaded FFNT copies (only slot 0 used)
+11b8:4aae	g_curFont	i16	size 0x2; refs 1068:0073; [code_1058] selected font slot
+11b8:4ab0	g_fontHeight	u16	size 0x2; refs 1060:0000 1060:01ef 1068:0073 1068:00d9; [code_1058] glyph rows (FFNT byte 2)
+11b8:4ab2	g_fontSeg	u16	size 0x2; refs 1060:0000 1060:01ef 1060:02e4 1068:0073; [code_1058] segment of the selected FFNT
+11b8:4ab4	g_fontWidths	u16	size 0x2; refs 1060:0000 1060:01ef 1060:02e4 1068:0073; [code_1058] offset of widths[n] (FFNT+3)
+11b8:4ab6	g_fontOffLo	u16	size 0x2; refs 1060:0000 1060:01ef 1068:0073; [code_1058] offset of glyph-offset low bytes
+11b8:4ab8	g_fontOffHi	u16	size 0x2; refs 1060:0000 1060:01ef 1068:0073; [code_1058] offset of glyph-offset high bytes
+11b8:4aba	g_fontBits	u16	size 0x2; refs 1060:0000 1060:01ef 1068:0073; [code_1058] offset of glyph bitmap data
+11b8:4abc	unk4abc	u16	no reference found; size 0x2
+11b8:4abe	g_music4abe	i16	zeroed by Music_PlayZone, never read; size 0x2; refs 1128:0000; [code_10f8] Zeroed by Music_PlayZone; no reader found in any code segment
+11b8:4ac0	unk4ac0	u16	no reference found; size 0x2
+11b8:4ac2	g_waveFmt	bytes	PCMWAVEFORMAT; size 0x10; refs 1088:0014; [code_1058] {1,1,rate,rate,1,8}
+11b8:4ad2	g_hWaveOut	u16	size 0x2; refs 1088:0014 1088:0114; [code_1058] handle from waveOutOpen
+11b8:4ad4	g_waveHdr	bytes	WAVEHDR; size 0x20; refs 1088:0014 1088:0114; [code_1058] 32-byte header (lpData, dwBufferLength, ..., dwUser=snd @0x4ae0)
+11b8:4af4	g_soundsDir	bytes	"<exe dir>\SOUNDS\"; size 0x82; refs 1090:0000 1090:02e9
+11b8:4b76	g_midiExtended	i16	1 = 'E' files, 0 = 'B' files; size 0x2; refs 1090:0000 1090:02e9; [code_1058] 1 = 'E' (extended/GM) files, 0 = 'B' (base, FM synth) files
+11b8:4b78	g_musicIdx	i16	size 0x2; refs 1090:02e9 1090:044b; [code_1058] index into the music tables of the last opened track
+11b8:4b7a	g_hotspots	bytes	Hotspot[50] {u16 id; i16 x,y,w,h}; size 0x1f4; refs 1098:0000 1098:0016 1098:0089 1098:00b8
+11b8:4d6e	g_hotspotsSaved	bytes	backup (dead code); size 0x1f4; refs 1138:007a; [code_1098] backup copy for Hotspot_SaveAll/RestoreAll (dead code); also overflow target of Hotspot_Set
+11b8:4f62	g_timerDeadline	u32[8]	timeGetTime deadlines; size 0x20; refs 10a8:002a 10a8:0049 10a8:0066; [code_1098] timeGetTime deadlines; slots used: 0 (1160), 4 (10f0/1138), 6 (text, never set), 7 (frame timer)
+11b8:4f82	g_animChan	bytes	AnimChannel[16] (29 bytes); size 0x1d0; refs 10b8:00fd 10b8:0119 10b8:020a 10b8:024e 10b8:0312; [code_1098] 29-byte animation channel records (see doc)
+11b8:5152	g_animFrames	far[100]	frame pixmap table; size 0x190; refs 10b8:0312 10d8:0000 10f0:0000 1190:009b; [code_1098] frame table indexed by channel.frameBase+frame (filled by 10d8:0000 and 1190:0196); size inferred
+11b8:52e2	g_animEraseRects	bytes	AnimEraseRect[100] (9 bytes); size 0x384; refs 10b8:029d 10b8:06e4; [code_1098] {u8 noDirty; i16 x,y,w,h} 9 bytes; rects to restore next frame; size inferred
+11b8:5666	g_animSprites	bytes	AnimSprite[100] (14 bytes); size 0x578; refs 10b8:0312 10b8:06e4; [code_1098] 14-byte per-frame draw queue built by Anim_Step; size inferred
+11b8:5bde	g_animUpdateRects	bytes	AnimUpdateRect[16] (6 bytes); size 0x60; refs 10b8:0312 10b8:090a; [code_1098] {i16 x; u8 y; i16 w; u8 h} 6 bytes from opcode F9; size inferred
+11b8:5c3e	g_btnX	i16[2]	size 0x4; refs 10c0:0000 10c0:046e 10c0:0640 10c0:0a1c; [code_1098] dialog button x
+11b8:5c42	g_btnY	i16[2]	size 0x4; refs 10c0:0000 10c0:046e 10c0:0640 10c0:0764 10c0:0a1c; [code_1098] dialog button y
+11b8:5c46	g_btnW	i16[2]	size 0x4; refs 10c0:0000 10c0:046e 10c0:0640 10c0:0a1c; [code_1098] dialog button width
+11b8:5c4a	g_btnH	i16[2]	size 0x4; refs 10c0:0000 10c0:046e 10c0:0640 10c0:0a1c; [code_1098] dialog button height
+11b8:5c4e	unk5c4e	bytes	no reference found; size 0x4; [code_1098] unreferenced 4 bytes between g_btnH and g_dlgX (no instruction touches them)
+11b8:5c52	g_dlgX	i16	size 0x2; refs 10c0:0000 10c0:06ca 10c0:0712 10c0:0764 10c0:0a1c; [code_1098] dialog box x
+11b8:5c54	g_dlgY	i16	size 0x2; refs 10c0:0000 10c0:06ca 10c0:0712 10c0:0764; [code_1098] dialog box y
+11b8:5c56	g_dlgW	i16	size 0x2; refs 10c0:0000 10c0:06ca 10c0:0712 10c0:0764 10c0:0a1c; [code_1098] dialog box width (also scratch during layout)
+11b8:5c58	g_dlgH	i16	size 0x2; refs 10c0:0000 10c0:06ca 10c0:0712 10c0:0764; [code_1098] dialog box height
+11b8:5c5a	g_dlgMarginL	i16	size 0x2; refs 10c0:0000 10c0:0764; [code_1098] body text left margin
+11b8:5c5c	g_dlgMarginT	i16	size 0x2; refs 10c0:0000 10c0:0764; [code_1098] space above body text
+11b8:5c5e	g_dlgMarginB	i16	size 0x2; refs 10c0:0000; [code_1098] space below body text (layout only)
+11b8:5c60	g_dlgTitleX	i16	size 0x2; refs 10c0:0000 10c0:0764; [code_1098] x of centred title
+11b8:5c62	g_dlgFooter	near	DGROUP offset of footer text; size 0x2; refs 10c0:0000 10c0:0764 10c0:0a1c 10c0:0aaa
+11b8:5c64	g_dlgFooterX	i16	size 0x2; refs 10c0:0000 10c0:0764; [code_1098] x of centred footer
+11b8:5c66	g_dlgFooterY	i16	size 0x2; refs 10c0:0000 10c0:0764 10c0:0a1c; [code_1098] y of footer (types 0-3, 8)
+11b8:5c68	g_btnLabel	near[2]	size 0x4; refs 10c0:0000 10c0:046e; [code_1098] DGROUP offsets of button labels
+11b8:5c6c	g_btnLabelX	i16[2]	size 0x4; refs 10c0:0000 10c0:046e; [code_1098] x of centred button labels
+11b8:5c70	g_btnState	i16[2]	size 0x4; refs 10c0:046e 10c0:0640; [code_1098] 1 = button drawn highlighted (inverted)
+11b8:5c74	g_pagerText	far[7]	size 0x1c; refs 10c8:0000; pointed to from 11b8:0b7d; [code_1098] page texts for g_bndlPagerDesc
+11b8:5c90	g_pagerPic	far[7]	size 0x1c; refs 10c8:0000; pointed to from 11b8:0b8a; [code_1098] page pictures for g_bndlPagerDesc
+11b8:5cac	g_pagerPicDx	i16[7]	size 0xe; refs 10c8:0000; pointed to from 11b8:0b8e; [code_1098] page picture x offsets (low byte used)
+11b8:5cba	g_pagerPicDy	i16[7]	size 0xe; refs 10c8:0000; pointed to from 11b8:0b92; [code_1098] page picture y offsets (low byte used)
+11b8:5cc8	g_musicPauseDepth	i8	size 0x1; refs 10d0:0000 10d0:000e 10d0:0025; [code_1098] nesting depth of Music_PauseNested
+11b8:5cc9	pad5cc9	bytes	size 0x1
+11b8:5cca	g_room	u8	current room 0..49 (0xFE = climb over); user record +0x1df; size 0x1; refs 10e0:007d 10e0:0447 10e8:019f 10e8:0228 10e8:026e 10e8:03cb 10e8:074a 10f8:0000 10f8:0285 1100:0638 1110:0059 1110:007d +25 more
+11b8:5ccb	g_nextRoom	u8	size 0x1; refs 10e0:007d 10e0:0447; [code_10e0] Room to switch to at end of frame
+11b8:5ccc	g_playerX	i16	size 0x2; refs 10e0:007d 10e0:042c 10e0:0447 10e0:0ff4 1110:00aa 1118:0000 1168:03d6 1168:05b5 1168:0a6d 1168:0c04 1168:10a7 1190:02a0; [code_10e0] Player sprite left x
+11b8:5cce	g_playerY	i16	size 0x2; refs 10e0:007d 10e0:042c 10e0:0447 10e0:0ff4 1118:0000 1168:03d6 1168:0442 1168:05b5 1168:0a6d 1168:0c04 1168:10a7; [code_10e0] Player sprite top y
+11b8:5cd0	g_playerFrame	u8	index into BNDL 300; size 0x1; refs 10e0:007d 10e0:0447 10e0:0ff4 10f8:0241 1118:0000 1168:0442 1168:05b5 1168:0a6d 1168:0c04 1168:10a7
+11b8:5cd1	g_playerFacingLeft	u8	size 0x1; refs 10e0:007d 10e0:0447 10e0:0ff4 1118:0000 1168:0442 1168:05b5 1168:0a6d 1168:0c04 1178:03bb; [code_10e0] 1 = facing left (sprite drawn mirrored)
+11b8:5cd2	g_playerW	i16	size 0x2; refs 10e0:007d 10e0:042c 10e0:0447 10f8:0241 1110:00aa 1168:03d6 1168:0442 1168:05b5 1168:0a6d 1168:0c04 1190:02a0; [code_10e0] Width of current frame
+11b8:5cd4	g_playerH	i16	size 0x2; refs 10e0:007d 10e0:042c 10e0:0447 10f8:0241 1168:0442 1168:05b5 1168:0a6d 1168:0c04; [code_10e0] Height of current frame
+11b8:5cd6	g_frameW	i16[85]	player frame widths; size 0xaa; refs 10e0:007d 10e0:0447 10f8:0241 1168:0442 1168:05b5 1198:0000; [code_10e0] Frame widths (filled by 1198:0000 from PMAP headers)
+11b8:5d80	g_frameH	i16[85]	player frame heights; size 0xaa; refs 10e0:007d 10e0:0447 10f8:0241 1168:0442 1168:05b5 1198:0000
+11b8:5e2a	g_roomTransition	u8	size 0x1; refs 10e0:0447 1118:0000; [code_10e0] Transition type of pending room change (1/2 = use destination start position)
+11b8:5e2b	g_doorStep	u8	size 0x1; refs 10e0:007d 10e0:0447 1118:0000; [code_10e0] Door-entry animation step 0..2
+11b8:5e2c	g_coinStep	u8	size 0x1; refs 10e0:007d 10e0:0447 1118:0000 1168:0442 1168:05b5 1198:0305 1198:0499; [code_10e0] Coin-toss animation step 0..13
+11b8:5e2d	g_walkActive	u8	size 0x1; refs 10e0:0447 10e0:1033; [code_10e0] Auto-walk active
+11b8:5e2e	g_arriveAction	u8	size 0x1; refs 10e0:0447; [code_10e0] Pending post-arrival action (1 next level, 2 net shop)
+11b8:5e2f	g_playerHidden	u8	size 0x1; refs 10e0:007d 10e0:0447 10e0:0ff4 10f8:0241 1118:0000; [code_10e0] Player not drawn and frozen (never set to 1 in exported code)
+11b8:5e30	g_netStep	u8	size 0x1; refs 10e0:007d 10e0:0447 1118:0000 1168:0442 1168:05b5 1178:03bb 1178:0b1d; [code_10e0] Net-swing animation step 0..11
+11b8:5e31	g_emptySwingStep	u8	size 0x1; refs 10e0:007d 10e0:0447 1168:0442 1168:05b5; [code_10e0] Empty-hand swing step 0..11
+11b8:5e32	g_netX	i16	size 0x2; refs 10e0:0447 1178:03bb; [code_10e0] Net catch x (player x+99 / x-98), read by elf AI 1178:03bb
+11b8:5e34	g_fxFrame	u16	size 0x2; refs 10e0:007d 10e0:0447 10e0:1057 10e0:1079 1168:0442 1168:05b5; [code_10e0] FX sprite frame (coin sparkle/POOF), 0 = none
+11b8:5e36	g_fxX	i16	size 0x2; refs 10e0:0447 10e0:1057 10e0:1079 1168:05b5; [code_10e0] FX sprite x
+11b8:5e38	g_fxY	i16	size 0x2; refs 10e0:0447 10e0:1057 10e0:1079 1168:05b5; [code_10e0] FX sprite y
+11b8:5e3a	g_fxW	i16	size 0x2; refs 10e0:0447 10e0:1057 1168:05b5; [code_10e0] FX sprite width
+11b8:5e3c	g_fxH	i16	size 0x2; refs 10e0:0447 10e0:1057 1168:05b5; [code_10e0] FX sprite height
+11b8:5e3e	g_walkTargetX	i16	size 0x2; refs 10e0:0447 10e0:1033; [code_10e0] Auto-walk target x
+11b8:5e40	g_walkTargetY	i16	size 0x2; refs 10e0:0447 10e0:1033; [code_10e0] Auto-walk target y
+11b8:5e42	g_walkArg3	u8	size 0x1; refs 10e0:1033; [code_10e0] Stored by Player_WalkTo, never read
+11b8:5e43	g_walkArriveAction	u8	size 0x1; refs 10e0:0447 10e0:1033; [code_10e0] Action copied to g_arriveAction on arrival
+11b8:5e44	g_prevShopCoins	u8	size 0x1; refs 10e0:007d; [code_10e0] Shop counter at start of frame (redraw sign if changed)
+11b8:5e45	g_entryX	i16	size 0x2; refs 10e0:007d 10e0:0447; [code_10e0] Player x for next room
+11b8:5e47	g_entryY	i16	size 0x2; refs 10e0:007d 10e0:0447; [code_10e0] Player y for next room
+11b8:5e49	g_entryFrame	u8	size 0x1; refs 10e0:007d 10e0:0447; [code_10e0] Player frame for next room
+11b8:5e4a	g_entryFacing	u8	size 0x1; refs 10e0:007d 10e0:0447; [code_10e0] Facing for next room
+11b8:5e4b	g_inputEvent	u16	size 0x2; refs 10e0:007d 10e0:0447; [code_10e0] Event code of current frame (key / hotspot id with flags)
+11b8:5e4d	g_bumpStep	u16	size 0x2; refs 10e0:007d 10e0:0447; [code_10e0] Bump animation step 0..12
+11b8:5e4f	g_lastMouseX	i16	size 0x2; refs 10e0:0000 10e0:0063 10e0:007d; [code_10e0] Previous mouse x for cursor direction
+11b8:5e51	g_lastMouseY	i16	size 0x2; refs 10e0:0000 10e0:0063 10e0:007d; [code_10e0] Previous mouse y
+11b8:5e53	pad5e53	bytes	size 0x1
+11b8:5e54	g_hudArt	far	BNDL 301; size 0x4; refs 10e8:0000 10e8:0019 10e8:0040 10e8:00dd 10e8:026e 10e8:03cb 1198:0305; [code_10e0] BNDL 301 (status bar art)
+11b8:5e58	g_rankTier	u8	rank/2; record +0x09; size 0x1; refs 10e8:03cb 10e8:0790 1100:04b5 1118:0000 1160:0f28 1160:1632 1168:0047 1168:1143 1198:0103; [code_10e0] Rank/2 (0..3)
+11b8:5e59	g_haveKey	u8	record +0x15; size 0x1; refs 10e0:0447 10e8:026e 10e8:06c9 1118:0000 1160:0f28 1188:0267; [code_10e0] Player has this level's key
+11b8:5e5a	g_coins	u16	record +0x16; size 0x2; refs 10e0:0447 10e8:02cf 10e8:06ff 1110:00aa 1160:0f28 1160:1632 1168:05b5; [code_10e0] COINS count; [code_1150] record +0x16; +2/+1 per correct answer
+11b8:5e5c	g_nets	u16	record +0x18; size 0x2; refs 10e0:0447 10e8:034d 10e8:0720 1110:00aa 1160:0f28 1160:1632 1168:05b5; [code_10e0] NETS count
+11b8:5e5e	g_gemsFound	u8	record +0x1a; size 0x1; refs 10e8:03cb 10e8:0741 10e8:074a 1118:0000 1160:0f28 1198:0305; [code_10e0] Treasures found this climb (gem icons)
+11b8:5e5f	g_climbPoints	u16	record +0x1b; size 0x2; refs 10e8:04b2 10e8:074a 10f0:030d 1118:0000 1160:0f28; [code_10e0] TREASURES points this climb
+11b8:5e61	g_treasureCount2	u8	size 0x1; refs 10e8:074a 1118:0000 1198:0103; [code_10e0] Incremented with each treasure; reset per climb; read by 1198:0103
+11b8:5e62	g_totalTreasures	u32	record +0x0a; size 0x4; refs 10e0:10b2 10e8:0790 10f0:030d 10f0:054b 1160:0f28 1160:1632; [code_10e0] Career treasure total (persisted by 1160); [code_1150] record +0x0a; sort key and rank source on sign-in list
+11b8:5e66	g_celebScript323	far	size 0x4; refs 10f0:0000; [code_10e0] Script entry 0 of BNDL 323
+11b8:5e6a	g_celebImageCount	i16	size 0x2; refs 10f0:0000; [code_10e0] Image count returned by 10d8:0000 for BNDL 323
+11b8:5e6c	g_treasureImage	far	size 0x4; refs 10f0:0000; [code_10e0] Entry 0 of treasure BNDL (also copied to image slot 80 at 5292)
+11b8:5e70	g_celebScript324	far	size 0x4; refs 10f0:0000; [code_10e0] Script entry 0 of BNDL 324
+11b8:5e74	g_celebScript325	far	size 0x4; refs 10f0:0000; [code_10e0] Script entry 0 of BNDL 325
+11b8:5e78	g_rank	i16	rank 0..7; size 0x2; refs 10f0:030d 10f0:054b 10f0:07f5
+11b8:5e7a	g_seeRankSave	far	size 0x4; refs 10f0:037e 10f0:0487; [code_10e0] Play-area save buffer of Menu_SeeRank ((514+2)*270+4 bytes from NewPtr); also freed by Celebrate_FreeAll
+11b8:5e7e	g_shopCoinsLeft	i16	record +0x1d; size 0x2; refs 10e0:007d 10e0:0447 10f8:0241 10f8:0285 1160:0f28 1160:1632; [code_10e0] Coins still needed at net shop (4..0; reset to 4)
+11b8:5e80	g_shopSignBndl	far	BNDL 302; size 0x4; refs 10f8:0285 1198:0000; [code_10e0] BNDL 302 (net shop sign states)
+11b8:5e84	g_clueText	far[3][3]	clue word strings per level; size 0x24; refs 10e8:019f 1100:0793 1150:049a
+11b8:5ea8	g_clueFlags	u8[3]	per level attribute mask 8 count,4 size,2 shape,1 noun; record +0x20; size 0x3; refs 1100:04b5 1100:06cc 1100:0793 1100:08ae 1160:0f28
+11b8:5eab	g_clueAttr	u8[3][3]	selected attribute values; record +0x23; size 0x9; refs 1100:06cc 1100:0793 1100:08ae 1160:0f28; [code_10f8] Per level: selected attribute values in order count,size,shape,noun (saved by 1160)
+11b8:5eb4	g_cluePlural	u8[3]	record +0x2c; size 0x3; refs 1100:06cc 1100:0793 1100:08ae 1160:0f28; [code_10f8] Per level: 1 if the key object's count > 1 (plural noun) (saved by 1160)
+11b8:5eb7	g_clueVoice	u16[3][3]	clue word voice offsets (SSND 7300/7400/7500 + v); size 0x12; refs 10e8:0228 1100:08ae 1150:049a; [code_10e0] Clue voice ids per level (filled by 1100:08ae); [code_1150] Clue word sound offset into voice bank (owned by 1100)
+11b8:5ec9	g_keyKind	u8[3]	object kind hiding the key per level (OTHR 10555 index); size 0x3; refs 1100:04b5 1100:06cc
+11b8:5ecc	unk5ecc	bytes	no reference found; size 0x6
+11b8:5ed2	g_coinPileNoSpawnRoom	u8	size 0x1; refs 1110:00aa; [code_10f8] Room in which the pile must not respawn (room where it was armed); 0xFF none
+11b8:5ed3	g_coinPileX	i16	size 0x2; refs 1110:0059 1110:007d 1110:00aa; [code_10f8] Coin pile x (50..461)
+11b8:5ed5	g_coinPileW	i16	size 0x2; refs 1110:0000 1110:0059 1110:00aa; [code_10f8] Coin pile width (PMAP 1699 header)
+11b8:5ed7	g_coinPileH	i16	size 0x2; refs 1110:0000 1110:0059; [code_10f8] Coin pile height
+11b8:5ed9	pad5ed9	bytes	size 0x1
+11b8:5eda	g_restartJmp	bytes	jmp_buf: KERNEL CATCHBUF + Borland words; size 0x18; refs 1118:0000 1140:008c; [code_10f8] setjmp buffer in GameMain (KERNEL CATCHBUF + Borland words at +0x14/+0x16); longjmp 1 = restart at sign-in, 2 = exit
+11b8:5ef2	g_isChampion	u8	size 0x1; refs 10f0:0000 10f0:030d; [code_10e0] Rank reached 7
+11b8:5ef3	g_newClimb	u8	size 0x1; refs 1118:0000; [code_10f8] 1 when GameMain generated a fresh layout for this climb
+11b8:5ef4	unk5ef4	bytes	no reference found; size 0x9
+11b8:5efd	g_music5efd	u8	size 0x1; owner seg 1128; [code_10f8] Zeroed by Music_PlayZone; no reader found
+11b8:5efe	g_musicZone	i16	size 0x2; refs 1128:00ef 1128:010c; [code_10f8] Zone passed to the last Music_PlayZone (0 after Music_StopScene)
+11b8:5f00	g_hintsOn	u8	record +0x10; size 0x1; refs 1140:0015 1160:0f28 1160:1632; [code_10f8] "New Player Messages" option (saved by 1160)
+11b8:5f01	g_hintUnseen	u32	record +0x11; size 0x4; refs 1130:0000 1140:0015 1160:0f28 1160:1632; [code_10f8] Bit n set = once-only hint n not shown yet (saved by 1160)
+11b8:5f05	unk5f05	bytes	no reference found; size 0xe
+11b8:5f13	g_titleBndl1	far	BNDL 400; size 0x4; refs 1138:0000 1138:0037; [code_10f8] BNDL 400 (title animation 1)
+11b8:5f17	g_titleScript1	far	size 0x4; refs 1138:0000 1138:007a; [code_10f8] Entry 0 of BNDL 400 (OTHR 20100 animation script)
+11b8:5f1b	g_titleAnim1	i16	size 0x2; refs 1138:007a; [code_10f8] Animation slot of title animation 1 (never read)
+11b8:5f1d	g_titleBndl2	far	BNDL 401; size 0x4; refs 1138:0000 1138:0037; [code_10f8] BNDL 401 (title animation 2)
+11b8:5f21	g_titleFrames1	i16	size 0x2; refs 1138:0000 1138:007a; [code_10f8] Image count of BNDL 400 (= image-slot base of BNDL 401)
+11b8:5f23	g_titleScript2	far	size 0x4; refs 1138:0000 1138:007a 1138:0283; [code_10f8] Entry 0 of BNDL 401 (OTHR 20101)
+11b8:5f27	g_titleAnim2	i16	size 0x2; refs 1138:007a 1138:0283; [code_10f8] Animation slot watched by Title_WaitStep (-1 none)
+11b8:5f29	unk5f29	bytes	no reference found; size 0x4
+11b8:5f2d	g_titleFramesTotal	i16	size 0x2; refs 1138:0000; [code_10f8] Total title images (never read)
+11b8:5f2f	g_titleScript3	far	size 0x4; refs 1138:0283 1150:01d5; [code_10f8] Script of a third watched animation (never set)
+11b8:5f33	g_titleAnim3	i16	size 0x2; refs 1138:007a 1138:0283; [code_10f8] Third watched animation slot (always -1)
+11b8:5f35	g_titleMusicPending	i16	size 0x2; refs 1138:007a 1138:0283; [code_10f8] 1 while title music zone -95 (open1) plays; when it ends zone -94 (open2) is started
+11b8:5f37	unk5f37	bytes	no reference found; size 0x3
+11b8:5f3a	g_quizSlots	bytes	QuizSlot[9] {i16 q; u8 perm[3]; u8 tried[3]}; record +0x197; size 0x48; refs 1150:01d5 1150:0375 1150:0403 1150:0a97 1150:0f85 1150:0fcb 1150:100a 1150:1449 1150:14d7 1178:0251; [code_1150] 9 elf question slots (3 per level), 8 bytes each
+11b8:5f82	g_quizTier	u8	record +0x2f; size 0x1; refs 1150:0000 1150:0327 1160:0f28 1160:1632; [code_1150] Question tier 0..4 (record +0x2f)
+11b8:5f83	g_quizStatus	u8[359]	record +0x30; size 0x167; refs 1150:0057 1150:00a7 1150:0314 1150:0327 1150:0375 1150:0403 1160:0f28; [code_1150] Per-question status 0 unseen,1 right first try,2 last answer wrong,3 right after retry; bit7 picked
+11b8:60ea	g_quizTextRes	far	size 0x4; refs 1150:100a 1150:13c6; [code_1150] Loaded OTHR 11000+q (question text, parsed in place)
+11b8:60ee	g_quizRangeLo	i16	size 0x2; refs 1150:0000 1150:0057 1150:00a7; [code_1150] First question index of current tier
+11b8:60f0	g_quizRangeHi	i16	size 0x2; refs 1150:0000 1150:0057; [code_1150] Last question index of current tier (inclusive)
+11b8:60f2	g_quizCount	i16[4]	size 0x8; refs 1150:0057 1150:00a7 1150:0327; [code_1150] Count of status 0..3 in range (60f2,60f4,60f6,60f8)
+11b8:60fa	g_quizSlot	i16	size 0x2; refs 1150:0403 1150:0a97 1150:0f85 1150:0fcb 1150:100a 1150:1449 1150:14d7; [code_1150] Slot being asked
+11b8:60fc	g_quizQ	i16	size 0x2; refs 1150:0403 1150:049a 1150:0748 1150:100a 1150:1409 1150:14d7; [code_1150] Question index being asked
+11b8:60fe	g_quizText	far	size 0x4; refs 1150:0901 1150:0a97; [code_1150] Start of question text
+11b8:6102	g_quizAnswer	far[3]	size 0xc; refs 1150:0901 1150:0a97; [code_1150] Answer strings (index 0 = correct)
+11b8:610e	g_quizLineSlots	u8	size 0x1; refs 1150:0901 1150:0a97; [code_1150] Line slots in question (text lines + blank lines + 1)
+11b8:610f	g_quizNumLines	i16	size 0x2; refs 1150:0901 1150:0a97 1150:0f85 1150:0fcb 1150:100a 1150:1449 1150:14d7; [code_1150] Number of non-blank question lines (narration units)
+11b8:6111	g_quizTextX	i16	size 0x2; refs 1150:0a97 1150:0d2d 1150:0e30; [code_1150] Question text box x
+11b8:6113	g_quizTextY	i16	size 0x2; refs 1150:0a97 1150:0d2d 1150:0e30; [code_1150] Question text top y
+11b8:6115	g_quizLineY	i16[10]	size 0x14; refs 1150:0901 1150:0d2d 1150:0e30; [code_1150] y offset of each non-blank line relative to g_quizTextY
+11b8:6129	g_quizTextW	i16	size 0x2; refs 1150:0a97 1150:0d2d 1150:0e30; [code_1150] Question text box width (even)
+11b8:612b	g_quizAnsX	i16	size 0x2; refs 1150:0a97 1150:0d2d 1150:0e30; [code_1150] Answer highlight box x
+11b8:612d	g_quizAnsY	i16[3]	size 0x6; refs 1150:0a97 1150:0d2d 1150:0e30; [code_1150] Answer row box top y per display position
+11b8:6133	g_quizAnsW	i16	size 0x2; refs 1150:0a97 1150:0d2d 1150:0e30; [code_1150] Answer highlight box width
+11b8:6135	g_quizAnsH	i16	size 0x2; refs 1150:0a97 1150:0d2d 1150:0e30; [code_1150] Answer row height (fontHeight+6)
+11b8:6137	g_quizInterrupted	i16	size 0x2; refs 1150:1409 1150:1449 1150:14d7; [code_1150] Last narration was interrupted by input
+11b8:6139	g_quizSpeakerIcon	far	PMAP 2001; size 0x4; refs 1150:049a 1150:0748 1150:0a97 1150:0ed6 1150:100a 1150:13c6
+11b8:613d	g_quizSpkRect	i16[4]	size 0x8; refs 1150:0a97 1150:0ed6; [code_1150] Speaker button rect x,y,w,h (434,217,iconW+8,iconH+6)
+11b8:6145	g_quizVoice	i16	size 0x2; refs 1150:0a97 1150:0f85 1150:0fcb 1150:100a; [code_1150] Copy of g_voiceOn for this question
+11b8:6147	g_quizNoAnswerVoice	i16	size 0x2; refs 1150:100a 1150:14d7; [code_1150] 1 if question in g_quizSilentAnswers
+11b8:6149	unk6149	bytes	no reference found; size 0x15
+11b8:615e	g_rowBarNormal	far	size 0x4; refs 1160:0b1b 1160:0e97; [code_1150] BNDL 322 entry 1 (PMAP 2181)
+11b8:6162	g_rowBarHilite	far	size 0x4; refs 1160:0b1b 1160:0e97; [code_1150] BNDL 322 entry 2 (PMAP 2182)
+11b8:6166	g_signInBndl	far	BNDL 322; size 0x4; refs 1160:0869 1160:0e2d 1160:0e97 1160:0f00
+11b8:616a	g_nameCursor	far	size 0x4; refs 1160:00ee 1160:0595 1160:0957; [code_1150] Insertion point in g_playerName
+11b8:616e	g_rowW	i16	size 0x2; refs 1160:051b 1160:0b1b 1160:0e97; [code_1150] Sign-in row width = width(PMAP 2181) (280)
+11b8:6170	g_userCount	i8	size 0x1; refs 1160:029c 1160:051b 1160:0595 1160:089f 1160:0957 1160:0b1b 1160:0dd6 1160:0f28; [code_1150] Number of player records (0..7)
+11b8:6171	g_userSel	i8	size 0x1; refs 1160:0595 1160:0f28; [code_1150] Highlighted/current record index (== g_userCount means "Start New Player")
+11b8:6172	g_users	far	UserRecord[7] (1583 bytes each); size 0x4; refs 1160:00ee 1160:089f 1160:0957 1160:0b1b 1160:0dd6 1160:0f28; [code_1150] 7 x 1583-byte table (allocated while needed)
+11b8:6176	g_nameDone	i16	size 0x2; refs 1160:02e0 1160:1632; [code_1150] Set to 1 by Users_InitNewPlayer to end the name-entry loop
+11b8:6178	cl_input	u16	size 0x2; refs 1168:0442 1168:05b5 1168:0a6d 1168:0c04; [code_1168] Climb scene input code this tick
+11b8:617a	cl_onLadder	i16	size 0x2; refs 1168:0442 1168:05b5 1168:0a6d 1168:0c04; [code_1168] Climb: on-ladder flag (walk loop exits when set)
+11b8:617c	cl_done	i16	size 0x2; refs 1168:0000 1168:0442 1168:0a6d; [code_1168] Climb: reached top of screen 3
+11b8:617e	cl_screen	i16	size 0x2; refs 1168:0000 1168:0299 1168:03d6 1168:0a6d 1168:0c04 1168:1101 1168:1143; [code_1168] Climb: current screen 0..3
+11b8:6180	cl_nextScreen	i16	size 0x2; refs 1168:0a6d 1168:0c04; [code_1168] Climb: requested screen after vertical wrap
+11b8:6182	cl_nextY	i16	size 0x2; refs 1168:0a6d 1168:0c04; [code_1168] Climb: y after screen change
+11b8:6184	cl_fullPresent	i16	size 0x2; refs 1168:0000 1168:0442 1168:0a6d; [code_1168] Climb: present full playfield next tick
+11b8:6186	cl_fadePending	i16	size 0x2; refs 1168:0000 1168:0442; [code_1168] Climb: call Fx_FadeIn_Stub on first present
+11b8:6188	cl_column	i16	size 0x2; refs 1168:03d6 1168:0a6d 1168:0c04; [code_1168] Climb: ladder column 0..4
+11b8:618a	cl_climbPhase	i16	size 0x2; refs 1168:0a6d 1168:0c04; [code_1168] Climb: phase 0..3, -1 re-attach
+11b8:618c	cl_jumpStep	i16	size 0x2; refs 1168:0a6d 1168:0c04; [code_1168] Climb: sideways jump step 1..4
+11b8:618e	cl_fallStep	i16	size 0x2; refs 1168:0a6d 1168:0c04; [code_1168] Climb: fall step 1..7
+11b8:6190	cl_landStep	i16	size 0x2; refs 1168:0a6d 1168:0c04; [code_1168] Climb: landing step 1..6
+11b8:6192	cl_climbBndl	far	BNDL 321; size 0x4; refs 1168:00ba 1168:01f3 1168:10a7
+11b8:6196	cl_climbW	i16[24]	size 0x30; refs 1168:00ba 1168:0a6d 1168:0c04; [code_1168] Climber frame widths
+11b8:61c6	cl_climbH	i16[24]	size 0x30; refs 1168:00ba 1168:0a6d 1168:0c04; [code_1168] Climber frame heights
+11b8:61f6	cl_ladderFull	far	PMAP 1090; size 0x4; refs 1168:00ba 1168:01f3 1168:0299
+11b8:61fa	cl_ladderLow	far	PMAP 1091; size 0x4; refs 1168:00ba 1168:01f3 1168:0299
+11b8:61fe	cl_ladderStub	far	PMAP 1092; size 0x4; refs 1168:00ba 1168:01f3 1168:0299
+11b8:6202	cl_creatBndl	far	BNDL 326; size 0x4; refs 1168:00ba 1168:01f3 1168:1101; [code_1168] BNDL 326 wall creature (Master of Mischief in a window, PMAP 1095-1098)
+11b8:6206	cl_creatW	i16[4]	size 0x8; refs 1168:00ba 1168:10d2 1168:1143; [code_1168] Creature frame widths
+11b8:620e	cl_creatH	i16[4]	size 0x8; refs 1168:00ba 1168:10d2 1168:1143; [code_1168] Creature frame heights
+11b8:6216	cl_creatTick	i16	size 0x2; refs 1168:0000 1168:0a6d 1168:10d2 1168:1101 1168:1143; [code_1168] Creature cycle tick (0 inactive)
+11b8:6218	cl_creatX	i16	size 0x2; refs 1168:10d2 1168:1101 1168:1143; [code_1168] Creature x
+11b8:621a	cl_creatY	i16	size 0x2; refs 1168:0c04 1168:10d2 1168:1101 1168:1143; [code_1168] Creature y
+11b8:621c	cl_creatFrame	i16	size 0x2; refs 1168:0a6d 1168:0c04 1168:10d2 1168:1101 1168:1143; [code_1168] Creature frame (-1 hidden)
+11b8:621e	cl_creatFlip	i16	size 0x2; refs 1168:0c04 1168:1101 1168:1143; [code_1168] Creature faces left
+11b8:6220	cl_creatCol	i16	size 0x2; refs 1168:0c04 1168:1143; [code_1168] Creature column
+11b8:6222	cl_creatScreen	i16	size 0x2; refs 1168:0c04 1168:1101 1168:1143; [code_1168] Creature screen
+11b8:6224	cl_layout	far	-> selected cl_layouts[tier]; size 0x4; refs 1168:0047 1168:0299 1168:03d6 1168:1143; [code_1168] Selected ladder layout
+11b8:6228	elf_animSets	bytes	ElfAnimSet[7] (0x32 bytes); size 0x15e; refs 1178:0000 1178:0041 1178:01ac 1178:01e3 1178:048d 1178:0766 1178:0b1d 1178:0cb0; [code_1168] {count,1,behaviour,frames far[10],bndl far}
+11b8:6386	elf_actors	bytes	Elf[32] (0x12 bytes); size 0x240; refs 1178:00d7 1178:01ac 1178:01e3 1178:0251 1178:0364 1178:03bb 1178:0453 1178:048d 1178:051f 1178:0565 1178:0766 1178:0b1d +1 more; [code_1168] {set,beh,step,x,y,facing,room,inNet,hasItem}
+11b8:65c6	elf_projBndl	far	BNDL 310; size 0x4; refs 1178:0251 1178:0364 1178:0cb0; [code_1168] BNDL 310 projectile frames (0-3 sparkle, 4-8 gold coin)
+11b8:65ca	elf_projX	i16	size 0x2; refs 1178:0cb0; [code_1168] Projectile x
+11b8:65cc	elf_drawYOff	i16	size 0x2; refs 1178:051f 1178:0766; [code_1168] Elf draw y offset (0 or 0x180)
+11b8:65ce	g_climbsDone	u16	completed climbs; record +0x62d; size 0x2; refs 10e0:007d 10f0:0000 1118:0000 1160:0f28 1160:1632 1190:0000 1190:009b 1198:0103; [code_10e0] Number of completed climbs (treasures recovered)
+11b8:65d0	hall_treasureBndl	far[6]	size 0x18; refs 1190:009b 1190:01c5 1190:03a3; [code_1168] Pedestal treasure BNDLs (330+t)
+11b8:65e8	hall_treasureAnim	far[6]	size 0x18; refs 1190:009b 1190:01c5 1190:02a0; [code_1168] Pedestal treasure anim scripts (OTHR 20000+t)
+11b8:6600	_atexittbl	far[32]	size 0x80; refs 1000:0198 1000:021d; [code_1000] atexit table
+11b8:6680	unk6680	bytes	no reference found; size 0x4
+11b8:6684	__fputcChar	u8	size 0x1; refs 1000:173a; [code_1000] Static char used by fputc
+11b8:6685	pad6685	bytes	size 0x1
+11b8:6686	eh_CleanupFnTmp	far	size 0x4; refs 11a0:237e; [code_11a0] scratch far fn ptr used by xx_UnwindLocals to call a __finally/cleanup block
+11b8:668a	eh_FilterFnTmp	far	size 0x4; owner seg 11a0; [code_11a0] scratch far fn ptr used by _ExceptionHandler to call an __except filter
+11b8:668e	g_badTypeid	u8	static Bad_typeid object; size 0x1; refs 11a0:3770; [code_11a0] static object thrown by __GetTypeInfo
+11b8:668f	g_badCast	u8	static Bad_cast object; size 0x1; refs 11a0:3a31; [code_11a0] static object thrown by __DynamicCast
+11b8:6690	eh_TaskTable	far	size 0x4; refs 1000:2c22 1000:2c9f 1000:2dae 11a0:04e7; [code_1000] Task table: entries {u16 ss; far ptr data} (6 bytes); [code_11a0] per-task context table (allocated by 1000:2ab7) used only when SS != DGROUP
+11b8:6694	_argc	i16	size 0x2; refs 1000:31eb 1018:086d; [code_1000] Argument count (read by 1018:086d)
+11b8:6696	_argv	far	size 0x4; refs 1000:31eb 1018:086d; [code_1000] Argument vector (read by 1018:086d)
+11b8:669a	__argvCap	i16	size 0x2; refs 1000:31eb; [code_1000] Allocated _argv slots (multiple of 16)
+11b8:669c	__heapDesc	bytes	far-heap descriptor; size 0x6; refs 1000:3bca; [code_1000] Far-heap descriptor (segment list head, segment count)

@@ -1,0 +1,73 @@
+1168:0000	ClimbScene_Run	void ClimbScene_Run(void)	Room 0x31 castle-wall ladder climb driver (Master of Mischief pushes): load, walk/climb loops until top reached, free
+1168:0047	ClimbScene_PickLayout	void ClimbScene_PickLayout(void)	cl_layout = &layouts[R(g_skill+1)] (DGROUP 2950+40k)
+1168:00ba	ClimbScene_LoadResources	void ClimbScene_LoadResources(void)	Load BNDL 321 (climber), PMAP 1090-1092 (ladders), BNDL 326 (creature); fill size tables
+1168:01f3	ClimbScene_FreeResources	void ClimbScene_FreeResources(void)	Free climb-scene resources
+1168:0299	ClimbScene_DrawScreenBackground	void ClimbScene_DrawScreenBackground(void)	Draw bg 1040/1041 + ladders per layout for cl_screen, separator line, save to bg layer
+1168:03d6	ClimbScene_FindLadderAtPlayer	int ClimbScene_FindLadderAtPlayer(void)	Return 1 and set cl_column if a climbable ladder column lies within the climber sprite
+1168:0442	ClimbScene_WalkLoop	void ClimbScene_WalkLoop(void)	Screen-0 walking loop at 10 Hz (hotspots 0x600/0x0d/0x601/0x602) until a ladder is grabbed
+1168:05b5	ClimbScene_WalkUpdate	void ClimbScene_WalkUpdate(void)	Walk/jump/net/coin update (trimmed copy of 10e0:0447; quirk: walking right adds dxLeft 0d33); Up at ladder sets cl_onLadder
+1168:0a6d	ClimbScene_ClimbLoop	void ClimbScene_ClimbLoop(void)	Ladder loop at 10 Hz with screen changes (0..3); exits on landing (walk) or climbing off top (done)
+1168:0c04	ClimbScene_ClimbUpdate	void ClimbScene_ClimbUpdate(void)	Climb/jump/fall/land state machine, creature push (-1 coin), vertical screen wrap
+1168:10a7	ClimbScene_DrawClimber	void ClimbScene_DrawClimber(void)	Draw climber frame from BNDL 321 (never flipped)
+1168:10d2	ClimbScene_EraseCreature	void ClimbScene_EraseCreature(void)	Restore bg under the wall creature (Master of Mischief, BNDL 326); reads widths[-1] quirk when frame=-1
+1168:1101	ClimbScene_DrawCreature	void ClimbScene_DrawCreature(void)	Draw wall creature (Master of Mischief in window) frame with flip
+1168:1143	ClimbScene_UpdateCreature	void ClimbScene_UpdateCreature(void)	Per-tick spawn chance (0/50/100/200 permille by g_rankTier) and 12-tick emerge/reach/retreat cycle of the Master of Mischief
+1170:0000	Sfx_Play	void Sfx_Play(int n)	Stop/free current effect, then if sfx enabled load SSND 7000+n and play via waveOut
+1170:005b	Sfx_Stop	void Sfx_Stop(void)	Stop and free current sound effect
+1170:0082	Sfx_IsPlaying	int Sfx_IsPlaying(void)	(not a Ghidra function) CALLF 1088:0175; RETF - unreferenced
+1178:0000	Elf_FreeAnimSet	void Elf_FreeAnimSet(int set)	Free animation set BNDL (6256+set*0x32)
+1178:0041	Elf_LoadAnimSet	void Elf_LoadAnimSet(int set, long resId)	Load BNDL into ElfAnimSet struct (count, behaviour=set, frame ptrs)
+1178:00d7	Elf_PlaceRandomly	void Elf_PlaceRandomly(int i)	x=30+R(250), y=175, random facing; room = 15-step random walk from start room of level
+1178:01ac	Elf_InitSystem	void Elf_InitSystem(void)	Null 7 set BNDLs, mark 32 elf slots free, count=0
+1178:01e3	Elf_ResetBehaviour	void Elf_ResetBehaviour(int i)	Base set: i<3 -> 3 if carrying else 0; i<6 -> 2; else 1; step=1
+1178:0251	Elf_SpawnForLevel	void Elf_SpawnForLevel(int count)	Load sets (BNDL 316,317,312,315,320,314,311) + projectile BNDL 310, create count elves (not in room 0x31)
+1178:0364	Elf_UnloadAll	void Elf_UnloadAll(void)	Free sets, slots and projectile BNDL
+1178:03bb	Elf_CheckNetCatch	void Elf_CheckNetCatch(int i)	Capture elf if net anim step 2..7 and |x-g_netX|<=30; Coins_Add(+1)
+1178:0453	Elf_EraseAll	void Elf_EraseAll(void)	Dispatch mode 0 (erase) to every elf
+1178:048d	Elf_UpdateAll	void Elf_UpdateAll(void)	Net check + mode 1 (update); on gate unlock (0b98) elves in room flee and get confined
+1178:051f	Elf_DrawAll	void Elf_DrawAll(int yoff)	Set draw y offset and dispatch mode 2 (draw)
+1178:0565	Elf_HandleRoomEdges	void far Elf_HandleRoomEdges(int i)	Edge wrap to adjacent room / bounce (confined), 1/3 side-path via door exit, room-0x24 fountain bounce (far; only called intra-segment)
+1178:0766	Elf_RunScript	void far Elf_RunScript(int mode, int i, signed char far *frames, int far *dx, int far *y, int far *snd)	Generic scripted elf behaviour: erase/update/draw, -1 loop, -2 leave room, thrower trigger (far; only called intra-segment)
+1178:0a6d	Elf_Beh0	void Elf_Beh0(int mode, int i)	Behaviour 0 script (frames 2acb, dx 2adc, y 2afc): clue elf empty-handed
+1178:0a90	Elf_Beh1	void Elf_Beh1(int mode, int i)	Behaviour 1 script (2b1c/2b2d/2b4d): thrower elf walking
+1178:0ab3	Elf_Beh2	void Elf_Beh2(int mode, int i)	Behaviour 2 script (2b6d/2b78/2b8c): hopping elf
+1178:0ad6	Elf_Beh3	void Elf_Beh3(int mode, int i)	Behaviour 3 script (2ba0/2bb1/2bd1): clue elf carrying item
+1178:0af9	Elf_Beh4_Flee	void Elf_Beh4_Flee(int mode, int i)	Behaviour 4 script (2bf1/2bfb/2c0d, sounds 2c1f): flee into adjacent room
+1178:0b1d	Elf_CaughtInNet	void Elf_CaughtInNet(int mode, int i)	Ride net (tables 2c31/2c3b/2c4d), set 2ab6 for carrier at step 7, release at step 9 (flee if no item or quiz correct)
+1178:0cb0	Elf_Beh5_Throw	void Elf_Beh5_Throw(int mode, int i)	Throw state machine 0..13: sparkle projectile (BNDL 310 frames 0-3); on hit Coins_Add(-1)+sfx 8 and coin (frames 4-8) flies back
+1180:0000	Help_ShowTopic	int far Help_ShowTopic(int firstPageId, int pageCount, char far *title)	Load OTHR pages firstId.., fill PagerDesc 2cfe, Dlg_RunPager 10c0:0cde (1=Done, 0=cancel), free
+1180:0117	Help_AboutTheGame	int Help_AboutTheGame(void)	(not a Ghidra function) Help_ShowTopic(11600, 4, title @2d1c)
+1180:0128	Help_UsingTheKeyboard	int Help_UsingTheKeyboard(void)	(not a Ghidra function) Help_ShowTopic(11605, 2, title @2d2b)
+1180:0139	Help_UsingTheMouse	int Help_UsingTheMouse(void)	(not a Ghidra function) Help_ShowTopic(11607, 1, title @2d3e)
+1180:014a	Help_EducationalFocus	int Help_EducationalFocus(void)	(not a Ghidra function) Help_ShowTopic(11608, 4, title @2d4e)
+1188:0000	LevelCutscene_Play	void LevelCutscene_Play(int oldLevel)	Levels 0/1 only: Anim_PlayModal BNDL 410/412 script, then bg 2200/2201 + script 20201/20205 at 7 fps; Space skips part 2
+1188:01aa	LevelCutscene_Free	void LevelCutscene_Free(void)	Free cut-scene BNDL (2d61) and second script (2d69)
+1188:01ed	GateLock_Load	void GateLock_Load(void)	Load BNDL 415 (3 lock frames 20x25) into 2d79
+1188:01fe	GateLock_Free	void GateLock_Free(void)	Free BNDL 415
+1188:0220	GateLock_Erase	void GateLock_Erase(void)	Restore lock rect in rooms 0x0b/0x19/0x26
+1188:0267	GateLock_Draw	void GateLock_Draw(int yoff)	Draw lock frame (2 unlocking, 1 has key, 0 locked); bake into bg layer when unlocking
+1190:0000	TreasureHall_BuildRooms	void TreasureHall_BuildRooms(void)	Chain castle hall rooms 0..N-1 (N=2..9 from g_climbsDone), set exits and bg 1037/1038
+1190:009b	TreasureHall_LoadRoom	uint TreasureHall_LoadRoom(void)	Assign treasures to pedestals (room0 newest; 6 per room), load BNDL 330+t and OTHR 20000+t
+1190:01c5	TreasureHall_UnloadRoom	void TreasureHall_UnloadRoom(void)	Stop pedestal animations and free treasure resources
+1190:02a0	TreasureHall_Update	void TreasureHall_Update(void)	Start/stop pedestal AnimObj (layer 0x4d) depending on player position
+1190:03a3	TreasureHall_Draw	void TreasureHall_Draw(int yoff)	Draw static frame 0 of non-animating treasures, then anim layer 0x4d
+1198:0000	Scene_LoadCommon	void Scene_LoadCommon(void)	Load BNDL 300 (+sizes), Hud_LoadArt (BNDL 301), BNDL 302 (shop sign), CoinPile_Load (PMAP 1699), BNDL 415, BNDL 328 (fountain)
+1198:00b1	Scene_FreeCommon	void Scene_FreeCommon(void)	Free BNDL 300/301/415/328 and PMAP 1699
+1198:0103	Treasures_PickForLevel	void Treasures_PickForLevel(void)	Pick 2..5 chest treasures: first = g_climbsDone%43 (if none found yet), rest unique random in [base,50]
+1198:01e1	Treasures_Free	void Treasures_Free(void)	Free 2dbc[0..4]
+1198:0228	RoomSlots_Load	void RoomSlots_Load(void)	Wrapper for 1100:0638 (slot pictures PMAP 1400+n)
+1198:022e	RoomSlots_Free	void RoomSlots_Free(void)	Wrapper for 1100:068a
+1198:0234	Room_DrawBackground	void Room_DrawBackground(int yoff)	Build bg layer (+0x180) and pristine layer (+0x300), net-shop sign, slot objects; copy to screen if yoff==0
+1198:0305	Room_DrawForeground	void Room_DrawForeground(int yoff)	Open-slot blink/reveal, NetShop_Tick, gate lock, hall, anim layers, fountain, elves, coin pile, player
+1198:0499	Room_EraseSlotReveal	void Room_EraseSlotReveal(void)	Restore open-slot rect from pristine layer during reveal frames
+1198:04f0	Room_DrawAll	void Room_DrawAll(int yoff)	AnimObj_Update + background + foreground (+status bar when yoff==0)
+1198:0527	Room_Present	void Room_Present(unsigned char t)	Room transition: 0 instant, 1 fade (stubs, gated by 0860), 2 dissolve, 3-6 cut; bit 7 ignored; then rebuild layers, flush input
+1198:06b4	Room24Anim_Erase	void Room24Anim_Erase(void)	Restore fountain animation rect (184,179,128,108) in room 0x24
+1198:06d5	Room24Anim_Draw	void Room24Anim_Draw(int yoff)	Draw BNDL 328 fountain frame and advance (4-frame loop) in room 0x24
+11b8:2a3e	cl_fallFrames_base	u8[8] stride 2	Fall frames (index 1..7 -> 10..16); code base used by the indexing code (index 1 = first element); the table data itself starts 2 bytes later at cl_fallFrames (dgroup.tsv)
+11b8:2a4c	cl_fallDx_base	int16[8]	Fall dx (index 1..7); code base used by the indexing code (index 1 = first element); the table data itself starts 2 bytes later at cl_fallDx (dgroup.tsv)
+11b8:2a5a	cl_fallDy_base	int16[8]	Fall dy minus 32 (index 1..7); code base used by the indexing code (index 1 = first element); the table data itself starts 2 bytes later at cl_fallDy (dgroup.tsv)
+11b8:2a68	cl_landFrames_base	u8[7] stride 2	Landing frames (index 1..6 -> 18..23); code base used by the indexing code (index 1 = first element); the table data itself starts 2 bytes later at cl_landFrames (dgroup.tsv)
+11b8:2a74	cl_landDx_base	int16[7]	Landing dx (index 1..6); code base used by the indexing code (index 1 = first element); the table data itself starts 2 bytes later at cl_landDx (dgroup.tsv)
+11b8:2a80	cl_landY_base	int16[7]	Landing absolute y (index 1..6); code base used by the indexing code (index 1 = first element); the table data itself starts 2 bytes later at cl_landY (dgroup.tsv)
+11b8:2a8c	cl_creatSeq_base	int16[13]	Creature frame per tick (index 1..12; -1 hidden); code base used by the indexing code (index 1 = first element); the table data itself starts 2 bytes later at cl_creatSeq (dgroup.tsv)

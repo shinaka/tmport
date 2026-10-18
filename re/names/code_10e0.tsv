@@ -1,0 +1,55 @@
+10e0:0000	Player_UpdateCursor	void far Player_UpdateCursor(void)	Mouse-move callback (installed via 1020:00be as far ptr 10e0:0000; no prologue, entered by near CALL from 10e0 or far via [06e5]). If !g_cursorForced and mouse in play area (0<=mx<=512, 20<=my<287) and mouse moved: SetCursorShape(mx<lastMx ? 1 : 2); else standard IDC_ARROW. Saves mouse pos to 5e4f/5e51
+10e0:0063	SetCursorForced	void far SetCursorForced(uint8_t forced)	g_cursorForced(06e2)=forced; lastMouse=(-1,-1); Player_UpdateCursor(). forced=1 -> arrow cursor during dialogs/animations (40 call sites)
+10e0:007d	Room_Run	void far Room_Run(void)	Per-room game loop (called by 1118:0000 once per room visit): registers hotspots 0x600-0x602, resets player anim state, then 100 ms frames (input, hints, elf question, erase/update/draw phases, dirty-rect flush) until nextRoom != room; then commits pending entry position
+10e0:036b	Gfx_SetPlayClip	void far Gfx_SetPlayClip(int16_t layerY)	Clip rect = x[0..511], y[layerY+20 .. layerY+286] (globals 0868/086a/0864/0866)
+10e0:0391	Gfx_ResetClip	void far Gfx_ResetClip(void)	Clip rect = x[0..511], y[0..767] (layers 0 and 1 of the 512-wide offscreen buffer)
+10e0:03a6	Gfx_RestoreFromLayer	void far Gfx_RestoreFromLayer(int16_t x,int16_t y,int16_t w,int16_t h,int16_t layerDy)	Clip (x,y,w,h) against clip rect, then copy offscreen rect (x,y+layerDy)->(x,y) via 1058:0b6a (marks dirty). Used to erase sprites from background layer (layerDy 0x180 or 0x300)
+10e0:042c	Player_Erase	void far Player_Erase(void)	Gfx_RestoreFromLayer(playerX,playerY,playerW,playerH,0x180)
+10e0:0447	Player_Update	void near Player_Update(void)	Player state machine for one 100 ms tick: mouse/keyboard intent, net swing, empty swing, coin toss (+slot reveal), door entry, auto-walk, post-arrival actions (next level / net shop), bump animation, Space/Enter actions, walking/jumping, walls, room-36 obstacle, room exits
+10e0:0b47	Player_Update_caseL	(code block)	Switch-case targets of jump table 10e0:0fe4 (walking left): frame 0x0c->Sfx_Play(0x17), 0x0e->Sfx_Play(0x23), 0x16->Sfx_Play(0x18), 0xff->frame=1,jumping=0; not a Ghidra function
+10e0:0b4b	Player_Update_caseL_sfx35	(code block)	Jump-table 10e0:0fe4 case frame 0x0e (walking left): push sfx 0x23 (35, jump) and join 10e0:0b51. Separate Ghidra function only because analysis split the shared case code
+10e0:0b51	Player_Update_caseL_playSfx	(code block)	Shared tail of the walking-left frame cases: Sfx_Play(pushed n), pop, continue at 10e0:0b63
+10e0:0b63	Player_Update_caseL_move	(code block)	Walking-left step after the frame cases: playerX -= DS:0d33[frame], playerY = DS:0ddd[frame], continue at 10e0:0da7 (part of Player_Update 10e0:0447)
+10e0:0bda	Player_Update_caseR	(code block)	Same as 10e0:0b47 for walking right (jump table 10e0:0fd4)
+10e0:0bde	Player_Update_caseR_sfx35	(code block)	Jump-table 10e0:0fd4 case frame 0x0e (walking right): push sfx 0x23 (35, jump) and join 10e0:0be4. Separate Ghidra function only because analysis split the shared case code
+10e0:0be4	Player_Update_caseR_playSfx	(code block)	Shared tail of the walking-right frame cases: Sfx_Play(pushed n), pop, continue at 10e0:0bf6
+10e0:0bf6	Player_Update_caseR_move	(code block)	Walking-right step after the frame cases: playerX += DS:0c89[frame], playerY = DS:0ddd[frame], then the rest of the right-walk update (593-byte part of Player_Update 10e0:0447 split off by Ghidra analysis)
+10e0:0fd4	Player_Update_jtabR	u16 keys[4]; u16 targets[4]	Code-segment switch table: keys {0x0c,0x0e,0x16,0xff} -> {0bda,0bde,0be2,0bec}
+10e0:0fe4	Player_Update_jtabL	u16 keys[4]; u16 targets[4]	Code-segment switch table: keys {0x0c,0x0e,0x16,0xff} -> {0b47,0b4b,0b4f,0b59}
+10e0:0ff4	Player_Draw	void far Player_Draw(int16_t dy)	If !g_playerHidden: DrawSprite(playerX, playerY+dy, Bndl_GetEntry(g_playerBndl,frame), flipX=facingLeft)
+10e0:1033	Player_WalkTo	void far Player_WalkTo(int16_t x,int16_t y,uint8_t unused,uint8_t arriveAction)	Start auto-walk: walkActive=1, target=(x,y), 5e42=unused, arriveAction (1=locked gate -> next level, 2=net shop)
+10e0:1057	PlayerFx_Erase	void far PlayerFx_Erase(void)	If fxFrame!=0: Gfx_RestoreFromLayer(fxX,fxY,fxW,fxH,0x180) (coin/sparkle/POOF sprite)
+10e0:1079	PlayerFx_Draw	void far PlayerFx_Draw(int16_t dy)	If fxFrame!=0: DrawSprite(fxX, fxY+dy, Bndl_GetEntry(g_playerBndl,fxFrame), 0)
+10e0:10b2	Room9_QueueRankHint	void far Room9_QueueRankHint(void)	QueueHint(rankHint9[Rank_FromTotal(g_totalTreasures)]) with table DGROUP 0e8f {11,13,16,19,22,25,28,31}
+10e8:0000	Hud_LoadArt	void far Hud_LoadArt(void)	If g_hudArt==NULL: g_hudArt = GetResource(301) (BNDL of PMAP 1300-1309)
+10e8:0019	Hud_FreeArt	void far Hud_FreeArt(void)	DisposePtrDeep(g_hudArt); g_hudArt=NULL
+10e8:003b	Hud_Redraw	void far Hud_Redraw(void)	Far thunk -> Hud_RedrawNear (10e8:003f is a dead RET byte)
+10e8:0040	Hud_RedrawNear	void near Hud_RedrawNear(void)	Redraw bottom status bar (y 287..383): black line, gray fill, panel art, clue box (texts+key or mode 1/2), coins, nets, gems, treasure points; present; restore play clip
+10e8:00dd	Hud_DrawClueBoxMode	void near Hud_DrawClueBoxMode(int16_t m)	Fill clue box (10,296,190,76) colour 9; m=0: prompt text DGROUP 0f17 at (10,310,w190) colour 15; m=1: CONTINUE image (art[9]) centred in box
+10e8:019f	Hud_DrawClueTexts	void near Hud_DrawClueTexts(void)	For i<numClues: DrawText(17, 315+19*i, clueText[level][i]) colour 15 (far char* table DGROUP 5e84, 3 per level)
+10e8:01ef	Hud_SpeakClue	void near Hud_SpeakClue(int16_t clueId)	If voice enabled (0b97): play SSND 7300+clueId and wait, abortable by Enter/Esc (1088:01a9, key list DGROUP 0f54)
+10e8:0228	Hud_ReplayClues	void far Hud_ReplayClues(void)	Present full screen; for each collected clue of current level speak clueVoice[level][i] (u16 table DGROUP 5eb7). Triggered by 'c','C' or hotspot event 0x2063
+10e8:026e	Hud_DrawKeyIcon	void far Hud_DrawKeyIcon(void)	If level<=2: DrawSprite(131,296, art[level*2 + (1-haveKey)], 0)
+10e8:02cf	Hud_DrawCoins	void near Hud_DrawCoins(void)	If showCoins(0ec1): DrawText(271,339,w32, FF 05 FF + 1-2 decimal digits of coins) colour 15
+10e8:034d	Hud_DrawNets	void near Hud_DrawNets(void)	If showNets(0ec2): DrawText(361,339,w41, FF 05 FF + 1-2 digits of nets) colour 15
+10e8:03cb	Hud_DrawTreasureGems	void near Hud_DrawTreasureGems(void)	If level<=2: draw art[7] (filled) for i<gemsFound and art[8] (hollow) for gemsFound<=i<gemsNeeded[tier] at positions DGROUP 0ec7/0eef [tier][i]
+10e8:04b2	Hud_DrawTreasurePoints	void near Hud_DrawTreasurePoints(void)	DrawText(463,339,w41, FF 05 FF + 1-5 decimal digits of climbPoints) colour 15
+10e8:0658	Hud_SetClueBoxMode	void far Hud_SetClueBoxMode(uint8_t mode)	Remove old hotspots (mode0: 99 and 0x409; mode1/2: 0x409); set g_clueBoxMode; mode0 adds hotspot 99 (10,296,190,76) and 0x409 (0,0,512,384); mode1/2 add 0x409; Hud_RedrawNear
+10e8:06c9	Inv_SetHaveKey	void far Inv_SetHaveKey(int16_t have)	haveKey=(u8)have; if have Sfx_Play(12); Hud_RedrawNear
+10e8:06e7	Inv_AddClue	void far Inv_AddClue(void)	numClues++; if numClues==2 QueueHint(3)
+10e8:06ff	Inv_AddCoins	void far Inv_AddCoins(int16_t delta)	If delta>=0 or (unsigned)-delta<=coins: coins+=delta; Hud_RedrawNear (refused decrements do nothing)
+10e8:0720	Inv_AddNets	void far Inv_AddNets(int16_t delta)	Same as Inv_AddCoins for nets (5e5c)
+10e8:0741	Inv_ResetGems	void far Inv_ResetGems(void)	gemsFound(5e5e)=0; Hud_RedrawNear
+10e8:074a	Inv_CollectTreasure	void far Inv_CollectTreasure(void)	QueueHint(4); gemsFound++; 5e61++; if level<=2 climbPoints++; Sfx_Play(0x29); Hud_RedrawNear
+10e8:0790	Rank_UpdateTier	void far Rank_UpdateTier(void)	g_rankTier(5e58) = Rank_FromTotal(g_totalTreasures)/2
+10e8:07a6	Rank_FromTotal	int16_t far Rank_FromTotal(uint32_t total)	i=0; while i<8 && thresholds[i]<=total: i++; return i-1 (thresholds DGROUP 0ea0 = {0,5,25,70,115,170,230,300}) -> 0..7
+10f0:0000	Climb_Celebrate	void far Climb_Celebrate(void)	End-of-climb sequence (called by 1118:0000 after summit): treasuresFound++, add climb points/rank, rank hint, music, 2-3 skippable animations (BNDL 323/324/325, OTHR 20301/20302, treasure BNDL 330+((n-1)%43)), then rank screen
+10f0:030d	Rank_AddClimbPoints	void near Rank_AddClimbPoints(void)	total += climbPoints (clamp 0xFFFFFFF0); rank=Rank_FromTotal; promoted(0b9c)=rank changed; champion(5ef2)=rank==7
+10f0:037d	Celebrate_Stub	void far Celebrate_Stub(void)	Empty function (RETF)
+10f0:037e	Celebrate_FreeAll	void far Celebrate_FreeAll(void)	DisposePtrDeep and NULL every celebration resource pointer (DGROUP 0f70,0f74,0f78,0f7c,0f80,0f84,0f88,5e7a)
+10f0:0487	Menu_SeeRank	int16_t far Menu_SeeRank(void)	File menu "See Rank" handler (far ptr at DGROUP 1338): save play area to buffer, disable menus, RankScreen_Show, restore play area and menus; returns 0
+10f0:054b	RankScreen_Show	void far RankScreen_Show(void)	Rank screen: PMAP 2380 background, player name and "Total Treasures" text, threshold labels, Sfx_Play(22), animate ranks 0..current, wait for Enter/Space (Esc -> quit dialog)
+10f0:06af	RankScreen_DrawLabels	void far RankScreen_DrawLabels(void)	Colour 0; DrawText(121, 181-16*i, thresholdLabel[i]) for i=0..6 (far char* table DGROUP 0f8c)
+10f0:0702	RankScreen_AnimateStep	void far RankScreen_AnimateStep(int16_t r)	Reveal PMAP 2381 inside band y=[197-16r..213-16r] growing upward 1 px per 50 ms for 16 steps, then DrawText(121,197-16r,w259,rankName[r]) (DGROUP 0fa8)
+10f0:07f5	Rank_QueueResultHint	void far Rank_QueueResultHint(void)	pendingHint=-1; QueueHint(promoted ? promoHint[rank] (0fc8) : stayHint[rank] (0fd8))
+11b8:5292	g_imageSlot80	void far*	Image-slot table entry 80 (table at 5152, owned by 10d8); Climb_Celebrate stores the treasure image (entry 0 of BNDL 330+k) here for the celebration scripts

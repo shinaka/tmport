@@ -1,0 +1,45 @@
+#pragma once
+// Command line of the game itself (`tmport` with no tool command). The tools (--info, --dump-*,
+// --render-*, --view, ...) keep their own parsers in src/cli and the other areas; main() runs the
+// game only when every argument is one of the options below (or there are none, or --play).
+
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace tmport::app {
+
+struct LaunchOptions {
+    std::string dataPath;       // --data <dir|cue|bin|iso>; default TM_DATA, tmport.ini, auto-detect
+    std::string configPath;     // --config <ini>: tmport.ini to use
+    std::string prefDir;        // --pref-dir <dir>: saves/settings directory (default: SDL pref path)
+    std::string screenshotDir;  // --screenshot-dir <dir>
+    bool colour16 = false;      // --16
+    bool integerScale = false;  // --integer-scale
+    bool fullscreen = false;    // --fullscreen (also [engine] fullscreen in tmport.ini; Alt+Enter / F11 toggle)
+    bool windowed = false;      // --windowed: start in a window even if tmport.ini says fullscreen
+    bool noPause = false;       // --no-pause
+    bool tapLatch = false;      // --tap-latch
+    std::string inputMode;      // --input-mode lossless|first-event
+    std::string midiSet;        // --midi-set E|B
+    std::string midiBackend;    // --midi auto|winmm|soundfont|null
+    std::string soundFont;      // --soundfont <file.sf2> (selects the soundfont output unless --midi is given)
+    bool noAudio = false;       // --no-audio: no wave device, null MIDI
+    bool verbose = false;       // --verbose
+    // Verification / automation:
+    bool headless = false;      // --headless: no window, no message boxes, silent audio; the run
+                                // ends when the --keys script is used up
+    std::string keys;           // --keys <script> (app/script_input.h)
+    std::string frameDump;      // --frame-dump <png>: the 640x480 canvas when the game ends
+    // Mods (area mods, docs/MODDING.md):
+    std::vector<std::string> modDirs;  // --mods <dir> (repeatable): extra mod folders, after tmport.ini's
+    bool noMods = false;               // --no-mods: load no mods at all
+};
+
+// True when argv should start the game: no arguments, --play, or only options of LaunchOptions.
+bool isGameInvocation(int argc, char** argv);
+// Parses the game's command line (--play is accepted and ignored). nullopt + error on bad input.
+std::optional<LaunchOptions> parseLaunchArgs(int argc, char** argv, std::string& error);
+std::string launchUsage();
+
+}  // namespace tmport::app
