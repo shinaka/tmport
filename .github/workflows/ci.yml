@@ -6,9 +6,9 @@
 
 name: CI
 
+# Manual runs only (Actions tab → CI → "Run workflow"), so pushes to the private repository do not
+# use Actions minutes. Re-add push/pull_request triggers here to run CI automatically.
 on:
-  push:
-  pull_request:
   workflow_dispatch:
 
 permissions:
