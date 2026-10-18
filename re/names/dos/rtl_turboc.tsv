@@ -1,0 +1,99 @@
+1000:0000	c0_startup	void far entry(void)	Turbo C 2.0 C0L startup: DGROUP=4d94, DOS version (INT21/30), PSP/env, SaveVectors, stack check, setblock (INT21/4A), clear BSS 4d94:8f9e..cc16, init hooks, _setargv/_setenvp, BIOS tick (INT1A/0) -> DS:0083, main(argc,argv,envp) 130f:0007, exit
+1000:010d	_exit	void far _exit(int status)	RestoreVectors, run DS:8f9a hook, INT21 AH=4Ch
+1000:012f	_SaveVectors	void near _SaveVectors(void)	Saves INT 0/4/5/6 vectors to DS:005b..0069, installs divide-error handler 1000:0125
+1000:0172	_RestoreVectors	void far _RestoreVectors(void)	Restores INT 0/4/5/6
+1000:019f	_c0_init_hook	void far _c0_init_hook(void)	Startup hook (DS:8f98): clears DS:0081
+1000:01a6	_c0_dummy_hook	void far _c0_dummy_hook(void)	Empty startup hook (DS:8f9c)
+1000:01a7	_c0_ErrorDisplay	void near _c0_ErrorDisplay(void)	INT21 AH=40h to stderr (message at DS:DX)
+1000:01af	_c0_abort	void far _c0_abort(void)	"Abnormal program termination" (DS:003d), exit code 3
+1000:2e42	_setargv	void far _setargv(void)	Builds argv from the PSP command tail
+1000:2ed0	_setargv_count	void near _setargv_count(void)	_setargv helper
+1000:2f40	_setenvp	void far _setenvp(void)	Builds envp from the environment segment (DS:0077)
+1000:2f84	F_PADA	void far F_PADA(void)	Huge pointer add/normalise (DX:AX += CX:BX)
+1000:2fdf	F_PCMP	void far F_PCMP(void)	Huge pointer compare (normalised)
+1000:3000	F_LXMUL	long far F_LXMUL(long a,long b)	32-bit multiply (DX:AX * CX:BX)
+1000:3019	F_LDIV	long far F_LDIV(long a,long b)	32-bit signed divide (entry CX=0 into 1000:302a)
+1000:3022	F_LMOD	long far F_LMOD(long a,long b)	32-bit signed modulo (entry CX=2 into 1000:302a)
+1000:302a	_ldivmod_core	long far _ldivmod_core(void)	Shared 32-bit div/mod loop (CX selects signed/unsigned/div/mod)
+1000:30bc	F_LXLSH	long far F_LXLSH(long v,int n)	32-bit shift left by CL
+1000:30db	F_SCOPY	void far F_SCOPY(void far *src,void far *dst)	Struct copy helper (CX bytes), RETF 8
+4ba4:057d	_rtl_creat	int near _rtl_creat(const char far *path,int attr)	INT21 AH=3Ch (open() helper)
+4ba4:059c	_rtl_trunc	int near _rtl_trunc(int h)	INT21 AH=40h with CX=0 (open() O_TRUNC helper)
+4ba4:05b0	open	int far open(const char far *path,int access,...)	Turbo C open(): _open/_creat/_chmod/ioctl handling
+4c15:000d	__IOerror	int far __IOerror(int doserr)	Maps DOS error to errno (DS:8da0) / _doserrno (DS:007f), returns -1
+4c15:0048	_exit_dummy	void far _exit_dummy(void)	Default exit hook (DS:8dfc/8e00/8e04 = _exitbuf/_exitfopen/_exitopen)
+4c19:0009	exit	void far exit(int status)	Runs atexit table (count DS:8e0a), exit hooks, _exit
+4c19:003c	atexit	int far atexit(void (far *fn)(void))	Registers an exit function (max 32)
+4c1f:000b	malloc	void far *far malloc(unsigned size)	Large-model malloc -> farmalloc
+4c1f:0020	_farheap_unlink	void far _farheap_unlink(void far *blk)	Far heap: unlink free block
+4c1f:0088	_farheap_split	void far *far _farheap_split(void far *blk,unsigned long sz)	Far heap: split a free block
+4c1f:0138	_farheap_grow	void far *far _farheap_grow(unsigned long sz)	Far heap: extend with sbrk
+4c1f:01a6	_farheap_first	void far *far _farheap_first(unsigned long sz)	Far heap: first allocation
+4c1f:020c	farmalloc	void far *far farmalloc(unsigned long size)	Far heap allocator (paragraph rounded)
+4c50:000b	__brk	int far __brk(void far *newbrk)	Moves the break with setblock
+4c50:009b	brk	int far brk(void far *addr)	
+4c50:00e2	sbrk	void far *far sbrk(long incr)	
+4c65:000d	setblock	int far setblock(unsigned seg,unsigned paras)	INT21 AH=4Ah
+4c67:000d	_open	int far _open(const char far *path,int oflag)	INT21 AH=3Dh, records flags in _openfd (DS:8f1c)
+4c6c:000a	ioctl	int far ioctl(int h,int func,...)	INT21 AH=44h
+4c6f:0007	close	int far close(int h)	Validates handle (<20), clears _openfd, _close
+4c72:0008	_close	int far _close(int h)	INT21 AH=3Eh
+4c74:000e	read	int far read(int h,void far *buf,unsigned n)	read with O_TEXT CR/^Z handling, calls _read
+4c81:0003	_read	int far _read(int h,void far *buf,unsigned n)	INT21 AH=3Fh
+4c83:0003	write	int far write(int h,const void far *buf,unsigned n)	write with O_TEXT LF->CRLF, calls _write
+4c99:0009	_write	int far _write(int h,const void far *buf,unsigned n)	INT21 AH=40h (seeks to end for O_APPEND)
+4c9e:0005	access	int far access(const char far *path,int mode)	via _chmod
+4ca2:0004	lseek	long far lseek(int h,long off,int whence)	INT21 AH=42h
+4ca5:0001	__longtoa	char far *far __longtoa(long v,char far *s,int radix,char sgn,char hexA)	Number to string core
+4ca5:0085	itoa	char far *far itoa(int v,char far *s,int radix)	
+4ca5:00b2	ultoa	char far *far ultoa(unsigned long v,char far *s,int radix)	
+4ca5:00d2	ltoa	char far *far ltoa(long v,char far *s,int radix)	
+4cb4:000d	strchr	char far *far strchr(const char far *s,int c)	
+4cb8:000b	strlen	unsigned far strlen(const char far *s)	
+4cba:0006	strcmp	int far strcmp(const char far *a,const char far *b)	
+4cbd:0008	strcpy	char far *far strcpy(char far *d,const char far *s)	
+4cc0:0001	setmem	void far setmem(void far *p,unsigned n,char v)	
+4cc0:0027	memset	void far *far memset(void far *p,int v,unsigned n)	
+4cc4:0006	movmem	void far movmem(const void far *src,void far *dst,unsigned n)	Overlap-safe copy
+4cc4:005a	memmove	void far *far memmove(void far *d,const void far *s,unsigned n)	via movmem
+4ccb:000a	_chmod	int far _chmod(const char far *path,int func,...)	INT21 AH=43h
+4ccd:000b	filelength	long far filelength(int h)	INT21 AX=4201/4202/4200
+4cd2:0000	atoi	int far atoi(const char far *s)	
+4cd2:0077	atoi_alias	int far atoi_alias(const char far *s)	Second entry into atoi (atol in the small library) [I]
+4cda:000a	chdir	int far chdir(const char far *path)	INT21 AH=3Bh
+4cda:0026	getdisk	int far getdisk(void)	INT21 AH=19h
+4cda:002f	setdisk	int far setdisk(int drive)	INT21 AH=0Eh
+4cdd:000f	_ctrlbrk_isr	void interrupt _ctrlbrk_isr(void)	INT 23h handler: calls the ctrlbrk callback (DS:cc04); 0 -> _exit(0)
+4cdd:0038	ctrlbrk	void far ctrlbrk(int (far *fn)(void))	Installs INT 23h handler
+4ce2:0008	dosexterr	int far dosexterr(struct DOSERROR far *e)	INT21 AH=59h
+4ce4:0007	getdate	void far getdate(struct date far *d)	INT21 AH=2Ah
+4ce4:001d	gettime	void far gettime(struct time far *t)	INT21 AH=2Ch
+4ce7:0003	getenv	char far *far getenv(const char far *name)	
+4cee:0006	getvect	void interrupt (far *far getvect(int n))()	INT21 AH=35h
+4cee:0018	setvect	void far setvect(int n,void interrupt (far *isr)())	INT21 AH=25h
+4cf0:0009	_harderr_isr	void interrupt _harderr_isr(void)	INT 24h handler: calls the harderr callback (DS:cc08)
+4cf0:0041	harderr	void far harderr(int (far *fn)(int,int,int far*))	Installs INT 24h handler
+4cf0:0061	hardresume	void far hardresume(int axret)	
+4cf0:007c	hardretn	void far hardretn(int retn)	
+4cf0:00b0	inport	int far inport(int port)	
+4cfb:000b	inportb	unsigned char far inportb(int port)	
+4cfc:0008	int86	int far int86(int n,union REGS far *in,union REGS far *out)	
+4cfc:003c	int86x	int far int86x(int n,union REGS far *in,union REGS far *out,struct SREGS far *s)	Builds an INT n stub on the stack
+4d09:0009	intdos	int far intdos(union REGS far *in,union REGS far *out)	
+4d09:003a	intdosx	int far intdosx(union REGS far *in,union REGS far *out,struct SREGS far *s)	
+4d12:000e	srand	void far srand(unsigned seed)	Seed -> DS:8f48 (high word DS:8f4a = 0)
+4d12:001f	rand	int far rand(void)	LCG seed = seed*0x015A4E35+1 (via F_LXMUL); returns (seed>>16)&0x7fff
+4d16:0007	segread	void far segread(struct SREGS far *s)	
+4d18:0004	setdate	void far setdate(struct date far *d)	INT21 AH=2Bh
+4d18:0019	settime	void far settime(struct time far *t)	INT21 AH=2Dh
+4d1a:000e	stime	int far stime(long far *t)	
+4d1a:0050	time	long far time(long far *t)	getdate+gettime -> dostounix
+4d24:000a	stricmp	int far stricmp(const char far *a,const char far *b)	Case-insensitive compare
+4d28:000d	strncpy	char far *far strncpy(char far *d,const char far *s,unsigned n)	
+4d2c:0000	tell	long far tell(int h)	lseek(h,0,SEEK_CUR)
+4d2d:0009	dostounix	long far dostounix(struct date far *d,struct time far *t)	
+4d2d:013c	unixtodos	void far unixtodos(long t,struct date far *d,struct time far *tm)	
+4d63:0000	tzset	void far tzset(void)	
+4d63:01e5	__isDST	int far __isDST(int hour,int yday,int month,int year)	
+4d8e:000f	bdos	int far bdos(int fn,unsigned dx,unsigned al)	
+4d90:0005	bioskey	int far bioskey(int cmd)	INT 16h AH=cmd with INT 1Bh temporarily hooked; cmd 1 returns 0 when no key

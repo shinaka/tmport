@@ -48,6 +48,25 @@ Usage (python -P tmctl.py <cmd> ...):
                              toggle DOSBox-X video recording (AVI + ZMBV, every emulated frame);
                              stop moves the new AVI to OUT.avi. Decode with tools/avi_frames.py.
   menu                       list DOSBox-X menu commands and ids
+
+Profiles (--profile win|dos, default win; the Windows profile behaves exactly as before):
+  win   Windows 3.1 + Win CD edition, tools/dosbox_tmwin.conf, states in extracted/captures/savestates,
+        USERS.DAT = extracted/win31_c/TLCWIN/TMTWINCD/USERS.DAT
+  dos   1990 DOS edition (SST.EXE), tools/dosbox_tmdos.conf. C: = extracted/dos_c (a writable COPY of
+        TM-DOS, game in C:\\TM), states in extracted/captures/dos/savestates,
+        USERS.DAT = extracted/dos_c/TM/USERS.DAT. Extra start options:
+          --machine M    DOSBox-X machine type (default ega; tandy, cga, hercules, mcga, vgaonly,
+                         svga_s3 ...), passed as -set machine=M
+          --args "A"     command line for SST.EXE (written to C:\\RUN.BAT), e.g. "-E" (EGA),
+                         "-T" (Tandy), "-C" (CGA), "-H" (Hercules), "-M" (MCGA), "-Sa" (AdLib sound)
+          --set K=V      any further DOSBox-X option (repeatable), e.g. --set "cycles=fixed 3000"
+  start writes the profile name to extracted/captures/dosbox.profile; later commands (state ...)
+  use the running profile unless --profile is given. Example:
+    python -P tools/tmctl.py start --profile dos --machine tandy --park
+    python -P tools/tmctl.py key enter text:ann enter
+    python -P tools/tmctl.py state save tandy/signin   (-> extracted/captures/dos/savestates/tandy/)
+  Note: the 1990 game drops shifted keys (shift+a types nothing); type names in lower case, the
+  game capitalises the first letter itself. Slots 1..9 of save/load N are shared by both profiles.
 """
 import ctypes
 import ctypes.wintypes as wt
@@ -64,7 +83,14 @@ CONF = os.path.join(TOOLS, 'dosbox_tmwin.conf')
 CAPDIR = os.path.normpath(os.path.join(TOOLS, '..', 'extracted', 'captures'))
 PIDFILE = os.path.join(CAPDIR, 'dosbox.pid')
 PARKFILE = os.path.join(CAPDIR, 'dosbox.parked')
+PROFILEFILE = os.path.join(CAPDIR, 'dosbox.profile')
 PARK_POS = (-4000, 100)
+
+# DOS edition profile (see "Profiles" in the docstring)
+CONF_DOS = os.path.join(TOOLS, 'dosbox_tmdos.conf')
+DOS_C = os.path.normpath(os.path.join(TOOLS, '..', 'extracted', 'dos_c'))
+DOS_USERS_DAT = os.path.join(DOS_C, 'TM', 'USERS.DAT')
+DOS_STATELIB = os.path.join(CAPDIR, 'dos', 'savestates')
 
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
@@ -328,7 +354,16 @@ def ensure_parked():
         set_pos(True)
 
 
-def start(park):
+def _dos_prepare(game_args):
+    """DOS profile: check the writable game copy and write C:\\RUN.BAT for this start."""
+    if not os.path.exists(os.path.join(DOS_C, 'TM', 'SST.EXE')):
+        raise SystemExit(f'{DOS_C}\\TM is missing: copy TM-DOS\\* there first (never mount TM-DOS itself)')
+    with open(os.path.join(DOS_C, 'RUN.BAT'), 'w', newline='\r\n') as f:
+        f.write('@echo off\ncd \\TM\n')
+        f.write(f'SST {game_args}'.rstrip() + '\n')
+
+
+def start(park, profile='win', machine=None, game_args='', sets=()):
     if _windows():
         print('already running')
         return
@@ -337,9 +372,19 @@ def start(park):
     si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
     si.wShowWindow = 4  # SW_SHOWNOACTIVATE: never take focus
     log = open(os.path.join(CAPDIR, 'dosbox.log'), 'w')
-    p = subprocess.Popen([DOSBOX, '-conf', CONF], cwd=os.path.dirname(DOSBOX), startupinfo=si,
+    if profile == 'dos':
+        _dos_prepare(game_args)
+        cmdline = [DOSBOX, '-conf', CONF_DOS]
+        if machine:
+            cmdline += ['-set', f'machine={machine}']
+        for s in sets:
+            cmdline += ['-set', s]
+    else:
+        cmdline = [DOSBOX, '-conf', CONF]
+    p = subprocess.Popen(cmdline, cwd=os.path.dirname(DOSBOX), startupinfo=si,
                          stdout=log, stderr=subprocess.STDOUT)
     open(PIDFILE, 'w').write(str(p.pid))
+    open(PROFILEFILE, 'w').write(profile)
     find(timeout=30)
     if park:
         set_pos(True)
@@ -360,6 +405,17 @@ def stop():
     except (OSError, ValueError):
         subprocess.run(['taskkill', '/IM', 'dosbox-x.exe', '/F'], capture_output=True)
         print('stopped (by image name)')
+    if os.path.exists(PROFILEFILE):
+        os.remove(PROFILEFILE)
+
+
+def running_profile():
+    """Profile of the instance started by tmctl (written by start); 'win' if unknown."""
+    try:
+        p = open(PROFILEFILE).read().strip()
+        return p if p in ('win', 'dos') else 'win'
+    except OSError:
+        return 'win'
 
 
 STATELIB = os.path.join(CAPDIR, 'savestates')
@@ -378,19 +434,20 @@ def _select_and(cmd, slot):
     return menu_cmd('/Capture/', 'Save state' if cmd == 'save' else 'Load state')
 
 
-def state(args):
+def state(args, profile='win'):
     """Named save states (see the docstring): state save NAME | load NAME [--keep-users] | list."""
+    lib, users_dat = (DOS_STATELIB, DOS_USERS_DAT) if profile == 'dos' else (STATELIB, USERS_DAT)
     action = args[0] if args else 'list'
     if action == 'list':
-        root = os.path.join(STATELIB, args[1]) if len(args) > 1 else STATELIB
+        root = os.path.join(lib, args[1]) if len(args) > 1 else lib
         for dirpath, _, files in os.walk(root):
             for f in sorted(files):
                 if f.endswith('.sav'):
                     p = os.path.join(dirpath, f)
-                    print(os.path.relpath(p, STATELIB)[:-4], time.ctime(os.path.getmtime(p)))
+                    print(os.path.relpath(p, lib)[:-4], time.ctime(os.path.getmtime(p)))
         return
     name = args[1]
-    dst = os.path.join(STATELIB, name + '.sav')
+    dst = os.path.join(lib, name + '.sav')
     slot = _slot_file(STATE_SLOT)
     if action == 'save':
         before = os.path.getmtime(slot) if os.path.exists(slot) else 0
@@ -407,8 +464,8 @@ def state(args):
             raise SystemExit('save state file was not written')
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copy2(slot, dst)
-        if os.path.exists(USERS_DAT):
-            shutil.copy2(USERS_DAT, dst[:-4] + '.users')
+        if os.path.exists(users_dat):
+            shutil.copy2(users_dat, dst[:-4] + '.users')
         print('saved', name)
     elif action == 'load':
         if not os.path.exists(dst):
@@ -416,7 +473,7 @@ def state(args):
         shutil.copy2(dst, slot)
         users = dst[:-4] + '.users'
         if os.path.exists(users) and '--keep-users' not in args:
-            shutil.copy2(users, USERS_DAT)
+            shutil.copy2(users, users_dat)
             print('restored USERS.DAT of', name)
         _select_and('load', STATE_SLOT)
         print('loaded', name)
@@ -429,10 +486,28 @@ def main(argv):
         print(__doc__)
         return
     cmd, args = argv[0], argv[1:]
+    # profile options (see "Profiles" in the docstring); without them nothing changes
+    opts = {'--profile': None, '--machine': None, '--args': ''}
+    sets, rest = [], []
+    i = 0
+    while i < len(args):
+        if args[i] in opts and i + 1 < len(args):
+            opts[args[i]] = args[i + 1]
+            i += 2
+        elif args[i] == '--set' and i + 1 < len(args):
+            sets.append(args[i + 1])
+            i += 2
+        else:
+            rest.append(args[i])
+            i += 1
+    args = rest
+    profile = opts['--profile'] or ('win' if cmd == 'start' else running_profile())
+    if profile not in ('win', 'dos'):
+        raise SystemExit(f'unknown profile {profile!r} (win or dos)')
     if cmd not in ('start', 'stop', 'park', 'unpark'):
         ensure_parked()
     if cmd == 'start':
-        start('--park' in args)
+        start('--park' in args, profile, opts['--machine'], opts['--args'], sets)
     elif cmd == 'stop':
         stop()
     elif cmd in ('park', 'unpark'):
@@ -450,7 +525,7 @@ def main(argv):
         time.sleep(0.3)
         print(menu_cmd('/Capture/', 'Save state' if cmd == 'save' else 'Load state'))
     elif cmd == 'state':
-        state(args)
+        state(args, profile)
     elif cmd == 'turbo':
         print(menu_cmd('/CPU/', 'Turbo' if args[0] == 'on' else 'Normal speed'))
     elif cmd == 'menu':

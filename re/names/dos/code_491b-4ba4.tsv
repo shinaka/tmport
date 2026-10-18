@@ -1,0 +1,90 @@
+43a0:02ab	Kbd_CtrlBreakCb	int far Kbd_CtrlBreakCb(void)	ctrlbrk callback (ignores Ctrl+Break)
+491b:0004	Sound_Tick	void far Sound_Tick(void)	236.7 Hz from Timer_ISR: sfx channel (DS:6448) has priority over the music channel (DS:64c0)
+491b:00be	Sound_RunChannel	void near Sound_RunChannel(void)	Copies a channel state, steps it, loops the tune when enabled
+491b:0136	Sound_RestartVoices	void near Sound_RestartVoices(void)	
+491b:0181	Sound_StepVoices	void near Sound_StepVoices(void)	Per-voice note timers (up to 4 voices on Tandy/AdLib)
+491b:01ee	Sound_NextEvent	void near Sound_NextEvent(void)	Tune bytes: low nibble 0 rest, 1..12 note, 0xd/0xe control, 0xf end
+491b:025d	Sound_NoteOn	void near Sound_NoteOn(void)	By device: Tandy SN76496, AdLib, speaker
+491b:02d8	Sound_NoteLength	unsigned near Sound_NoteLength(void)	
+491b:033d	Tandy_UpdateVolumes	void near Tandy_UpdateVolumes(void)	
+491b:03fe	Sound_Control	void near Sound_Control(void)	Control codes (tempo, octave, volume, loop)
+491b:0446	Sound_CtlA	void near Sound_CtlA(void)	
+491b:0464	Sound_CtlB	void near Sound_CtlB(void)	
+491b:0497	Sound_CtlC	void near Sound_CtlC(void)	
+491b:04a5	Sound_CtlD	void near Sound_CtlD(void)	
+491b:04b0	Sound_CtlE	void near Sound_CtlE(void)	
+491b:04c3	Sound_CtlF	void near Sound_CtlF(void)	
+491b:04ce	Sound_Glide	void near Sound_Glide(void)	Pitch sweep effect
+491b:0575	Speaker_On	void near Speaker_On(void)	Port 61h gate on (AdLib note via 4ac9:029e)
+491b:05b8	Sound_VoiceOff	void near Sound_VoiceOff(void)	Speaker off / Tandy volume off / AdLib key off
+491b:0607	Sound_SetFrequency	void near Sound_SetFrequency(void)	PIT channel 2 divisor or Tandy tone register
+491b:0656	Sound_AllVoicesDone	void near Sound_AllVoicesDone(void)	
+491b:067b	Sound_Init	void far Sound_Init(void)	AdLib init when present; speaker off
+491b:06d7	Sfx_Play	void far Sfx_Play(int n)	Starts sound effect n from SFX.* (DS:63a4); 22 call sites
+491b:074b	Sfx_Stop	void far Sfx_Stop(void)	
+491b:0791	Music_Play	void far Music_Play(int tune)	Starts tune 0..2 from TUNES.* (DS:63a8) when music is on (DS:63b6)
+491b:0811	Music_Stop	void far Music_Stop(void)	
+491b:0854	Sound_SilenceAll	void far Sound_SilenceAll(void)	
+491b:0875	AdLib_Write	void far AdLib_Write(int reg,int val)	Port DS:656c (0x388) register write with delays
+49a6:0001	SoundPort_Out	void near SoundPort_Out(char v)	out(DS:656c, AL)
+49a6:000f	Hints_Update	void far Hints_Update(void)	New Player Hints: Hints_CheckTriggers, shows the highest pending hint via Flutter_Show; Enter/Esc/click closes
+49a6:0121	Hints_CheckTriggers	void far Hints_CheckTriggers(void)	Arms hints: standing still at the start (3 s), not using the net (31 s), 2+ clue words but no coin dropped (5 s), torn net with no nets
+49a6:022b	Hints_PickNext	int far Hints_PickNext(void)	Highest pending hint of DS:923e[15] (0 = pending, 0x80 = done); disables hints when all done
+49a6:026f	Gameover_UpdateMessages	void far Gameover_UpdateMessages(void)	Start-of-game rank message (DS:911c==1, thresholds DS:7d37) and end-of-game message (==2): treasures this game, "found all", crown messages at total 300..314
+49a6:0565	Flutter_Show	void far Flutter_Show(int msg)	Draws Flutter (the butterfly guide) and message msg (far text table DS:7ca3)
+4a03:0003	Search_Update	void far Search_Update(void)	Hiding-place search (timer DS:8fa3): the picture opens, the content shows; at the end: treasure (< 0x66) -> treasures found DS:9113++, sfx 7, found-mask bit; key 0x66/0x68/0x6a -> key state 2/4/6, sfx 6; marks the place searched (0x80, also its mirror cell)
+4a03:038c	Treasure_PickShowcase	void far Treasure_PickShowcase(void)	Picks the treasure shown at the end (DS:9219) among those found this game, preferring one not yet collected
+4a03:04a8	Treasures_DrawFound	void far Treasures_DrawFound(void)	Draws the collected treasures of the treasure-room shelves (bits DS:8fb6)
+4a03:078c	Treasure_AddCollected	void far Treasure_AddCollected(void)	Adds the showcase treasure to the collected list (record +0x8a) and its shelf bit
+4a85:000e	Input_Poll	void far Input_Poll(void)	bioskey(1/0) through the context key table (DS:80f3/810b) or mouse zones (DS:80db) -> command code DS:9226
+4a85:00cd	Mouse_ChangedMask	unsigned far Mouse_ChangedMask(void)	
+4a85:0107	Input_LookupKey	int far Input_LookupKey(int key,int far *table)	
+4a85:0130	Input_HitZone	char far Input_HitZone(char far *zones)	Mouse zone hit test (x1,y1,x2,y2, codes for hover/press/held/release)
+4a85:0208	Input_MouseWalk	void far Input_MouseWalk(void)	Play mode: Down drops a coin where there is no ladder (0x40); command 9 (click) -> direction/jump/net bits from the click position relative to the player; 10 stop; 11 drop
+4a85:03ac	Input_Tick	void far Input_Tick(void)	Input_Poll; Esc/F-keys open the menu bar (slow CPU: help instead)
+4ac9:0002	AdLib_PlayTune	void far AdLib_PlayTune(int tune)	
+4ac9:00b7	AdLib_Init	void far AdLib_Init(void)	
+4ac9:0103	AdLib_KeyOffAll	void far AdLib_KeyOffAll(void)	
+4ac9:010d	AdLib_ResetRegs	void far AdLib_ResetRegs(void)	
+4ac9:0150	AdLib_InitTables	void far AdLib_InitTables(void)	
+4ac9:0179	AdLib_Silence	void far AdLib_Silence(void)	
+4ac9:019a	AdLib_LoadTune	void far AdLib_LoadTune(void)	
+4ac9:020f	AdLib_SetVoiceA	void far AdLib_SetVoiceA(void)	
+4ac9:0251	AdLib_SetVoiceB	void far AdLib_SetVoiceB(void)	
+4ac9:0271	AdLib_SetReg	void far AdLib_SetReg(void)	
+4ac9:029e	AdLib_NoteOn	void far AdLib_NoteOn(void)	
+4ac9:0432	AdLib_NoteOff	void far AdLib_NoteOff(void)	
+4ac9:04ef	AdLib_NoteOffVoice	void far AdLib_NoteOffVoice(void)	
+4ac9:054a	AdLib_SetTempo	void far AdLib_SetTempo(void)	
+4ac9:055c	AdLib_CalcFreq	long far AdLib_CalcFreq(void)	
+4ac9:0601	AdLib_CalcBlock	long far AdLib_CalcBlock(void)	
+4ac9:067e	AdLib_BuildFreqTable	void far AdLib_BuildFreqTable(void)	
+4ac9:071d	AdLib_PitchBend	void far AdLib_PitchBend(void)	
+4ac9:081a	AdLib_SetInstrument	void far AdLib_SetInstrument(void)	
+4ac9:0847	AdLib_SetVoiceInstr	void far AdLib_SetVoiceInstr(void)	
+4ac9:089d	AdLib_SetPercInstr	void far AdLib_SetPercInstr(void)	
+4ac9:08db	AdLib_WriteOperator	void far AdLib_WriteOperator(int op,int param)	Operator parameter switch (18 cases)
+4ac9:095e	AdLib_WriteOperator2	void far AdLib_WriteOperator2(void)	
+4ac9:099c	AdLib_SetFeedback	void far AdLib_SetFeedback(void)	
+4ac9:0a0e	AdLib_SetAM	void far AdLib_SetAM(void)	
+4ac9:0a29	AdLib_SetLevel	void far AdLib_SetLevel(void)	
+4ac9:0a86	AdLib_SetAD	void far AdLib_SetAD(void)	
+4ac9:0ad6	AdLib_SetSR	void far AdLib_SetSR(void)	
+4ac9:0b26	AdLib_SetMult	void far AdLib_SetMult(void)	
+4ac9:0bd6	AdLib_SetRhythm	void far AdLib_SetRhythm(void)	
+4ac9:0c03	AdLib_SetWave	void far AdLib_SetWave(void)	
+4ac9:0c44	AdLib_SetFreq	void far AdLib_SetFreq(void)	
+4ac9:0ce8	AdLib_KeyOff	void far AdLib_KeyOff(void)	
+4ac9:0d0f	AdLib_Detect	int far AdLib_Detect(void)	Timer-status AdLib test (regs 4/2), true when present
+4ba4:000f	Title_ClearBox	void far Title_ClearBox(void)	
+4ba4:0045	TitleStep_DrawTitle	void near TitleStep_DrawTitle(void)	Phase 0 (DS:8d83 table)
+4ba4:00b2	TitleStep_Wait	void near TitleStep_Wait(void)	Phases 1/3/5: waits 0x1C20 ticks (30.4 s) or input; Esc quits, s = Super Solvers page
+4ba4:0156	Title_DrawSprite	void far Title_DrawSprite(int x,int y,int frame,int f)	
+4ba4:017f	TitleStep_Story1	void near TitleStep_Story1(void)	Story page 1 (DS:8a5a)
+4ba4:01cc	TitleStep_Story2	void near TitleStep_Story2(void)	Story page 2 (DS:8b54)
+4ba4:0233	TitleStep_Finish	void near TitleStep_Finish(void)	
+4ba4:027a	TitleStep_Clear	void near TitleStep_Clear(void)	
+4ba4:02a3	TitleStep_Done	void near TitleStep_Done(void)	
+4ba4:02b1	Title_SuperSolversPage	void near Title_SuperSolversPage(void)	"Look for these other Super Solvers adventures" page
+4ba4:042b	Title_ResetPhase	void near Title_ResetPhase(void)	
+4ba4:0434	Title_Run	void far Title_Run(void)	Loads OPENING.PAN, runs the title phases DS:8d83 until a zero entry, then the sign-in

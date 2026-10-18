@@ -1,0 +1,61 @@
+46ce:0007	Quiz_Update	void far Quiz_Update(void)	Elf question dialog (DS:9119 bit 2): opens the slot of the caught elf (Quiz_PickQuestion/SplitText/SetupAnswers); Up/Down/mouse select, Enter answers (Quiz_Correct/Quiz_Wrong), Esc closes; coins become DS:b1f8 on close
+46ce:0271	Quiz_DrawScreen	void far Quiz_DrawScreen(void)	Screen painter 1: HUD, frame, question and answers
+46ce:028d	Quiz_DrawFrame	void far Quiz_DrawFrame(void)	Quiz picture sprites
+46ce:02d9	Quiz_PickQuestion	int far Quiz_PickQuestion(void)	Slot = caught elf index-1; question id, enabled-answer mask DS:9107[slot], text pointer; answer order DS:a21e = R(6) (DS:5e9c permutations)
+46ce:0323	Quiz_SplitText	void far Quiz_SplitText(void)	Splits the decompressed text at "~" into the question (DS:a293) and 3 answers
+46ce:03ff	Quiz_SetupAnswers	void far Quiz_SetupAnswers(void)	Mouse zones for the enabled answers (DS:80b2..)
+46ce:0482	Quiz_DrawQuestion	void far Quiz_DrawQuestion(void)	
+46ce:049e	Quiz_DrawAnswers	void far Quiz_DrawAnswers(void)	Greys disabled answers, focuses the first enabled one
+46ce:052d	Quiz_SetFocus	void far Quiz_SetFocus(int i)	Moves the answer highlight
+46ce:05bb	Quiz_Correct	void far Quiz_Correct(void)	Clue_Reveal, slot answered (bit 15), praise text R(4), reward +2/+1/0 coins by remaining wrong answers (DS:5f93[mask]), sfx 10, history = 1 (first try) or 2
+46ce:069e	Quiz_Wrong	void far Quiz_Wrong(void)	No clue (DS:921e = 0), "Oops" text R(4), sfx 11, history marked missed; the answer stays disabled
+46ce:06f0	Clue_Reveal	void far Clue_Reveal(void)	Reveals the next unrevealed clue word of the level (random order DS:5fbc) and returns its text (word table DS:5eb2)
+46ce:079c	Clue_BuildWords	void far Clue_BuildWords(int base)	Builds the 3 clue words of a level from the key picture attributes by scheme DS:9296 (DS:5fb3: which attribute fields; some fields pick a random sub-attribute); stored with bit 7 = hidden
+46ce:08f1	Dict_Expand	int far Dict_Expand(char far *src,char far *dst)	Expands dictionary codes (bytes >= 0x80 -> 16-byte words of PRG_DICT at DS:b204)
+46ce:095f	Quiz_LoadDictionary	int far Quiz_LoadDictionary(void)	Loads PRG_DICT (file 8) into DS:b204
+46ce:09ab	Quiz_LoadQuestions	int far Quiz_LoadQuestions(char resume)	Reads the ALL_PUZS index (0x2D0 bytes = 360 offsets); new game: tier check/promotion (Quiz_TierHasWork, max tier 5 = all) and Quiz_Deal; expands the 9 dealt questions
+46ce:0b6a	Quiz_Deal	void far Quiz_Deal(void)	Deals 9 distinct questions of the tier (range DS:5fd2) by wanted history status (DS:5fe0 with fallbacks)
+46ce:0c39	Quiz_PlanStatuses	void far Quiz_PlanStatuses(void)	Adjusts the wanted statuses to the available counts
+46ce:0cd0	Quiz_TierHasWork	int far Quiz_TierHasWork(void)	Counts history statuses in the tier; true while right-first-time < 70 %
+46ce:0d60	Quiz_ResetHistory	void far Quiz_ResetHistory(void)	Clears the history bits from the tier start
+46ce:0d9a	Quiz_FindTierEnd	void far Quiz_FindTierEnd(void)	Question count limit (360)
+46ce:0df2	Quiz_ReorderSlots	int far Quiz_ReorderSlots(void)	On a level change: puts missed questions first, then unanswered, answered last; returns the number of clue words still hidden on the level
+47c7:0007	SignIn_Update	void far SignIn_Update(void)	Sign-in mode (DS:9119 bit 8): first time loads OPENING.PAN/BEGIN.PAK, reads USERS.DAT, shows the list
+47c7:00e7	SignIn_DrawPanel	void far SignIn_DrawPanel(void)	Sign-in panel and title
+47c7:0189	SignIn_DrawNameEntry	void far SignIn_DrawNameEntry(void)	"Enter New Player Name" box
+47c7:01e0	SignIn_DrawList	void far SignIn_DrawList(void)	Players sorted by total treasures (shell sort), name, rank label (Trainee/stars, thresholds DS:629d), total
+47c7:03cf	SignIn_Draw	void far SignIn_Draw(void)	Screen painter 2
+47c7:042d	Screen_DrawBackdrop	void far Screen_DrawBackdrop(void)	Draws all tile columns
+47c7:0452	Users_EnsureLoaded	int far Users_EnsureLoaded(void)	Loads USERS.DAT once; true if any player exists
+47c7:04a4	Users_NameExists	int far Users_NameExists(void)	Case-insensitive duplicate check of the typed name
+47c7:0514	Users_ReadFile	void far Users_ReadFile(void)	USERS.DAT (file 9): 0xCAB bytes into DS:ba14
+47c7:055a	Users_WriteFile	void far Users_WriteFile(void)	Writes the whole 0xCAB-byte USERS.DAT (retries)
+47c7:05a9	SignIn_DrawCaret	void far SignIn_DrawCaret(void)	
+47c7:05d4	SignIn_DrawField	void far SignIn_DrawField(char on)	
+47c7:06d4	SignIn_HighlightRow	void far SignIn_HighlightRow(void)	
+47c7:071a	SignIn_MoveHighlight	void far SignIn_MoveHighlight(void)	
+47c7:075d	Users_ClearRecord	void far Users_ClearRecord(void)	Remove player: clears the record and saves
+47c7:07b9	Users_AddPlayer	void far Users_AddPlayer(void)	New player in the first free record: Users_SelectRecord, Users_InitNewPlayer, name, save
+47c7:0831	SignIn_SetupZones	void far SignIn_SetupZones(void)	Input context 4 (letters, digits)
+47c7:08b5	Game_Start	int far Game_Start(void)	Starts a game: new (record +9 == 0: Game_NewSetup) or resumed (Game_Restore); Quiz_LoadQuestions; music by area
+47c7:09a2	Game_End	void far Game_End(void)	Game finished: games played++, keeps treasures found/tier for the messages, record +9 = 0, banked nets/coins, Users_Pack, save
+47c7:09dd	Users_SelectRecord	void far Users_SelectRecord(void)	Sets the far pointers into the selected 360-byte record
+47c7:0a8b	Users_InitNewPlayer	void far Users_InitNewPlayer(void)	New player: 5 coins, 10 nets, start at (0x140,0x70), collected list 0x80, Users_Pack
+47c7:0b19	Users_LoadPlayer	void far Users_LoadPlayer(void)	Loads tier, coins, nets, shown treasure, games, sound settings; New Player Hints on while total < 5
+47c7:0bd6	Game_NewSetup	void far Game_NewSetup(void)	New game: treasures found 0, key state 8, 9 question slots empty, masks 7, clue words 0, found masks 0; Layout_Generate
+47c7:0c62	Game_Restore	void far Game_Restore(void)	Unpacks a saved game from the record (hiding places, castle cells, level data, position, counters)
+47c7:0e0e	Users_Pack	void far Users_Pack(void)	Packs the game state into the record (see the save record table)
+47c7:0f8b	SignIn_HandleInput	void far SignIn_HandleInput(void)	Sign-in input: dispatches by sub-state DS:ba07 (DS:6186 -> DS:616a); when a player is chosen: Users_LoadPlayer, Game_Start
+47c7:1011	SignInCmd_Select	void far SignInCmd_Select(void)	Sign-in: choose the highlighted player (continue saved game? DS:578e)
+47c7:1199	SignInCmd_NewName	void far SignInCmd_NewName(void)	Sign-in: accept a new name (list full / identical name checks)
+47c7:1328	SignInCmd_Remove	void far SignInCmd_Remove(void)	Sign-in: remove player name (Yes/No)
+47c7:13d7	Dialog_CloseRedraw	void far Dialog_CloseRedraw(void)	Default confirm/cancel handler: close the box and redraw (DS:62b7/6303 entries)
+47c7:13dd	SignInDlg_ExitYes	void far SignInDlg_ExitYes(void)	Sign-in exit box (dialog 14): g_quit = answer, back to the list
+47c7:13e9	SignInDlg_Back	void far SignInDlg_Back(void)	Back to the sign-in list
+47c7:13fa	SignInDlg_RemoveYes	void far SignInDlg_RemoveYes(void)	Remove-player box (dialog 15): Yes clears the record
+47c7:1414	SignInDlg_ContinueAnswer	void far SignInDlg_ContinueAnswer(void)	Saved-game box (dialog 16): No drops the saved game (record +9 = 0); then the game starts
+47c7:1436	SignInDlg_Reset	void far SignInDlg_Reset(void)	Back to sign-in sub-state 1
+47c7:1442	SignInDlg_ListFull	void far SignInDlg_ListFull(void)	List-full box (dialog 18): switch to remove mode
+47c7:1454	Dialog_HandleButtons	void far Dialog_HandleButtons(void)	Yes/No boxes: Enter flashes and runs the confirm handler DS:62b7[dialog], Esc the cancel handler DS:6303[dialog]; Left/Right/Tab toggle, Y/N choose and confirm, clicks select
+47c7:1502	Dialog_HandleOk	void far Dialog_HandleOk(void)	Boxes without buttons: Enter -> confirm handler, Esc -> cancel handler
+47c7:152b	UI_ForceRedraw	void far UI_ForceRedraw(void)	Screen_DrawOverlay + Present_Dirty

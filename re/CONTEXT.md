@@ -83,6 +83,31 @@ game's keyboard controls. **Only one agent may drive the emulator at a time**; o
 task explicitly says so. Never use `tools\wincap.py key` (that one does steal focus).
 Captures go to `extracted\captures\` (`ref\` for curated reference frames).
 
+**DOS profile** (1990 DOS edition): `tmctl.py start --profile dos [--machine ega|tandy|mcga|cga]
+[--args "-E"] --park`, using `tools\dosbox_tmdos.conf`. C: is the writable copy
+`extracted\dos_c\` (the game is in `C:\TM`; never mount `TM-DOS`). `tmctl` writes `C:\RUN.BAT` on
+each start. Host sound is muted (`nosound=true`). Later commands follow the running profile;
+`state save/load` use `extracted\captures\dos\savestates\` and `extracted\dos_c\TM\USERS.DAT`.
+Raw slots 1-9 are shared with the Windows profile. The game drops shifted keys, so type names in
+lower case. EGA shots are 640x400 (2x2 doubled); Tandy/CGA/MCGA shots are 320x200. Reference
+frames, AVIs, states and USERS.DAT snapshots are in `extracted\captures\dos\`; see
+`re\dos\docs\REFERENCE_CAPTURES.md`.
+
+## DOS edition (1990, `TM-DOS\SST.EXE`)
+
+Scoped as a possible second engine edition; start with `re\dos\docs\SCOPING.md` (decision report,
+engine plan, waves), then `re\dos\docs\ARCHITECTURE.md` (program, rules, differences from Windows)
+and the format specs `fmt_graphics.md`, `fmt_data.md`, `fmt_sound.md` in the same folder.
+
+- Decoders: `tools\dos\` (`pan.py`, `pak.py`, `dos_font.py`, `dos_gfx_common.py`, `dos_text.py`,
+  `puzzles.py`, `users_dos.py`, `dos_sound.py`). They read `TM-DOS\` and unpack SST.EXE's EXEPACK
+  in memory; outputs go to `extracted\previews\dos\` (side-by-side comparisons in `compare\`).
+- Ghidra: project `re\ghidra_proj\TMDos` (program `SST_unpacked.EXE`), export
+  `re\dos\ghidra_export\` (628 named functions), names in `re\names\dos\`.
+- Addresses: `SSSS:OOOO` = file offset `(SSSS-0x1000)*16 + OOOO + 0x21F0` of
+  `extracted\SST_unpacked.EXE`; DGROUP is segment `4d94`, `DS:XXXX` = file offset `0x3FB30 + XXXX`.
+  Ghidra prints `MOV Sreg,r16` (opcode 8E) with its operands swapped.
+
 ## Address conventions (Windows EXE)
 
 - Ghidra maps NE segment N to selector `0x1000 + (N-1)*8`: segment 1 = `1000`, segment 56 = `11b8`.

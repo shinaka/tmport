@@ -1,0 +1,50 @@
+1000:0361	Video_Init	void far Video_Init(void)	Video_SetMode(g_videoType) and colour 0xff
+1000:037d	Gfx_InitBufferPtrs	void far Gfx_InitBufferPtrs(void)	Far buffer pointers: tiles 32d7:0000 (DS:37b4), map 2897:0000 (DS:37b8), sfx 415f:0000 (DS:63a4), tunes 41ca:0000 (DS:63a8); DS:37be++
+1000:03c5	Timer_Install	void far Timer_Install(void)	Hooks INT 8 with Timer_ISR; PIT ch0 divisor 0x13B1 (236.7 Hz); counters DS:3d33=12, DS:3d34=4
+1000:0407	Timer_Remove	void far Timer_Remove(void)	Restores INT 8 and PIT divisor 0 (18.2 Hz)
+1000:0428	Timer_ISR	void interrupt Timer_ISR(void)	236.7 Hz: tick counter DS:3d2b++ (u32); chains BIOS INT 8 every 13th tick; Sound_Tick if sound active; Game_Tick 130f:00fe every 5th tick (47.3 Hz) guarded by DS:1309
+1000:04a1	Hw_Detect	void far Hw_Detect(void)	Machine id F000:FFFE (Tandy if F000:C000==0x21 -> DS:1300=0x21), 8086 test (shift by 32) -> g_slowCpu DS:923c, INT 11h, floppy info, Video_DetectAdapter, sound device DS:63bc: 1 Tandy, 2 AdLib (4ac9:0d0f), 3 IBM PS/1 audio (INT15 C0 model FC/0B + port 203h loopback), else 0 speaker
+1000:05bf	Video_DetectAdapter	void near Video_DetectAdapter(void)	g_videoType DS:912c: INT10/1A (MCGA/VGA ->5, EGA ->1 or 2 if 64 KB), Hercules status toggle ->4, EGA INT10/12, CRTC probe (CGA ->2, Tandy ->3); -1 none
+1000:06e9	Video_SetMode	void far Video_SetMode(int type)	Sets the mode for the type, builds the back-buffer row table CS:01c9 (200 rows of 160 bytes from 2005:0010), back-buffer header 2005:0000
+1000:0738	Video_SetModeByType	void near Video_SetModeByType(int type)	Patches the present thunks (CS:13af, CS:158d) and calls the per-adapter mode set
+1000:07bf	Video_SetModeMCGA	void near Video_SetModeMCGA(void)	INT10 mode 13h, palette DS:3c1a, Vga_SetDac16, row tables, generates unrolled copy code at CS:09f5
+1000:0836	Video_SetModeEGA	void near Video_SetModeEGA(void)	INT10 mode 0Eh (640x200x16) page 1, palette DS:3c4a, fills video RAM with 16x16x16 latch patterns, row tables (80 bytes/row), unrolled code at CS:09f5
+1000:0921	Video_SetModeCGA	void near Video_SetModeCGA(void)	INT10 mode 4 (320x200x4)
+1000:0957	Video_SetModeTandy	void near Video_SetModeTandy(void)	INT10 mode 9 (320x200x16 Tandy/PCjr)
+1000:1087	Gfx_BuildCgaColorMap	void far Gfx_BuildCgaColorMap(void)	Builds the 16->4 colour expansion table at 2005:7e00 for CGA
+1000:1144	Vga_SetDac16	void far Vga_SetDac16(void)	Expands the 16-entry palette DS:38ea to 256 DAC entries (DS:391a) and sets them (INT10 AX=1012h)
+1000:1181	Dirty_AddRect	void far Dirty_AddRect(int x1,int y1,int x2,int y2)	Adds a rectangle to the per-row dirty span lists (DS:154c, 100 rows of 2)
+1000:11d1	Dirty_AddSpriteRect	void far Dirty_AddSpriteRect(void)	Adds the rectangle of a sprite header at ES:BX (preceded by an exit(99) stub)
+1000:122f	Dirty_MergeSpan	void near Dirty_MergeSpan(void)	Span list merge
+1000:12ad	Dirty_Return	void near Dirty_Return(void)	Common epilogue
+1000:12b2	Dirty_RemoveCovered	void near Dirty_RemoveCovered(void)	Span list helper
+1000:12dc	Dirty_InsertNode	void near Dirty_InsertNode(void)	Span list helper
+1000:1312	Dirty_ExtendNode	void near Dirty_ExtendNode(void)	Span list helper
+1000:133f	Dirty_AllocNode	void near Dirty_AllocNode(void)	Span node pool (DS:30a2/30a4)
+1000:1364	Dirty_FreeNode	void near Dirty_FreeNode(void)	Span node pool
+1000:138d	Dirty_Clear	void far Dirty_Clear(void)	Clears the row lists DS:154c
+1000:13a1	Dirty_ResetPool	void far Dirty_ResetPool(void)	Resets the span node pool
+1000:13ae	Present_Dirty	void far Present_Dirty(void)	Thunk patched by Video_SetModeByType: copies dirty spans from the back buffer to the screen (CGA 13b1, EGA/MCGA 144a, Tandy 14fa)
+1000:13b1	Present_DirtyCGA	void far Present_DirtyCGA(void)	Back buffer -> B800 (CGA) for dirty spans
+1000:144a	Present_DirtyEGA	void far Present_DirtyEGA(void)	Back buffer -> A000 (EGA/MCGA) for dirty spans
+1000:153b	Present_DirtyTail	void far Present_DirtyTail(void)	Shared tail of the dirty present routines (Tandy path)
+1000:158c	Present_Full	void far Present_Full(void)	Thunk patched by Video_SetModeByType: whole back buffer to the screen
+1000:158f	Present_FullCGA	void far Present_FullCGA(void)	Whole back buffer -> B800
+1000:15dd	Present_FullEGA	void far Present_FullEGA(void)	Whole back buffer -> A000 (EGA/MCGA; Tandy at 1617)
+1000:169b	Gfx_FillRect	void far Gfx_FillRect(int x1,int y1,int x2,int y2)	Fills a back-buffer rectangle with the current pattern colour (register arguments SI,DI,CX,DX; x in bytes)
+1000:176c	Gfx_XorRect	void far Gfx_XorRect(int x1,int y1,int x2,int y2)	Inverts/highlights a back-buffer rectangle (menu highlight)
+1000:18af	Gfx_SetColor	void far Gfx_SetColor(char c)	AL -> DS:37ae
+1000:18b3	Scroll_PlayfieldLeft	void far Scroll_PlayfieldLeft(void)	Shifts the play-field contents by one tile column (camera moved right)
+1000:1934	Scroll_Setup	void near Scroll_Setup(void)	Common set-up of the scroll routines (play-field 2..0x9e x 16..143)
+1000:196d	Scroll_PlayfieldRight	void far Scroll_PlayfieldRight(void)	Shifts the play-field by one tile column (camera moved left)
+1000:19cf	Tile_DrawColumn	void far Tile_DrawColumn(int x,int y)	Draws a 4-byte (8 px) wide tile column from the tile map (DS:37b4) into the back buffer
+1000:1a86	Scroll_PlayfieldUp	void far Scroll_PlayfieldUp(void)	Vertical scroll by 8 rows
+1000:1aef	Scroll_PlayfieldDown	void far Scroll_PlayfieldDown(void)	Vertical scroll by 8 rows
+1000:1b8d	Sprite_Draw	void far Sprite_Draw(int x,int y,int frame,int flags)	Draws a sprite frame from the sprite bank (segment DS:37be) with transparency; flags 0x80/0x40/0x20 select modes (mirror, opaque, offset)
+1000:1f46	Sprite_DrawRows	void near Sprite_DrawRows(void)	Sprite_Draw inner loop (nibble masking via XLAT tables)
+1000:2056	Sprite_SaveUnder	void far Sprite_SaveUnder(int x,int y,int w,int h)	Saves the background under a sprite into the save buffer (1ae7:0000), clipped to DS:37da..37e0
+1000:2159	Sprite_GetHeader	void far Sprite_GetHeader(int frame)	Loads a sprite frame header (w,h,hotspot,data offset) from the sprite bank into registers
+1000:2180	Font_DrawChar	int far Font_DrawChar(int x,int y,char c,int color)	Draws one glyph of the built-in font (CS:2447) and returns its width
+1000:2368	Map_Unpack	void far Map_Unpack(void far *src,int w,int h)	Unpacks the 12-bit RLE mountain map (count in the top 4 bits, 0xFFF escape) into 2897:0000
+1000:23b9	Map_UnpackRow	void near Map_UnpackRow(void)	Map_Unpack inner loop
+1000:240e	Tiles_Unpack	void far Tiles_Unpack(void far *src)	Unpacks 0xA5-escaped RLE tile graphics into 32d7:0000 (up to 0xE880 bytes)

@@ -1,0 +1,46 @@
+130f:0007	main	int far main(void)	Game_Init, Kbd_Install, Timer_Install, Title_Run; then the frame loop until g_quit (DS:912e): Frame_Begin, (when no full redraw pending) SignIn_Update, Gameover_UpdateMessages, Hints_Update, Menu_Update, Scene_Update, Scroll_Update, Search_Update, Quiz_Update, Sound_SyncState, Game_HandleHotkeys, Screen_DrawOverlay, Playfield_Redraw, Treasures_DrawFound, Rank_Update, sprites draw/present/erase; Game_Shutdown
+130f:00db	Game_Shutdown	void far Game_Shutdown(void)	Stops music and sfx, Timer_Remove, Kbd_Remove, text mode 3, exit
+130f:00fe	Game_Tick	void far Game_Tick(void)	47.3 Hz from Timer_ISR: player screen position (DS:568e7/568e9), Mouse_Poll, Input_Tick, Anim_Tick; when the scene is loaded: Input_MouseWalk, Player_Update, Elves_Update, Cells_UpdateVisible; counters DS:90fe (mod 13) and DS:9100 (60 ticks -> DS:9115 "seconds")
+130f:01c2	Frame_Present	void far Frame_Present(void)	Presents the frame: delay loop when nothing changed, else dirty or full present; slow-CPU 8-bit fade loop
+130f:025a	Frame_Begin	void far Frame_Begin(void)	Latches camera/position and redraw flags for this frame, Sprites_Snapshot, computes tile scroll offsets
+130f:0326	Playfield_Redraw	void far Playfield_Redraw(void)	Full play-field redraw from the tile map when DS:8fbb is set (camera position, optional partial range)
+130f:04e5	Scroll_Update	void far Scroll_Update(void)	Incremental scrolling: shifts the play-field and draws the newly exposed tile columns/rows
+130f:07a5	Hud_Redraw	void far Hud_Redraw(void)	Status bar: coins (counted up with sfx 4), nets, treasures found, per-level treasure slots (found mask DS:9209), key icon (DS:9120), clue words of the level
+130f:0c2e	Hud_DrawHintIcon	void far Hud_DrawHintIcon(void)	Draws the status icon selected by DS:90f8
+130f:0c73	Screen_DrawOverlay	void far Screen_DrawOverlay(void)	Calls the screen painter DS:0104[g_screen DS:913e] (0 Hud_Redraw, 1 Quiz_DrawScreen, 2 SignIn_Draw) or restores the menu bar
+130f:0d00	Hud_DrawNumber	void far Hud_DrawNumber(int x,int y,int color,int value)	Draws a 1-3 digit number with Font_DrawChar
+130f:0d94	Mouse_Poll	void far Mouse_Poll(void)	INT33/3 position and buttons -> DS:911a/911e/90f4; pointer sprite visibility and 600-tick idle hide
+130f:0edf	Rank_Update	void far Rank_Update(void)	Treasure-chest/rank display: draws the total, steps the chest fill (DS:0110 thresholds) with sfx 3, then flashes CHAMPION (DS:013a) while DS:0100 counts down
+130f:1261	Rank_DrawChestCoin	void far Rank_DrawChestCoin(int x,int y,int c)	Draws one chest-fill item
+1437:0001	Pal_Apply	void far Pal_Apply(void)	MCGA: copies palette DS:0144 and Vga_SetDac16; CGA: Gfx_BuildCgaColorMap
+1437:0034	Scene_Update	unsigned far Scene_Update(void)	When g_scene (DS:8fca) differs from the loaded scene (DS:8fbe): saves/ends game if requested, Quiz_ReorderSlots + Elves_Spawn for mountain levels, Scene_LoadPan, loads SPRITES.PAK (levels) or CLOSE/SHACK.PAK (scenes 3/4) into the sprite bank, forces a redraw
+1460:0003	Game_Init	int far Game_Init(void)	Allocates the 0x1C908-byte sprite bank, harderr, Hw_Detect, ParseCommandLine, needs a graphics adapter, disk/path set-up, network checks (ssrnet.dat/ssrquiet.dat), Mouse_Detect, buffers, Video_Init, Pal_Apply, Mouse_Setup, Sound_LoadData, Help_LoadFile, Quiz_LoadDictionary, Sprites_LoadBegin, Game_InitVars
+1460:022a	Sound_LoadData	int far Sound_LoadData(void)	Loads SFX.TAN (Tandy/PS1) or SFX.IBM into 415f:0000 and TUNES.IBM (speaker) or TUNES.TAN into 41ca:0000; Sound_Init
+1460:02c6	Sprites_LoadBegin	int far Sprites_LoadBegin(void)	Loads BEGIN.PAK (file 15) into the sprite bank
+1460:033a	Game_InitVars	void far Game_InitVars(void)	Initial values of the frame/UI globals; Anim_InitSlots
+1460:0437	StrIndexOf	int far StrIndexOf(char c,const char far *s)	Index of c in s or -1
+1460:0463	ParseCommandLine	void far ParseCommandLine(void)	Switches -/ /: C CGA, E EGA, H Hercules, M MCGA, T Tandy, X toggles the slow-CPU flag, S<c> sound device from "iItTaAsS" (DS:0620) -> DS:0629
+1460:0567	Video_GetMode	int near Video_GetMode(void)	INT10 AH=0Fh
+1460:056e	Video_RestoreMode	void far Video_RestoreMode(void)	INT10 AH=0 with the saved mode
+1460:057d	HardErr_Handler	int far HardErr_Handler(int err,int ax,int bp)	Critical-error callback: records the error (DS:92c1..92c5), hardretn
+1460:05a3	Net_IsNetworkDrive	int far Net_IsNetworkDrive(int drive)	Stub: returns 0
+1460:05e8	Scene_LoadPan	int far Scene_LoadPan(int file)	Reads a .PAN file (header of 4 words, packed map and tiles) and unpacks map and tiles
+1460:06c8	File_OpenByIndex	int far File_OpenByIndex(int idx,int mode)	Opens file idx of the table DS:0476 (22-byte records: name, disk number) on the disk-1/disk-2 path, prompting for disks and retrying
+1460:07b4	File_Read	int far File_Read(void far *buf,unsigned n,int h)	read() with critical-error retry
+1460:080b	File_Write	int far File_Write(void far *buf,unsigned n,int h)	write() with error handling
+1460:0849	File_Close	int far File_Close(int h)	close() with retry
+1460:0887	Fatal_Print	void far Fatal_Print(const char far *msg)	Restores text mode and prints msg to stderr (intdos AH=40h)
+1460:08cc	Path_InitDrives	void far Path_InitDrives(int drive)	Sets the disk-1/disk-2 paths (DS:036e, DS:03c9) from the current drive or argv[0]
+1460:09b7	StrCopyBounded	char far *far StrCopyBounded(char far *d,const char far *s)	strcpy limited to 1000 chars
+1460:09f2	StrConcatList	int far StrConcatList(char far *d,...)	Concatenates a NULL-terminated list of far strings
+1460:0a5e	Mouse_Detect	int far Mouse_Detect(void)	INT 33h vector present -> INT33/0 reset
+1460:0a74	Mouse_Setup	void far Mouse_Setup(void)	INT33 0Ch handler, 07h/08h ranges, 0Fh mickey ratio
+150a:0002	Disk_CheckInfoFile	int far Disk_CheckInfoFile(char drive)	Reads the 0xE9-byte disk info file into DS:07ab; 8 = missing, 1 = ok, -1 = error
+150a:00c4	Disk_Ensure	int far Disk_Ensure(int disk,char drive)	For floppy drives A/B: makes sure the right disk is inserted
+150a:00f5	Disk_PromptForDisk	int far Disk_PromptForDisk(int disk,char drive)	Prompts until the disk is found (swaps A/B on two-drive machines)
+150a:01af	Disk_IsCorrectDisk	int far Disk_IsCorrectDisk(int disk,char drive)	Compares the disk label with "Disk 1"/"Disk 2"
+150a:0244	Disk_ShowInsertPrompt	void far Disk_ShowInsertPrompt(int disk)	MsgBox 0x10/0x11 (insert disk 1/2) or 0x15 (insert program disk)
+150a:027c	Disk_ResetDrive	int far Disk_ResetDrive(int drive)	INT13 reset/read retries; INT21 AH=0Dh
+153e:0000	MsgBox_ShowWaitKey	int far MsgBox_ShowWaitKey(int id)	Draws message box id and waits for a key or click (sprites keep animating); returns 3 = retry
+153e:0137	File_HandleError	int far File_HandleError(int op,int want,int got,int res)	Decides retry (3) / ok (4) / fail (5) after a file operation; write-protect and disk error boxes 0x12..0x14
+153e:02a7	Null_Handler	void far Null_Handler(void)	Empty far function (RETF); used as "no handler" in the cell, player and elf dispatch tables (also addressed as 1568:0007)

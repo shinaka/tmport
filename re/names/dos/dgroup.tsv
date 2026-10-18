@@ -1,0 +1,114 @@
+4d94:0100	g_champFlashTimer	u16	CHAMPION flash countdown (800)
+4d94:0104	g_screenPainters	far[3]	Screen painters by DS:913e: Hud_Redraw, Quiz_DrawScreen, SignIn_Draw
+4d94:0110	g_rankTable	i16[20]	Pairs (threshold, chest fill): 5,1 25,8 70,16 115,24 170,32 230,40 300,48 400,56 9999,66 9999,86, -1
+4d94:013a	s_CHAMPION	char[]	CHAMPION
+4d94:036e	g_pathDisk1	char[]	Disk 1 path (A:\TLC\sst\, drive patched)
+4d94:03c9	g_pathDisk2	char[]	Disk 2 path
+4d94:0476	g_fileTable	rec22[19]	Data files: name[13], disk number (0 mountain.pan .. 17 shack.pak)
+4d94:0620	s_soundSwitchChars	char[]	iItTaAsS
+4d94:0629	g_soundSwitchMap	u8[8]	0 0 1 1 2 2 2 2
+4d94:08a6	g_cellPlayerHandlers	far[75]	Terrain handler per cell type for an object in that cell (returns the mask)
+4d94:09d2	g_cellVisibleHandlers	far[74]	Per-tick handler per visible cell type (decorations, castle creature)
+4d94:0b8a	g_playerStateHandlers	far[72]	Player state machine (DS:913c)
+4d94:0caa	g_cellPicture	u16[256]	Per cell: scenery block (low 7 bits = 128x128 block number of the scene PAN); hiding-place and castle cells get theirs from the layout; the search animation toggles it
+4d94:0eaa	g_cellType	u8[256]	World map 16x16 cells of 128x128 px: cell type
+4d94:0faa	g_cellContent	u16[256]	Per cell: hidden content (0x80 empty, 6+2k treasure k, 0x66/0x68/0x6a key of level 0/1/2; bit 7 = searched)
+4d94:11aa	g_hidingCells	u16[48]	Cells that hold a hiding place (level 2: 0..10, level 1: 13..26, level 0: 29..47)
+4d94:120a	g_castleCells	u16[9]	Castle wall cells with variable pictures
+4d94:121c	g_castleDefaultPics	u16[9]	Default castle pictures, followed by per-level picture data (count, key picture, ?, places)
+4d94:1246	g_pictureAttrTables	far[3]	Per level: 4-byte attribute records of the hiding-place pictures
+4d94:1252	g_castleLayouts	u16[]	Castle ladder layouts, 20 cells each
+4d94:1300	g_machineId	u8	F000:FFFE byte, 0x21 = Tandy 1000
+4d94:1309	g_inGameTick	u16	Re-entrancy guard of Game_Tick
+4d94:37b4	g_tilesPtr	far	Unpacked tiles (32d7:0000)
+4d94:37b8	g_mapPtr	far	Unpacked map (2897:0000)
+4d94:37bc	g_spriteBank	far	0x1C908-byte sprite bank (PAK)
+4d94:37e2	g_player	Obj	Player object: +0 world x, +2 world y, +4 dx, +6 dy ...
+4d94:37e6	g_playerDX	i16	Movement request x
+4d94:37e8	g_playerDY	i16	Movement request y
+4d94:37ea	g_cameraX	u16	Camera world x
+4d94:37ec	g_cameraY	u16	Camera world y (multiple of 0x80 = one cell row)
+4d94:37fa	g_elves	Elf[15]	Elves, 32 bytes: +0 x, +2 y, +4 dx, +8 base state, +0xa state, +0xc question slot (0 = none), +0xe sprite slot
+4d94:3d2b	g_ticks	u32	236.7 Hz tick counter
+4d94:3d31	g_slowScroll	u16	Copy of the slow-CPU flag used by scrolling
+4d94:4f5a	g_animScripts	far[]	Animation script table
+4d94:59cc	g_msgBoxes	rec16[]	Message/dialog boxes
+4d94:5b6f	g_menuHandlers	far[14]	Menu command handlers
+4d94:5d34	g_elfCounts	u16[4][4]	Elves per tier: type A, type D (coin), type B (thrower), type C
+4d94:5d54	g_levelXRange	u16[3][4]	Per level: x base, y, random mask for elf placement
+4d94:5d6c	g_elfStateHandlers	far[76]	Elf state machine
+4d94:5e9c	g_answerPerms	u8[6][3]	Answer orders
+4d94:5eb2	g_clueWordText	far[]	Clue word strings
+4d94:5f93	g_quizReward	u8[8]	Coins by remaining answer mask: 6 -> 2, 4/2 -> 1, else 0
+4d94:5fd2	g_quizTierStart	u16[5]	Question index ranges: 0, 63, 180, 303, 360
+4d94:6132	g_userRecOffsets	u16[9]	Record offsets in USERS.DAT (3 + 360*i)
+4d94:616a	g_signinHandlers	far[7]	Sign-in input handlers by sub-state (DS:6186 keys)
+4d94:629d	g_signinRankThresholds	u16[7]	5 25 70 115 170 230 300
+4d94:62b7	g_dialogYesHandlers	far[38]	Confirm handler per dialog id (DS:9323): help pages, menu boxes, sign-in boxes
+4d94:6303	g_dialogNoHandlers	far[19]	Cancel (Esc) handler per dialog id
+4d94:63b4	g_soundOn	u16	Sound effects on
+4d94:63b6	g_musicOn	u16	Music on
+4d94:63bc	g_soundDevice	u16	0 speaker, 1 Tandy, 2 AdLib, 3 IBM PS/1
+4d94:656c	g_soundPort	u16	Sound chip port (Tandy 0xC0 / AdLib 0x388)
+4d94:7ca3	g_flutterText	far[]	Hint/message texts
+4d94:8a16	g_titlePhase	u16	Title phase index into DS:8d83
+4d94:8d83	g_titlePhases	near[10]	Title phase functions (segment 4ba4), 0-terminated
+4d94:8f9e	g_castleLayout	u8	Chosen castle layout (record +0x166)
+4d94:8fa3	g_searchTimer	i16	Hiding-place search countdown
+4d94:8fab	g_curObj	far	Object being processed (player or elf)
+4d94:8fb0	g_shownTreasure	i16	Treasure shown in the treasure room (record +0x164)
+4d94:8fb6	g_shelfBits	far	Collected-treasure shelf bits (record +0x133)
+4d94:8fbb	g_fullRedraw	u8	Request a full play-field redraw (counter)
+4d94:8fbe	g_loadedScene	u16	Scene currently loaded (0xff none)
+4d94:8fc0	g_cellScreenX	i16	Screen x (bytes) of the cell being handled by Cells_UpdateVisible
+4d94:8fc6	g_searchCell	u16	Cell being searched
+4d94:8fca	g_sceneWanted	u16	Scene to show (copy of DS:928f each frame)
+4d94:8fd2	g_quizHistory	far	2 bits per question (record +0x0c)
+4d94:8fd6	g_spriteSlots	Slot[13]	Sprite/animation slots, 22 bytes: x, y, ?, frame, slot, anim, prev, pos, delay, far obj
+4d94:9002	g_slot2X	i16	Sprite slot 2 x (coin / search content sprite)
+4d94:9101	g_quizTier	far	Quiz tier byte (record +0x13f)
+4d94:9105	g_keys	u16	Held keys: 1 up 2 down 4 left 8 right 0x10 net 0x20 jump 0x40 coin; high byte = cell mask
+4d94:9107	g_answerMasks	far	9 enabled-answer masks (record +0x78)
+4d94:910b	g_area	u16	Area/music id (record +0x156)
+4d94:910d	g_stepDone	u16	Set when an animation advanced or the camera moved; cleared by Frame_Begin; blocks further logic ticks until the next frame
+4d94:910f	g_nets	u16	Nets (record +0x146)
+4d94:9113	g_treasuresFound	u16	Treasures found this game (record +0x148)
+4d94:9115	g_seconds	u16	1.27 s counter
+4d94:9119	g_uiMode	u8	0 play; 0x80 title; 0x40 menu; 0x20 dialog; 0x10 hint; 8 sign-in; 4 message; 2 quiz
+4d94:911c	g_messagePending	u16	1 start-of-game message, 2 end-of-game message
+4d94:9120	g_keyState	u16	2/4/6 key of level 0/1/2 held, 8 new game, 10/12 key of level 1/2 hidden
+4d94:912c	g_videoType	i16	1 EGA, 2 CGA, 3 Tandy, 4 Hercules, 5 MCGA; -1 none
+4d94:912e	g_quit	u16	Leave the frame loop
+4d94:9130	g_tier	u16	Rank tier 0..3 by total treasures (record +0x140)
+4d94:9134	g_coins	u16	Coins (record +0x144)
+4d94:9138	g_totalTreasures	far	Total treasures (record +0x0a)
+4d94:913c	g_playerState	u16	Player state
+4d94:913e	g_screen	u16	Screen painter index
+4d94:91fd	g_clueWords	far	9 clue word bytes, 3 per level (record +0x81)
+4d94:9205	g_gameInProgress	u16	Set after the start message; copied to record +9 when leaving with the game kept
+4d94:9209	g_foundMasks	far	Per level found-treasure bits (record +0x130)
+4d94:9217	g_transition	u16	Teleport/transition in progress (1/2)
+4d94:921a	g_quizSlots	far	9 question ids (record +0x66)
+4d94:921e	g_caughtSlot	u16	Question slot of the caught elf (0 none)
+4d94:9224	g_hintsOn	u16	New Player Hints
+4d94:9226	g_cmd	i16	Current input command
+4d94:9228	g_userRec	far	Selected 360-byte record
+4d94:922c	g_inputContext	u16	Key/zone table set
+4d94:9232	g_lastGameTreasures	u16	Treasures found in the game just finished (end message)
+4d94:9234	g_endState	u16	End of game: 1 at the castle gate, 2 when leaving the treasure room (Scene_Update then runs Game_End and a new game)
+4d94:923c	g_slowCpu	u16	1 on an 8088/8086 (or toggled with X)
+4d94:923e	g_hintFlags	u8[15]	0 pending, 0x80 shown
+4d94:9255	g_dirty	u16	Something was drawn this frame (present needed)
+4d94:9264	g_creatureStrike	u16	Set by animation op -6 (castle creature strike)
+4d94:926e	g_gamesPlayed	u16	Games played (record +0x162)
+4d94:9274	g_cellCallKind	u16	1 = visible-cell call, 2 = object-in-cell call
+4d94:9276	g_searchSide	i16	-1/0/+1: search the left/own/right cell
+4d94:927e	g_collected	far	48 collected treasure ids (record +0x8a)
+4d94:928f	g_level	u16	0..2 mountain level, 3 castle top, 4 treasure room
+4d94:9296	g_clueScheme	u8	Clue scheme 0..2
+4d94:92a1	g_shopCoinsOwed	i16	Net-shop price still to pay (4..0, -1 = net taken; record +0x158)
+4d94:92c9	g_cellMask	u16	Terrain mask returned by the cell handlers
+4d94:9325	g_helpData	u8[0xed8]	HELP.DAT
+4d94:b1f8	g_quizCoins	u16	Coins including the pending quiz reward
+4d94:b204	g_dictionary	u8[]	PRG_DICT
+4d94:ba14	g_usersFile	u8[0xcab]	USERS.DAT image: 3-byte header + 9 records of 360 bytes

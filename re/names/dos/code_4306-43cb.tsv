@@ -1,0 +1,44 @@
+4306:0022	Anim_Tick	void far Anim_Tick(void)	Advances the animation scripts of the 13 sprite slots (DS:8fd6, 22 bytes): frame lists with ops -2 dx, -3 dy, -4 obj y, -5 sfx, -6 strike flag (DS:9264), -7 move, -10 stop
+4306:02c0	Anim_InitSlots	void far Anim_InitSlots(void)	Clears the 13 slots and draw records (DS:9145)
+4306:0393	Sprites_Snapshot	void far Sprites_Snapshot(int from,int to)	Copies slot positions/frames to the draw records when the scene is current
+4306:0497	Sprites_DrawSorted	void far Sprites_DrawSorted(int from,int to)	Draws changed sprites back to front by y, saving the background under each
+4306:06dd	Sprites_EraseAll	void far Sprites_EraseAll(int from,int to)	Restores the saved backgrounds in reverse order
+4306:0784	Anim_SetIfIdle	void far Anim_SetIfIdle(int slot,int anim)	Starts anim only if the slot has none
+4306:07b9	Anim_Queue	void far Anim_Queue(int slot,int anim)	Changes to anim unless it is already the previous one
+4306:07fa	Anim_Set	void far Anim_Set(int slot,int anim)	Stops the current animation and starts anim (DS:4f5a far pointer table of scripts)
+4306:0844	Anim_Stop	void far Anim_Stop(int slot)	Remembers and stops the current animation
+4306:088e	Anim_Start	void far Anim_Start(int slot,int anim)	Initialises the slot(s) used by anim
+4306:092f	Anim_Clear	void far Anim_Clear(int slot)	Clears the slot (no sprite)
+43a0:0002	Kbd_Install	void far Kbd_Install(void)	Hooks INT 9 with Kbd_ISR, ctrlbrk callback 43a0:02ab
+43a0:0043	Kbd_Remove	void far Kbd_Remove(void)	Restores INT 9 and flushes the BIOS buffer
+43a0:0071	Kbd_ISR	void interrupt Kbd_ISR(void)	Scan codes -> held-key bits DS:9105: Up 1, Down 2, Left 4, Right 8, Space 0x10, Home=Up+Left, PgUp=Up+Right; Up+Left/Right -> jump 0x20; Tandy arrow codes on Tandy keyboards; Ctrl -> DS:92fa; other keys go to the BIOS
+43cb:0001	Menu_Update	void far Menu_Update(void)	Menu bar (File/Options/Help) navigation and command dispatch DS:5b6f
+43cb:014a	Menu_MoveSelection	void far Menu_MoveSelection(void)	Moves the highlighted menu item
+43cb:019a	Dialog_Update	void far Dialog_Update(void)	Help pager / Yes-No dialog handling
+43cb:021d	MenuCmd_HelpPage	void far MenuCmd_HelpPage(void)	Help topics: next/previous page (help text DS:9325 from HELP.DAT)
+43cb:028b	MenuCmd_StartOver	void far MenuCmd_StartOver(void)	Yes: drops the saved game (record +9 = 0), saves, restarts the game
+43cb:02f8	MenuCmd_StartNewPlayer	void far MenuCmd_StartNewPlayer(void)	Yes: keeps the game (record +9 = DS:9205), saves, back to the sign-in
+43cb:032c	MenuCmd_ExitAndSave	void far MenuCmd_ExitAndSave(void)	Yes: saves the game and quits
+43cb:034f	MenuCmd_NewPlayerHints	void far MenuCmd_NewPlayerHints(void)	New Player Hints on/off (DS:9224, DS:913f); re-arms all 15 hints
+43cb:0371	MenuCmd_Music	void far MenuCmd_Music(void)	Music on/off (DS:63b6; on also turns sound on)
+43cb:039d	MenuCmd_Sound	void far MenuCmd_Sound(void)	Sound on/off (DS:63b6 and DS:63b4)
+43cb:03cb	Game_HandleHotkeys	void far Game_HandleHotkeys(void)	Command 14 (Ctrl+S / Y in dialogs) toggles sound and music; 15 toggles the slow-CPU mode
+43cb:046e	Sound_SyncState	void far Sound_SyncState(void)	Starts/stops music by area (DS:910b) when the sound settings change
+43cb:04ff	Menu_HighlightItem	void far Menu_HighlightItem(void)	Inverts the current menu item
+43cb:0592	MsgBox_Draw	void far MsgBox_Draw(int id)	Draws message/dialog box id from DS:59cc (16-byte records: type, x, y, default, far title, far text); Yes/No buttons for type 1
+43cb:0848	Box_DrawFrame	void far Box_DrawFrame(int type,int x1,int y1,int x2,int y2,char far *title)	Box with shadow, title bar and footer text by type
+43cb:0ab9	Gfx_HLine	void far Gfx_HLine(int x,int y,int w,int color)	
+43cb:0ada	Gfx_VLine	void far Gfx_VLine(int x,int y,int h,int color)	
+43cb:0afb	Gfx_FillRectColor	void far Gfx_FillRectColor(int x1,int y1,int x2,int y2,int color)	
+43cb:0b18	Gfx_FrameRect	void far Gfx_FrameRect(int x1,int y1,int x2,int y2,int color)	
+43cb:0b63	Text_Draw	int far Text_Draw(int x,int y,char far *s)	Draws text with CR/LF, ~XXXYYY positioning, | and ` codes; returns the line count
+43cb:0cfc	Text_Width	int far Text_Width(char far *s)	Width of the first line
+43cb:0d50	Button_Draw	void far Button_Draw(int i)	Draws dialog button i (selected = DS:a1fd)
+43cb:0eb6	Button_Flash	void far Button_Flash(void)	Flashes the chosen button 4 times
+43cb:0ee8	Delay_Ticks	void far Delay_Ticks(unsigned long n)	Busy-waits n ticks of the 236.7 Hz counter DS:3d2b
+43cb:0f1d	MenuBar_DrawTitle	void far MenuBar_DrawTitle(int i,char on)	Draws menu title i (DS:5bc7/5bcd x ranges)
+43cb:107a	Help_LoadFile	int far Help_LoadFile(void)	Loads HELP.DAT (0xED8 bytes) into DS:9325 once
+43cb:10c4	Help_DrawPage	void near Help_DrawPage(int topic,int page,char far *data)	Draws a help page with Done/See Next Page/Go Back a Page buttons and its pictures
+43cb:1273	Help_Open	void near Help_Open(int topic)	Opens help topic (page count DS:9325)
+43cb:12cf	HotZones_Setup	void near HotZones_Setup(int type,char x1,char x2,int y2)	Sets the mouse zones and key table for a dialog type (input context DS:922c)
+43cb:156b	Null_Handler2	void far Null_Handler2(void)	Empty far function (RETF); "no handler" entry of the elf table (also addressed as 4521:000b)
