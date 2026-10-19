@@ -1,0 +1,154 @@
+{
+ "description": "two treasures found: up the last ladder, the end sequence, the chute, the treasure room, the rank chest (r2/fl_end_t2_wait; ega_r2_end_t2_nokey.avi was recorded in the same run)",
+ "start": {
+  "state": "savestates/r2/fl_castle_upper_t2.sav"
+ },
+ "keys": "82:down:up, 342:up:up",
+ "ticks": 2331,
+ "checkpoints": [
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_end_t2_wait.sav",
+   "capture_state": "savestates/r2/fl_end_t2_wait.sav"
+  },
+  {
+   "id": "horn",
+   "tick": 266,
+   "capture": "ega/r2_end_01_castle_top_horn.png",
+   "max_px": 0
+  },
+  {
+   "id": "into_chest",
+   "tick": 403,
+   "capture": "ega/r2_end_02_treasure_into_chest.png",
+   "max_px": 0
+  },
+  {
+   "id": "chest_open",
+   "tick": 517,
+   "capture": "ega/r2_end_03_chest_open.png",
+   "max_px": 0
+  },
+  {
+   "id": "second_treasure",
+   "tick": 647,
+   "capture": "ega/r2_end_04_second_treasure.png",
+   "max_px": 0
+  },
+  {
+   "id": "at_chute",
+   "tick": 972,
+   "capture": "ega/r2_end_05_at_chute.png",
+   "max_px": 0
+  },
+  {
+   "id": "fall_shaft",
+   "tick": 1036,
+   "capture": "ega/r2_end_06_fall_shaft.png",
+   "max_px": 0
+  },
+  {
+   "id": "treasure_room",
+   "tick": 1358,
+   "capture": "ega/r2_end_07_treasure_room.png",
+   "max_px": 0
+  },
+  {
+   "id": "rank_chest_fill",
+   "tick": 1457,
+   "capture": "ega/r2_end_08_rank_chest_fill.png",
+   "max_px": 0
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_end_t2_wait",
+   "state": "savestates/r2/fl_end_t2_wait.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ],
+ "timings": [
+  {
+   "id": "castle_top_to_gate",
+   "from": {
+    "event": "level=3"
+   },
+   "to": {
+    "event": "level=4"
+   },
+   "expect_ticks": 1175,
+   "tolerance": 1,
+   "source": "avi/ega_r2_end_t2_nokey.avi frames 159-1656: the first dissolving frames of the castle top and of the castle gate, both a scene load and a redraw after their ticks"
+  },
+  {
+   "id": "chute_to_rank_chest",
+   "from": {
+    "event": "dissolve=on",
+    "nth": 2
+   },
+   "to": {
+    "event": "dissolve=on",
+    "nth": 4
+   },
+   "expect_ticks": 444,
+   "tolerance": 1,
+   "source": "avi/ega_r2_end_t2_nokey.avi frames 1211-1776 (first dissolving frames, 60.29 frames/s)"
+  },
+  {
+   "id": "rank_chest_rows_2_to_8",
+   "from": {
+    "event": "sfx=3",
+    "nth": 2
+   },
+   "to": {
+    "event": "sfx=3",
+    "nth": 8
+   },
+   "expect_ticks": 20,
+   "tolerance": 1,
+   "source": "avi/ega_r2_end_t2_nokey.avi frames 1786-1812 (rows 2 and 8 of the Trainee fill: one row per DS:9100 group, 4 ticks, 3 and 1 at the 60-tick wrap, code_player.md 7.4)"
+  }
+ ],
+ "avi_fits": [
+  {
+   "id": "castle_top_to_chute_fall",
+   "avi": "avi/ega_r2_end_t2_nokey.avi",
+   "frames": [
+    200,
+    1650
+   ],
+   "ticks": [
+    140,
+    1340
+   ],
+   "max_off": 8,
+   "max_dev": 0.6
+  },
+  {
+   "id": "treasure_room_rank_chest",
+   "avi": "avi/ega_r2_end_t2_nokey.avi",
+   "frames": [
+    1663,
+    1830
+   ],
+   "ticks": [
+    1330,
+    1480
+   ],
+   "max_off": 6,
+   "max_dev": 0.6
+  }
+ ]
+}

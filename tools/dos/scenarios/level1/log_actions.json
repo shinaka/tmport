@@ -1,0 +1,34 @@
+{
+ "description": "level 1: the net swing, a coin toss, tapped jumps left and right",
+ "start": {
+  "state": "savestates/r2/fl_outside2.sav"
+ },
+ "keys": "56:down:space, 60:up:space, 185:down:down, 187:up:down, 314:down:home, 318:up:home, 443:down:pgup, 447:up:pgup",
+ "ticks": 619,
+ "checkpoints": [
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_actions.sav",
+   "capture_state": "savestates/r2/fl_actions.sav"
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_actions",
+   "state": "savestates/r2/fl_actions.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ]
+}

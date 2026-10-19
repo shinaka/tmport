@@ -1,0 +1,22 @@
+{
+ "description": "level 1 (Round 1, Ada): from ega/outside_caught1 one net swing (Space at 865, the only press tick that reproduces ega/quiz1) pulls the clue carrier of question slot 2 into the net: nets -1, coins +1, the question opens; the end equals ega/quiz1 in g_randSeed, every elf record and the screen (the tick counters are one tick behind: the start state was saved inside Game_Tick, which the loader cannot resume)",
+ "start": {
+  "state": "savestates/ega/outside_caught1.sav"
+ },
+ "keys": "865:down:space, 869:up:space",
+ "ticks": 1608,
+ "checkpoints": [
+  {
+   "id": "quiz_question",
+   "at_log_end": "savestates/ega/quiz1.sav",
+   "capture": "ega/030_quiz_question.png",
+   "max_px": 0
+  },
+  {
+   "id": "quiz1_state",
+   "at_log_end": "savestates/ega/quiz1.sav",
+   "capture_state": "savestates/ega/quiz1.sav",
+   "max_px": 0
+  }
+ ]
+}

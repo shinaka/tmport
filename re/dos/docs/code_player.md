@@ -742,9 +742,10 @@ frame 178; `ega_coin_drop_key_found.avi` blinks at 135-153, the key sprite shows
 close and the HUD change come at 184; `ega_r2_treasure_found.avi` (answers §1, treasure 5 in cell
 0xe9) blinks at AVI frames 154-171 with the treasure sprite, holds the opened picture with the
 sprite at 172-197, closes at 198 (HUD count 0 → 1) and shows hint 4 at 204. The capture agent's
-loop-frame log of that search: 38 main-loop frames of 4-5 PIT ticks (17-21 ms) = 693 ms, then
-one 97 ms frame (the redraw of the result), during which 4 game ticks were blocked by
-`g_stepDone` (answers §1, §9). The player is frozen in state 5 meanwhile unless a direction key
+loop-frame log of a search at the same spot (`r2/fl_search_t`, a separate run: Down 114 ticks after
+`ega/r2_treasure_spot`; wave 4): 37 search frames of 4-5 PIT ticks ending with the result frame (ring
+entry g_ticks 331520), then the hint-4 bubble frame (23 PIT ticks) and its present (about 7), during
+which 4 game ticks were blocked by `g_stepDone` (answers §1, §9). The player is frozen in state 5 meanwhile unless a direction key
 is pressed (§4.5).
 
 `Playfield_Redraw` (130f:0326, main loop) redraws only the band of the searched cell when DS:8fc8 is
@@ -1277,9 +1278,9 @@ tick-driven but polled per frame [O 130f:019a-01c1]; measured one row per ≈4 t
 a Trainee (answers §3) [O]. The CHAMPION text is drawn in colour 6 (the colour of the band, so it
 is invisible there) at 800, 640, 480, 320, 160 and in black (visible) at 720, 560, 400, 240, 80: it
 appears 5 times for 80 frames each and **ends visible** (answers §4: visible at AVI frames 3042,
-3053, 3063, 3074, 3084) [O]. It counts **main-loop frames**: on that screen the loop runs at ≈914
-frames/s in DOSBox-X, so the 800 frames last ≈0.88 s (640 frames took 0.70 s) [O answers §4]; on a
-slow CPU the timer drops by 4 per frame.
+3053, 3063, 3074, 3084) [O]. It counts **main-loop frames**: on that screen the loop runs at ≈918
+frames/s in DOSBox-X, so the 800 frames last ≈0.87 s (640 frames took 42 AVI frames = 0.697 s at the
+60.29 frames/s of the EGA AVIs; wave 4) [O answers §4]; on a slow CPU the timer drops by 4 per frame.
 
 Observation (answers §2) [O]: after a game that brought the total to 6, the rank chest showed one
 star row (16 rows filled) while a rank label in the band still read "Trainee". `RankChest_Update` draws
@@ -1494,3 +1495,55 @@ Found while implementing `src/dos/game/player.cpp`, `anim.cpp`, `search.cpp`, `e
    the player in state 5 for **36 ticks** in lockstep against 30 in DOSBox-X (its search frames took
    17-21 ms); the castle gate fires one tick after the last chute step in lockstep, where the log
    shows two because its tick 1048 was gated behind a slow scroll frame.
+
+---
+
+## Wave 4 (fidelity): verification and corrections
+
+Checked against the reference material through the whole engine, starting from the DOSBox-X states
+(`--dos-load-state`), with the scenarios of `tools/dos/scenarios/castle_end/` (fidelity runner) and the
+test `tests/test_dos_player_end.cpp` "the end of a game from the reference states equals the captures".
+
+1. **Captures: 0 pixels.** The castle of Round 1 (ega/097-104: the hall, the ladder, the shaft, a
+   ladder jump, the castle-top end screen, the rank chest after the castle, the clubhouse message and
+   the File-menu hint), the end sequence with two treasures (r2_end_01..08), all six found
+   (r2_end_allfound_01/02, r2_end_t6_rank_chest_1star), the crown (r2_crown_01..07, r2_crown_a/b), the
+   end messages after the rank chest (r2_end_t6_clubhouse_message/_after, r2_crown_08..10), the castle
+   creature (r2_castle_creature_01..03), the treasure room from the clubhouse (r2_treasure_room_from_
+   clubhouse_00..03: the lamp's pair display, Left, Right, Down) and the six prize-room views. Masked:
+   the clue box's key icon on the castle-top screens (item 3) and three torn AVI frames (a frame
+   presented half way: r2_castle_creature_02 status bar, r2_end_allfound_02 a sprite, r2_crown_04 the
+   frame that starts the dissolve to the chute).
+2. **Timing.** r2/fl_end_t2_wait (2048 ticks: states 41-61, the chute, the castle gate, the treasure
+   room, the rank screen) and r2/fl_castle_t3_a (847 ticks) match on every tick; r2/fl_crown_wait
+   differs in 4 ticks at the champion's arrival in the clubhouse (the frame timing of main_loop, not
+   this module: the load loses 6 ticks in the original, 5 in the engine, and the dissolve ends a tick
+   later; a verified change of the timing model is in `extracted/scratch/dos_w4/requests/castle_end.md`
+   §1, which makes it 0). The AVIs fit tick for tick (`tools/dos/avifit.py`: every AVI frame looked up
+   among the engine's per-tick pictures): ega_r2_end_t2_nokey 1216 of 1224 frames of the castle top
+   through the chute fall on their ticks and the rest within half a tick, likewise the crown, all-found,
+   castle creature, castle ladder jump and treasure room AVIs (the exceptions are pictures of long
+   frames, which DOSBox-X shows when the frame ends and the engine when it begins: bubbles, the scene
+   change into the treasure room, up to 2.3 ticks). The rank chest fills in the AVI's step order
+   (rows on the DS:9100 groups, which count executed ticks only, so a lost tick shifts them); the
+   CHAMPION flash's nine phases of about 4.1 ticks fall on the AVI's frames.
+3. **The key icon at the castle top** [O, the AVIs]: `Cell_P63_V63_CastleTop` clears g_keyState, but
+   `Screen_DrawOverlay` calls no painter for scenes >= 3, so the clue box loses its key only if the
+   castle-top tick lands between a frame's `Frame_Begin` and its `Screen_DrawOverlay` (the frame still
+   has scene 2 latched). That happened in 1 of the 5 reference runs (ega_r2_end_t2_nokey, AVI frame
+   155); in the others the key stays until the clubhouse (DS:9268 still 6 on the rank screen of
+   r2/end_t2_enter_after and r2/end_t6_rankchest). The engine's lockstep order (Frame_Begin, Game_Tick,
+   frame body) always takes the first path.
+4. **The treasure room's camera** [O]: neither `Cell_P12_StartRoom` (the walk into the room) nor
+   `Cell_P20_CastleGate` sets the camera; `Player_Move` puts it at x - 2·SI with SI the player's screen
+   x before the move (§4.3). Up at x 0x168 of the start room gives camera x 0x448 (the scenery of the
+   captures, the same as after the castle gate's 0x44C: the scenery ignores the low 3 bits), Up at
+   x 0x170 gives 0x440 and the whole room 8 pixels further right.
+5. **EGA AVIs run at 60.29 frames per emulated second**, not the 59.92 of their header (frames
+   against the audio track; the frame-by-frame fits confirm it): durations taken from EGA AVIs at
+   59.92 Hz are 0.6 % long. Corrected above: the CHAMPION flash (§7.4). The others in this document
+   change by less than their rounding (the chute fall 445 frames = 7.38 s, the coin toss 90 frames =
+   1.49 s = 70.7 ticks).
+6. Wave 3 correction 6's "the castle gate fires one tick after the last chute step in lockstep, where
+   the log shows two" no longer applies: with the reference frame timing the chute, the gate and the
+   treasure room's load match the log tick for tick.

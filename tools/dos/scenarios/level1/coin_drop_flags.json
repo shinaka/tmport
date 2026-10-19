@@ -1,0 +1,28 @@
+{
+ "description": "level 1 (Round 1, Ada): a coin dropped at the flags from ega/path_flags (the start of avi/ega_coin_drop_nothing.avi): coin toss, POOF, the blinking place, nothing found. No elf is on screen, so any press tick shows the same frames. The AVI's search lasts 35 ticks, the engine's 29 (requests/level1.md 3)",
+ "start": {
+  "state": "savestates/ega/path_flags.sav"
+ },
+ "keys": "10:down:down, 12:up:down",
+ "ticks": 120,
+ "checkpoints": [
+  {
+   "id": "coin_toss",
+   "tick": 19,
+   "capture": "ega/034_coin_toss.png",
+   "max_px": 0
+  },
+  {
+   "id": "poof",
+   "tick": 47,
+   "capture": "ega/035_coin_poof.png",
+   "max_px": 0
+  },
+  {
+   "id": "blink",
+   "tick": 83,
+   "capture": "ega/036_coin_place_blink.png",
+   "max_px": 0
+  }
+ ]
+}

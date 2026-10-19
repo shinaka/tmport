@@ -1,0 +1,47 @@
+{
+ "description": "the Tandy level-2 state: the help menu, About page 1, the Exit and Save box, a net swing to the left that catches an elf, the game after the catch (the state was saved a little after the capture tandy/09: its own screen differs there)",
+ "start": {
+  "state": "savestates/tandy/level2_resumed.sav"
+ },
+ "keys": "49:tap:f1, 80:tap:enter, 120:tap:esc, 149:tap:esc, 170:tap:enter, 1027:tap:left, 1035:tap:space",
+ "ticks": 1117,
+ "checkpoints": [
+  {
+   "id": "loaded",
+   "tick": 0,
+   "capture": "tandy/09_level2_resumed.png",
+   "info": "the Tandy state was saved at another moment than the capture (the elves moved in between); the state's own screen is checked at 0 px by test_dos_load_state"
+  },
+  {
+   "id": "frame1",
+   "tick": 1,
+   "capture": "tandy/09_level2_resumed.png",
+   "info": "the Tandy state was saved at another moment than the capture (the elves moved in between); the state's own screen is checked at 0 px by test_dos_load_state"
+  },
+  {
+   "id": "menu_help",
+   "tick": 54,
+   "capture": "tandy/10_menu_help.png"
+  },
+  {
+   "id": "help_about_p1",
+   "tick": 91,
+   "capture": "tandy/11_help_about_p1.png"
+  },
+  {
+   "id": "exit_dialog",
+   "tick": 157,
+   "capture": "tandy/13_esc_exit_dialog.png"
+  },
+  {
+   "id": "net_catch",
+   "tick": 1069,
+   "capture": "tandy/14_net_catch.png"
+  },
+  {
+   "id": "after_catch",
+   "tick": 1117,
+   "capture": "tandy/15_after_catch.png"
+  }
+ ]
+}

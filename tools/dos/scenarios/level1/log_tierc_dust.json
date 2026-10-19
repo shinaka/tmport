@@ -1,0 +1,53 @@
+{
+ "description": "tier 3: standing outside the clubhouse while the dust throwers take the coins (2617 ticks, no key); avi/ega_r2_tierc_standing_elves.avi is this run (578 of its 714 changed frames match at 0 px from tick 408 on, the rest are torn frames and the dust in flight between ticks)",
+ "start": {
+  "state": "savestates/r2/fl_tierc_outside.sav"
+ },
+ "keys": "",
+ "ticks": 2617,
+ "checkpoints": [
+  {
+   "id": "before_hit",
+   "tick": 1588,
+   "capture": "ega/r2_elf_dust_01_before_hit.png",
+   "max_px": 0
+  },
+  {
+   "id": "hit_coin_lost",
+   "tick": 1593,
+   "capture": "ega/r2_elf_dust_02_hit_coin_lost.png",
+   "max_px": 0
+  },
+  {
+   "id": "coin_flies_back",
+   "tick": 1608,
+   "capture": "ega/r2_elf_dust_03_coin_flies_back.png",
+   "max_px": 0
+  },
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_tierc_dust1.sav",
+   "capture_state": "savestates/r2/fl_tierc_dust1.sav",
+   "max_px": 0
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_tierc_dust1",
+   "state": "savestates/r2/fl_tierc_dust1.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ]
+}

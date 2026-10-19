@@ -1,0 +1,30 @@
+{
+ "description": "the crafted player tierb in the clubhouse (state r2/tierb_after_troom, where the Round 2 UI boxes were captured): Options > New Player Hints (opens with No: the player setting), Esc; Options > Sound, Esc; File > Start Over, Left (Yes), Esc",
+ "start": {
+  "state": "savestates/r2/tierb_after_troom.sav"
+ },
+ "keys": "60:tap:f3, 100:tap:enter, 160:tap:esc, 200:tap:f3, 220:tap:down, 230:tap:down, 240:tap:enter, 300:tap:esc, 340:tap:f2, 380:tap:enter, 440:tap:left, 500:tap:esc",
+ "ticks": 520,
+ "checkpoints": [
+  {
+   "id": "hints_box",
+   "tick": 140,
+   "capture": "ega/r2_ui_box_new_player_hints.png"
+  },
+  {
+   "id": "sound_box",
+   "tick": 280,
+   "capture": "ega/r2_ui_box_sound.png"
+  },
+  {
+   "id": "start_over",
+   "tick": 420,
+   "capture": "ega/r2_ui_box_start_over.png"
+  },
+  {
+   "id": "start_over_left",
+   "tick": 480,
+   "capture": "ega/r2_ui_box_start_over_after_left.png"
+  }
+ ]
+}

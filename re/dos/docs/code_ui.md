@@ -633,6 +633,44 @@ Save DS:5b3c; DS:9008 = −1, DS:900e = 0, `Anim_Clear(2)`; DS:5b3c = 12; DS:8a1
 (these strings use `|NN` colours and TABs); ink 0xFFFF; `Text_Draw(0x28, 0xB9, DS:8a48)`; phase++;
 restore DS:5b3c; DS:80da = 8.
 
+### 8.5 The title loop on the reference machine (wave 4) [O AVIs, engine `title.cpp`]
+
+Measured in the title AVIs of the captures (`avi/tandy_attract_full_cycle.avi` 150 s,
+`avi/ega_r2_title_60s_nokeys.avi`, `avi/ega_opening_title.avi`; scratch tools
+`extracted/scratch/dos_w4_ui/avisparks.py`, `sparkfit3.py`, `t1check.py`):
+
+* **Reading AVI times.** AVI frame f shows the screen at PIT time 3.95·f (236.69543 / 59.9228 Hz;
+  no drift over 150 s), but a change to row y appears in frame f only if it happened before the
+  raster reached that row: `(f − 1 + y/262)·3.95 < t ≤ (f + y/262)·3.95`. With that correction the
+  script steps of all sparkles put the game ticks at one phase per AVI (Tandy 0.7, EGA 2.95 and
+  4.25 PIT ticks after the AVI's frame grid, ±0.1). A present that copies a whole page shows the new
+  page from the row the raster had reached (story page 2 of the Tandy AVI: new from row 189 in frame
+  2050, the rest in 2051), which times a page's present to a fraction of a PIT tick.
+* **Page draws.** `TitleStep_Wait` sets its timer to g_ticks on its first call, which runs right after
+  the page's draw iteration; it fires on the PIT interrupt that takes g_ticks past the timer (7201
+  PIT ticks later), and the next iteration draws the next page. The Tandy AVI's presents (story 1 at
+  frame 225, story 2 2050.7, series page 3877.2, title 5703.4, story 1 7529) give the draws: title
+  page 12.8 PIT ticks, story page 1 13.3, story page 2 7.5, series page 14.3 (±0.5); one cycle of
+  the four pages 28 851 PIT ticks = 5770 game ticks. The walk-off's backdrop is taken as 12 (the
+  title page less its text line; no capture shows it), and the walk-off script starts after it.
+* **Sparkles.** The order of the sparkles is fixed by the rand() sequence (§8.1: an attempt draws
+  one rand(), a start one more; on the AdLib machine `Music_Play(1)` draws one before the loop): all
+  249 sparkles of the three AVIs are the predicted spots in order. The time a start needs after the
+  game tick whose -10 ended the previous sparkle is about 0.75 PIT ticks plus 1/7.3 PIT tick per
+  attempt (the loop's idle iterations, about 1730/s while the interrupt work leaves time): with these
+  values 233 of the 249 sparkles take their first script step on the observed game tick and the
+  others one tick off (the loop's pace varies by a PIT tick or two with the interrupt work, e.g. the
+  music). Script 0x5C shows frames 36..39 and the blank frame 40 (entry 4, 24 ticks after the first
+  script tick); its -10 comes 6 ticks later.
+* **Engine.** At `frame_speed = reference` a lockstep frame runs the loop's iterations up to the next
+  game tick on this clock (UiState::titleLoopAt in thousandths of a PIT tick): page draws take their
+  time, time-outs fire on their PIT interrupt, a phase change and the following draw happen in the
+  same frame, and frames inside a draw run no iteration (g_stepDone gating inside a draw never
+  matters on the title: no script steps on two consecutive ticks). The attract pages then change at
+  game ticks 1444 (story 1), 2887, 4329 (series page), 5772 (title) of a boot without keys, and the
+  title, story and walk-off captures are matched at 0 pixels by a boot that presses its keys at the
+  capture run's moments (`tools/dos/scenarios/ui/boot_title_signin.json`, `tandy_title_pages.json`).
+
 ---
 
 ## 9. Sign-in, players and saved games (47c7)
@@ -1117,7 +1155,12 @@ DS:9122:
 One count step per call, i.e. **per drawn frame**, each restarting effect 4 (`Sfx_Play` restarts an
 effect of the same id). `Game_Start` sets DS:9122 = coins, so a game starts without counting.
 Measured by the runtime agent (DOSBox-X, cycles 6000): 13.7 ms per count-up frame (3-4 PIT ticks,
-73 frames/s) [O `dos_requests/player.answers.md` #9].
+73 frames/s) [O `dos_requests/player.answers.md` #9]. Wave 4: `r2/fl_countup_after` (20 coins, the
+player standing) has the count-up frames begin at g_ticks 44674/44675, 44678, 44682, ... 44735, 44738:
+**3.32 PIT ticks (14.0 ms) per coin**, the first right after the change; the engine counts coin k at
+3.32·k PIT ticks after the game tick that changed `g_coins` (`hud.cpp`), so 20 coins take 13 game
+ticks as in the log. Frames that also scroll or walk are longer (`avi/ega_r2_bonus_coins.avi`: the 5
+coins of the bonus spot in AVI frames 115, 116, 117, 118, 120, about 3.95 PIT ticks each).
 
 `Hud_DrawNumber(x, y, ink, v)` (0d00): h = number of times 100 can be subtracted with the result
 staying ≥ 0 (signed), t likewise with 10 on the rest, units = rest; draw '0'+h if h ≠ 0 else x += 2;
@@ -1511,12 +1554,13 @@ use the virtual PIT of the DOS runtime.
 
 ## 18. Open questions
 
-1. Frame-counted UI timing: measured for the coin count-up (73 frames/s) and the CHAMPION flash
-   (~914 frames/s) by the runtime agent (`player.answers.md` #4, #9); the menu/box frame rate and
-   the title sparkle rate are not measured (requests `ui.md` #6, #7).
-2. Remaining boxes not yet compared with captures: Start Over, New Player Hints, Sound, sign-in
-   exit, remove, identical name, list full; help topics 2 and 3 (requests `ui.md` #1-#5). They use
-   the verified code paths with other table entries.
+1. Frame-counted UI timing: measured for the coin count-up (73 frames/s; wave 4: 3.32 PIT ticks per
+   coin, §11.2) and the CHAMPION flash (~914 frames/s) by the runtime agent (`player.answers.md` #4,
+   #9); the title sparkle rate and the page draws are measured in wave 4 (§8.5). The menu/box frame
+   rate is still not measured (no frame log keeps a box's opening frame; no tick was gated behind one).
+2. ~~Remaining boxes not yet compared with captures~~: wave 4 compares all of them in the running
+   engine at 0 pixels (Start Over, New Player Hints, Sound, sign-in exit, remove, identical name, list
+   full, help topics 2 and 3: `tools/dos/scenarios/ui/`).
 3. Help pictures in scenes 3/4 (other sprite bank), if the menu can be opened there (DS:926c is set
    by the end-sequence cells, so probably not) [I].
 4. What DS:913f (set by `Game_Start` and the hints option, read by `Hints_Update` 49a6:004f)
@@ -1599,3 +1643,34 @@ Found while porting this document's modules (`src/dos/game/ui.cpp`, `title.cpp`,
   captures in every pixel (`extracted/scratch/dos_w3_ui/verify.py`; the test stores their hashes).
   The boxes of the Round 2 captures open with hints No, music Yes, sound Yes (the player's
   settings that `Game_Start` copied into DS:5A32/5A42/5A52).
+
+---
+
+## Wave 4 corrections
+
+Found while matching the captures and AVIs of this document's scope in the running engine
+(`tools/dos/scenarios/ui/`, the fidelity runner `tools/dos/fidelity.py`; every UI capture of the
+scope is matched at 0 pixels, scratch `extracted/scratch/dos_w4_ui/`):
+
+* **The attract pages do not all last 1826 AVI frames** (§8.3): a page lasts 7201 PIT ticks after
+  the previous page's draw plus its own draw, 12.8 / 13.3 / 7.5 / 14.3 PIT ticks for the title, story
+  1, story 2 and the series page (§8.5); one cycle is 5770 game ticks (the wave-3 engine's 5773).
+* **Sparkles** (§8.1, §17 "frame-rate dependence"): the loop does not start a sparkle "almost as soon
+  as the previous one ends": the attempts begin about 0.75 PIT ticks after the tick that ended the
+  last one and run about 7.3 per PIT tick, so a sparkle starts 1..80 PIT ticks after the last one
+  ended (§8.5); the spot order follows from rand() alone.
+* **Coin count-up** (§11.2): 3.32 PIT ticks = 14.0 ms per coin, not 13.1 (the "20 coins in 262 ms" of
+  `code_runtime.md` §9 counts 20 intervals where the log has 19).
+* **Where the Round 2 UI captures were taken** (REFERENCE_CAPTURES R2.2): the boxes and help pages
+  (`r2_ui_box_*`, `r2_ui_help_*`) in the clubhouse of the state `r2/tierb_after_troom` (camera 0xC8;
+  the tierb HUD), the sign-in captures on a boot with the roster `USERS_crafted_tierb_layout.DAT`
+  (`r2_ui_signin_*` except the list-full ones, `r2_signin_crafted_list`, `r2_kbd_*`) or with the
+  nine-player roster of the wave-1 runtime agent (`r2_ui_signin_9players`, `_list_full_*`), all more
+  than 600 ticks after the boot (pointer hidden). The start-of-game rank messages
+  (`r2_tierb/tierc_start_message_outside`) were taken after the reference run had moved the mouse:
+  the pointer shows at the right edge (rows 127 / 97); `ega/069_prize_button` is the frame where the
+  player looks up at the prize picture, just before the treasure room opens.
+* **Button_Flash and the sign-in boxes** (§4.4, §9.6): the wave-3 contract (the four toggles at +0,
+  +18, +36, +54 PIT ticks, the handler at +72, the ticks running with `g_uiMode` = 0 for the Yes/No
+  boxes) is now also in `code_runtime.md` (Wave 4 corrections, ui).
+

@@ -893,6 +893,73 @@ TEST_CASE("DOS ui: title phases, the 7200-tick page timer, keys and sparkle atte
     CHECK(g.core.musicLoop == 0);
 }
 
+TEST_CASE("DOS ui: the title loop on the reference clock: page draws, time-outs on PIT ticks, sparkle attempts") {
+    TM_REQUIRE_DOS_GAME_FILES();
+    dosgame::GameFixture f(*gameFiles);  // frame_speed reference, lockstep
+    DosGame& g = f.g();
+    f.runtime().setClient(nullptr);
+    g.pan = &gameFiles->pan("OPENING");
+    g.bank = &gameFiles->pak("BEGIN");
+    titleStart(g);
+    const uint32_t t0 = g.ticks();
+    const uint64_t milli = FrameTiming::kMilli;
+    auto frame = [&](int cmd) {
+        g.input.cmd = static_cast<int16_t>(cmd);
+        const bool more = titleFrame(g);
+        f.runtime().stepPitTicks(5);
+        return more;
+    };
+    // Phase 0 draws the title page: 12.8 PIT ticks, so the loop is busy in the frames of the next two
+    // game ticks; the iteration after the draw arms the wait's timer with g_ticks at the draw's end.
+    CHECK(frame(-1));
+    CHECK(g.ui.titlePhase == 1);
+    CHECK(g.ui.titleLoopAt == t0 * milli + 12800);
+    CHECK(frame(-1));  // tick t0 + 5: still drawing
+    CHECK(g.ui.titleTimer == 0);
+    CHECK(frame(-1));  // tick t0 + 10
+    CHECK(g.ui.titleTimer == t0 + 12 + 7200);
+    CHECK(g.ui.titleLoopAt == (t0 + 15) * milli);  // idle up to the next tick
+    // The time-out fires on the PIT interrupt that takes g_ticks past the timer (t0 + 7213), in the
+    // frame whose game tick precedes it; story page 1 follows in the same frame (13.3 PIT ticks).
+    f.runtime().stepPitTicks(7190 - 15);  // tick t0 + 7190
+    CHECK(frame(-1));
+    CHECK(g.ui.titlePhase == 1);
+    f.runtime().stepPitTicks(15);  // tick t0 + 7210: the frame covers g_ticks t0 + 7210 .. 7214
+    CHECK(frame(-1));
+    CHECK(g.ui.titlePhase == 3);
+    CHECK(g.ui.titleLoopAt == (t0 + 7213) * milli + 13300);
+    // The frames of the ticks inside the draw run no iteration: an Enter waits for the draw's end.
+    CHECK(frame(8));  // tick t0 + 7215
+    CHECK(g.ui.titlePhase == 3);
+    CHECK(frame(8));  // tick t0 + 7220
+    CHECK(g.ui.titlePhase == 3);
+    CHECK(frame(8));  // tick t0 + 7225: the draw ends at t0 + 7226.3, then story page 2 (7.5 PIT ticks)
+    CHECK(g.ui.titlePhase == 5);
+    CHECK(g.ui.titleLoopAt == (t0 + 7226) * milli + 300 + 7500);
+
+    SUBCASE("sparkle attempts start 0.75 PIT ticks after the tick that ended the last one, 7.3 per PIT tick") {
+        frame(-1);  // tick t0 + 7230: the draw ends at t0 + 7233.8, the wait arms its timer
+        frame(-1);  // tick t0 + 7235
+        SpriteSlot& s = g.player.slots[2];
+        s.anim = 0;
+        s.prev = 0x5C;  // its script ended on this tick (-10)
+        g.ui.sparkleIdle = false;
+        g.ui.sparkleEndAt = 0;
+        BorlandRand replay;
+        replay.setRawSeed(g.rand.seed());
+        bool started = false;
+        for (int k = 0; k < 32 && !started; ++k) {  // 0.75 + k / 7.3 < 5 PIT ticks: k = 0..31
+            if ((replay.rand() & 0x7F) == 0) {
+                replay.rand();
+                started = true;
+            }
+        }
+        frame(-1);
+        CHECK(g.rand.seed() == replay.seed());
+        CHECK((s.anim == 0x5C) == started);
+    }
+}
+
 TEST_CASE("DOS ui: Esc on a title page quits") {
     TM_REQUIRE_DOS_GAME_FILES();
     dosgame::GameFixture f(*gameFiles, periodOptions());
@@ -933,20 +1000,30 @@ TEST_CASE("DOS ui: the HUD counts coins up one per frame-clock step with effect 
         CHECK(g.ui.coinsShown == 7);
         CHECK(f.sound().calls().empty());
     }
-    SUBCASE("the reference rate (76.3 coins per second) gives 1 or 2 per 47.3 Hz frame") {
+    SUBCASE("the reference speed: a count-up frame every 3.32 PIT ticks from the tick that changed the coins") {
+        // r2/fl_countup_after: 20 coins counted in loop frames beginning 0, 1, 4, 8, ... 61 PIT ticks
+        // after the change (every 3 or 4): the 20th in the 13th game tick. Lockstep frame n shows the
+        // coins whose frames begin before tick n + 1.
         dosgame::GameFixture f(*gameFiles);
         DosGame& g = f.g();
+        f.runtime().setClient(nullptr);
         g.bank = &gameFiles->pak("SPRITES");
-        g.core.coins = 200;
-        g.ui.coinsShown = 0;
-        int frames = 0;
-        while (g.ui.coinsShown < 76 && frames < 100) {
-            g.frameClock().beginFrame(5);
+        g.ui.hudRedraw = 0;
+        g.core.coins = 25;
+        g.ui.coinsShown = 5;
+        g.ui.hudCoins = 25;
+        std::vector<int> shown;
+        for (int frame = 0; frame < 14; ++frame) {
             hudRedraw(g);
-            ++frames;
+            shown.push_back(g.ui.coinsShown);
+            f.runtime().stepPitTicks(5);
         }
-        CHECK(frames >= 46);
-        CHECK(frames <= 48);  // about one second of game ticks
+        CHECK(shown == std::vector<int>{7, 9, 10, 12, 13, 15, 16, 18, 19, 21, 22, 24, 25, 25});
+        CHECK(g.ui.countUpDone == 0);  // finished: the next count-up starts its own clock
+        // A later gain starts again with two coins in its first frame.
+        g.core.coins = 28;
+        hudRedraw(g);
+        CHECK(g.ui.coinsShown == 27);
     }
     SUBCASE("the prompt icon and the clue box follow their caches") {
         dosgame::GameFixture f(*gameFiles);

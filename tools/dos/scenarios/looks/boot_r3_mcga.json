@@ -1,0 +1,245 @@
+{
+ "description": "Round 3 (DOSBox-X, MCGA): the sign-in with its Esc box and the name box, the saved-game prompt, Ada's resumed level-2 game with Flutter's hint, the Help menu and its highlight, About pages 1-2 and Keyboard page 1, the File and Options menus, the New Player Hints and Music boxes with either button, the Exit and Save box (roster as in the Round 1 run)",
+ "start": {
+  "boot": true,
+  "seed": "0x1EE2",
+  "users": "USERS_after_tandy_newplayer_Ben.DAT"
+ },
+ "look": "mcga",
+ "keys": "2300:tap:enter, 2390:tap:enter, 2710:tap:esc, 2800:tap:enter, 2870:tap:enter, 2930:tap:c, 2933:tap:a, 2936:tap:t, 3000:tap:esc, 3080:tap:up, 3120:tap:up, 3170:tap:enter, 3250:tap:enter, 3510:tap:enter, 3600:tap:f1, 3670:tap:down, 3730:tap:down, 3780:tap:down, 3840:tap:up, 3870:tap:up, 3900:tap:up, 3950:tap:enter, 4030:tap:enter, 4110:tap:esc, 4190:tap:f1, 4250:tap:down, 4290:tap:enter, 4370:tap:esc, 4450:tap:f2, 4520:tap:down, 4580:tap:esc, 4650:tap:f3, 4720:tap:enter, 4800:tap:esc, 4870:tap:f3, 4930:tap:down, 4970:tap:enter, 5050:tap:up, 5110:tap:esc, 5180:tap:esc, 5260:tap:up, 5320:tap:esc",
+ "ticks": 5400,
+ "checkpoints": [
+  {
+   "id": "story1",
+   "tick": 2290,
+   "capture": "mcga/r3_01_story1.png",
+   "masks": [
+    {
+     "rect": [
+      248,
+      32,
+      267,
+      50
+     ],
+     "reason": "title sparkle spot 0: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      250,
+      59,
+      269,
+      77
+     ],
+     "reason": "title sparkle spot 1: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      282,
+      89,
+      301,
+      107
+     ],
+     "reason": "title sparkle spot 2: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      244,
+      85,
+      263,
+      103
+     ],
+     "reason": "title sparkle spot 3: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      288,
+      50,
+      307,
+      68
+     ],
+     "reason": "title sparkle spot 4: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      270,
+      35,
+      289,
+      53
+     ],
+     "reason": "title sparkle spot 5: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      274,
+      10,
+      293,
+      28
+     ],
+     "reason": "title sparkle spot 6: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      286,
+      28,
+      305,
+      46
+     ],
+     "reason": "title sparkle spot 7: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      276,
+      58,
+      295,
+      76
+     ],
+     "reason": "title sparkle spot 8: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      256,
+      87,
+      275,
+      105
+     ],
+     "reason": "title sparkle spot 9: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      240,
+      84,
+      259,
+      102
+     ],
+     "reason": "title sparkle spot 10: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    }
+   ]
+  },
+  {
+   "id": "signin",
+   "tick": 2700,
+   "capture": "mcga/r3_02_signin.png"
+  },
+  {
+   "id": "signin_escbox",
+   "tick": 2790,
+   "capture": "mcga/r3_03_signin_escbox.png"
+  },
+  {
+   "id": "newname_typed",
+   "tick": 2990,
+   "capture": "mcga/r3_04_newname_typed.png"
+  },
+  {
+   "id": "signin_ada",
+   "tick": 3160,
+   "capture": "mcga/r3_05_signin_ada.png"
+  },
+  {
+   "id": "continue_prompt",
+   "tick": 3240,
+   "capture": "mcga/r3_06_continue_prompt.png"
+  },
+  {
+   "id": "resumed_hint",
+   "tick": 3500,
+   "capture": "mcga/r3_07_resumed_hint.png"
+  },
+  {
+   "id": "level2",
+   "tick": 3590,
+   "capture": "mcga/r3_08_level2.png"
+  },
+  {
+   "id": "menu_help",
+   "tick": 3660,
+   "capture": "mcga/r3_09_menu_help.png"
+  },
+  {
+   "id": "menu_help_item2",
+   "tick": 3720,
+   "capture": "mcga/r3_10_menu_help_item2.png"
+  },
+  {
+   "id": "menu_help_item4",
+   "tick": 3830,
+   "capture": "mcga/r3_11_menu_help_item4.png"
+  },
+  {
+   "id": "help_about_p1",
+   "tick": 4020,
+   "capture": "mcga/r3_12_help_about_p1.png"
+  },
+  {
+   "id": "help_about_p2",
+   "tick": 4100,
+   "capture": "mcga/r3_13_help_about_p2.png"
+  },
+  {
+   "id": "after_help_esc",
+   "tick": 4180,
+   "capture": "mcga/r3_14_after_help_esc.png"
+  },
+  {
+   "id": "help_keyboard_p1",
+   "tick": 4360,
+   "capture": "mcga/r3_15_help_keyboard_p1.png"
+  },
+  {
+   "id": "menu_file",
+   "tick": 4510,
+   "capture": "mcga/r3_16_menu_file.png"
+  },
+  {
+   "id": "menu_file_item2",
+   "tick": 4570,
+   "capture": "mcga/r3_17_menu_file_item2.png"
+  },
+  {
+   "id": "menu_options",
+   "tick": 4710,
+   "capture": "mcga/r3_18_menu_options.png"
+  },
+  {
+   "id": "box_hints",
+   "tick": 4790,
+   "capture": "mcga/r3_19_box_hints.png"
+  },
+  {
+   "id": "box_music",
+   "tick": 5040,
+   "capture": "mcga/r3_20_box_music.png"
+  },
+  {
+   "id": "box_music_up",
+   "tick": 5100,
+   "capture": "mcga/r3_21_box_music_up.png"
+  },
+  {
+   "id": "exit_box",
+   "tick": 5250,
+   "capture": "mcga/r3_22_exit_box.png"
+  },
+  {
+   "id": "exit_box_up",
+   "tick": 5310,
+   "capture": "mcga/r3_23_exit_box_up.png"
+  },
+  {
+   "id": "level2_end",
+   "tick": 5400,
+   "capture": "mcga/r3_24_level2_end.png",
+   "masks": [
+    {
+     "rect": [
+      4,
+      100,
+      40,
+      130
+     ],
+     "reason": "an elf entering at the left edge: the elves of a boot run are random (the original's title sparkles drew rand() at its loop rate)"
+    }
+   ]
+  }
+ ]
+}

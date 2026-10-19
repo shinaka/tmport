@@ -2,16 +2,24 @@
 // search.cpp, rank_chest.cpp): the end sequence and the champion branch compared tick for tick with
 // the frame logger of the reference recordings (r2/fl_end_t2_wait, r2/fl_crown_wait), the chute,
 // the treasure room, the rank chest fill and the CHAMPION flash, the search schedule, the showcase
-// choice and hand-over, the carousel and the pair displays. Only numbers are compared.
+// choice and hand-over, the carousel and the pair displays. Only numbers are compared; the last test
+// compares the engine's pictures with the reference captures, which it reads from TM_DOS_CAPTURES.
 #include <doctest/doctest.h>
 
+#include <array>
 #include <initializer_list>
 #include <iterator>
 
 #include "dos/game/cells.h"
+#include "dos/game/load_state.h"
 #include "dos/gfx/blitter.h"
 #include "dos/gfx/pak.h"
+#include "dos/gfx/palettes.h"
+#include "dos/save/dosbox_state.h"
+#include "dos_test_data.h"
+#include "mods/png_codec.h"
 #include "test_dos_player_harness.h"
+#include "util/file_util.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -874,4 +882,119 @@ TEST_CASE("DOS player: ShelfRoom_DrawShelf draws the first flagged room once, wi
     for (int y = 0; y < BackBuffer::kHeight; ++y)
         for (int x = 0; x < BackBuffer::kRowBytes; ++x) differ += g.back.byteAt(x, y) != expected.byteAt(x, y) ? 1 : 0;
     CHECK(differ == 0);
+}
+
+// ---- wave 4: the captures of the end of a game through the whole engine ------------------------
+// Each run starts from a DOSBox-X reference state (loadDosboxState) with the --keys script of the
+// castle_end fidelity scenario of the same name (tools/dos/scenarios/castle_end/) and compares the
+// picture shown after each listed game tick with a capture: 0 differing pixels. The pictures are
+// read from the user's captures at run time; only file names, ticks and rectangles are stored here.
+
+namespace {
+
+struct CaptureCheck {
+    int tick = 0;                  // the picture shown after this game tick (0: the loaded moment)
+    const char* capture = nullptr;  // a 320x200 capture of TM_DOS_CAPTURES
+    bool keyMask = false;          // leave out the clue box's key icon (the castle-top race below)
+};
+
+struct CaptureRun {
+    const char* name;
+    const char* state;  // the DOSBox-X state the run starts from
+    const char* keys;   // the --keys script, game ticks from the load
+    std::vector<CaptureCheck> checks;
+};
+
+// The castle-top tick clears g_keyState. DOSBox-X redraws the clue box only when that tick lands
+// between a frame's Frame_Begin and its Screen_DrawOverlay (1 of the 5 reference runs); the engine's
+// order (Frame_Begin, Game_Tick, the frame body) always takes that path, so its key icon is gone where
+// most captures still show it (re/dos/docs/code_player.md, wave 4).
+constexpr std::array<int, 4> kKeyIcon = {6, 165, 22, 191};
+
+int differingPixels(const DosGame& g, const tmport::mods::DecodedPng& cap, bool keyMask) {
+    const std::vector<uint8_t> shown = toRgba(g.screen, g.palette);
+    int n = 0;
+    for (int y = 0; y < BackBuffer::kHeight; ++y)
+        for (int x = 0; x < BackBuffer::kWidth; ++x) {
+            if (keyMask && x >= kKeyIcon[0] && x <= kKeyIcon[2] && y >= kKeyIcon[1] && y <= kKeyIcon[3]) continue;
+            const size_t i = (static_cast<size_t>(y) * BackBuffer::kWidth + static_cast<size_t>(x)) * 4;
+            if (shown[i] != cap.rgba[i] || shown[i + 1] != cap.rgba[i + 1] || shown[i + 2] != cap.rgba[i + 2]) ++n;
+        }
+    return n;
+}
+
+}  // namespace
+
+TEST_CASE("DOS player: the end of a game from the reference states equals the captures (wave 4)") {
+    TM_REQUIRE_DOS_GAME_FILES();
+    TM_REQUIRE_DOS_CAPTURES();
+    const std::vector<CaptureRun> runs = {
+        {"two treasures: the end sequence, the chute, the treasure room, the rank chest",
+         "savestates/r2/fl_castle_upper_t2.sav", "82:down:up, 342:up:up",
+         {{266, "ega/r2_end_01_castle_top_horn.png"}, {403, "ega/r2_end_02_treasure_into_chest.png"},
+          {517, "ega/r2_end_03_chest_open.png"}, {647, "ega/r2_end_04_second_treasure.png"},
+          {972, "ega/r2_end_05_at_chute.png"}, {1036, "ega/r2_end_06_fall_shaft.png"},
+          {1358, "ega/r2_end_07_treasure_room.png"}, {1457, "ega/r2_end_08_rank_chest_fill.png"}}},
+        {"the crown: the champion branch, the clubhouse with two figures, CHAMPION",
+         "savestates/r2/fl_castle_upper_t6_294.sav", "81:down:up, 342:up:up",
+         {{1277, "ega/r2_crown_01_chest_glow.png", true}, {1446, "ega/r2_crown_02_window_empty.png", true},
+          {1567, "ega/r2_crown_03_crown_on_pedestal.png", true}, {1774, "ega/r2_crown_a.png", true},
+          {2158, "ega/r2_crown_05_treasure_room_two_figures.png"}, {2419, "ega/r2_crown_07_rank_champion_hidden.png"},
+          {2423, "ega/r2_crown_06_rank_champion_visible.png"}, {2600, "ega/r2_crown_b.png"}}},
+        {"Round 1: the castle hall, the ladder", "savestates/ega/castle.sav", "10:down:right, 152:up:right",
+         {{1, "ega/097_castle_inside.png"}, {156, "ega/098_castle_ladder.png"}}},
+        {"Round 1: the shaft, a ladder jump, the castle top", "savestates/ega/castle_shaft.sav",
+         "30:down:pgup, 32:up:pgup, 210:down:up",
+         {{1, "ega/099_castle_ladder_shaft.png"}, {119, "ega/100_castle_ladder_jump.png"},
+          {545, "ega/101_castle_top_treasure_room.png", true}}},
+        {"Round 1: the rank chest, the clubhouse message, the hint", "savestates/ega/castle_top.sav",
+         "10:down:enter, 11:up:enter, 200:down:enter, 201:up:enter, 450:down:enter, 451:up:enter",
+         {{160, "ega/102_castle_rank_chest.png"}, {222, "ega/103_clubhouse_top_reached_msg.png"},
+          {458, "ega/104_hint_after_climb.png"}}},
+        {"the champion's end messages", "savestates/r2/crown_t2_298_wait.sav",
+         "10:down:enter, 11:up:enter, 259:down:enter, 260:up:enter, 469:down:enter, 470:up:enter",
+         {{30, "ega/r2_crown_08_end_message.png"}, {265, "ega/r2_crown_09_after_message.png"},
+          {475, "ega/r2_crown_10_after_message2.png"}}},
+        {"the treasure room from the clubhouse", "savestates/r2/tierb_exitbox.sav",
+         "5:down:esc, 6:up:esc, 20:down:right, 52:up:right, 98:down:up, 128:up:up, 1490:down:left, 1495:up:left, "
+         "1700:down:right, 1705:up:right, 1911:down:down, 1915:up:down",
+         {{126, "ega/r2_treasure_room_from_clubhouse_00.png"}, {1547, "ega/r2_treasure_room_from_clubhouse_01_left.png"},
+          {1800, "ega/r2_treasure_room_from_clubhouse_02_right.png"}, {1927, "ega/r2_treasure_room_from_clubhouse_03_down.png"}}},
+        {"the prize rooms", "savestates/r2/tierb_exitbox.sav",
+         "5:down:esc, 6:up:esc, 20:down:right, 296:up:right, 310:down:right, 454:up:right, 470:down:right, 613:up:right, "
+         "630:down:right, 773:up:right, 790:down:right, 933:up:right",
+         {{156, "ega/r2_prize_room_1.png"}, {300, "ega/r2_prize_room_2.png"}, {458, "ega/r2_prize_room_3.png"},
+          {617, "ega/r2_prize_room_4.png"}, {777, "ega/r2_prize_room_5.png"}, {937, "ega/r2_prize_room_6.png"}}},
+    };
+    int compared = 0;
+    for (const CaptureRun& run : runs) {
+        CAPTURE(run.name);
+        const auto sav = testdata::dosCapture(run.state);
+        REQUIRE(sav.has_value());
+        const DosboxState st = DosboxState::load(*sav);
+        dosgame::FixtureOptions opts;
+        opts.options.look = stateLook(st);
+        dosgame::GameFixture f(*gameFiles, opts);
+        DosGame& g = f.g();
+        const LoadedState loaded = loadDosboxState(g, st);
+        for (const std::string& w : loaded.warnings) MESSAGE(run.name << ": " << w);
+        REQUIRE(f.setScript(run.keys));
+        int done = 0;
+        for (const CaptureCheck& c : run.checks) {
+            CAPTURE(c.capture);
+            CAPTURE(c.tick);
+            if (c.tick > done) f.step(c.tick - done);
+            done = std::max(done, c.tick);
+            const auto file = testdata::dosCapture(c.capture);
+            REQUIRE(file.has_value());
+            const auto bytes = readWholeFile(*file);
+            REQUIRE(bytes.has_value());
+            const tmport::mods::DecodedPng cap = tmport::mods::decodePng(*bytes);
+            REQUIRE(cap.width == BackBuffer::kWidth);
+            REQUIRE(cap.height == BackBuffer::kHeight);
+            CHECK(differingPixels(g, cap, c.keyMask) == 0);
+            ++compared;
+        }
+    }
+    CHECK(compared == 37);
 }

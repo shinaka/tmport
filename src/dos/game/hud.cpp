@@ -3,6 +3,9 @@
 // Spec: re/dos/docs/code_ui.md §2.4, §11.1-11.3; code_runtime.md §3.8-3.11.
 #include "dos/game/hud.h"
 
+#include <algorithm>
+#include <cstdlib>
+
 #include "dos/game/anim.h"
 #include "dos/game/camera.h"
 #include "dos/game/game.h"
@@ -50,6 +53,35 @@ uint8_t foundMask(const DosGame& g, unsigned level) {
     return g.hasRec() && level < 3 ? g.rec().foundMasks[level] : 0;
 }
 uint8_t clueWord(const DosGame& g, unsigned i) { return g.hasRec() && i < 9 ? g.rec().clueWords[i] : 0x80; }
+
+// A count-up frame on the reference machine (DOSBox-X, cycles=fixed 6000): the counters box, the
+// three numbers, Sfx_Play(4): 3.32 PIT ticks (r2/fl_countup_after: 20 coins in the loop frames that
+// begin at g_ticks 44674 .. 44738, one coin each, every 3 or 4 PIT ticks), in thousandths.
+constexpr uint64_t kCountUpFrame = 3320;
+
+// How many count-up steps this frame runs. At the reference speed the count-up's frames follow each
+// other from the frame after the game tick that changed g_coins: coin k at k * kCountUpFrame after it,
+// and the lockstep frame of tick n runs those that begin before tick n + 1. At the period speed one
+// per frame (the frame clock).
+int countUpSteps(DosGame& g) {
+    UiState& ui = g.ui;
+    if (!g.rt.longFrames()) return g.frameClock().steps(FrameFeature::CoinCountUp);
+    const uint64_t tick = uint64_t{g.ticks()} * FrameTiming::kMilli;
+    const uint64_t next = tick + 5 * FrameTiming::kMilli;
+    auto dueBy = [&ui, next] { return next > ui.countUpStart ? (next - 1 - ui.countUpStart) / kCountUpFrame + 1 : 0; };
+    // A new count-up, or one that stopped for a while (the HUD painter did not run): from this tick.
+    if (ui.countUpDone == 0 || dueBy() > ui.countUpDone + 2u) {
+        ui.countUpStart = tick;
+        ui.countUpDone = 0;
+    }
+    const uint64_t due = dueBy();
+    const int steps = due > ui.countUpDone ? static_cast<int>(due - ui.countUpDone) : 0;
+    const int left = std::abs(int{g.core.coins} - int{ui.coinsShown});
+    const int run = std::min(steps, left);
+    // Running on while coins are left to count; the next count-up starts its own clock.
+    ui.countUpDone = run < left ? static_cast<uint16_t>(ui.countUpDone + run) : 0;
+    return run;
+}
 
 }  // namespace
 
@@ -128,10 +160,9 @@ void hudRedraw(DosGame& g) {
             }
             ++core.dirty;
         }
-        // The count-up: one coin (and effect 4, restarted each time) per original frame, taken from
-        // the original frame clock (PORTING_NOTES §2.3: reference rate or one per frame); a loss
+        // The count-up: one coin (and effect 4, restarted each time) per original frame; a loss
         // counts down silently.
-        const int steps = g.frameClock().steps(FrameFeature::CoinCountUp);
+        const int steps = countUpSteps(g);
         for (int s = 0; s < steps; ++s) {
             if (ui.coinsShown < core.coins) {
                 sfxPlay(g, 4);

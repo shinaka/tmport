@@ -246,8 +246,10 @@ logic is a port of the DOS program, so it plays as the DOS game did, not as the 
   game messages, the menus (Help, File, Options) and the help pages.
 * **Faithful to the original**: the game advances in the original's 47.3 Hz timer ticks with the
   original's order of events, the same random number generator (the same layouts and question deals
-  for the same seed), the original's movement timings (checked tick for tick against recordings of
-  the original in DOSBox-X), and the original's screens (compared with captures pixel for pixel).
+  for the same seed), the original's movement timings and the reference machine's slow frames (21
+  per-tick recordings of the original in DOSBox-X replayed from the same moment match on every tick),
+  and the original's screens: every EGA, Tandy, MCGA and CGA capture reachable from a recorded moment
+  of the original matches pixel for pixel, apart from two (`re/dos/docs/ENGINE_MAP.md` §11).
 * **Saves** at the original's moments (new player, remove player, Start Over, Start New Player,
   Exit and Save, the end of each game) in `dos_users.dat` in the preference folder, in the DOS
   `USERS.DAT` format byte for byte. On the first start the DOS folder's `USERS.DAT` is imported (the
@@ -272,23 +274,30 @@ shown at 4:3, as on a monitor of the time. DOS options (also in the `[dos]` sect
 | `--look ega\|tandy\|mcga\|cga` | the picture of that video adapter (EGA and Tandy look the same; MCGA has softer colours; CGA is dithered to 4 colours) |
 | `--sound tandy\|speaker\|adlib\|off` | the sound device (default `tandy`) |
 | `--slow-cpu` | the original's slow-machine mode (`-X`: fewer elves, coarser scrolling, shorter search) |
-| `--frame-speed reference\|period` | the speed of the effects the original counted in frames (search, coin count-up, CHAMPION flash, dissolve): as in the reference recordings (default) or one step per frame like a period PC |
+| `--frame-speed reference\|period` | the speed of the effects the original counted in frames (search, coin count-up, CHAMPION flash, dissolve) and of its slow frames: as in the reference recordings (default: scene loads and full redraws take the game ticks they took there) or one step per frame like a period PC, every frame within its tick and files loading at once |
 | `--dos-args "<switches>"` | the original's own switches, e.g. `"-T -St"` |
 | `--square-pixels`, `--integer-scale` | 320x200 with square pixels; whole-number scaling (5x6 per pixel) |
 
 For testing and comparisons: `--headless --keys "<script>"` plays a script in game ticks
-(`60:tap:enter, 400:down:left, +20:up:left`), `--dos-trace <csv>` writes one row per game tick,
-`--dos-dump-state <tick>:<file>` the game's memory in the original's layout (and the picture shown),
-`--frame-dump <folder>` the last frame of each screen, and `--dos-layout-seed <n>` makes new games
-use a fixed layout instead of one from the clock. `tmport --data <folder> --dos-preview` shows the
-earlier static preview of six screens.
+(`60:tap:enter, 400:down:left, +20:up:left`; `806.4923:down:down` presses a key inside a game tick,
+which decides when its typematic repeats come), `--dos-trace <csv>` writes one row per game tick that
+ran, `--dos-dump-state <tick>:<file>` the game's memory in the original's layout (and the picture
+shown), `--frame-dump <folder>` the last frame of each screen, `--dos-layout-seed <n>` makes new
+games use a fixed layout instead of one from the clock, and `--dos-load-state <file.sav>` starts from
+a DOSBox-X save state of the original. `tools/dos/fidelity.py` compares the engine with the
+reference captures, recordings and logs of the original (`docs/BUILDING.md`).
+`tmport --data <folder> --dos-preview` shows the earlier static preview of six screens.
 
-**Known differences** (`re/dos/docs/ENGINE_MAP.md` §8): the game runs one original frame per timer
-tick, so the few frames the original needed several ticks for (full redraws, about 40-130 ms in the
-recordings) are shorter (one visible case: the player is not yet drawn under the start-of-game
-message); files load instantly; the mouse pointer starts one row higher than in DOSBox-X; the slow-CPU
-mode's box save does not model the original's save heap; the AdLib music is a stand-in; there are no
-mods for the DOS edition yet.
+**Known differences** (`re/dos/docs/ENGINE_MAP.md` §8): the slow frames of the original (scene loads,
+full redraws, message bubbles, scrolling) last as long as in the reference recordings and their
+pictures appear when they end, but only the measured kinds are modelled (menus, dialog boxes and the
+quiz screen draw within one timer tick); the engine latches a frame's sprites before its timer tick
+where the original usually latches them after it, which shows only under a bubble that freezes the
+picture right after a tick (an elf's feet under the hint after a treasure search) and in whether the
+castle top's tick removes the key icon from the status bar at once; sounds that the original starts
+in the middle of a slow frame start at its beginning; the slow-CPU mode's box save does not model
+the original's save heap; the AdLib music is a stand-in; there are no mods for the DOS edition
+yet.
 
 ## Modding
 
@@ -357,10 +366,10 @@ The game itself can also run headless with scripted input (`--headless --keys ".
 | Path | Contents |
 |---|---|
 | `src/` | the engine: `util`, `vfs` (folders and CD images), `ne` (Windows NE executables), `data` (tables of `TMTWINCD.EXE`), `res` (resources), `gfx`, `text`, `anim`, `input`, `timing`, `audio`, `ui` (dialogs, menu bar), `save`, `game` (the game itself), `mods`, `rtl`, `platform` (SDL), `app` (start-up), `cli` (tools); `docs/DESIGN.md` describes them |
-| `tests/` | unit tests (doctest); tests that need the game read it from `TM_DATA` (`TM_DATA_DOS` for the DOS edition) and skip themselves without it |
+| `tests/` | unit tests (doctest); tests that need the game read it from `TM_DATA` (`TM_DATA_DOS` for the DOS edition, `TM_DOS_CAPTURES` for the DOS reference captures) and skip themselves without it |
 | `docs/` | `BUILDING.md` (building, running, tools), `DESIGN.md` (engine conventions), `MODDING.md` |
 | `re/` | the specifications written from the study of the original: `re/docs/ARCHITECTURE.md` first, then `PORTING_NOTES.md` and the topic documents; reviews in `re/reviews/` |
-| `tools/` | Python tools used for the study (resource extraction and reference decoders) |
+| `tools/` | Python tools used for the study (resource extraction and reference decoders); `tools/dos/` the DOS edition's decoders and its fidelity runner with the scenario files (`tools/dos/README.md`) |
 | `cmake/`, `CMakeLists.txt`, `CMakePresets.json`, `scripts/` | the build |
 | `.github/workflows/` | continuous integration (Windows, Linux, macOS) |
 

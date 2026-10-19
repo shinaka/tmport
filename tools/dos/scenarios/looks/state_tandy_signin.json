@@ -1,0 +1,35 @@
+{
+ "description": "the Tandy sign-in state: Ada's saved-game prompt, the resumed level-2 game with Flutter's first hint, the game after Enter (the elves share the original's rand state)",
+ "start": {
+  "state": "savestates/tandy/signin.sav"
+ },
+ "keys": "20:tap:up, 30:tap:enter, 60:tap:enter, 150:tap:enter",
+ "ticks": 238,
+ "checkpoints": [
+  {
+   "id": "loaded",
+   "tick": 0,
+   "capture": "tandy/06_signin.png"
+  },
+  {
+   "id": "frame1",
+   "tick": 1,
+   "capture": "tandy/06_signin.png"
+  },
+  {
+   "id": "continue_prompt",
+   "tick": 41,
+   "capture": "tandy/07_continue_prompt.png"
+  },
+  {
+   "id": "resumed_hint",
+   "tick": 91,
+   "capture": "tandy/08_resumed_game.png"
+  },
+  {
+   "id": "level2_resumed",
+   "tick": 238,
+   "capture": "tandy/09_level2_resumed.png"
+  }
+ ]
+}

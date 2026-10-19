@@ -667,10 +667,27 @@ TEST_CASE("DOS Input_MouseWalk (4a85:0208)") {
     CHECK_FALSE(ip.mouseWalk(kbd, m, p));
 }
 
+TEST_CASE("DOS mouse: the driver's start position per look, as the DOSBox-X captures show the pointer") {
+    // REFERENCE_CAPTURES.md §6: EGA and Tandy (159, 101), MCGA (158, 82), CGA (159, 146).
+    struct Start {
+        Look look;
+        uint16_t x, y;
+    };
+    for (const Start s : {Start{Look::Ega, 159, 101}, Start{Look::Tandy, 159, 101}, Start{Look::Mcga, 158, 82},
+                          Start{Look::Cga, 159, 146}}) {
+        MouseDriver d;
+        d.setLogicalPosition(10, 20);
+        d.resetPosition(s.look);
+        CAPTURE(static_cast<int>(s.look));
+        CHECK(d.x() == s.x);
+        CHECK(d.y() == s.y);
+    }
+}
+
 TEST_CASE("DOS mouse: logical coordinates and Mouse_Poll's 600-tick hide (130f:0D94)") {
     MouseDriver d;
     CHECK(d.x() == 159);
-    CHECK(d.y() == 100);
+    CHECK(d.y() == 101);
     d.setLogicalPosition(319, 250);
     CHECK(d.x() == 159);
     CHECK(d.y() == 199);

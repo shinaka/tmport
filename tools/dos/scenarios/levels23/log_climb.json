@@ -1,0 +1,107 @@
+{
+ "description": "level 1: the trunk lock opens, the climb to level 2 (vertical scroll, the level change); the Round-1 climb captures 052-057 on the same path",
+ "start": {
+  "state": "savestates/r2/fl_at_lock.sav"
+ },
+ "keys": "89:down:up, 104:up:up, 248:down:up, 431:up:up, 435:down:up, 533:up:up",
+ "ticks": 640,
+ "checkpoints": [
+  {
+   "id": "052_lock_open_climb",
+   "tick": 192,
+   "capture": "ega/052_lock_open_climb.png",
+   "max_px": 0
+  },
+  {
+   "id": "053_climb_trunk",
+   "tick": 296,
+   "capture": "ega/053_climb_trunk.png",
+   "masks": [
+    {
+     "rect": [
+      0,
+      139,
+      319,
+      143
+     ],
+     "reason": "the capture caught a scroll step half presented (DOSBox-X presents without retrace sync)"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "053_climb_trunk_old_rows",
+   "tick": 289,
+   "capture": "ega/053_climb_trunk.png",
+   "masks": [
+    {
+     "rect": [
+      0,
+      0,
+      319,
+      139
+     ],
+     "reason": "only the rows the torn capture still took from the frame before the scroll step"
+    },
+    {
+     "rect": [
+      0,
+      144,
+      319,
+      199
+     ],
+     "reason": "only the rows the torn capture still took from the frame before the scroll step"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "054_climb_treetop",
+   "tick": 405,
+   "capture": "ega/054_climb_treetop.png",
+   "max_px": 0
+  },
+  {
+   "id": "055_climb_rope_ladder",
+   "tick": 452,
+   "capture": "ega/055_climb_rope_ladder.png",
+   "max_px": 0
+  },
+  {
+   "id": "056_arrive_level2",
+   "tick": 503,
+   "capture": "ega/056_arrive_level2.png",
+   "max_px": 0
+  },
+  {
+   "id": "057_level2_start",
+   "tick": 592,
+   "capture": "ega/057_level2_start.png",
+   "max_px": 0
+  },
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_climb.sav",
+   "capture_state": "savestates/r2/fl_climb.sav"
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_climb",
+   "state": "savestates/r2/fl_climb.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ]
+}

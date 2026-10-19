@@ -51,6 +51,8 @@ struct LaunchOptions {
     std::string dosTicks;                    // --dos-ticks <n>: a headless run lasts at least n game ticks
     bool dosPreview = false;                 // --dos-preview (not in the help): the wave-2 screen preview
     std::string dosLayoutSeed;               // --dos-layout-seed <n>: srand value of new games instead of time()
+    std::string dosLoadState;                // --dos-load-state <file.sav>: start from a DOSBox-X save state
+    bool dosGreyKeyArtefact = false;         // --dos-grey-key-artefact: KeyboardOptions::greyKeyE0Artefact
 };
 
 // True when argv should start the game: no arguments, --play, or only options of LaunchOptions.

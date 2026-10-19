@@ -10,7 +10,8 @@ saves and settings; this document is the reference for building, running and the
 * CMake 3.24 or newer and a C++20 compiler. Windows: Visual Studio 2026 (MSVC, with the bundled
   CMake and Ninja). Linux: GCC (built and tested with GCC 15 on Ubuntu under WSL 2) or Clang, plus
   the development packages SDL needs (see "Linux and macOS"). macOS: Xcode's Clang (builds and
-  plays; the CI workflow also builds it, but has not been run yet).
+  plays both editions, packaged with `scripts/package.sh`; the CI workflow also builds it, but has
+  not been run yet).
 * Network access on the first configure. CMake downloads, pinned by URL and SHA-256:
   * SDL 3.4.18 (zlib license), built as a static library;
   * doctest 2.4.12 (MIT), header-only, for the unit tests only;
@@ -193,19 +194,21 @@ Game options (any other argument selects the command-line tools below; `tmport -
 | `--show-treasure`, `--debug` | debug: boxes around the hiding places that hold a treasure (gold) or the key (cyan), drawn over the picture by the presenter (the game's own frame is unchanged); `--debug` only enables F9, which switches them on and off (`[debug] show_treasure` / `keys` in `tmport.ini`). `--room-run` takes `--show-treasure` too |
 | `--verbose` | debug logging |
 | `--headless` | no window, no message boxes, no sound (automation); errors go to stderr; the run ends when the `--keys` script is used up |
-| `--keys <script>` | scripted input: comma-separated steps `enter`, `esc`, `space`, arrows, `f1`..`f12`, `alt`, letters/digits, `alt+o`/`ctrl+s`/`shift+a`, `click:<x>:<y>`, `move:<x>:<y>` (canvas coordinates), `wait:<ms>`, `shot:<file.png>` (writes the 640x480 canvas), `quit`. The DOS edition counts in game ticks (47.34 per second): items `TICK:down:KEY`, `TICK:up:KEY`, `TICK:tap:KEY[:N]`, `TICK:move:X:Y`, `TICK:click:X:Y`, `TICK:buttons:MASK` (`+N` = N ticks after the previous item; keys `enter`, `esc`, `space`, `up`, `kp8`, `lctrl`, `a`, `5`, `minus`, ...), e.g. `--keys "50:tap:enter, +50:tap:enter, +10:tap:3"` |
+| `--keys <script>` | scripted input: comma-separated steps `enter`, `esc`, `space`, arrows, `f1`..`f12`, `alt`, letters/digits, `alt+o`/`ctrl+s`/`shift+a`, `click:<x>:<y>`, `move:<x>:<y>` (canvas coordinates), `wait:<ms>`, `shot:<file.png>` (writes the 640x480 canvas), `quit`. The DOS edition counts in game ticks (47.34 per second): items `TICK:down:KEY`, `TICK:up:KEY`, `TICK:tap:KEY[:N]`, `TICK:move:X:Y`, `TICK:click:X:Y`, `TICK:buttons:MASK` (`+N` = N ticks after the previous item; keys `enter`, `esc`, `space`, `up`, `kp8`, `lctrl`, `a`, `5`, `minus`, ...), e.g. `--keys "50:tap:enter, +50:tap:enter, +10:tap:3"`; a TICK with a fraction (`806.4923:down:down`) lies inside the game tick, as a key press on the original falls between two timer interrupts (it decides the phase of the key's typematic repeats) |
 | `--frame-dump <png>` | writes the 640x480 canvas when the game ends (the DOS edition: its 320x200 canvas). DOS edition: a folder (an existing one, or a name without an extension) receives a PNG of every screen shown, `NN_<screen>_<look>.png`, and with `--headless` the sound of the run as `sound.wav` |
-| `--dos-trace <csv>` | DOS edition: one CSV row per game tick (player, camera, state, keys, coins, nets, level, scene, UI mode, area and the events of the tick) |
+| `--dos-trace <csv>` | DOS edition: one CSV row per game tick that ran (player, camera, state, keys, coins, nets, level, scene, UI mode, area and the events of the tick; a tick the original lost in disk I/O has no row, and the events of a frame whose own tick was lost start the next row) |
 | `--dos-dump-state <tick>:<file>` | DOS edition, repeatable: after that game tick, the game state in the original's memory layout (DGROUP, 52 256 bytes), `<file>.fields.tsv` naming its fields, and `<file>.png`, the picture shown |
 | `--dos-ticks <n>` | DOS edition with `--headless`: run at least n game ticks (otherwise the run ends when the `--keys` script is used up and a flash or dissolve it started has ended) |
 | `--dos-layout-seed <n>` | DOS edition: new games take their layout from this srand value (0..65535, decimal or `0x` hex) instead of the clock, so scripted runs repeat exactly |
+| `--dos-load-state <file.sav>` | DOS edition: start from a DOSBox-X save state of the original instead of the boot (the reference states of `extracted\captures\dos\savestates`): the game, the screen, the random generator and the timer phase continue from that moment; the state's look and sound device are used (a `--look` wins), and its sibling `<name>.users` becomes the DOS save of the preference folder (a replaced file is kept as `.bak`: use a scratch `--pref-dir`). Ticks of `--keys`, `--dos-ticks` and `--dos-dump-state` count from the load, `--dos-dump-state 0:<file>` writes the loaded moment, and the trace's `ticks` column is the original's g_ticks (`tools/dos/README.md`); the sound driver's effect and tune go on where the state left them |
+| `--dos-grey-key-artefact` | DOS edition: the E0 prefix bytes of the grey keys (PgUp, Home, the grey arrows) reach the game's keyboard handler as on DOSBox-X, which clears the jump bit for a tick per PgUp repeat; to replay the reference frame logs exactly |
 | `--mods <dir>`, `--no-mods` | also load this mod folder (repeatable, after the `[mods]` folders of `tmport.ini`) / load no mods at all (`docs/MODDING.md`) |
 | `--play` | accepted and ignored (`tmport --play` = `tmport`) |
 | `--edition win\|dos\|auto` | which edition to play when the data holds both (default: `edition =` in `[engine]` of `tmport.ini`, else detected; see "Pointing the engine at the game data") |
 | `--look ega\|tandy\|mcga\|cga` | DOS edition: the picture of that video adapter (EGA and Tandy look the same; MCGA has softer colours; CGA is dithered to 4 colours; `hercules` is accepted and looks like CGA, as in the original); default `ega`, `[dos] look` |
 | `--sound tandy\|speaker\|adlib\|off` | DOS edition: the sound device (Tandy 3-voice, PC speaker, AdLib music); default `tandy`, `[dos] sound`; `--no-audio` = `off` |
 | `--slow-cpu` | DOS edition: the original's slow-machine mode (`-X`: fewer elves, coarser scrolling); `[dos] slow_cpu` |
-| `--frame-speed reference\|period` | DOS edition: effects that the original counted in drawn frames run at the speed of the reference recordings (default) or one step per frame, like a period PC; `[dos] frame_speed` |
+| `--frame-speed reference\|period` | DOS edition: effects that the original counted in drawn frames run at the speed of the reference recordings (default; then the reference machine's slow frames also take their time: scene loads lose the timer ticks they lost there, a slow frame's picture appears when it ends) or one step per frame, like a period PC, every frame within its tick; `[dos] frame_speed` |
 | `--dos-args "<switches>"` | DOS edition: the original's switches, e.g. `"-T -St"`: `-E -C -T -H -M` look, `-X` slow CPU (toggles), `-Si -St -Sa` sound; only the second letter counts, later ones win; `--look`, `--sound`, `--slow-cpu`, `--frame-speed` win over them |
 | `--square-pixels` | DOS edition: show the 320x200 picture with square pixels (16:10) instead of 4:3; `[dos] square_pixels` |
 
@@ -411,6 +414,7 @@ described in "Music" above.
 set TM_DATA=C:\path\to\TMTWINCD
 set TM_IMAGE=C:\path\to\cd.cue
 set TM_DATA_DOS=C:\path\to\TM-DOS
+set TM_DOS_CAPTURES=C:\path\to\extracted\captures\dos
 build\tmtests.exe
 ```
 
@@ -420,6 +424,34 @@ build\tmtests.exe
 * The tests of the 1990 DOS edition (file checks, decoders, screens, sound, input, saves, the
   runtime, the preview, the game logic and two end-to-end playthroughs) read the DOS folder from `TM_DATA_DOS` (the folder with `SST.EXE`) and
   skip themselves without it. They too store only sizes, counts and hashes.
+* The DOS tests that compare with the DOSBox-X reference material of the original (its save states,
+  frame logs and USERS.DAT snapshots: the play-field redraws, the frame-log replays, the state
+  loader, the save round trips) read it from `TM_DOS_CAPTURES` (`extracted\captures\dos`, see
+  `re/dos/docs/REFERENCE_CAPTURES.md`) and skip themselves without it.
+
+### The DOS fidelity runner
+
+`tools/dos/fidelity.py` runs the scenario files of `tools/dos/scenarios/<group>/` (`ui`, `level1`,
+`levels23`, `castle_end`, `looks`) through `tmport-cli --headless` and compares the engine with the
+same reference material: the picture after a tick against a capture, an AVI frame or a state's
+screen; the per-tick trace against the r2 frame logs (by timer-tick slot and as a sequence of
+executed ticks); timings between trace events; AVI time bases (`tools/dos/avifit.py`). It writes a
+report (`report.md`, per group `report.md`, `report.csv` and a montage of the differences) and exits
+with 1 on a regression against `tools/dos/scenarios/baseline.json`:
+
+```
+set TM_CLI=C:\path\to\build\tmport-cli.exe
+set TM_DATA_DOS=C:\path\to\TM-DOS
+set TM_DOS_CAPTURES=C:\path\to\extracted\captures\dos
+python -P tools\dos\fidelity.py --jobs 8 [GROUP ...] [--scenario NAME] [--no-avi] [--out DIR]
+python -P tools\dos\fidelity.py --update-baseline        (store the current numbers)
+```
+
+Every run passes a scratch `--pref-dir`, a headless window and dummy audio; nothing of the game is
+stored in the scenarios (file names, ticks, key scripts and rectangles only). The scenario format,
+the tools around it (`savmem.py`, `fl2csv.py`, `imgcmp.py`, `avifit.py`, the playthrough driver) and
+the reference material are described in `tools/dos/README.md` and
+`re/dos/docs/ENGINE_MAP.md` §10-11 (the result after wave 4).
 * No test opens a window or plays sound. The app-area tests write their PNGs (the decoded window
   icon, scripted-run screenshots) to a temporary folder; set `TM_APP_SHOTS=<folder>` to keep them.
 * The image comparison test needs `TM_DATA` to be the extracted folder and `TM_IMAGE` the CD

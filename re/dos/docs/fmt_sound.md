@@ -522,3 +522,35 @@ offset of −5.6 cents on average (max 9 cents) from the F-number table.
 * AdLib (wave 5 not done): the tunes play on a square-wave stand-in at the Tandy pitches; the
   AdLib timing rules (music not frozen by effects, effects on the speaker, one `rand()` per
   `Music_Play`) are those of the original.
+
+### 11.6 Wave 4: the driver of a saved state, and the sound of the whole game (looks agent)
+
+* **Restoring a DOSBox-X state's driver.** `Sequencer::blockFromDgroup` / `blockToDgroup` read and
+  write the 0x78-byte blocks of §5.1 (DS:6448, DS:64c0; stream pointers are offsets into the effect /
+  music file, e.g. 0x230.. in TUNES.TAN, envelope pointers DS offsets, as observed in every reference
+  state). `Sequencer::restore(sfx, music, voices)` continues them: the device gets what the current
+  notes had written (the pitch of the time-taking event right before each sounding voice's stream
+  pointer, `Sound_NextEvent` having advanced past it; a rest or raw-pitch 0 as voice off; the speaker
+  gate off past the release point; the Tandy volumes come with the next tick's volume pass).
+  `DosAudioDevice::restoreBlocks` queues it like the other commands; the game side is
+  `soundRestoreDriver(g, dgroup)` (sound.h, DS:63be = voices). Checked in `tests/test_dos_audio.cpp`:
+  a driver restored from the blocks of tick 1000 of tune 1 (inside notes) and one restored inside
+  effect 6 write exactly the bytes of the uninterrupted driver in every following tick (speaker and
+  Tandy). The AdLib orchestration of the tune is not in the blocks (the OPL driver's tables, wave 5).
+* **The game's sound against DOSBox-X AVIs** (`tools/dos/audiocmp.py`: `align` / `track` = Goertzel
+  magnitudes of the 61 semitones C2..C7 per 4 PIT ticks, cosine similarity; `edges` = sound on/off
+  edges per PIT tick):
+  * `avi/tandy_attract_full_cycle.avi` (150 s) against 300 s of the engine's attract (Tandy look and
+    sound): tune 1 at one constant alignment over all 150 s (best lag per 6-s segment within ±1
+    window = 4 PIT ticks of the global one, similarity 0.93-0.96; the AVI began 148.66 s after the
+    tune's start, in the second attract cycle, so the tune loops seamlessly every 17032 PIT ticks as
+    the engine does); the five page changes lie 0.01-0.03 s after the engine's at the same tune
+    position (the original's title page wait starts after the title has been drawn).
+  * `avi/tandy_r3_session.avi` (Round 3, 45 s; REFERENCE_CAPTURES.md R3) against the engine run with
+    the same keys: the attract music similarity 0.94-0.99 at one alignment; the sign-in pauses the
+    music 17 PIT ticks later in the engine (the walk-off runs 3 game ticks later: its title redraw is
+    a long frame in the original, not in the engine); the coin toss's effects 5 and 0 start 3 PIT
+    ticks later than in the recording (within the ±4 of the alignment) and their pulses (16 PIT ticks
+    apart) and the frozen tune match; the resumed game's tune 0 starts 23 PIT ticks earlier in the
+    engine after Yes on the saved-game prompt and resumes 10 PIT ticks earlier when Flutter's hint is
+    closed (sound calls made inside a long frame take effect at the frame's start in the engine).

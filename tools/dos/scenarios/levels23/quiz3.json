@@ -1,0 +1,16 @@
+{
+ "description": "Round 1: a step left, the net swung at a passing elf on level 3, the quiz it asks (088; the catch time found by sweeping it)",
+ "start": {
+  "state": "savestates/ega/l3_ice_doorway.sav"
+ },
+ "keys": "1760:down:left, 1769:up:left, 1780:down:space, 1782:up:space",
+ "ticks": 1920,
+ "checkpoints": [
+  {
+   "id": "088_level3_quiz",
+   "tick": 1917,
+   "capture": "ega/088_level3_quiz.png",
+   "max_px": 0
+  }
+ ]
+}

@@ -1,0 +1,15 @@
+{
+ "description": "the castle top of the EGA climb (state ega/castle_top) without keys: the end sequence, the treasure room and the rank chest screen with the level 3 clue words, the coins and the chest filled to the first rank",
+ "start": {
+  "state": "savestates/ega/castle_top.sav"
+ },
+ "keys": "",
+ "ticks": 220,
+ "checkpoints": [
+  {
+   "id": "rank_chest",
+   "tick": 200,
+   "capture": "ega/102_castle_rank_chest.png"
+  }
+ ]
+}

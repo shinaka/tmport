@@ -1,0 +1,25 @@
+{
+ "description": "level 2 (state ega/level2_after_tunnel): File menu, Down twice (Exit and Save), Enter (the box, No), Up (Yes)",
+ "start": {
+  "state": "savestates/ega/level2_after_tunnel.sav"
+ },
+ "keys": "20:tap:f2, 40:tap:down, 50:tap:down, 80:tap:enter, 120:tap:up",
+ "ticks": 150,
+ "checkpoints": [
+  {
+   "id": "menu_exit",
+   "tick": 70,
+   "capture": "ega/070a_menu_file_exit.png"
+  },
+  {
+   "id": "exit_box",
+   "tick": 100,
+   "capture": "ega/070b_exit_confirm.png"
+  },
+  {
+   "id": "exit_yes",
+   "tick": 140,
+   "capture": "ega/070c_exit_yes.png"
+  }
+ ]
+}

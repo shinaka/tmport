@@ -1,0 +1,60 @@
+{
+ "description": "level 2: up into the mine-tunnel doorway, the dissolve, the tunnel (Round-1 captures 063/065 of the same doorway; 064 is a mid-dissolve frame, checked by extracted/scratch/dos_w4_levels23/dissolve.py)",
+ "start": {
+  "state": "savestates/r2/fl_l2door.sav"
+ },
+ "keys": "56:down:up, 71:up:up",
+ "ticks": 190,
+ "checkpoints": [
+  {
+   "id": "063_level2_at_doorway",
+   "tick": 28,
+   "capture": "ega/063_level2_at_doorway.png",
+   "max_px": 0
+  },
+  {
+   "id": "065_tunnel_inside",
+   "tick": 139,
+   "capture": "ega/065_tunnel_inside.png",
+   "max_px": 0
+  },
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_l2door_after.sav",
+   "capture_state": "savestates/r2/fl_l2door_after.sav"
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_l2door_after",
+   "state": "savestates/r2/fl_l2door_after.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ],
+ "timings": [
+  {
+   "id": "dissolve",
+   "from": {
+    "event": "dissolve=on"
+   },
+   "to": {
+    "event": "dissolve=off"
+   },
+   "expect_ticks": 6,
+   "tolerance": 0,
+   "source": "r2/fl_l2door_after: the dissolve frame lasted 30 PIT ticks (127 ms); avi/ega_doorway_dissolve.avi frames 74-81"
+  }
+ ]
+}

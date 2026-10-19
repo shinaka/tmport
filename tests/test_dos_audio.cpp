@@ -609,6 +609,69 @@ TEST_CASE("DOS audio: the user's sound files and driver tables") {
     CHECK(tan.music.entryCount() == 3);
 }
 
+TEST_CASE("DOS audio: a driver restored from its DGROUP blocks continues the tune and the effect") {
+    TM_REQUIRE_DOS_DATA();
+    // The DGROUP layout of a block round-trips.
+    Sequencer::Block blk;
+    blk.status = 2;
+    blk.id = 1;
+    blk.tempo = 448;
+    blk.ptr = {600, 1700, 2500, 2950};
+    blk.envPos = {0x66A3, 0x68EE, 0x68EE, 0};
+    blk.tie = {0, 3, 1, 0};
+    const auto bytes = Sequencer::blockToDgroup(blk);
+    CHECK(bytes.size() == 0x78u);
+    CHECK(bytes[0x08] == (600 & 0xFF));  // stream pointer 0 at +0x08
+    const Sequencer::Block back = Sequencer::blockFromDgroup(bytes);
+    CHECK(Sequencer::blockToDgroup(back) == bytes);
+    CHECK(back.tie == blk.tie);
+
+    for (SoundCard card : {SoundCard::Tandy, SoundCard::Speaker}) {
+        CAPTURE(soundCardName(card));
+        const SoundBank bank = userBank(*dosExe, card);
+        const int voices = card == SoundCard::Tandy ? 4 : 1;
+        // A tune for 1000 ticks, then effect 6 (which freezes the tune) at 1020: driver b continues
+        // from the blocks of tick 1000 (in the middle of notes), driver c from those of tick 1030
+        // (in the middle of the effect). From their first tick on they write what driver a writes.
+        RecordingPorts pa, pb, pc;
+        Sequencer a(bank, pa), b(bank, pb), c(bank, pc);
+        for (Sequencer* s : {&a, &b, &c}) s->setMusicLoop(true);
+        a.musicPlay(1, 0);
+        run(a, pa, 1000);
+        auto copy = [](const Sequencer::Block& blk) { return Sequencer::blockFromDgroup(Sequencer::blockToDgroup(blk)); };
+        b.restore(copy(a.sfxBlock()), copy(a.musicBlock()), voices);
+        // The device got the sounding notes again: a PSG period (or a speaker divisor).
+        CHECK(pb.count(card == SoundCard::Tandy ? 'p' : 'd') >= 1);
+        auto same = [](const RecordingPorts& x, size_t nx, const RecordingPorts& y, size_t ny) {
+            if (x.ev.size() - nx != y.ev.size() - ny) return false;
+            for (size_t i = 0; i < x.ev.size() - nx; ++i)
+                if (x.ev[nx + i].kind != y.ev[ny + i].kind || x.ev[nx + i].a != y.ev[ny + i].a) return false;
+            return true;
+        };
+        int differB = 0, differC = 0;
+        for (int t = 0; t < 400; ++t) {
+            if (t == 20) {
+                a.sfxPlay(6);
+                b.sfxPlay(6);
+            }
+            if (t == 30) {
+                c.restore(copy(a.sfxBlock()), copy(a.musicBlock()), voices);
+                CHECK(c.sfxActive());
+            }
+            const size_t na = pa.ev.size(), nb = pb.ev.size(), nc = pc.ev.size();
+            run(a, pa, 1);
+            run(b, pb, 1);
+            if (t >= 30) run(c, pc, 1);
+            differB += !same(pa, na, pb, nb);
+            if (t >= 30) differC += !same(pa, na, pc, nc);
+        }
+        CHECK(differB == 0);
+        CHECK(differC == 0);
+        CHECK(Sequencer::blockToDgroup(a.musicBlock()) == Sequencer::blockToDgroup(b.musicBlock()));
+        CHECK(Sequencer::blockToDgroup(a.musicBlock()) == Sequencer::blockToDgroup(c.musicBlock()));
+    }
+}
+
 TEST_CASE("DOS audio: lengths of every effect and tune (ticks, as dos_sound.py lists them)") {
     TM_REQUIRE_DOS_DATA();
     const std::array<uint64_t, 15> speaker = {193, 501, 121, 22, 49, 49, 200, 145, 75, 477, 137, 167, 12545, 16997, 5761};

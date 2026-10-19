@@ -1,0 +1,67 @@
+{
+ "description": "Round 1 castle shaft: a ladder jump (PgUp), then Up held to the castle top and the end screen (ega/099-101; ega_castle_ladder_jump_top.avi fits these keys within a tick)",
+ "start": {
+  "state": "savestates/ega/castle_shaft.sav"
+ },
+ "keys": "30:down:pgup, 32:up:pgup, 210:down:up",
+ "ticks": 560,
+ "checkpoints": [
+  {
+   "id": "shaft",
+   "tick": 1,
+   "capture": "ega/099_castle_ladder_shaft.png",
+   "max_px": 0
+  },
+  {
+   "id": "jump",
+   "tick": 119,
+   "capture": "ega/100_castle_ladder_jump.png",
+   "max_px": 0
+  },
+  {
+   "id": "castle_top",
+   "tick": 545,
+   "capture": "ega/101_castle_top_treasure_room.png",
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; DOSBox-X redraws the clue box only when that tick lands between a frame's Frame_Begin and its Screen_DrawOverlay (1 of 5 reference runs: ega_r2_end_t2_nokey); the engine's lockstep order (Frame_Begin, Game_Tick, frame body) always takes that path, so its key icon is gone where most captures still show it"
+    }
+   ]
+  }
+ ],
+ "avi_fits": [
+  {
+   "id": "jump_climb_top",
+   "avi": "avi/ega_castle_ladder_jump_top.avi",
+   "frames": [
+    4,
+    766
+   ],
+   "ticks": [
+    1,
+    605
+   ],
+   "max_off": 24,
+   "max_dev": 1.2,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; DOSBox-X redraws the clue box only when that tick lands between a frame's Frame_Begin and its Screen_DrawOverlay (1 of 5 reference runs: ega_r2_end_t2_nokey); the engine's lockstep order (Frame_Begin, Game_Tick, frame body) always takes that path, so its key icon is gone where most captures still show it"
+    }
+   ],
+   "note": "1.2 ticks at the castle-top transition: DOSBox-X shows the shaft until the transition frame has loaded CLOSE and drawn, the engine from its start"
+  }
+ ]
+}

@@ -1,8 +1,8 @@
 // DOS edition USERS.DAT (dos/save/users_dat.h, users_store.h). Synthetic files always; byte-exact
 // round trips of the user's TM-DOS\USERS.DAT (TM_DATA_DOS, read only) and of every reference file
 // written by the original in DOSBox-X (TM_DOS_CAPTURES = extracted\captures\dos: USERS_*.DAT,
-// original\USERS.DAT, savestates\*\*.users; when unset, <TM_DATA_DOS>\..\extracted\captures\dos is
-// tried). Writes happen only in a temporary directory.
+// original\USERS.DAT, savestates\*\*.users; skipped when unset). Writes happen only in a temporary
+// directory.
 #include <doctest/doctest.h>
 
 #include <algorithm>
@@ -40,15 +40,7 @@ std::vector<uint8_t> pseudoRandomFile(uint32_t seed) {
     return v;
 }
 
-std::optional<fs::path> capturesDir() {
-    if (auto p = getEnv("TM_DOS_CAPTURES")) return pathFromUtf8(*p);
-    if (auto d = testdata::dosDataPath()) {
-        const fs::path guess = *d / ".." / "extracted" / "captures" / "dos";
-        std::error_code ec;
-        if (fs::is_directory(guess, ec)) return guess;
-    }
-    return std::nullopt;
-}
+std::optional<fs::path> capturesDir() { return testdata::dosCapturesPath(); }
 
 // Every USERS.DAT the original wrote in the reference runs.
 std::vector<fs::path> referenceUsersFiles(const fs::path& dir) {

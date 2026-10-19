@@ -1,0 +1,43 @@
+{
+ "description": "load the state, compare the loaded moment (its own screen) and the first engine frame with the capture (masked: the capture is of the all-found run (6 treasures), the state of the two-found run (2))",
+ "start": {
+  "state": "savestates/r2/crown_t2_298_wait.sav"
+ },
+ "ticks": 1,
+ "checkpoints": [
+  {
+   "id": "loaded",
+   "tick": 0,
+   "capture": "ega/r2_crown_06_rank_champion_visible.png",
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      296,
+      187,
+      302,
+      194
+     ],
+     "reason": "the capture is of the all-found run (6 treasures), the state of the two-found run (2)"
+    }
+   ]
+  },
+  {
+   "id": "frame1",
+   "tick": 1,
+   "capture": "ega/r2_crown_06_rank_champion_visible.png",
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      296,
+      187,
+      302,
+      194
+     ],
+     "reason": "the capture is of the all-found run (6 treasures), the state of the two-found run (2)"
+    }
+   ]
+  }
+ ]
+}

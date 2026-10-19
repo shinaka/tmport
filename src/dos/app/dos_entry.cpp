@@ -9,16 +9,20 @@
 #include <cmath>
 #include <format>
 #include <fstream>
+#include <optional>
 #include <system_error>
 
 #include "dos/app/dos_preview.h"
 #include "dos/app/dos_runtime.h"
 #include "dos/app/script_input.h"
+#include "dos/data/dgroup_offsets.h"
 #include "dos/game/game.h"
+#include "dos/game/load_state.h"
 #include "dos/game/main_loop.h"
 #include "dos/game/sound.h"
 #include "dos/game/trace.h"
 #include "dos/game/ui.h"
+#include "dos/save/dosbox_state.h"
 #include "dos/save/users_store.h"
 #include "mods/wav_codec.h"
 #include "platform/host.h"
@@ -190,6 +194,32 @@ int runPreview(platform::Host& host, const DosOptions& options, const std::files
 
 // ---- the game ------------------------------------------------------------------------------------
 
+// The state's USERS.DAT copy (<name>.users next to the .sav) becomes the preference folder's DOS
+// save, so the next sign-in reads what DOSBox-X had on disk. A replaced file is kept as .bak.
+void useStateUsersFile(const DosboxState& state, const std::filesystem::path& usersPath) {
+    const auto copy = DosboxState::usersFileOf(state.path());
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(copy, ec)) {
+        log::warn("{} not found: the DOS save of the preference folder stays as it is", pathToUtf8(copy));
+        return;
+    }
+    const DosImportResult r = importDosUsers(copy, usersPath, true);
+    if (r != DosImportResult::Imported) log::warn("{} -> {}: {}", pathToUtf8(copy), pathToUtf8(usersPath), describe(r));
+}
+
+void logLoadedState(const LoadedState& s) {
+    log::info("state loaded: CPU at {}{}{}, g_ticks {} (the next game tick at {}), PAN {} (before it {}), bank {}, {} dirty "
+              "spans{}{}{}",
+              s.cpu.empty() ? "?" : s.cpu, s.insideTimerBeforeCountdown ? " (timer interrupt, before its countdown)" : "",
+              s.insideGameTick ? " (inside Game_Tick: the engine starts with the next tick)" : "", s.ticks, s.firstTickTicks,
+              s.pan.empty() ? "?" : s.pan, s.prevPan.empty() ? "-" : s.prevPan,
+              s.bank.empty() ? "?" : s.bank, s.dirtySpans,
+              s.midFrame ? std::format(", saved inside a frame ({} sprite backgrounds put back)", s.spritesRestored) : "",
+              s.restartedSfx >= 0 ? std::format(", effect {} goes on", s.restartedSfx) : "",
+              s.restartedTune >= 0 ? std::format(", tune {} goes on", s.restartedTune) : "");
+    for (const std::string& w : s.warnings) log::warn("state: {}", w);
+}
+
 // --frame-dump as a folder: the last frame of each screen the game showed (the title pages, the
 // sign-in, play in each scene, each UI mode), so the settled pictures can be compared with the
 // reference captures, and the final frame. Files: NNN_tTICK_<what>_<look>.png.
@@ -200,13 +230,14 @@ public:
         std::filesystem::create_directories(dir_, ec);
     }
 
-    // After the frame of game tick `tick`; `rgba` is the screen now shown.
-    void afterFrame(const DosGame& g, uint64_t tick, std::span<const uint32_t> rgba) {
+    // After the frame of game tick `tick`; `rgba` is the screen now shown, the copy `shownVersion` of
+    // DosGame::screenVersion.
+    void afterFrame(const DosGame& g, uint64_t tick, uint64_t shownVersion, std::span<const uint32_t> rgba) {
         const Phase now = phaseOf(g);
         if (have_ && now != phase_) write(tick_, phase_, rgba_);
-        if (!have_ || now != phase_ || g.screenVersion != version_) {
+        if (!have_ || now != phase_ || shownVersion != version_) {
             rgba_.assign(rgba.begin(), rgba.end());
-            version_ = g.screenVersion;
+            version_ = shownVersion;
         }
         phase_ = now;
         tick_ = tick;
@@ -261,7 +292,17 @@ private:
     size_t n_ = 0;
 };
 
-int runGame(platform::Host& host, const DosOptions& options, const std::filesystem::path& folder) {
+int runGame(platform::Host& host, const DosOptions& launchOptions, const std::filesystem::path& folder) {
+    // --dos-load-state: the DOSBox-X state decides the machine (its look unless one was given, and
+    // its sound device, which the game's rand() sequence depends on: AdLib draws one per tune).
+    std::optional<DosboxState> state;
+    DosOptions options = launchOptions;
+    if (!options.loadState.empty()) {
+        state = DosboxState::load(options.loadState);
+        if (!options.lookFromCommandLine) options.look = stateLook(*state);
+        log::info("DOSBox-X state {} ({}, g_videoType {}, g_soundDevice {})", pathToUtf8(options.loadState),
+                  state->machineName(), static_cast<int16_t>(state->dsWord(dg::kVideoType)), state->dsWord(dg::kSoundDevice));
+    }
     log::info("DOS edition in {} (look {}, sound {}{}, frame speed {})", pathToUtf8(folder), lookName(options.look),
               iniValue(options.sound), options.slowCpu ? ", slow CPU" : "", iniValue(options.frameSpeed));
     const DosGfxFiles files = DosGfxFiles::open(folder);
@@ -269,6 +310,7 @@ int runGame(platform::Host& host, const DosOptions& options, const std::filesyst
     RuntimeOptions ro;
     ro.frameSpeed = options.frameSpeed;
     // The host keyboard is a PC keyboard, also with the Tandy look: KeyboardOptions::tandy stays off.
+    ro.keyboard.greyKeyE0Artefact = options.greyKeyArtefact;
     DosRuntime runtime(ro);
 
     // The saves: the engine's DOS file in the preference folder, imported from the DOS folder's
@@ -279,6 +321,7 @@ int runGame(platform::Host& host, const DosOptions& options, const std::filesyst
     if (usersPath.empty()) {
         log::warn("no preference folder: the DOS edition's players and saved games are not kept");
     } else {
+        if (state) useStateUsersFile(*state, usersPath);
         const DosUsersStatus status = users.loadWithImport(folder);  // logs an import
         if (status != DosUsersStatus::Ok && status != DosUsersStatus::Missing)
             log::warn("{}: {}{}", pathToUtf8(usersPath), describe(status), users.fromBackup() ? " (the backup is used)" : "");
@@ -291,7 +334,13 @@ int runGame(platform::Host& host, const DosOptions& options, const std::filesyst
     DosGame* game = nullptr;
     const bool offline = options.headless || !host.hasWindow();
     const bool silent = options.sound == SoundDevice::Off;
-    std::unique_ptr<DosAudioDevice> audio = makeDosAudioDevice(files.files(), silent ? SoundDevice::Tandy : options.sound,
+    SoundDevice device = silent ? SoundDevice::Tandy : options.sound;
+    if (state) {
+        device = stateSoundDevice(*state);  // also when silent: the device is part of the game's state
+        if (!silent && device != options.sound)
+            log::info("sound device {}: the state's (the sound option does not apply to a loaded state)", iniValue(device));
+    }
+    std::unique_ptr<DosAudioDevice> audio = makeDosAudioDevice(files.files(), device,
                                                                [&game] { return game ? game->rand.rand() : 0; });
     if (!audio) throw Error("the DOS sound driver could not be created");
     bool audioOffline = offline || silent;
@@ -318,15 +367,33 @@ int runGame(platform::Host& host, const DosOptions& options, const std::filesyst
     g.layoutSeedOverride = options.layoutSeed;  // --dos-layout-seed (reproducible new games)
     syncSoundFlags(g);  // the driver starts with the EXE's flags (sound and music on, gate open)
     std::unique_ptr<DosTrace> trace;
-    if (traceSound) trace = std::make_unique<DosTrace>(g, traceFile, traceSound.get());
-    runtime.setClient(trace ? static_cast<RuntimeClient*>(trace.get()) : &g);
-    mainStart(g);
+    if (state) {
+        // The runtime's g_ticks go on from the state's (DosRuntime::resumeAt): the trace's ticks
+        // column and the DGROUP dumps carry the original's g_ticks.
+        runtime.setClient(&g);
+        const LoadedState loaded = loadDosboxState(g, *state);
+        logLoadedState(loaded);
+        // Created after the load, so the first row's events are what the first tick changed.
+        if (traceSound) trace = std::make_unique<DosTrace>(g, traceFile, traceSound.get());
+        runtime.setClient(trace ? static_cast<RuntimeClient*>(trace.get()) : &g);
+    } else {
+        if (traceSound) trace = std::make_unique<DosTrace>(g, traceFile, traceSound.get());
+        runtime.setClient(trace ? static_cast<RuntimeClient*>(trace.get()) : &g);
+        mainStart(g);
+    }
 
-    // Presentation: the screen buffer through the look's palette whenever Frame_Present changed it.
+    // Presentation: the screen buffer through the look's palette whenever Frame_Present changed it. At
+    // the reference frame speed a long frame's picture appears when the frame ends, as DOSBox-X
+    // presents it at the end of its frame (a bubble, a scene load, a title page): until the last game
+    // tick before that end the previous picture stays (the frames in between run no frame body, so
+    // `screen` keeps the new picture meanwhile).
     std::vector<uint32_t> rgba(static_cast<size_t>(BackBuffer::kWidth * BackBuffer::kHeight));
     uint64_t shownVersion = ~0ull;
     auto present = [&] {
         if (g.screenVersion == shownVersion) return;
+        const uint64_t shownAt = std::max(runtime.frameEndUnits(), g.screenShownAt);
+        const uint64_t nextTick = (runtime.pitTicks() / kPitTicksPerGameTick + 1) * kPitTicksPerGameTick * FrameTiming::kMilli;
+        if (runtime.longFrames() && shownVersion != ~0ull && shownAt > nextTick) return;
         shownVersion = g.screenVersion;
         toRgba32(g.screen, g.palette, rgba);
         host.presenter().presentFrame(rgba);
@@ -339,7 +406,7 @@ int runGame(platform::Host& host, const DosOptions& options, const std::filesyst
     auto afterTicks = [&] {
         present();
         const uint64_t tick = runtime.gameTicks();
-        if (dumper) dumper->afterFrame(g, tick, rgba);
+        if (dumper) dumper->afterFrame(g, tick, shownVersion, rgba);
         for (size_t i = 0; i < options.stateDumps.size(); ++i) {
             const auto& d = options.stateDumps[i];
             if (dumped[i] || tick < d.tick) continue;
@@ -354,6 +421,9 @@ int runGame(platform::Host& host, const DosOptions& options, const std::filesyst
                 log::error("cannot write {}", pathToUtf8(shot));
         }
     };
+    // From a state, tick 0 is the loaded moment: --dos-dump-state 0:<file> and the frame dump see the
+    // picture DOSBox-X showed (the state's video memory).
+    if (state) afterTicks();
 
     if (offline) {
         // Headless: the --keys script (game ticks) drives the run, which lasts until the script is used

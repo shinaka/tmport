@@ -1,0 +1,341 @@
+{
+ "description": "the boot with the MCGA look and the roster of its capture run (after the Tandy session: Rascal, Ada, Ben): the title pages, the walk-off, the sign-in, Ada's resumed level-2 game after Flutter's first hint",
+ "start": {
+  "boot": true,
+  "seed": "0x1EE2",
+  "users": "USERS_after_tandy_newplayer_Ben.DAT"
+ },
+ "look": "mcga",
+ "keys": "660:tap:enter, 720:tap:enter, 780:tap:enter, 1000:tap:up, 1010:tap:up, 1020:tap:enter, 1060:tap:enter, 1150:tap:enter",
+ "ticks": 1161,
+ "checkpoints": [
+  {
+   "id": "title",
+   "tick": 59,
+   "capture": "mcga/01_title.png",
+   "masks": [
+    {
+     "rect": [
+      248,
+      32,
+      267,
+      50
+     ],
+     "reason": "title sparkle spot 0: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      250,
+      59,
+      269,
+      77
+     ],
+     "reason": "title sparkle spot 1: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      282,
+      89,
+      301,
+      107
+     ],
+     "reason": "title sparkle spot 2: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      244,
+      85,
+      263,
+      103
+     ],
+     "reason": "title sparkle spot 3: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      288,
+      50,
+      307,
+      68
+     ],
+     "reason": "title sparkle spot 4: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      270,
+      35,
+      289,
+      53
+     ],
+     "reason": "title sparkle spot 5: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      274,
+      10,
+      293,
+      28
+     ],
+     "reason": "title sparkle spot 6: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      286,
+      28,
+      305,
+      46
+     ],
+     "reason": "title sparkle spot 7: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      276,
+      58,
+      295,
+      76
+     ],
+     "reason": "title sparkle spot 8: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      256,
+      87,
+      275,
+      105
+     ],
+     "reason": "title sparkle spot 9: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      240,
+      84,
+      259,
+      102
+     ],
+     "reason": "title sparkle spot 10: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    }
+   ]
+  },
+  {
+   "id": "story2",
+   "tick": 760,
+   "capture": "mcga/02_story2.png",
+   "masks": [
+    {
+     "rect": [
+      248,
+      32,
+      267,
+      50
+     ],
+     "reason": "title sparkle spot 0: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      250,
+      59,
+      269,
+      77
+     ],
+     "reason": "title sparkle spot 1: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      282,
+      89,
+      301,
+      107
+     ],
+     "reason": "title sparkle spot 2: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      244,
+      85,
+      263,
+      103
+     ],
+     "reason": "title sparkle spot 3: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      288,
+      50,
+      307,
+      68
+     ],
+     "reason": "title sparkle spot 4: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      270,
+      35,
+      289,
+      53
+     ],
+     "reason": "title sparkle spot 5: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      274,
+      10,
+      293,
+      28
+     ],
+     "reason": "title sparkle spot 6: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      286,
+      28,
+      305,
+      46
+     ],
+     "reason": "title sparkle spot 7: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      276,
+      58,
+      295,
+      76
+     ],
+     "reason": "title sparkle spot 8: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      256,
+      87,
+      275,
+      105
+     ],
+     "reason": "title sparkle spot 9: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      240,
+      84,
+      259,
+      102
+     ],
+     "reason": "title sparkle spot 10: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    }
+   ]
+  },
+  {
+   "id": "walkoff",
+   "tick": 937,
+   "capture": "mcga/03_enter_walkoff.png",
+   "masks": [
+    {
+     "rect": [
+      248,
+      32,
+      267,
+      50
+     ],
+     "reason": "title sparkle spot 0: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      250,
+      59,
+      269,
+      77
+     ],
+     "reason": "title sparkle spot 1: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      282,
+      89,
+      301,
+      107
+     ],
+     "reason": "title sparkle spot 2: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      244,
+      85,
+      263,
+      103
+     ],
+     "reason": "title sparkle spot 3: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      288,
+      50,
+      307,
+      68
+     ],
+     "reason": "title sparkle spot 4: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      270,
+      35,
+      289,
+      53
+     ],
+     "reason": "title sparkle spot 5: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      274,
+      10,
+      293,
+      28
+     ],
+     "reason": "title sparkle spot 6: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      286,
+      28,
+      305,
+      46
+     ],
+     "reason": "title sparkle spot 7: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      276,
+      58,
+      295,
+      76
+     ],
+     "reason": "title sparkle spot 8: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      256,
+      87,
+      275,
+      105
+     ],
+     "reason": "title sparkle spot 9: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      240,
+      84,
+      259,
+      102
+     ],
+     "reason": "title sparkle spot 10: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    }
+   ]
+  },
+  {
+   "id": "signin",
+   "tick": 990,
+   "capture": "mcga/04_signin.png"
+  },
+  {
+   "id": "level2",
+   "tick": 1161,
+   "capture": "mcga/05_level2.png"
+  }
+ ]
+}

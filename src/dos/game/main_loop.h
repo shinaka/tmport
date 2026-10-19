@@ -10,7 +10,8 @@ class DosGame;
 struct TickInfo;
 
 // 130f:0007 main, up to its frame loop: g_quit = 0, Game_Init (gameInit; Kbd_Install and
-// Timer_Install are the runtime's), then the start of Title_Run (titleStart): the frames that follow
+// Timer_Install are the runtime's), then the start of Title_Run (titleStart, with its OPENING load
+// reported to the runtime's frame timing: the first game tick falls into it): the frames that follow
 // run the title loop (DosGame::titleRunning) until it ends, then main's loop with g_uiMode = 8.
 void mainStart(DosGame& g);
 // 130f:0007 main, the frame loop body (130f:003D..00D1) after Frame_Begin: g_dirty = 0 is done
@@ -21,8 +22,18 @@ void mainStart(DosGame& g);
 // While the title runs (DosGame::titleRunning) the frame is one iteration of Title_Run's loop
 // (titleFrame; when it ends: titleFinish, g_uiMode = 8). While a dissolve spans frames
 // (DosGame::dissolveRunning, one long Frame_Present of the original) the frame only continues it;
-// Sprites_EraseAll follows its last cell.
+// Sprites_EraseAll follows its last cell. At the reference frame speed the frame runs as many
+// Search_Update calls as reference search frames fit into it, and reports what it cost on the
+// reference machine to the runtime (DosRuntime::frameTiming: USERS.DAT writes, Quiz_LoadQuestions and
+// PAN loads with g_quit = 1, a full HUD redraw, a bubble opening; PORTING_NOTES.md §2.5).
 void mainFrameBody(DosGame& g);
+// The reference frame timing (DosRuntime::frameTiming, PORTING_NOTES.md §2.5) of the I/O that
+// Frame_Begin's latches start: a scene the ticks asked for (g_sceneWanted != g_loadedScene with no UI
+// mode open) is loaded by Scene_Update right at the start of the frame body, with g_quit = 1; on the
+// reference machine that frame began right after the previous game tick. Called by
+// DosGame::frameBegin after Frame_Begin; sets DosGame::latchedLoad. (mainFrameBody reports the rest of
+// a frame's cost: the I/O the frame body starts, a full HUD redraw.)
+void frameBeginTiming(DosGame& g);
 // 130f:00fe Game_Tick (per game tick; the runtime handles g_quit and the two counters): not gated:
 // player screen offsets (DS:8FA7/8FA9, wrapped rows), Mouse_Poll, Input_Tick, Anim_Tick, and with the
 // scene loaded (or the title) Input_MouseWalk, Player_Update, Elves_Update, Cells_UpdateVisible;
@@ -31,8 +42,9 @@ void gameTick(DosGame& g, const TickInfo& info);
 // 130f:01c2 Frame_Present: nothing drawn: no copy (the 1000-iteration delay is dropped); no
 // transition: Present_Dirty (g.back -> g.screen); a latched transition: the dissolve
 // (transitionDissolve, camera.h), then Present_Full and g_transition = 0. A dissolve that needs
-// more frames sets DosGame::dissolveRunning (mainFrameBody continues it). Each copy into g.screen
-// counts DosGame::screenVersion.
+// more frames sets DosGame::dissolveRunning (mainFrameBody continues it); at the reference frame
+// speed its first frame's cells make it end in the frame of the last game tick before its end on the
+// reference machine (PORTING_NOTES.md §2.5). Each copy into g.screen counts DosGame::screenVersion.
 void framePresent(DosGame& g);
 // 130f:00db Game_Shutdown: Music_Stop, Sfx_Stop; the timer / keyboard / video restores have no
 // engine part; ends the run (g_quit = 1). Runs once (DosGame::shutdownDone): from TitleStep_Wait

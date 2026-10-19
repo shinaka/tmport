@@ -11,6 +11,8 @@
 #include <array>
 #include <cstdint>
 
+#include "dos/gfx/palettes.h"
+
 namespace tmport::dos {
 
 class MouseDriver {
@@ -25,6 +27,12 @@ public:
 
     // Host pointer at logical pixel (x, y) of the 320x200 screen; clamped like the driver's range.
     void setLogicalPosition(int x, int y);
+    // Where the driver leaves the pointer after Mouse_Detect's reset (INT 33h AX=0, 1460:0A5E) in
+    // the game's video mode and Mouse_Setup's ranges (x in bytes, y in rows): the DOSBox-X driver of
+    // the reference captures has it at (159, 101) in the EGA and Tandy modes, (158, 82) in MCGA and
+    // (159, 146) in CGA (REFERENCE_CAPTURES.md §6; every untouched pointer of the captures).
+    static void startPosition(Look look, uint16_t& x, uint16_t& y);
+    void resetPosition(Look look) { startPosition(look, x_, y_); }
     void setButtons(uint16_t mask) { buttons_ = mask; }
     void setButton(uint16_t button, bool down) { buttons_ = down ? (buttons_ | button) : (buttons_ & ~button); }
 
@@ -34,10 +42,9 @@ public:
     uint16_t buttons() const { return buttons_; }
 
 private:
-    // [I] After the mode set the driver centres the pointer (320, 100 in its 640x200 space); the
-    // range set by Mouse_Setup then clamps x to 159.
+    // The EGA start position until resetPosition() picks the look's (gameInit, Mouse_Setup).
     uint16_t x_ = kMaxX;
-    uint16_t y_ = 100;
+    uint16_t y_ = 101;
     uint16_t buttons_ = 0;
 };
 

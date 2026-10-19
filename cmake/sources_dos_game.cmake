@@ -25,4 +25,7 @@ target_sources(tmcore PRIVATE
     src/dos/game/quiz.cpp
     src/dos/game/hud.cpp
     src/dos/game/trace.cpp
+    src/util/inflate.cpp
+    src/dos/save/dosbox_state.cpp
+    src/dos/game/load_state.cpp
 )

@@ -1,0 +1,34 @@
+{
+ "description": "level 1: walking right and left with the camera following",
+ "start": {
+  "state": "savestates/r2/fl_outside2.sav"
+ },
+ "keys": "89:down:right, 280:up:right, 295:down:left, 438:up:left",
+ "ticks": 544,
+ "checkpoints": [
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_walk2.sav",
+   "capture_state": "savestates/r2/fl_walk2.sav"
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_walk2",
+   "state": "savestates/r2/fl_walk2.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ]
+}

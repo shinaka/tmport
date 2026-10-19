@@ -24,6 +24,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <span>
 
 #include "dos/audio/sound_data.h"
 
@@ -107,6 +108,19 @@ public:
     const Block& musicBlock() const { return music_; }
     bool sfxActive() const { return sfx_.status != 0; }
     bool musicActive() const { return music_.status != 0; }
+    // ---- a DOSBox-X state's driver (wave 4): the blocks as the original holds them in DGROUP
+    static constexpr size_t kBlockBytes = 0x78;
+    // The 0x78-byte block at DS:6448 (effects) or DS:64c0 (music) in the field order above (stream
+    // pointers are offsets into the effect / music file, envelope pointers DS offsets).
+    static Block blockFromDgroup(std::span<const uint8_t> bytes);
+    static std::array<uint8_t, kBlockBytes> blockToDgroup(const Block& b);
+    // Continues a driver saved between two timer interrupts: both blocks and the voice count DS:63be
+    // as they were; then the device gets what the current notes had written to it (each sounding
+    // voice's pitch from the time-taking event before its stream pointer, the speaker gate off past
+    // the release point, a rest as voice off; the Tandy volumes follow at the next tick's volume
+    // pass). `adlibVariant` = the orchestration of the playing tune (AdLib).
+    void restore(const Block& sfx, const Block& music, int voices, int adlibVariant = 0);
+
     // Times a looping block restarted (DS:63ba / 63b8), for tools and tests.
     uint32_t musicLoops() const { return musicLoopCount_; }
     // A stream that never yields a duration (it would hang the original's interrupt) was cut.
@@ -123,6 +137,8 @@ private:
     void updateVolumes(Block& b);     // 491b:033d Tandy_UpdateVolumes
     void control(Block& b, int v, uint8_t cmd, uint8_t value);  // 491b:03fe Sound_Control
     void glide(Block& b, int v, uint8_t oct, uint8_t value);    // 491b:04ce Sound_Glide
+    void glidePitch(int v, uint8_t oct, uint8_t value);         // its pitch part
+    void resumeVoice(Block& b, int v, bool music);              // restore(): the note in progress
     void speakerOn(int v);            // 491b:0575 Speaker_On
     void voiceOff(int v);             // 491b:05b8 Sound_VoiceOff
     void setFrequency(int v, uint16_t value);  // 491b:0607 Sound_SetFrequency

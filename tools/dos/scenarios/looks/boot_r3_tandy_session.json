@@ -1,0 +1,507 @@
+{
+ "description": "Round 3 (DOSBox-X, Tandy, avi/tandy_r3_session.avi): the attract, the walk-off, the sign-in, Ada's saved game, Flutter's hint, a coin toss, a net swing, the Help menu; the AVI frames at the engine ticks of their time (engine PIT tick = AVI time x 236.695 + 10336, from the title music), the keys at the ticks the AVI shows them (the walk-off's Enter 3 ticks before its redrawn title: the original draws it in a long frame). avi_f00421 (that long frame) and avi_f01185 (the resumed game's screen, about 8 ticks after Yes) match since the engine shows a long frame's picture when the frame ends, as the original presents it",
+ "start": {
+  "boot": true,
+  "seed": "0x1EE2",
+  "users": "USERS_after_tandy_newplayer_Ben.DAT"
+ },
+ "look": "tandy",
+ "extra_args": [
+  "--sound",
+  "tandy"
+ ],
+ "keys": "2244:tap:enter, 2398:tap:enter, 2793:tap:up, 2836:tap:up, 2898:tap:enter, 2983:tap:enter, 3236:tap:enter, 3439:tap:down, 3688:tap:space, 3897:tap:f1, 4004:tap:esc",
+ "ticks": 4200,
+ "checkpoints": [
+  {
+   "id": "avi_f00300",
+   "tick": 2304,
+   "capture": "tandy/r3_session_f00300.png",
+   "masks": [
+    {
+     "rect": [
+      248,
+      32,
+      267,
+      50
+     ],
+     "reason": "title sparkle spot 0: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      250,
+      59,
+      269,
+      77
+     ],
+     "reason": "title sparkle spot 1: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      282,
+      89,
+      301,
+      107
+     ],
+     "reason": "title sparkle spot 2: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      244,
+      85,
+      263,
+      103
+     ],
+     "reason": "title sparkle spot 3: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      288,
+      50,
+      307,
+      68
+     ],
+     "reason": "title sparkle spot 4: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      270,
+      35,
+      289,
+      53
+     ],
+     "reason": "title sparkle spot 5: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      274,
+      10,
+      293,
+      28
+     ],
+     "reason": "title sparkle spot 6: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      286,
+      28,
+      305,
+      46
+     ],
+     "reason": "title sparkle spot 7: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      276,
+      58,
+      295,
+      76
+     ],
+     "reason": "title sparkle spot 8: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      256,
+      87,
+      275,
+      105
+     ],
+     "reason": "title sparkle spot 9: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      240,
+      84,
+      259,
+      102
+     ],
+     "reason": "title sparkle spot 10: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    }
+   ]
+  },
+  {
+   "id": "avi_f00421",
+   "tick": 2399,
+   "capture": "tandy/r3_session_f00421.png",
+   "masks": [
+    {
+     "rect": [
+      248,
+      32,
+      267,
+      50
+     ],
+     "reason": "title sparkle spot 0: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      250,
+      59,
+      269,
+      77
+     ],
+     "reason": "title sparkle spot 1: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      282,
+      89,
+      301,
+      107
+     ],
+     "reason": "title sparkle spot 2: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      244,
+      85,
+      263,
+      103
+     ],
+     "reason": "title sparkle spot 3: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      288,
+      50,
+      307,
+      68
+     ],
+     "reason": "title sparkle spot 4: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      270,
+      35,
+      289,
+      53
+     ],
+     "reason": "title sparkle spot 5: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      274,
+      10,
+      293,
+      28
+     ],
+     "reason": "title sparkle spot 6: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      286,
+      28,
+      305,
+      46
+     ],
+     "reason": "title sparkle spot 7: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      276,
+      58,
+      295,
+      76
+     ],
+     "reason": "title sparkle spot 8: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      256,
+      87,
+      275,
+      105
+     ],
+     "reason": "title sparkle spot 9: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      240,
+      84,
+      259,
+      102
+     ],
+     "reason": "title sparkle spot 10: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    }
+   ]
+  },
+  {
+   "id": "avi_f00500",
+   "tick": 2462,
+   "capture": "tandy/r3_session_f00500.png",
+   "masks": [
+    {
+     "rect": [
+      248,
+      32,
+      267,
+      50
+     ],
+     "reason": "title sparkle spot 0: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      250,
+      59,
+      269,
+      77
+     ],
+     "reason": "title sparkle spot 1: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      282,
+      89,
+      301,
+      107
+     ],
+     "reason": "title sparkle spot 2: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      244,
+      85,
+      263,
+      103
+     ],
+     "reason": "title sparkle spot 3: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      288,
+      50,
+      307,
+      68
+     ],
+     "reason": "title sparkle spot 4: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      270,
+      35,
+      289,
+      53
+     ],
+     "reason": "title sparkle spot 5: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      274,
+      10,
+      293,
+      28
+     ],
+     "reason": "title sparkle spot 6: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      286,
+      28,
+      305,
+      46
+     ],
+     "reason": "title sparkle spot 7: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      276,
+      58,
+      295,
+      76
+     ],
+     "reason": "title sparkle spot 8: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      256,
+      87,
+      275,
+      105
+     ],
+     "reason": "title sparkle spot 9: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      240,
+      84,
+      259,
+      102
+     ],
+     "reason": "title sparkle spot 10: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    }
+   ]
+  },
+  {
+   "id": "avi_f00560",
+   "tick": 2509,
+   "capture": "tandy/r3_session_f00560.png",
+   "masks": [
+    {
+     "rect": [
+      248,
+      32,
+      267,
+      50
+     ],
+     "reason": "title sparkle spot 0: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      250,
+      59,
+      269,
+      77
+     ],
+     "reason": "title sparkle spot 1: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      282,
+      89,
+      301,
+      107
+     ],
+     "reason": "title sparkle spot 2: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      244,
+      85,
+      263,
+      103
+     ],
+     "reason": "title sparkle spot 3: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      288,
+      50,
+      307,
+      68
+     ],
+     "reason": "title sparkle spot 4: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      270,
+      35,
+      289,
+      53
+     ],
+     "reason": "title sparkle spot 5: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      274,
+      10,
+      293,
+      28
+     ],
+     "reason": "title sparkle spot 6: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      286,
+      28,
+      305,
+      46
+     ],
+     "reason": "title sparkle spot 7: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      276,
+      58,
+      295,
+      76
+     ],
+     "reason": "title sparkle spot 8: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      256,
+      87,
+      275,
+      105
+     ],
+     "reason": "title sparkle spot 9: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      240,
+      84,
+      259,
+      102
+     ],
+     "reason": "title sparkle spot 10: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    }
+   ]
+  },
+  {
+   "id": "avi_f00700",
+   "tick": 2620,
+   "capture": "tandy/r3_session_f00700.png"
+  },
+  {
+   "id": "avi_f01000",
+   "tick": 2857,
+   "capture": "tandy/r3_session_f01000.png"
+  },
+  {
+   "id": "avi_f01100",
+   "tick": 2936,
+   "capture": "tandy/r3_session_f01100.png"
+  },
+  {
+   "id": "avi_f01170",
+   "tick": 2991,
+   "capture": "tandy/r3_session_f01170.png"
+  },
+  {
+   "id": "avi_f01185",
+   "tick": 3003,
+   "capture": "tandy/r3_session_f01185.png"
+  },
+  {
+   "id": "avi_f01200",
+   "tick": 3015,
+   "capture": "tandy/r3_session_f01200.png"
+  },
+  {
+   "id": "avi_f01500",
+   "tick": 3252,
+   "capture": "tandy/r3_session_f01500.png"
+  },
+  {
+   "id": "avi_f01760",
+   "tick": 3457,
+   "capture": "tandy/r3_session_f01760.png",
+   "masks": [
+    {
+     "rect": [
+      0,
+      88,
+      160,
+      140
+     ],
+     "reason": "an elf walking in from the left: the elves of a boot run are random (the original's title sparkles drew rand() at its loop rate)"
+    }
+   ]
+  },
+  {
+   "id": "avi_f02100",
+   "tick": 3726,
+   "capture": "tandy/r3_session_f02100.png"
+  },
+  {
+   "id": "avi_f02330",
+   "tick": 3907,
+   "capture": "tandy/r3_session_f02330.png"
+  },
+  {
+   "id": "avi_f02600",
+   "tick": 4121,
+   "capture": "tandy/r3_session_f02600.png"
+  }
+ ]
+}

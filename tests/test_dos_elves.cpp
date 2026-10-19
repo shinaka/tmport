@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <iterator>
 #include <set>
 #include <span>
@@ -20,8 +21,11 @@
 #include "dos/game/elves.h"
 #include "dos/data/dgroup_offsets.h"
 #include "dos/game/game.h"
+#include "dos/game/load_state.h"
+#include "dos/save/dosbox_state.h"
 #include "dos/save/users_dat.h"
 #include "dos_game_fixture.h"
+#include "dos_test_data.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -959,46 +963,29 @@ TEST_CASE("dos elves: state table dispatch (no-op entries) and a spawned level r
 }
 
 TEST_CASE("dos elves: replay of the DOSBox-X tierc session (elf dust takes the coins on the logged ticks)") {
-    // Optional (skipped unless TM_DOS_ELF_REPLAY names a folder): the DGROUP images DS:0000..CC1F of
-    // the logger states savestates/r2/fl_tierc_outside and fl_tierc_dust1, written with
-    // extracted/scratch/dos_w1_runtime/savmem.py (State(...).mem[ds:ds+0xCC20]) as
-    // fl_tierc_outside.dgroup / fl_tierc_dust1.dgroup. Between the two the crafted tier-3 player
-    // stood still outside the clubhouse for 2617 game ticks (g_seconds 5 -> 49, DS:9100 10 -> 33)
-    // while the throwers took his coins; the dust1 state's per-tick log shows the losses 4->3, 3->2,
-    // 2->1, 1->0 in the STEP records of PIT ticks 22550, 24010, 24405, 25625, i.e. during game ticks
-    // 1591, 1883, 1962 and 2206 after the outside state (the 5->4 loss lies before the log's ring).
-    const char* dir = std::getenv("TM_DOS_ELF_REPLAY");
-    if (!dir) {
-        MESSAGE("TM_DOS_ELF_REPLAY is not set: replay skipped");
+    // The logger states savestates/r2/fl_tierc_outside and fl_tierc_dust1 (TM_DOS_CAPTURES), loaded
+    // with the engine's state loader (dos/game/load_state.h). Between the two the crafted tier-3
+    // player stood still outside the clubhouse for 2617 game ticks (g_seconds 5 -> 49, DS:9100
+    // 10 -> 33) while the throwers took his coins; the dust1 state's per-tick log shows the losses
+    // 4->3, 3->2, 2->1, 1->0 in the STEP records of PIT ticks 22550, 24010, 24405, 25625, i.e. during
+    // game ticks 1591, 1883, 1962 and 2206 after the outside state (the 5->4 loss lies before the
+    // log's ring).
+    TM_REQUIRE_DOS_GAME_FILES();
+    const auto startPath = testdata::dosCapture("savestates/r2/fl_tierc_outside.sav");
+    const auto endPath = testdata::dosCapture("savestates/r2/fl_tierc_dust1.sav");
+    if (!startPath || !endPath) {
+        MESSAGE("TM_DOS_CAPTURES (r2/fl_tierc_outside, fl_tierc_dust1) not found: replay skipped");
         return;
     }
-    TM_REQUIRE_DOS_GAME_FILES();
-    auto readImage = [&](const char* name) {
-        std::ifstream in(std::filesystem::path(dir) / name, std::ios::binary);
-        std::vector<uint8_t> v((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-        return v;
-    };
-    const std::vector<uint8_t> start = readImage("fl_tierc_outside.dgroup");
-    const std::vector<uint8_t> end = readImage("fl_tierc_dust1.dgroup");
-    REQUIRE(start.size() == kDgroupSize);
-    auto u32 = [](const std::vector<uint8_t>& img, uint16_t ds) {
-        return static_cast<uint32_t>(img[ds] | img[ds + 1u] << 8 | img[ds + 2u] << 16 | static_cast<uint32_t>(img[ds + 3u]) << 24);
-    };
-
+    const DosboxState start = DosboxState::load(*startPath);
+    const DosboxState end = DosboxState::load(*endPath);
     dosgame::GameFixture f(*gameFiles);
     DosGame& g = f.g();
-    f.placePlayer(0x1C0, 0x7F0, 0x120, 0x780, 0, 10);  // the level-0 PAN and SPRITES.PAK
-    auto users = UsersDat::parse(std::span<const uint8_t>(start).subspan(dg::kUsersFile, kUsersFileSize));
-    REQUIRE(users.has_value());
-    f.users().users() = *users;
-    loadFromDgroup(static_cast<GameState&>(g), start);
-    g.rand.setRawSeed(u32(start, dg::kRandSeed));
-    g.counters().cycle13 = static_cast<int16_t>(start[dg::kTick13] | start[dg::kTick13 + 1u] << 8);
-    g.counters().secondCountdown = start[dg::kSecondTicks];
-    g.counters().seconds = static_cast<uint16_t>(start[dg::kSeconds] | start[dg::kSeconds + 1u] << 8);
-    g.keys() = 0;
+    const LoadedState loaded = loadDosboxState(g, start);
+    CHECK(loaded.warnings.empty());
     REQUIRE(g.core.uiMode == 0);
     REQUIRE(g.core.coins == 5);
+    REQUIRE(g.keys() == 0);
 
     std::vector<uint64_t> losses;
     uint16_t coins = g.core.coins;
@@ -1016,53 +1003,38 @@ TEST_CASE("dos elves: replay of the DOSBox-X tierc session (elf dust takes the c
     CHECK(losses[2] == 1883);
     CHECK(losses[3] == 1962);
     CHECK(losses[4] == 2206);
-    if (end.size() == kDgroupSize) {
-        CHECK(g.rand.seed() == u32(end, dg::kRandSeed));
-        const std::vector<uint8_t> now = dumpToDgroup(static_cast<const GameState&>(g), initialDgroupImage(g.exe()));
-        std::vector<DgroupField> elfFields;
-        for (const DgroupField& d : gameStateFields())
-            if (d.name == "g_elves" || d.name == "g_elfActiveCount" || d.name == "g_netCatchesThisTick" || d.name == "g_coins" ||
-                d.name == "g_nets")
-                elfFields.push_back(d);
-        const auto diff = diffDgroup(now, end, &elfFields);
-        for (const auto& n : diff) MESSAGE("differs from the DOSBox-X state: " << n);
-        CHECK(diff.empty());
-    }
+    CHECK(g.rand.seed() == end.dsDword(dg::kRandSeed));
+    const std::vector<uint8_t> now = dumpToDgroup(static_cast<const GameState&>(g), initialDgroupImage(g.exe()));
+    std::vector<DgroupField> elfFields;
+    for (const DgroupField& d : gameStateFields())
+        if (d.name == "g_elves" || d.name == "g_elfActiveCount" || d.name == "g_netCatchesThisTick" || d.name == "g_coins" ||
+            d.name == "g_nets")
+            elfFields.push_back(d);
+    const auto diff = diffDgroup(now, end.dgroup(), &elfFields);
+    for (const auto& n : diff) MESSAGE("differs from the DOSBox-X state: " << n);
+    CHECK(diff.empty());
 }
 
 TEST_CASE("dos elves: replay of the DOSBox-X coin creature run (walk right and back, +2 coins, then dust)") {
-    // Optional, as the replay above (TM_DOS_ELF_REPLAY): fl_tierc_coincreature.dgroup (the dust1
-    // state with g_nets poked to 3) and fl_coin_after.dgroup. The player walked right and back left
-    // (g_keys of each executed tick from the fl_coin_after log: below), the gold coin scrolled into
-    // view and was touched: coins 0 -> 2 during game tick 1421, then elf dust took one during 1504;
-    // the after state was saved at the start of tick 1747's record.
-    const char* dir = std::getenv("TM_DOS_ELF_REPLAY");
-    if (!dir) {
-        MESSAGE("TM_DOS_ELF_REPLAY is not set: replay skipped");
+    // The logger states savestates/r2/fl_tierc_coincreature (the dust1 state with g_nets poked to 3)
+    // and fl_coin_after (TM_DOS_CAPTURES). The player walked right and back left (g_keys of each
+    // executed tick from the fl_coin_after log: below), the gold coin scrolled into view and was
+    // touched: coins 0 -> 2 during game tick 1421, then elf dust took one during 1504; the after
+    // state was saved at the start of tick 1747's record.
+    TM_REQUIRE_DOS_GAME_FILES();
+    const auto startPath = testdata::dosCapture("savestates/r2/fl_tierc_coincreature.sav");
+    const auto endPath = testdata::dosCapture("savestates/r2/fl_coin_after.sav");
+    if (!startPath || !endPath) {
+        MESSAGE("TM_DOS_CAPTURES (r2/fl_tierc_coincreature, fl_coin_after) not found: replay skipped");
         return;
     }
-    TM_REQUIRE_DOS_GAME_FILES();
-    auto readImage = [&](const char* name) {
-        std::ifstream in(std::filesystem::path(dir) / name, std::ios::binary);
-        return std::vector<uint8_t>((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    };
-    const std::vector<uint8_t> start = readImage("fl_tierc_coincreature.dgroup");
-    const std::vector<uint8_t> end = readImage("fl_coin_after.dgroup");
-    REQUIRE(start.size() == kDgroupSize);
-    auto u32 = [](const std::vector<uint8_t>& img, uint16_t ds) {
-        return static_cast<uint32_t>(img[ds] | img[ds + 1u] << 8 | img[ds + 2u] << 16 | static_cast<uint32_t>(img[ds + 3u]) << 24);
-    };
+    const DosboxState start = DosboxState::load(*startPath);
+    const DosboxState end = DosboxState::load(*endPath);
     dosgame::GameFixture f(*gameFiles);
     DosGame& g = f.g();
-    f.placePlayer(0x1C0, 0x7F0, 0x120, 0x780, 0, 10);
-    auto users = UsersDat::parse(std::span<const uint8_t>(start).subspan(dg::kUsersFile, kUsersFileSize));
-    REQUIRE(users.has_value());
-    f.users().users() = *users;
-    loadFromDgroup(static_cast<GameState&>(g), start);
-    g.rand.setRawSeed(u32(start, dg::kRandSeed));
-    g.counters().cycle13 = static_cast<int16_t>(start[dg::kTick13] | start[dg::kTick13 + 1u] << 8);
-    g.counters().secondCountdown = start[dg::kSecondTicks];
-    g.counters().seconds = static_cast<uint16_t>(start[dg::kSeconds] | start[dg::kSeconds + 1u] << 8);
+    const LoadedState loaded = loadDosboxState(g, start);
+    CHECK(loaded.warnings.empty());
+    CHECK(loaded.midFrame);  // saved between Sprites_DrawSorted and Sprites_EraseAll
     REQUIRE(g.core.nets == 3);
     REQUIRE(g.core.coins == 0);
     // g_keys at the start of tick k (from k on): right 56..222, left 238..451 and 1374..1445.
@@ -1089,15 +1061,98 @@ TEST_CASE("dos elves: replay of the DOSBox-X coin creature run (walk right and b
     CHECK(coinChanges[0].second == 2);
     CHECK(coinChanges[1].first == 1504);
     CHECK(coinChanges[1].second == 1);
-    if (end.size() == kDgroupSize) {
-        CHECK(g.player.obj.x == (end[dg::kPlayer] | end[dg::kPlayer + 1u] << 8));
-        CHECK(g.rand.seed() == u32(end, dg::kRandSeed));
-        const std::vector<uint8_t> now = dumpToDgroup(static_cast<const GameState&>(g), initialDgroupImage(g.exe()));
-        std::vector<DgroupField> elfFields;
-        for (const DgroupField& d : gameStateFields())
-            if (d.name == "g_elves" || d.name == "g_coins" || d.name == "g_nets") elfFields.push_back(d);
-        const auto diff = diffDgroup(now, end, &elfFields);
-        for (const auto& n : diff) MESSAGE("differs from the DOSBox-X state: " << n);
-        CHECK(diff.empty());
+    CHECK(g.player.obj.x == end.dsWord(dg::kPlayer));
+    CHECK(g.rand.seed() == end.dsDword(dg::kRandSeed));
+    const std::vector<uint8_t> now = dumpToDgroup(static_cast<const GameState&>(g), initialDgroupImage(g.exe()));
+    std::vector<DgroupField> elfFields;
+    for (const DgroupField& d : gameStateFields())
+        if (d.name == "g_elves" || d.name == "g_coins" || d.name == "g_nets") elfFields.push_back(d);
+    const auto diff = diffDgroup(now, end.dgroup(), &elfFields);
+    for (const auto& n : diff) MESSAGE("differs from the DOSBox-X state: " << n);
+    CHECK(diff.empty());
+}
+
+namespace {
+
+// Loads `startRel`, runs the --keys script `keys` up to the game tick of `endRel`'s g_ticks and
+// compares g_randSeed, the elf records and the named fields with that state (wave 4, level1 group).
+void replayToState(const DosGfxFiles& files, const char* startRel, const char* endRel, const char* keys,
+                   std::initializer_list<const char*> more) {
+    const auto startPath = testdata::dosCapture(startRel);
+    const auto endPath = testdata::dosCapture(endRel);
+    if (!startPath || !endPath) {
+        MESSAGE("TM_DOS_CAPTURES (" << startRel << ", " << endRel << ") not found: replay skipped");
+        return;
     }
+    const DosboxState start = DosboxState::load(*startPath);
+    const DosboxState end = DosboxState::load(*endPath);
+    dosgame::GameFixture f(files);
+    DosGame& g = f.g();
+    const LoadedState loaded = loadDosboxState(g, start);
+    CHECK(loaded.warnings.empty());
+    REQUIRE(f.setScript(keys));
+    // The game ticks from the first after the start state up to the end state's g_ticks (the
+    // fidelity runner's at_log_end tick).
+    const uint32_t first = loaded.firstTickTicks;
+    REQUIRE(end.dsDword(dg::kTicks) >= first);
+    const int ticks = static_cast<int>((end.dsDword(dg::kTicks) - first) / 5 + 1);
+    f.step(ticks);
+    CHECK(g.rand.seed() == end.dsDword(dg::kRandSeed));
+    CHECK(g.player.obj.x == end.dsWord(dg::kPlayer));
+    const std::vector<uint8_t> now = dumpToDgroup(g);  // with the service-held globals (g_seconds)
+    std::vector<DgroupField> fields;
+    auto pick = [&](const std::vector<DgroupField>& from) {
+        for (const DgroupField& d : from) {
+            bool want = d.name == "g_elves" || d.name == "g_elfActiveCount" || d.name == "g_coins" || d.name == "g_nets" ||
+                        d.name == "g_cameraX" || d.name == "g_cameraY";
+            for (const char* m : more) want = want || d.name == m;
+            if (want) fields.push_back(d);
+        }
+    };
+    pick(gameStateFields());
+    pick(serviceFields());
+    const auto diff = diffDgroup(now, end.dgroup(), &fields);
+    for (const auto& n : diff) MESSAGE("differs from the DOSBox-X state: " << n);
+    CHECK(diff.empty());
+}
+
+}  // namespace
+
+TEST_CASE("dos elves: replay of the Round-1 walk to the flags (ega/outside_clue1 -> ega/path_flags, 2267 ticks)") {
+    // Ada's Round-1 session: Right held from 83 to 273 (the press pinned by avi/ega_walk_and_scroll.avi,
+    // where an elf enters 8 AVI frames before the walk starts), then 2000 ticks standing at the flags
+    // while the elves walk, pause and leave the view. Every elf record and g_randSeed equal the
+    // DOSBox-X state saved there (level1/walk_to_flags).
+    TM_REQUIRE_DOS_GAME_FILES();
+    replayToState(*gameFiles, "savestates/ega/outside_clue1.sav", "savestates/ega/path_flags.sav", "83:down:right, 273:up:right",
+                  {"g_seconds"});
+}
+
+TEST_CASE("dos elves: replay of r2/fl_treasure5_found (an elf walks on screen through a treasure search)") {
+    // From r2/at_treasure5: Down at 433 (the only press tick that gives the end state's seed), the coin
+    // throw, the search (the visible elf keeps walking, its walk script does not end during the
+    // search), hint 4; the elves stop with the hint (level1/treasure5_found).
+    TM_REQUIRE_DOS_GAME_FILES();
+    replayToState(*gameFiles, "savestates/r2/at_treasure5.sav", "savestates/r2/fl_treasure5_found.sav", "433:down:down, 435:up:down",
+                  {"g_seconds", "g_treasuresFound"});
+}
+
+TEST_CASE("dos elves: replay of the Round-1 first question (ega/quiz1 -> ega/outside_clue1, 1624 ticks)") {
+    // The first answer with Enter at tick 10, the praise bubble closed with Enter at 1007: the elves
+    // stand still while the question and the bubble are open, then the caught carrier gets up
+    // (ElfSt_03 with the stale g_elfAnimSel) and walks off. g_seconds (paused, with the byte-wrap
+    // quirk), every elf record and g_randSeed equal the DOSBox-X state (level1/quiz1_to_clue1).
+    TM_REQUIRE_DOS_GAME_FILES();
+    replayToState(*gameFiles, "savestates/ega/quiz1.sav", "savestates/ega/outside_clue1.sav", "10:tap:enter, 1007:tap:enter",
+                  {"g_seconds", "g_coinsShown"});
+}
+
+TEST_CASE("dos elves: replay of the Round-1 catch of a clue carrier (ega/outside_caught1 -> ega/quiz1)") {
+    // One net swing, Space at 865: the carrier of question slot 2 is pulled into the net (ElfSt_62/65,
+    // ElfSt_63/66, Elf_NetCatch), nets 9 -> 8, coins 6 -> 7, g_caughtSlot = 2 and the question opens
+    // (level1/catch_to_quiz1). The start state was saved inside Game_Tick, so the tick counters end
+    // one tick behind; they are not compared.
+    TM_REQUIRE_DOS_GAME_FILES();
+    replayToState(*gameFiles, "savestates/ega/outside_caught1.sav", "savestates/ega/quiz1.sav",
+                  "865:down:space, 869:up:space", {"g_caughtSlot", "g_uiMode", "g_elfAnimSel"});
 }

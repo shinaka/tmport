@@ -1,0 +1,36 @@
+{
+ "description": "the boot with nine players (the wave-1 list-full roster, outside the captures folder): the full list, a letter typed (list-full box), Esc, Enter on New Player (list-full box), Enter (remove mode)",
+ "start": {
+  "boot": true,
+  "seed": "0x1EE2",
+  "users": "../../scratch/dos_w1_runtime/USERS_9players.DAT"
+ },
+ "extra_args": [
+  "--sound",
+  "adlib"
+ ],
+ "keys": "660:tap:enter, 720:tap:enter, 780:tap:enter, 840:tap:enter, 1000:tap:e, 1100:tap:esc, 1200:tap:enter, 1300:tap:enter",
+ "ticks": 1360,
+ "checkpoints": [
+  {
+   "id": "list",
+   "tick": 960,
+   "capture": "ega/r2_ui_signin_9players.png"
+  },
+  {
+   "id": "typed_letter",
+   "tick": 1060,
+   "capture": "ega/r2_ui_signin_list_full_typed_letter.png"
+  },
+  {
+   "id": "full_box",
+   "tick": 1260,
+   "capture": "ega/r2_ui_signin_list_full_box.png"
+  },
+  {
+   "id": "remove_list",
+   "tick": 1340,
+   "capture": "ega/r2_ui_signin_list_full_remove_list.png"
+  }
+ ]
+}

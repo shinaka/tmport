@@ -3,7 +3,8 @@
 // (extracted/scratch/dos_w1_runtime/framelog.py) and DGROUP state dumps for comparisons with
 // DOSBox-X save states (savmem.py). Engine tooling only: nothing here changes the game.
 //
-// Trace (--dos-trace FILE): a CSV with one row per game tick,
+// Trace (--dos-trace FILE): a CSV with one row per game tick that ran Game_Tick (the ticks inside the
+// original's disk I/O, g_quit, have none, like the frame logger's STEP ring),
 //
 //   tick,ticks,gated,x,y,camx,camy,state,keys,coins,nets,level,scene,uimode,area,events
 //
@@ -14,7 +15,8 @@
 //             DS:913C, g_keys DS:9105, g_coins DS:9134), so engine row n lines up with STEP record n
 //             of a DOSBox-X log (whose gated ticks are in its BLOCKED ring instead)
 //   nets level scene uimode area   g_nets, g_level, g_loadedScene, g_uiMode, g_area after the frame
-//   events    what happened in the tick and its frame, separated by ';' (empty if nothing):
+//   events    what happened in the tick and its frame, separated by ';' (empty if nothing; what a
+//             frame whose own tick fell into its I/O did starts the next row):
 //             key=XXXX (BIOS key word read by Input_Poll), cmd=N (command delivered), ui=0xNN,
 //             level=N, scene=N, area=N, screen=N (painter), ctx=N (input context), title=N (title
 //             phase), transition=N, dissolve=on|off, game=N (g_gameInProgress), end=N (g_endState),
@@ -59,6 +61,9 @@ public:
     void setMusicGate(uint16_t m) override;
     bool sfxActive() const override { return inner_.sfxActive(); }
     void pitTick() override { inner_.pitTick(); }
+    void restoreDriver(std::span<const uint8_t> sfxBlock, std::span<const uint8_t> musicBlock, int voices) override {
+        inner_.restoreDriver(sfxBlock, musicBlock, voices);
+    }
 
     // The events since the last call.
     std::vector<std::string> takeEvents();
@@ -115,6 +120,8 @@ private:
         uint16_t x = 0, y = 0, camX = 0, camY = 0, state = 0, keys = 0, coins = 0;
         std::vector<std::string> events;
     } row_;
+    // The events of a frame whose own tick was frozen (no row): the next row starts with them.
+    std::vector<std::string> pendingEvents_;
     uint64_t rows_ = 0;
 };
 

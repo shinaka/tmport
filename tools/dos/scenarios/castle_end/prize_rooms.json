@@ -1,0 +1,46 @@
+{
+ "description": "tierb: Esc, walk right out of the start room into the four prize rooms (rows 3-6), stopping where the captures were taken",
+ "start": {
+  "state": "savestates/r2/tierb_exitbox.sav"
+ },
+ "keys": "5:down:esc, 6:up:esc, 20:down:right, 296:up:right, 310:down:right, 454:up:right, 470:down:right, 613:up:right, 630:down:right, 773:up:right, 790:down:right, 933:up:right",
+ "ticks": 945,
+ "checkpoints": [
+  {
+   "id": "room_1",
+   "tick": 156,
+   "capture": "ega/r2_prize_room_1.png",
+   "max_px": 0
+  },
+  {
+   "id": "room_2",
+   "tick": 300,
+   "capture": "ega/r2_prize_room_2.png",
+   "max_px": 0
+  },
+  {
+   "id": "room_3",
+   "tick": 458,
+   "capture": "ega/r2_prize_room_3.png",
+   "max_px": 0
+  },
+  {
+   "id": "room_4",
+   "tick": 617,
+   "capture": "ega/r2_prize_room_4.png",
+   "max_px": 0
+  },
+  {
+   "id": "room_5",
+   "tick": 777,
+   "capture": "ega/r2_prize_room_5.png",
+   "max_px": 0
+  },
+  {
+   "id": "room_6",
+   "tick": 937,
+   "capture": "ega/r2_prize_room_6.png",
+   "max_px": 0
+  }
+ ]
+}

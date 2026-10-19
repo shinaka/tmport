@@ -342,7 +342,17 @@ void Sequencer::glide(Block& b, int v, uint8_t oct, uint8_t value) {
     if (value == 0) {
         voiceOff(v);
         b.rest[v] = 1;
-    } else if (device_ == SoundCard::Tandy) {
+    } else {
+        glidePitch(v, oct, value);
+        if (device_ != SoundCard::Speaker) b.newNote[v] = 1;  // AdLib: no sound on the OPL
+        if (device_ == SoundCard::Tandy) b.rest[v] = 0;
+    }
+    b.ticksLeft[v] = b.rawDur[v];
+}
+
+// The pitch part of Sound_Glide (491b:04ce).
+void Sequencer::glidePitch(int v, uint8_t oct, uint8_t value) {
+    if (device_ == SoundCard::Tandy) {
         auto k = static_cast<uint16_t>(((value * 3) >> 2) + 1);
         const uint8_t c = oct ? oct : 1;
         auto n = static_cast<uint16_t>(0xD70 >> c);
@@ -353,18 +363,105 @@ void Sequencer::glide(Block& b, int v, uint8_t oct, uint8_t value) {
         n = static_cast<uint16_t>(n - k);
         if (static_cast<int16_t>(n) > 0x400) n = static_cast<uint16_t>(n >> 1);
         setFrequency(v, n);
-        b.newNote[v] = 1;
-        b.rest[v] = 0;
-    } else if (device_ == SoundCard::AdLib) {
-        b.newNote[v] = 1;  // no sound on the OPL
-    } else {
+    } else if (device_ == SoundCard::Speaker) {
         // divisor = (first word of the device's period table - 128 * value) >> octave, 16-bit
         const uint16_t table = tables_.ds16(static_cast<uint16_t>(SoundTables::kDsPeriodTables + 2 * static_cast<int>(device_)));
         const auto base = static_cast<uint16_t>(tables_.ds16(table) - (value << 7));
         setFrequency(v, static_cast<uint16_t>(base >> oct));
         speakerOn(v);
     }
-    b.ticksLeft[v] = b.rawDur[v];
+}
+
+// ------------------------------------------------------------------------------ restore
+
+namespace {
+
+// The 14 per-voice arrays of a block in their DGROUP order (fmt_sound.md §5.1).
+template <class B>
+auto voiceArrays(B& b) {
+    return std::array{&b.ptr,    &b.start,    &b.ticksLeft, &b.rawDur,  &b.active,  &b.legato, &b.release,
+                      &b.envStart, &b.envPos, &b.envDone,   &b.sustain, &b.newNote, &b.rest,   &b.tie};
+}
+
+}  // namespace
+
+Sequencer::Block Sequencer::blockFromDgroup(std::span<const uint8_t> bytes) {
+    Block b;
+    if (bytes.size() < kBlockBytes) return b;
+    auto w = [&](size_t i) { return static_cast<uint16_t>(bytes[2 * i] | (bytes[2 * i + 1] << 8)); };
+    b.status = w(0);
+    b.id = w(1);
+    b.tempo = w(2);
+    b.tempoAdj = w(3);
+    const auto arrays = voiceArrays(b);
+    for (size_t a = 0; a < arrays.size(); ++a)
+        for (size_t v = 0; v < kVoices; ++v) (*arrays[a])[v] = w(4 + 4 * a + v);
+    return b;
+}
+
+std::array<uint8_t, Sequencer::kBlockBytes> Sequencer::blockToDgroup(const Block& b) {
+    std::array<uint8_t, kBlockBytes> out{};
+    auto put = [&](size_t i, uint16_t v) {
+        out[2 * i] = static_cast<uint8_t>(v);
+        out[2 * i + 1] = static_cast<uint8_t>(v >> 8);
+    };
+    put(0, b.status);
+    put(1, b.id);
+    put(2, b.tempo);
+    put(3, b.tempoAdj);
+    const auto arrays = voiceArrays(b);
+    for (size_t a = 0; a < arrays.size(); ++a)
+        for (size_t v = 0; v < kVoices; ++v) put(4 + 4 * a + v, (*arrays[a])[v]);
+    return out;
+}
+
+void Sequencer::restore(const Block& sfx, const Block& music, int voices, int adlibVariant) {
+    sfx_ = sfx;
+    music_ = music;
+    owned_.fill(0);
+    if (voices >= 1 && voices <= kVoices) voices_ = voices;
+    // What sounds: on the speaker and the Tandy the effect while one plays (the music is frozen);
+    // on AdLib the effect on the speaker and the music on the OPL.
+    if (device_ == SoundCard::AdLib) {
+        if (music_.status == 2) {
+            ports_.oplPlayTune(music_.id, adlibVariant);
+            for (int v = 0; v < kVoices; ++v) resumeVoice(music_, v, true);
+        }
+        if (sfx_.status == 2) {
+            device_ = SoundCard::Speaker;
+            resumeVoice(sfx_, 0, false);
+            device_ = SoundCard::AdLib;
+        }
+        return;
+    }
+    if (sfx_.status == 2) {
+        for (int v = 0; v < voices_; ++v) resumeVoice(sfx_, v, false);
+    } else if (music_.status == 2) {
+        for (int v = 0; v < voices_; ++v) resumeVoice(music_, v, true);
+    }
+}
+
+// The time-taking event that set the voice's current ticks left lies right before its stream
+// pointer (Sound_NextEvent advances past every event it ran): a note's pitch goes to the device
+// again, a raw-pitch event's too, a rest turns the voice off. The speaker's gate is off once the
+// note passed its release point (ticks left below the release gap, Sound_StepVoices).
+void Sequencer::resumeVoice(Block& b, int v, bool music) {
+    if (!b.active[v] || b.ticksLeft[v] == 0) return;  // the next tick fetches the next event anyway
+    const SoundFile& f = fileOf(music);
+    const auto p = static_cast<uint16_t>(b.ptr[v] - 2);
+    const uint8_t b0 = f.byteAt(p), b1 = f.byteAt(static_cast<uint16_t>(p + 1));
+    const auto oct = static_cast<uint8_t>(b0 >> 4), note = static_cast<uint8_t>(b0 & 0x0F);
+    if (note == 0 || (note == 0xE && b1 == 0)) {
+        voiceOff(v);
+        return;
+    }
+    if (note == 0xE)
+        glidePitch(v, oct, b1);
+    else if (note >= 1 && note <= 12)
+        noteOn(b, v, oct, note);
+    else
+        return;
+    if (device_ != SoundCard::Tandy && b.legato[v] != 1 && b.release[v] != 0 && b.ticksLeft[v] < b.release[v]) voiceOff(v);
 }
 
 // 491b:0575 Speaker_On

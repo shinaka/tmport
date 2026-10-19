@@ -1,0 +1,99 @@
+{
+ "description": "Round 1: two steps right, Up opens the level-2 gate (the portcullis goes, the geyser cloud rises), Up again: the geyser lifts the player to level 3 while the clue box is redrawn; key times found against avi/ega_gate2_geyser_up.avi (all frames equal except the torn ones); 080 at 444, in the still picture after the clue box's long frame has presented",
+ "start": {
+  "state": "savestates/ega/l2_at_gate.sav"
+ },
+ "keys": "5:down:right, 20:up:right, 70:down:up, 94:up:up, 334:down:up",
+ "ticks": 830,
+ "checkpoints": [
+  {
+   "id": "078_gate2_cloud",
+   "tick": 98,
+   "capture": "ega/078_gate2_cloud.png",
+   "max_px": 0
+  },
+  {
+   "id": "079_gate2_lift",
+   "tick": 367,
+   "capture": "ega/079_gate2_lift.png",
+   "masks": [
+    {
+     "rect": [
+      0,
+      125,
+      319,
+      143
+     ],
+     "reason": "the capture caught a scroll step half presented (DOSBox-X presents without retrace sync)"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "079_gate2_lift_old_rows",
+   "tick": 361,
+   "capture": "ega/079_gate2_lift.png",
+   "masks": [
+    {
+     "rect": [
+      0,
+      0,
+      319,
+      125
+     ],
+     "reason": "only the rows the torn capture still took from the frame before the scroll step"
+    },
+    {
+     "rect": [
+      0,
+      144,
+      319,
+      199
+     ],
+     "reason": "only the rows the torn capture still took from the frame before the scroll step"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "080_gate2_lift_clues_wipe",
+   "tick": 444,
+   "capture": "ega/080_gate2_lift_clues_wipe.png",
+   "masks": [
+    {
+     "rect": [
+      0,
+      166,
+      319,
+      199
+     ],
+     "reason": "the capture caught the redrawn clue box half presented: rows from 166 still show the box before the level change"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "080_gate2_lift_clues_wipe_old_rows",
+   "tick": 430,
+   "capture": "ega/080_gate2_lift_clues_wipe.png",
+   "masks": [
+    {
+     "rect": [
+      0,
+      0,
+      319,
+      165
+     ],
+     "reason": "only the clue-box rows the torn capture took from the frame before"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "081_level3_arrive",
+   "tick": 824,
+   "capture": "ega/081_level3_arrive.png",
+   "max_px": 0
+  }
+ ]
+}

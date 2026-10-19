@@ -1,0 +1,194 @@
+{
+ "description": "all six found at total 294: the end sequence with the crown (champion branch), the arrival in the clubhouse, the rank chest with CHAMPION (r2/fl_crown_wait; ega_r2_crown_nokey.avi was recorded in the same run)",
+ "start": {
+  "state": "savestates/r2/fl_castle_upper_t6_294.sav"
+ },
+ "keys": "81:down:up, 342:up:up",
+ "ticks": 2870,
+ "checkpoints": [
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_crown_wait.sav",
+   "capture_state": "savestates/r2/fl_crown_wait.sav"
+  },
+  {
+   "id": "chest_glow",
+   "tick": 1277,
+   "capture": "ega/r2_crown_01_chest_glow.png",
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; DOSBox-X redraws the clue box only when that tick lands between a frame's Frame_Begin and its Screen_DrawOverlay (1 of 5 reference runs: ega_r2_end_t2_nokey); the engine's lockstep order (Frame_Begin, Game_Tick, frame body) always takes that path, so its key icon is gone where most captures still show it"
+    }
+   ]
+  },
+  {
+   "id": "window_empty",
+   "tick": 1446,
+   "capture": "ega/r2_crown_02_window_empty.png",
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; DOSBox-X redraws the clue box only when that tick lands between a frame's Frame_Begin and its Screen_DrawOverlay (1 of 5 reference runs: ega_r2_end_t2_nokey); the engine's lockstep order (Frame_Begin, Game_Tick, frame body) always takes that path, so its key icon is gone where most captures still show it"
+    }
+   ]
+  },
+  {
+   "id": "crown_on_pedestal",
+   "tick": 1567,
+   "capture": "ega/r2_crown_03_crown_on_pedestal.png",
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; DOSBox-X redraws the clue box only when that tick lands between a frame's Frame_Begin and its Screen_DrawOverlay (1 of 5 reference runs: ega_r2_end_t2_nokey); the engine's lockstep order (Frame_Begin, Game_Tick, frame body) always takes that path, so its key icon is gone where most captures still show it"
+    }
+   ]
+  },
+  {
+   "id": "player_crown",
+   "tick": 1681,
+   "capture": "ega/r2_crown_04_player_crown.png",
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; DOSBox-X redraws the clue box only when that tick lands between a frame's Frame_Begin and its Screen_DrawOverlay (1 of 5 reference runs: ega_r2_end_t2_nokey); the engine's lockstep order (Frame_Begin, Game_Tick, frame body) always takes that path, so its key icon is gone where most captures still show it"
+    },
+    {
+     "rect": [
+      164,
+      120,
+      184,
+      128
+     ],
+     "reason": "AVI frame 2105 caught the frame that starts the dissolve to the chute before its first cell (a black rectangle on the floor); the AVI frames before it equal the engine frames of ticks 1678-1684"
+    }
+   ]
+  },
+  {
+   "id": "fall",
+   "tick": 1774,
+   "capture": "ega/r2_crown_a.png",
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; DOSBox-X redraws the clue box only when that tick lands between a frame's Frame_Begin and its Screen_DrawOverlay (1 of 5 reference runs: ega_r2_end_t2_nokey); the engine's lockstep order (Frame_Begin, Game_Tick, frame body) always takes that path, so its key icon is gone where most captures still show it"
+    }
+   ]
+  },
+  {
+   "id": "two_figures",
+   "tick": 2158,
+   "capture": "ega/r2_crown_05_treasure_room_two_figures.png",
+   "max_px": 0
+  },
+  {
+   "id": "champion_hidden",
+   "tick": 2419,
+   "capture": "ega/r2_crown_07_rank_champion_hidden.png",
+   "max_px": 0
+  },
+  {
+   "id": "champion_visible",
+   "tick": 2423,
+   "capture": "ega/r2_crown_06_rank_champion_visible.png",
+   "max_px": 0
+  },
+  {
+   "id": "champion_final",
+   "tick": 2600,
+   "capture": "ega/r2_crown_b.png",
+   "max_px": 0
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_crown_wait",
+   "state": "savestates/r2/fl_crown_wait.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ],
+ "avi_fits": [
+  {
+   "id": "castle_top_to_chute_fall",
+   "avi": "avi/ega_r2_crown_nokey.avi",
+   "frames": [
+    200,
+    2540
+   ],
+   "ticks": [
+    140,
+    2040
+   ],
+   "max_off": 18,
+   "max_dev": 0.6,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; DOSBox-X redraws the clue box only when that tick lands between a frame's Frame_Begin and its Screen_DrawOverlay (1 of 5 reference runs: ega_r2_end_t2_nokey); the engine's lockstep order (Frame_Begin, Game_Tick, frame body) always takes that path, so its key icon is gone where most captures still show it"
+    }
+   ]
+  },
+  {
+   "id": "clubhouse_rank_chest",
+   "avi": "avi/ega_r2_crown_nokey.avi",
+   "frames": [
+    2566,
+    3100
+   ],
+   "ticks": [
+    2040,
+    2480
+   ],
+   "max_off": 60,
+   "max_dev": 2.6,
+   "note": "its own time base: about 1.5 ticks after the one of the castle part, because the original lost 6 ticks at the arrival in the clubhouse and the engine 5 (fl_crown_wait), which also shifts the rank chest fill steps (DS:9100 counts executed ticks)"
+  }
+ ]
+}

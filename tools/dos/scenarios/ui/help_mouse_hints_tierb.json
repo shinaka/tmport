@@ -1,0 +1,50 @@
+{
+ "description": "state r2/tierb_after_troom: Help > Using the Mouse, PgDn, PgUp, Enter through the pages (each Enter with its button flash), Done reopens the Help menu; Esc; Help > Getting More Hints",
+ "start": {
+  "state": "savestates/r2/tierb_after_troom.sav"
+ },
+ "keys": "60:tap:f1, 80:tap:down, 90:tap:down, 100:tap:enter, 160:tap:pgdn, 220:tap:pgup, 280:tap:enter, 340:tap:enter, 400:tap:enter, 460:tap:enter, 540:tap:esc, 580:tap:f1, 600:tap:down, 610:tap:down, 620:tap:down, 630:tap:enter",
+ "ticks": 700,
+ "checkpoints": [
+  {
+   "id": "mouse_p1",
+   "tick": 140,
+   "capture": "ega/r2_ui_help_mouse_p1.png"
+  },
+  {
+   "id": "after_pgdn",
+   "tick": 200,
+   "capture": "ega/r2_ui_help_mouse_after_pgdn.png"
+  },
+  {
+   "id": "after_pgup",
+   "tick": 260,
+   "capture": "ega/r2_ui_help_mouse_p2_after_pgup.png"
+  },
+  {
+   "id": "mouse_p2",
+   "tick": 320,
+   "capture": "ega/r2_ui_help_mouse_p2.png"
+  },
+  {
+   "id": "mouse_next",
+   "tick": 380,
+   "capture": "ega/r2_ui_help_mouse_next.png"
+  },
+  {
+   "id": "mouse_next2",
+   "tick": 440,
+   "capture": "ega/r2_ui_help_mouse_next2.png"
+  },
+  {
+   "id": "menu_after_done",
+   "tick": 520,
+   "capture": "ega/r2_ui_help_mouse_next3.png"
+  },
+  {
+   "id": "hints_p1",
+   "tick": 680,
+   "capture": "ega/r2_ui_help_hints_p1.png"
+  }
+ ]
+}

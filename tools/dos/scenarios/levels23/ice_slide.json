@@ -1,0 +1,28 @@
+{
+ "description": "Round 1: from the ice cave (090) right into the slide (P62), down the rock shaft (091) to the mine-tunnel exit on level 2 (092)",
+ "start": {
+  "state": "savestates/ega/l3_ice_tunnel.sav"
+ },
+ "keys": "0:down:right",
+ "ticks": 410,
+ "checkpoints": [
+  {
+   "id": "090_level3_ice_tunnel",
+   "tick": 0,
+   "capture": "ega/090_level3_ice_tunnel.png",
+   "max_px": 0
+  },
+  {
+   "id": "091_slide_tunnel_shaft",
+   "tick": 178,
+   "capture": "ega/091_slide_tunnel_shaft.png",
+   "max_px": 0
+  },
+  {
+   "id": "092_slide_landed_level2",
+   "tick": 400,
+   "capture": "ega/092_slide_landed_level2.png",
+   "max_px": 0
+  }
+ ]
+}

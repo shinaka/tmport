@@ -16,8 +16,10 @@
 #include "dos/game/hud.h"
 #include "dos/game/signin.h"
 #include "dos/game/ui.h"
+#include "dos/save/dosbox_state.h"
 #include "dos/save/users_dat.h"
 #include "dos_game_fixture.h"
+#include "dos_test_data.h"
 #include "util/file_util.h"
 
 using namespace tmport;
@@ -401,12 +403,11 @@ TEST_CASE("DOS sign-in: Game_End and the menu save moments") {
     }
 }
 
-// Exit and Save from DOSBox-X states of the reference runs (DGROUP dumps made by
-// extracted/scratch/dos_w3_ui/dgroup_dump.py; set TM_DOS_UI_STATES to that folder's states/).
+// Exit and Save from DOSBox-X states of the reference runs (their DGROUP, read with the shared
+// reader from TM_DOS_CAPTURES).
 TEST_CASE("DOS sign-in: Exit and Save from reference states writes the reference USERS.DAT") {
     TM_REQUIRE_DOS_GAME_FILES();
-    const char* dir = std::getenv("TM_DOS_UI_STATES");
-    if (!dir || !*dir) return;
+    TM_REQUIRE_DOS_CAPTURES();
     struct Case {
         const char* state;
         const char* expected;
@@ -415,13 +416,16 @@ TEST_CASE("DOS sign-in: Exit and Save from reference states writes the reference
     // after_castle was saved while the end message was still up; the player closed it and pressed
     // Esc before the reference write, which changed two bytes: the header's DS:929F (frames drew
     // sprites meanwhile) and the record's prompt icon (+0x14C of record 1 = file offset 695).
-    for (const Case& c : {Case{"r2_tierb_exitbox", "USERS_crafted_tierb_layout.DAT", {}},
-                          Case{"ega_after_castle", "USERS_after_exit_post_castle_Ada.DAT", {1, 695}}}) {
+    for (const Case& c : {Case{"savestates/r2/tierb_exitbox.sav", "USERS_crafted_tierb_layout.DAT", {}},
+                          Case{"savestates/ega/after_castle.sav", "USERS_after_exit_post_castle_Ada.DAT", {1, 695}}}) {
         const std::string name = c.state;
         CAPTURE(name);
-        const auto dgroup = readWholeFile(fs::path(dir) / (std::string(c.state) + ".dgroup"));
+        const auto sav = testdata::dosCapture(c.state);
         const auto ref = capturesFile(c.expected);
-        if (!dgroup || !ref) continue;
+        if (!sav || !ref) continue;
+        const DosboxState st = DosboxState::load(*sav);
+        const std::vector<uint8_t> image(st.dgroup().begin(), st.dgroup().end());
+        const auto* dgroup = &image;
         dosgame::GameFixture f(*gameFiles);
         DosGame& g = f.g();
         loadFromDgroup(g, *dgroup);
@@ -450,11 +454,13 @@ TEST_CASE("DOS sign-in: Exit and Save from reference states writes the reference
 // the level, position, camera and area fields of the record and the header word may differ.
 TEST_CASE("DOS sign-in: Game_End from the rank-chest state writes the following state's USERS.DAT") {
     TM_REQUIRE_DOS_GAME_FILES();
-    const char* dir = std::getenv("TM_DOS_UI_STATES");
-    if (!dir || !*dir) return;
-    const auto dgroup = readWholeFile(fs::path(dir) / "r2_end_t6_rankchest.dgroup");
+    TM_REQUIRE_DOS_CAPTURES();
+    const auto sav = testdata::dosCapture("savestates/r2/end_t6_rankchest.sav");
     const auto ref = capturesFile("savestates/r2/end_t6_clubhouse.users");
-    if (!dgroup || !ref) return;
+    if (!sav || !ref) return;
+    const DosboxState st = DosboxState::load(*sav);
+    const std::vector<uint8_t> image(st.dgroup().begin(), st.dgroup().end());
+    const auto* dgroup = &image;
     dosgame::GameFixture f(*gameFiles);
     DosGame& g = f.g();
     loadFromDgroup(g, *dgroup);

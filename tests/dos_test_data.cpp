@@ -1,6 +1,7 @@
 #include "dos_test_data.h"
 
 #include <memory>
+#include <system_error>
 
 #include "util/file_util.h"
 
@@ -29,6 +30,24 @@ const tmport::dos::DosFiles* dosFiles() {
         if (auto p = dosDataPath()) files = std::make_unique<tmport::dos::DosFiles>(tmport::dos::DosFiles::open(*p));
     }
     return files.get();
+}
+
+std::optional<std::filesystem::path> dosCapturesPath() {
+    const auto p = tmport::getEnv("TM_DOS_CAPTURES");
+    if (!p || p->empty()) return std::nullopt;
+    const auto dir = tmport::pathFromUtf8(*p);
+    std::error_code ec;
+    if (!std::filesystem::is_directory(dir, ec)) return std::nullopt;
+    return dir;
+}
+
+std::optional<std::filesystem::path> dosCapture(const std::filesystem::path& relative) {
+    const auto dir = dosCapturesPath();
+    if (!dir) return std::nullopt;
+    const auto file = *dir / relative;
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(file, ec)) return std::nullopt;
+    return file;
 }
 
 }  // namespace testdata

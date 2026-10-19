@@ -1,0 +1,15 @@
+{
+ "description": "the clubhouse (state ega/shack): walk left to the chest picture, hold Up: the rank room (dissolve), the chest filled row by row to the first rank",
+ "start": {
+  "state": "savestates/ega/shack.sav"
+ },
+ "keys": "20:down:left, 70:up:left, 130:down:up, 160:up:up",
+ "ticks": 260,
+ "checkpoints": [
+  {
+   "id": "rank_chest",
+   "tick": 250,
+   "capture": "ega/068_rank_chest.png"
+  }
+ ]
+}

@@ -16,4 +16,5 @@ target_sources(tmtests PRIVATE
     tests/test_dos_signin.cpp
     tests/test_dos_quiz.cpp
     tests/test_dos_playthrough.cpp
+    tests/test_dos_load_state.cpp
 )

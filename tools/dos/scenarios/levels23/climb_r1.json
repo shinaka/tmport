@@ -1,0 +1,63 @@
+{
+ "description": "Round 1: Up at the trunk lock (082 found against avi/ega_lock1_open_climb.avi, which starts 49 ticks after the state), the climb to level 2; captures 051-057",
+ "start": {
+  "state": "savestates/ega/at_lock.sav"
+ },
+ "keys": "82:down:up",
+ "ticks": 430,
+ "checkpoints": [
+  {
+   "id": "051_at_lock",
+   "tick": 17,
+   "capture": "ega/051_at_lock.png",
+   "max_px": 0
+  },
+  {
+   "id": "052_lock_open_climb",
+   "tick": 132,
+   "capture": "ega/052_lock_open_climb.png",
+   "max_px": 0
+  },
+  {
+   "id": "053_climb_trunk",
+   "tick": 183,
+   "capture": "ega/053_climb_trunk.png",
+   "masks": [
+    {
+     "rect": [
+      0,
+      139,
+      319,
+      143
+     ],
+     "reason": "the capture caught a scroll step half presented (DOSBox-X presents without retrace sync)"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "054_climb_treetop",
+   "tick": 292,
+   "capture": "ega/054_climb_treetop.png",
+   "max_px": 0
+  },
+  {
+   "id": "055_climb_rope_ladder",
+   "tick": 339,
+   "capture": "ega/055_climb_rope_ladder.png",
+   "max_px": 0
+  },
+  {
+   "id": "056_arrive_level2",
+   "tick": 390,
+   "capture": "ega/056_arrive_level2.png",
+   "max_px": 0
+  },
+  {
+   "id": "057_level2_start",
+   "tick": 426,
+   "capture": "ega/057_level2_start.png",
+   "max_px": 0
+  }
+ ]
+}

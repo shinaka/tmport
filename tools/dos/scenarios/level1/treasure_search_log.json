@@ -1,0 +1,30 @@
+{
+ "description": "level 1, the run of r2/fl_search_t from ega/r2_treasure_spot: Down at 114 (pinned by the hidden elves, which move until the hint opens: their x in the end state), the treasure search, hint 4 opening at g_ticks 331520 as in the FRAME ring. The host mouse moved the pointer to the status bar during the reference run (DS:911E 98 -> 199; placed at tick 60)",
+ "start": {
+  "state": "savestates/ega/r2_treasure_spot.sav"
+ },
+ "keys": "60:move:318:199, 114:down:down, 116:up:down",
+ "ticks": 290,
+ "checkpoints": [
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_search_t.sav",
+   "capture_state": "savestates/r2/fl_search_t.sav",
+   "max_px": 0
+  }
+ ],
+ "timings": [
+  {
+   "id": "hint_opens",
+   "from": {
+    "event": "key=5000"
+   },
+   "to": {
+    "event": "ui=0x10"
+   },
+   "expect_ticks": 105,
+   "tolerance": 0,
+   "source": "r2/fl_search_t FRAME ring: the hint frame began after g_ticks 331520 (tick 219); Down at tick 114"
+  }
+ ]
+}

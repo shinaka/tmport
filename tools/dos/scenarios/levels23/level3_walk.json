@@ -1,0 +1,140 @@
+{
+ "description": "level 3 walked right from level3_start: the scenery, decorations and HUD of the Round-1 captures 082-085 and 087 (player and elves masked)",
+ "start": {
+  "state": "savestates/ega/level3_start.sav"
+ },
+ "keys": "10:down:right",
+ "ticks": 850,
+ "checkpoints": [
+  {
+   "id": "082_level3_shovels_sleds",
+   "tick": 155,
+   "capture": "ega/082_level3_shovels_sleds.png",
+   "masks": [
+    {
+     "rect": [
+      0,
+      108,
+      22,
+      146
+     ],
+     "reason": "an elf: the Round-1 key times between the state and this capture are not known, so the elves walk elsewhere"
+    },
+    {
+     "rect": [
+      227,
+      66,
+      276,
+      133
+     ],
+     "reason": "the player: the Round-1 key times between the state and this capture are not known (pose and step)"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "083_level3_snowmen_bridge",
+   "tick": 431,
+   "capture": "ega/083_level3_snowmen_bridge.png",
+   "masks": [
+    {
+     "rect": [
+      60,
+      86,
+      151,
+      131
+     ],
+     "reason": "an elf: the Round-1 key times between the state and this capture are not known, so the elves walk elsewhere"
+    },
+    {
+     "rect": [
+      228,
+      66,
+      283,
+      132
+     ],
+     "reason": "the player: the Round-1 key times between the state and this capture are not known (pose and step)"
+    },
+    {
+     "rect": [
+      305,
+      95,
+      319,
+      129
+     ],
+     "reason": "an elf: the Round-1 key times between the state and this capture are not known, so the elves walk elsewhere"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "084_level3_bridge",
+   "tick": 569,
+   "capture": "ega/084_level3_bridge.png",
+   "masks": [
+    {
+     "rect": [
+      23,
+      103,
+      55,
+      132
+     ],
+     "reason": "an elf: the Round-1 key times between the state and this capture are not known, so the elves walk elsewhere"
+    },
+    {
+     "rect": [
+      228,
+      68,
+      276,
+      132
+     ],
+     "reason": "the player: the Round-1 key times between the state and this capture are not known (pose and step)"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "087_level3_snowballs",
+   "tick": 708,
+   "capture": "ega/087_level3_snowballs.png",
+   "masks": [
+    {
+     "rect": [
+      225,
+      66,
+      275,
+      133
+     ],
+     "reason": "the player: the Round-1 key times between the state and this capture are not known (pose and step)"
+    },
+    {
+     "rect": [
+      304,
+      98,
+      319,
+      120
+     ],
+     "reason": "an elf: the Round-1 key times between the state and this capture are not known, so the elves walk elsewhere"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "085_level3_lock_arch",
+   "tick": 847,
+   "capture": "ega/085_level3_lock_arch.png",
+   "masks": [
+    {
+     "rect": [
+      228,
+      67,
+      279,
+      132
+     ],
+     "reason": "the player: the Round-1 key times between the state and this capture are not known (pose and step)"
+    }
+   ],
+   "max_px": 0
+  }
+ ]
+}

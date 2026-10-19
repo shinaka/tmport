@@ -1,0 +1,21 @@
+{
+ "description": "load the state, compare the loaded moment (its own screen) and the first engine frame with the capture taken there (1273 px between the state and the capture)",
+ "start": {
+  "state": "savestates/r2/fl_tierc_coincreature.sav"
+ },
+ "ticks": 1,
+ "checkpoints": [
+  {
+   "id": "loaded",
+   "tick": 0,
+   "capture": "ega/r2_elf_dust_01_before_hit.png",
+   "info": "the capture was taken before the state was saved (the elves, sparkles or pointer moved in between); the state's own screen is checked at 0 px by test_dos_load_state"
+  },
+  {
+   "id": "frame1",
+   "tick": 1,
+   "capture": "ega/r2_elf_dust_01_before_hit.png",
+   "info": "the capture was taken before the state was saved (the elves, sparkles or pointer moved in between); the state's own screen is checked at 0 px by test_dos_load_state"
+  }
+ ]
+}

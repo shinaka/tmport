@@ -109,8 +109,14 @@ void DosGame::soundTick() { sound.pitTick(); }
 //    SignIn_Update (43cb:0eb6, 72 PIT ticks), so there is no Frame_Begin either and g_stepDone keeps
 //    its value across the frames of the wait, as for the dissolve.
 //  * main 130f:003D: g_dirty = 0, then 130f:025a Frame_Begin. The title loop (Title_Run) has no
-//    Frame_Begin; it clears g_dirty and g_stepDone itself (titleFrame, and the runtime).
+//    Frame_Begin; it clears g_dirty and g_stepDone itself (titleFrame, and the runtime). A scene load
+//    the latches start is reported to the runtime's frame timing here (frameBeginTiming): on the
+//    reference machine it begins right after the previous game tick.
 void DosGame::frameBegin() {
+    latchedLoad = false;
+    latchedRedraw = false;
+    musicPlaysAtPrevBegin = musicPlaysAtBegin;
+    musicPlaysAtBegin = musicPlays;
     if (dissolveRunning) {
         if (dissolveGate) stepGate().mark();
         return;
@@ -120,7 +126,9 @@ void DosGame::frameBegin() {
         return;
     }
     core.dirty = 0;
-    if (!titleRunning) ::tmport::dos::frameBegin(*this);
+    if (titleRunning) return;
+    ::tmport::dos::frameBegin(*this);
+    frameBeginTiming(*this);  // the reference timing of a scene load the latches start
 }
 
 // 130f:00fe Game_Tick.

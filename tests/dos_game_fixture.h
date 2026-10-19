@@ -34,8 +34,8 @@ namespace testdata {
 // The decoded DOS folder of TM_DATA_DOS (SST.EXE, data files, PANs, PAKs, font), shared by all
 // tests; nullptr when TM_DATA_DOS is unset.
 const tmport::dos::DosGfxFiles* dosGfxFiles();
-// extracted/captures/dos (reference states, USERS.DAT snapshots) next to TM_DATA_DOS's parent if
-// it exists (C:\Git\TM\extracted\captures\dos for TM_DATA_DOS = C:\Git\TM\TM-DOS).
+// The reference captures (reference states, USERS.DAT snapshots): TM_DOS_CAPTURES, nullopt without
+// it (defined in dos_test_data.cpp, which also has TM_REQUIRE_DOS_CAPTURES).
 std::optional<std::filesystem::path> dosCapturesPath();
 }  // namespace testdata
 

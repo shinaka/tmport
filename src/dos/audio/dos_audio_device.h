@@ -19,6 +19,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -63,6 +64,12 @@ public:
     void setMusicPaused(bool paused);  // DS:37ce (0 while g_uiMode != 0, Sound_SyncState 43cb:046e)
     void setMusicLoop(bool on);        // DS:63ba
     void setSfxLoop(bool on);          // DS:63b8 (the end sequence loops effect 2, player states 44/45/64/65)
+    // A DOSBox-X state's driver (wave 4): the effect block DS:6448 and the music block DS:64c0 (0x78
+    // bytes each, as in DGROUP) and the voice count DS:63be, applied before the next PIT tick like the
+    // other commands; the effect and the tune continue where the state left them (Sequencer::restore).
+    // The flags (DS:63b4..63ba, DS:37ce) are set with the calls above.
+    void restoreBlocks(std::span<const uint8_t> sfxBlock, std::span<const uint8_t> musicBlock, int voices,
+                       int adlibVariant = 0);
 
     // ---- engine-side controls (no effect on the driver state)
     void setVolume(float v) { volume_.store(v); }
@@ -93,7 +100,7 @@ public:
 private:
     struct Command {
         enum class Kind : uint8_t { SfxPlay, SfxStop, MusicPlay, MusicStop, SilenceAll, SoundOn, MusicOn, MusicPaused, MusicLoop,
-                                    SfxLoop };
+                                    SfxLoop, Restore };
         Kind kind;
         int a = 0;
         int b = 0;
@@ -116,6 +123,11 @@ private:
 
     std::mutex queueMutex_;
     std::vector<Command> queue_;
+    struct Restore {
+        Sequencer::Block sfx, music;
+        int voices = 4, variant = 0;
+    };
+    std::vector<Restore> restores_;  // the payloads of queued Restore commands (in order)
     std::atomic<bool> pending_{false};
 
     std::atomic<float> volume_;

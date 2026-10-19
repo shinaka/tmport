@@ -1,0 +1,119 @@
+{
+ "description": "the boot with the Tandy look: S on story page 2 opens the other Super Solvers titles page",
+ "start": {
+  "boot": true,
+  "seed": "0x1EE2",
+  "users": "USERS_after_exit_level2_Ada.DAT"
+ },
+ "look": "tandy",
+ "keys": "660:tap:enter, 720:tap:enter, 780:tap:s",
+ "ticks": 791,
+ "checkpoints": [
+  {
+   "id": "series",
+   "tick": 791,
+   "capture": "tandy/04_other_titles_ad.png",
+   "masks": [
+    {
+     "rect": [
+      248,
+      32,
+      267,
+      50
+     ],
+     "reason": "title sparkle spot 0: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      250,
+      59,
+      269,
+      77
+     ],
+     "reason": "title sparkle spot 1: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      282,
+      89,
+      301,
+      107
+     ],
+     "reason": "title sparkle spot 2: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      244,
+      85,
+      263,
+      103
+     ],
+     "reason": "title sparkle spot 3: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      288,
+      50,
+      307,
+      68
+     ],
+     "reason": "title sparkle spot 4: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      270,
+      35,
+      289,
+      53
+     ],
+     "reason": "title sparkle spot 5: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      274,
+      10,
+      293,
+      28
+     ],
+     "reason": "title sparkle spot 6: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      286,
+      28,
+      305,
+      46
+     ],
+     "reason": "title sparkle spot 7: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      276,
+      58,
+      295,
+      76
+     ],
+     "reason": "title sparkle spot 8: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      256,
+      87,
+      275,
+      105
+     ],
+     "reason": "title sparkle spot 9: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    },
+    {
+     "rect": [
+      240,
+      84,
+      259,
+      102
+     ],
+     "reason": "title sparkle spot 10: the original tries a sparkle (rand) in every loop frame, at a rate the engine cannot share"
+    }
+   ]
+  }
+ ]
+}

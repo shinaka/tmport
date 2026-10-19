@@ -1,0 +1,22 @@
+{
+ "description": "Round 1: off the rope ladder onto the level-2 path (058)",
+ "start": {
+  "state": "savestates/ega/level2_start.sav"
+ },
+ "keys": "20:down:up, 60:up:up",
+ "ticks": 60,
+ "checkpoints": [
+  {
+   "id": "057_level2_start",
+   "tick": 10,
+   "capture": "ega/057_level2_start.png",
+   "max_px": 0
+  },
+  {
+   "id": "058_level2_on_path",
+   "tick": 46,
+   "capture": "ega/058_level2_on_path.png",
+   "max_px": 0
+  }
+ ]
+}

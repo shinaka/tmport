@@ -1,0 +1,41 @@
+{
+ "description": "load the state; the first engine frame against the state's own screen; the capture checks found from the state (forward, or masked where the capture was taken before the state was saved)",
+ "start": {
+  "state": "savestates/ega/l2_netfixed.sav"
+ },
+ "ticks": 1,
+ "checkpoints": [
+  {
+   "id": "frame1_own_screen",
+   "tick": 1,
+   "capture_state": "savestates/ega/l2_netfixed.sav",
+   "max_px": 0
+  },
+  {
+   "id": "075_net_fixed",
+   "tick": 0,
+   "capture": "ega/075_net_fixed.png",
+   "masks": [
+    {
+     "rect": [
+      118,
+      91,
+      171,
+      132
+     ],
+     "reason": "an elf: the capture was taken before the state was saved, the elves moved in between"
+    },
+    {
+     "rect": [
+      307,
+      95,
+      319,
+      131
+     ],
+     "reason": "an elf: the capture was taken before the state was saved, the elves moved in between"
+    }
+   ],
+   "max_px": 0
+  }
+ ]
+}

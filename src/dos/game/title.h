@@ -13,11 +13,15 @@ class DosGame;
 // 4ba4:0434 Title_Run, before its loop: line height 10, g_uiMode = 0x80, area 6, OPENING.PAN, phase 0,
 // music loop on, Music_Play(1).
 void titleStart(DosGame& g);
-// 4ba4:0434 Title_Run, one loop iteration: g_dirty = 0, Game_HandleHotkeys, the phase function
-// (DS:8D83), the sparkle attempt (slot 2 idle, not on the SS page: rand() & 0x7F == 0 -> rand() % 12
-// spot, Anim_Set(2, 0x5C); g.frameClock() TitleSparkle steps), Sprites_Snapshot(0, 3), g_stepDone =
-// 0, Sprites_DrawSorted(0, 3), Frame_Present, Sprites_EraseAll(0, 3). Returns false once the phase
-// entry is 0 (phase 9: the sign-in follows).
+// 4ba4:0434 Title_Run, the loop iterations of one frame. An iteration: g_dirty = 0,
+// Game_HandleHotkeys, the phase function (DS:8D83), the sparkle attempt (slot 2 idle, not on the SS
+// page: rand() & 0x7F == 0 -> rand() % 12 spot, Anim_Set(2, 0x5C)), Sprites_Snapshot(0, 3),
+// g_stepDone = 0, Sprites_DrawSorted(0, 3), Frame_Present, Sprites_EraseAll(0, 3). At the reference
+// speed the frame runs the iterations up to the next game tick on the reference machine's clock
+// (UiState::titleLoopAt: page draws take their measured time, a time-out fires on its PIT interrupt,
+// the sparkle attempts at the measured rate from the tick that ended the last sparkle; a page draw
+// past the next tick is a long frame, code_ui.md §8.5); at the period speed one iteration with the
+// frame clock's attempt. Returns false once the phase entry is 0 (phase 9: the sign-in follows).
 bool titleFrame(DosGame& g);
 // 4ba4:0434 Title_Run, after its loop: slow Tandy/CGA: music off; line height restored; g_uiMode = 0;
 // music loop off; Anim_InitSlots. (main then sets g_uiMode = 8.)

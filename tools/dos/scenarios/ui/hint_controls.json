@@ -1,0 +1,15 @@
+{
+ "description": "the first start message (state ega/shack_hint1): Enter closes it; the arrow-keys hint follows",
+ "start": {
+  "state": "savestates/ega/shack_hint1.sav"
+ },
+ "keys": "20:tap:enter",
+ "ticks": 360,
+ "checkpoints": [
+  {
+   "id": "hint_controls",
+   "tick": 341,
+   "capture": "ega/009_hint_controls.png"
+  }
+ ]
+}

@@ -1,0 +1,22 @@
+{
+ "description": "Round 1 castle hall: walking right to the ladder and stopping there (ega/098)",
+ "start": {
+  "state": "savestates/ega/castle.sav"
+ },
+ "keys": "10:down:right, 152:up:right",
+ "ticks": 160,
+ "checkpoints": [
+  {
+   "id": "hall",
+   "tick": 1,
+   "capture": "ega/097_castle_inside.png",
+   "max_px": 0
+  },
+  {
+   "id": "ladder",
+   "tick": 156,
+   "capture": "ega/098_castle_ladder.png",
+   "max_px": 0
+  }
+ ]
+}

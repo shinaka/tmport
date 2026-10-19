@@ -250,7 +250,10 @@ DS:910d is set when an animation script advanced a frame (`Anim_Tick`) or the ca
 (`Player_Move` 18cf:15f0) and is cleared by `Frame_Begin` (130f:025a) at the start of every frame
 [O]. So the logic advances **at most one visible step per drawn frame**: the game runs at 47.3 Hz on
 a machine that draws faster than that and slows down with the frame rate on a slow machine. The
-logic runs *inside the timer interrupt* while the frame loop may be half-way through drawing.
+logic runs *inside the timer interrupt* while the frame loop may be half-way through drawing. On the
+reference machine (DOSBox-X) a game tick usually lands in the drawing and presenting part of a
+frame, so the next `Frame_Begin` is the first to latch its changes (wave 4: the castle-top tick
+keeps the HUD key icon in 4 of 5 reference runs; `code_player.md` wave 4) [O].
 
 ### 3.3 Frame (variable rate, main program)
 

@@ -1,0 +1,16 @@
+{
+ "description": "Round 1: walking right onto the level-3 geyser top (089), the slide down the geyser to the level-2 gate",
+ "start": {
+  "state": "savestates/ega/l3_clue1.sav"
+ },
+ "keys": "0:down:right",
+ "ticks": 180,
+ "checkpoints": [
+  {
+   "id": "089_level3_walk_into_geyser_down",
+   "tick": 176,
+   "capture": "ega/089_level3_walk_into_geyser_down.png",
+   "max_px": 0
+  }
+ ]
+}

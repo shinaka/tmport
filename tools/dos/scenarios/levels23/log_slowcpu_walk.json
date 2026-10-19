@@ -1,0 +1,69 @@
+{
+ "description": "slow-CPU mode (-X): out of the clubhouse, walking right and left with the 16-pixel scroll (rows 112..143 not scrolled); the r2 slow-CPU frames of avi/ega_r2_slowcpu_X_walk.avi (the same run: every untorn AVI frame equals an engine frame)",
+ "start": {
+  "state": "savestates/r2/fl_slowcpu_clubhouse.sav"
+ },
+ "keys": "55:down:up, 80:up:up, 914:down:right, 1199:up:right, 1214:down:left, 1499:up:left",
+ "ticks": 1745,
+ "checkpoints": [
+  {
+   "id": "r2_slowcpu_scroll_avi150",
+   "tick": 997,
+   "capture": "ega/r2_slowcpu_scroll_avi150.png",
+   "masks": [
+    {
+     "rect": [
+      0,
+      16,
+      319,
+      18
+     ],
+     "reason": "the capture caught a scroll step half presented (DOSBox-X presents without retrace sync)"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "r2_slowcpu_scroll_avi151",
+   "tick": 1002,
+   "capture": "ega/r2_slowcpu_scroll_avi151.png",
+   "max_px": 0
+  },
+  {
+   "id": "r2_slowcpu_scroll_avi157",
+   "tick": 1002,
+   "capture": "ega/r2_slowcpu_scroll_avi157.png",
+   "max_px": 0
+  },
+  {
+   "id": "r2_slowcpu_scroll_avi158",
+   "tick": 1008,
+   "capture": "ega/r2_slowcpu_scroll_avi158.png",
+   "max_px": 0
+  },
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_slowcpu_walk.sav",
+   "capture_state": "savestates/r2/fl_slowcpu_walk.sav"
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_slowcpu_walk",
+   "state": "savestates/r2/fl_slowcpu_walk.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ]
+}

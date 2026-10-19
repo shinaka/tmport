@@ -29,6 +29,7 @@ constexpr Flag kFlags[] = {
     {"--frame-speed", 1},  {"--dos-args", 1},    {"--square-pixels", 0},
     {"--dos-trace", 1},    {"--dos-dump-state", 1}, {"--dos-ticks", 1}, {"--dos-preview", 0},
     {"--dos-layout-seed", 1},
+    {"--dos-load-state", 1}, {"--dos-grey-key-artefact", 0},
 };
 
 const Flag* findFlag(std::string_view a) {
@@ -164,6 +165,10 @@ std::optional<LaunchOptions> parseLaunchArgs(int argc, char** argv, std::string&
                 return std::nullopt;
             }
             o.dosLayoutSeed = v;
+        } else if (a == "--dos-load-state") {
+            o.dosLoadState = v;
+        } else if (a == "--dos-grey-key-artefact") {
+            o.dosGreyKeyArtefact = true;
         }
     }
     return o;
@@ -206,7 +211,8 @@ std::string launchUsage() {
            "                       alt, a..z, 0..9; prefixes alt+ ctrl+ shift+), click:<x>:<y> and\n"
            "                       move:<x>:<y> (640x480 canvas), wait:<ms>, shot:<file.png>, quit.\n"
            "                       DOS edition, in game ticks: TICK:down|up|tap:KEY, TICK:move:X:Y,\n"
-           "                       TICK:click:X:Y (+N = N ticks later), e.g. \"50:tap:enter, +10:tap:3\"\n"
+           "                       TICK:click:X:Y (+N = N ticks later), e.g. \"50:tap:enter, +10:tap:3\";\n"
+           "                       a TICK with a fraction lies inside the tick (806.4923:down:down)\n"
            "  --frame-dump <png>   write the 640x480 canvas when the game ends (DOS edition: the\n"
            "                       320x200 canvas; a folder: a PNG per screen, headless also sound.wav)\n"
            "\n"
@@ -231,7 +237,12 @@ std::string launchUsage() {
            "                       after that game tick (repeatable; plus <file>.fields.tsv, <file>.png)\n"
            "  --dos-ticks <n>      with --headless: run at least n game ticks (47.34 per second)\n"
            "  --dos-layout-seed <n>  a new game's layout from this srand value (0..65535, or 0x..)\n"
-           "                       instead of the clock, for reproducible runs\n";
+           "                       instead of the clock, for reproducible runs\n"
+           "  --dos-load-state <file.sav>   start from a DOSBox-X save state of the original (its\n"
+           "                       sibling <name>.users becomes the DOS save of --pref-dir); ticks of\n"
+           "                       --keys, --dos-ticks and --dos-dump-state count from the load\n"
+           "  --dos-grey-key-artefact  the E0 prefix bytes of the grey keys reach the game's keyboard\n"
+           "                       handler as on DOSBox-X (to replay its frame logs)\n";
 }
 
 }  // namespace tmport::app

@@ -1,0 +1,61 @@
+{
+ "description": "level 1, upper room: walking right over the bonus-coin spot (+5 once), back left and right again (no second bonus); the r2 logs of w_bonus_after and w_bonus_after2 replayed from ega/w_bonus",
+ "start": {
+  "state": "savestates/ega/w_bonus.sav"
+ },
+ "keys": "136:down:right, 265:up:right, 431:down:left, 503:up:left, 518:down:right, 590:up:right",
+ "ticks": 820,
+ "checkpoints": [
+  {
+   "id": "after_spot",
+   "at_log_end": "savestates/r2/w_bonus_after.sav",
+   "capture_state": "savestates/r2/w_bonus_after.sav"
+  },
+  {
+   "id": "after_spot_capture",
+   "at_log_end": "savestates/r2/w_bonus_after.sav",
+   "capture": "ega/r2_w_bonus_02_after_spot.png"
+  },
+  {
+   "id": "back_over_spot",
+   "at_log_end": "savestates/r2/w_bonus_after2.sav",
+   "capture_state": "savestates/r2/w_bonus_after2.sav"
+  }
+ ],
+ "logs": [
+  {
+   "id": "w_bonus_after",
+   "state": "savestates/r2/w_bonus_after.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  },
+  {
+   "id": "w_bonus_after2",
+   "state": "savestates/r2/w_bonus_after2.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ]
+}

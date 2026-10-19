@@ -1221,6 +1221,41 @@ TEST_CASE("dos world: incremental scrolling equals a full redraw at the new came
     CHECK(playfield(g.back) == before);
 }
 
+TEST_CASE("dos world: a scroll frame reports its reference length (the FRAME marks of the r2 logs)") {
+    TM_REQUIRE_DOS_GAME_FILES();
+    World w(*gameFiles);
+    DosGame& g = w.g;
+    g.pan = &gameFiles->pan("MOUNTAIN");
+    g.ui.hudRedraw = 0;
+    FrameTiming& t = g.rt.frameTiming();
+    struct Step {
+        int sx, sy;
+        uint32_t units;  // thousandths of a PIT tick
+    };
+    for (const Step& s : {Step{8, 0, 6500}, Step{-8, 0, 6500}, Step{0, 8, 7000}, Step{0, -8, 7000}, Step{8, 8, 7500}}) {
+        CAPTURE(s.sx);
+        CAPTURE(s.sy);
+        redrawAt(g, 0x300, 0x700);
+        t.clear();
+        scrollBy(g, s.sx, s.sy);
+        CHECK(t.length() == s.units);
+        CHECK(t.countsFromPreviousTick());  // the step was asked for by the previous game tick
+        CHECK(t.quitSections().empty());
+    }
+    // No step, a full redraw instead of the step, a pending HUD redraw: nothing reported here.
+    redrawAt(g, 0x300, 0x700);
+    t.clear();
+    scrollBy(g, 0, 0);
+    CHECK(t.empty());
+    g.world.fullRedrawReq = 1;
+    scrollBy(g, 8, 0);
+    CHECK(t.empty());
+    playfieldRedraw(g);
+    g.ui.hudRedraw = 1;
+    scrollBy(g, 8, 0);
+    CHECK(t.empty());
+}
+
 TEST_CASE("dos world: the partial redraw of a searched cell") {
     TM_REQUIRE_DOS_GAME_FILES();
     World w(*gameFiles);

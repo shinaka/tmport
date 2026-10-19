@@ -1,0 +1,47 @@
+{
+ "description": "tier 3: out of the clubhouse door (the start-of-game rank message), Enter at 1004 closes it. The host mouse moved during the reference run (DS:911E 180 -> 97): the pointer shows on the message (ega/r2_tierc_start_message_outside) and again when the message closes (its animation gates the ticks DOSBox-X blocked, g_ticks 13815/13820), hidden by the end (moves placed at 60 and 430)",
+ "start": {
+  "state": "savestates/r2/fl_tierc_start.sav"
+ },
+ "keys": "60:move:318:97, 430:move:316:97, 431:move:318:97, 56:down:up, 79:up:up, 83:down:up, 85:up:up, 1004:tap:enter",
+ "ticks": 1161,
+ "checkpoints": [
+  {
+   "id": "message",
+   "tick": 84,
+   "capture": "ega/r2_tierc_start_message_outside.png",
+   "max_px": 0
+  },
+  {
+   "id": "outside",
+   "tick": 1062,
+   "capture": "ega/r2_tierc_outside.png",
+   "max_px": 0
+  },
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_tierc_outside.sav",
+   "capture_state": "savestates/r2/fl_tierc_outside.sav",
+   "max_px": 0
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_tierc_outside",
+   "state": "savestates/r2/fl_tierc_outside.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ]
+}

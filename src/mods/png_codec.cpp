@@ -6,6 +6,7 @@
 #include <format>
 
 #include "util/error.h"
+#include "util/inflate.h"
 #include "util/png_writer.h"
 
 namespace tmport::mods {
@@ -14,6 +15,7 @@ namespace tmport::mods {
 
 namespace {
 
+// Length and distance codes of RFC 1951 (the deflate encoder below uses them).
 constexpr std::array<uint16_t, 29> kLenBase = {3,  4,  5,  6,  7,  8,  9,  10, 11,  13,  15,  17,  19,  23, 27,
                                                31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258};
 constexpr std::array<uint8_t, 29> kLenExtra = {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2,
@@ -23,228 +25,11 @@ constexpr std::array<uint16_t, 30> kDistBase = {1,   2,   3,   4,   5,   7,    9
 constexpr std::array<uint8_t, 30> kDistExtra = {0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6,
                                                 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13};
 
-class BitReader {
-public:
-    explicit BitReader(std::span<const uint8_t> d) : d_(d) {}
-
-    void fill(int need) {
-        while (cnt_ < need && cnt_ <= 24) {
-            uint32_t b = 0;
-            if (pos_ < d_.size()) {
-                b = d_[pos_++];
-            } else {
-                ++over_;  // virtual zero bytes past the end (checked on consume)
-            }
-            buf_ |= b << cnt_;
-            cnt_ += 8;
-        }
-    }
-    uint32_t peek(int n) {
-        fill(n);
-        return buf_ & ((1u << n) - 1);
-    }
-    void consume(int n) {
-        // The virtual zero bytes sit above the real bits; they may be peeked, never consumed.
-        if (n > cnt_ - 8 * over_) throw FormatError("zlib: unexpected end of the compressed data");
-        buf_ >>= n;
-        cnt_ -= n;
-    }
-    uint32_t bits(int n) {
-        if (n == 0) return 0;
-        const uint32_t v = peek(n);
-        consume(n);
-        return v;
-    }
-    void alignToByte() { consume(cnt_ % 8); }
-    // Byte-aligned read (after alignToByte).
-    uint8_t byte() { return static_cast<uint8_t>(bits(8)); }
-    // Real bytes consumed so far (call when byte aligned).
-    size_t bytePos() const { return pos_ - static_cast<size_t>(cnt_ / 8 - over_); }
-
-private:
-    std::span<const uint8_t> d_;
-    size_t pos_ = 0;
-    uint32_t buf_ = 0;
-    int cnt_ = 0;
-    int over_ = 0;
-};
-
-struct Huffman {
-    static constexpr int kFast = 10;
-    std::array<uint16_t, 1 << kFast> fast{};  // (len << 9) | symbol, 0 = use the slow path
-    std::array<uint16_t, 16> count{};
-    std::vector<uint16_t> symbol;
-
-    void build(const uint8_t* lengths, int n) {
-        count.fill(0);
-        fast.fill(0);
-        for (int i = 0; i < n; ++i) count[lengths[i]]++;
-        count[0] = 0;
-        int left = 1;
-        for (int len = 1; len < 16; ++len) {
-            left <<= 1;
-            left -= count[static_cast<size_t>(len)];
-            if (left < 0) throw FormatError("zlib: over-subscribed Huffman code");
-        }
-        std::array<uint16_t, 16> offs{};
-        for (int len = 1; len < 15; ++len) offs[static_cast<size_t>(len + 1)] = static_cast<uint16_t>(offs[static_cast<size_t>(len)] + count[static_cast<size_t>(len)]);
-        symbol.assign(static_cast<size_t>(n), 0);
-        for (int i = 0; i < n; ++i)
-            if (lengths[i]) symbol[offs[lengths[i]]++] = static_cast<uint16_t>(i);
-        // Canonical codes (RFC 1951 §3.2.2) for the fast table.
-        std::array<uint32_t, 16> next{};
-        uint32_t code = 0;
-        for (int len = 1; len < 16; ++len) {
-            code = (code + count[static_cast<size_t>(len - 1)]) << 1;
-            next[static_cast<size_t>(len)] = code;
-        }
-        for (int i = 0; i < n; ++i) {
-            const int len = lengths[i];
-            if (!len) continue;
-            const uint32_t c = next[static_cast<size_t>(len)]++;
-            if (len > kFast) continue;
-            uint32_t r = 0;
-            for (int b = 0; b < len; ++b) r |= ((c >> b) & 1u) << (len - 1 - b);
-            for (uint32_t k = r; k < (1u << kFast); k += 1u << len) fast[k] = static_cast<uint16_t>((len << 9) | i);
-        }
-    }
-
-    int decode(BitReader& br) const {
-        const uint16_t e = fast[br.peek(kFast)];
-        if (e) {
-            br.consume(e >> 9);
-            return e & 0x1FF;
-        }
-        // Slow canonical walk (codes longer than kFast bits).
-        int code = 0, first = 0, index = 0;
-        for (int len = 1; len < 16; ++len) {
-            code |= static_cast<int>(br.bits(1));
-            const int c = count[static_cast<size_t>(len)];
-            if (code - c < first) return symbol[static_cast<size_t>(index + (code - first))];
-            index += c;
-            first += c;
-            first <<= 1;
-            code <<= 1;
-        }
-        throw FormatError("zlib: invalid Huffman code");
-    }
-};
-
-const Huffman& fixedLit() {
-    static const Huffman h = [] {
-        std::array<uint8_t, 288> l{};
-        for (int i = 0; i < 144; ++i) l[static_cast<size_t>(i)] = 8;
-        for (int i = 144; i < 256; ++i) l[static_cast<size_t>(i)] = 9;
-        for (int i = 256; i < 280; ++i) l[static_cast<size_t>(i)] = 7;
-        for (int i = 280; i < 288; ++i) l[static_cast<size_t>(i)] = 8;
-        Huffman x;
-        x.build(l.data(), 288);
-        return x;
-    }();
-    return h;
-}
-
-const Huffman& fixedDist() {
-    static const Huffman h = [] {
-        std::array<uint8_t, 30> l{};
-        l.fill(5);
-        Huffman x;
-        x.build(l.data(), 30);
-        return x;
-    }();
-    return h;
-}
-
-void inflateBlock(BitReader& br, std::vector<uint8_t>& out, const Huffman& lit, const Huffman& dist, size_t maxOutput) {
-    for (;;) {
-        const int sym = lit.decode(br);
-        if (sym < 256) {
-            if (out.size() >= maxOutput) throw FormatError("zlib: output larger than expected");
-            out.push_back(static_cast<uint8_t>(sym));
-            continue;
-        }
-        if (sym == 256) return;
-        const int li = sym - 257;
-        if (li >= 29) throw FormatError("zlib: bad length code");
-        const size_t len = kLenBase[static_cast<size_t>(li)] + br.bits(kLenExtra[static_cast<size_t>(li)]);
-        const int ds = dist.decode(br);
-        if (ds >= 30) throw FormatError("zlib: bad distance code");
-        const size_t d = kDistBase[static_cast<size_t>(ds)] + br.bits(kDistExtra[static_cast<size_t>(ds)]);
-        if (d > out.size()) throw FormatError("zlib: distance too far back");
-        if (out.size() + len > maxOutput) throw FormatError("zlib: output larger than expected");
-        const size_t from = out.size() - d;
-        for (size_t i = 0; i < len; ++i) out.push_back(out[from + i]);
-    }
-}
-
 }  // namespace
 
+// The engine-wide inflate (util/inflate.h); kept here for the mod layer's callers.
 std::vector<uint8_t> inflateZlib(std::span<const uint8_t> data, size_t maxOutput) {
-    if (data.size() < 6) throw FormatError("zlib: stream too short");
-    const uint8_t cmf = data[0], flg = data[1];
-    if ((cmf & 0x0F) != 8 || (cmf >> 4) > 7) throw FormatError("zlib: not a deflate stream");
-    if (((cmf << 8) | flg) % 31 != 0) throw FormatError("zlib: bad header check");
-    if (flg & 0x20) throw FormatError("zlib: preset dictionaries are not supported");
-    BitReader br(data.subspan(2));
-    std::vector<uint8_t> out;
-    bool last = false;
-    while (!last) {
-        last = br.bits(1) != 0;
-        const uint32_t type = br.bits(2);
-        if (type == 0) {
-            br.alignToByte();
-            const uint32_t len = br.bits(16), nlen = br.bits(16);
-            if ((len ^ 0xFFFF) != nlen) throw FormatError("zlib: bad stored block length");
-            if (out.size() + len > maxOutput) throw FormatError("zlib: output larger than expected");
-            for (uint32_t i = 0; i < len; ++i) out.push_back(br.byte());
-        } else if (type == 1) {
-            inflateBlock(br, out, fixedLit(), fixedDist(), maxOutput);
-        } else if (type == 2) {
-            const int hlit = static_cast<int>(br.bits(5)) + 257, hdist = static_cast<int>(br.bits(5)) + 1,
-                      hclen = static_cast<int>(br.bits(4)) + 4;
-            static constexpr std::array<uint8_t, 19> order = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
-            std::array<uint8_t, 19> cl{};
-            for (int i = 0; i < hclen; ++i) cl[order[static_cast<size_t>(i)]] = static_cast<uint8_t>(br.bits(3));
-            Huffman clh;
-            clh.build(cl.data(), 19);
-            std::array<uint8_t, 320> lens{};
-            int n = 0;
-            while (n < hlit + hdist) {
-                const int s = clh.decode(br);
-                if (s < 16) {
-                    lens[static_cast<size_t>(n++)] = static_cast<uint8_t>(s);
-                    continue;
-                }
-                int rep = 0;
-                uint8_t val = 0;
-                if (s == 16) {
-                    if (n == 0) throw FormatError("zlib: repeat with no previous length");
-                    val = lens[static_cast<size_t>(n - 1)];
-                    rep = 3 + static_cast<int>(br.bits(2));
-                } else if (s == 17) {
-                    rep = 3 + static_cast<int>(br.bits(3));
-                } else {
-                    rep = 11 + static_cast<int>(br.bits(7));
-                }
-                if (n + rep > hlit + hdist) throw FormatError("zlib: too many code lengths");
-                while (rep--) lens[static_cast<size_t>(n++)] = val;
-            }
-            if (lens[256] == 0) throw FormatError("zlib: no end-of-block code");
-            Huffman lit, dist;
-            lit.build(lens.data(), hlit);
-            dist.build(lens.data() + hlit, hdist);
-            inflateBlock(br, out, lit, dist, maxOutput);
-        } else {
-            throw FormatError("zlib: invalid block type");
-        }
-    }
-    br.alignToByte();
-    const size_t p = 2 + br.bytePos();
-    if (p + 4 > data.size()) throw FormatError("zlib: missing Adler-32 checksum");
-    const uint32_t want = (static_cast<uint32_t>(data[p]) << 24) | (static_cast<uint32_t>(data[p + 1]) << 16) |
-                          (static_cast<uint32_t>(data[p + 2]) << 8) | data[p + 3];
-    if (png::adler32(out) != want) throw FormatError("zlib: Adler-32 checksum mismatch");
-    return out;
+    return tmport::inflateZlib(data, maxOutput);
 }
 
 // ===================================================================================== deflate

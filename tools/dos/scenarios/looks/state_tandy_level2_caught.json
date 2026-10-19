@@ -1,0 +1,66 @@
+{
+ "description": "the Tandy state after the catch: the File menu, Start New Player's box, the sign-in, the new name 'ben', Ben's clubhouse with the first hint, the clubhouse, the controls hint, outside (Ben's layout: srand 0x27ED = time() of 16:11:25, the guest clock of the USERS.DAT write)",
+ "start": {
+  "state": "savestates/tandy/level2_caught.sav"
+ },
+ "extra_args": [
+  "--dos-layout-seed",
+  "0x27ED"
+ ],
+ "keys": "49:tap:f2, 70:tap:down, 80:tap:enter, 100:tap:up, 110:tap:enter, 200:tap:enter, 230:tap:b, 240:tap:e, 250:tap:n, 270:tap:enter, 400:tap:enter, 800:tap:enter, 811:down:up, 871:up:up",
+ "ticks": 869,
+ "checkpoints": [
+  {
+   "id": "loaded",
+   "tick": 0,
+   "capture": "tandy/15_after_catch.png",
+   "info": "the Tandy state was saved at another moment than the capture (the elves moved in between); the state's own screen is checked at 0 px by test_dos_load_state"
+  },
+  {
+   "id": "frame1",
+   "tick": 1,
+   "capture": "tandy/15_after_catch.png",
+   "info": "the Tandy state was saved at another moment than the capture (the elves moved in between); the state's own screen is checked at 0 px by test_dos_load_state"
+  },
+  {
+   "id": "menu_file",
+   "tick": 54,
+   "capture": "tandy/16_menu_file.png"
+  },
+  {
+   "id": "new_player_confirm",
+   "tick": 91,
+   "capture": "tandy/17_new_player_confirm.png"
+  },
+  {
+   "id": "signin_again",
+   "tick": 141,
+   "capture": "tandy/18_signin_again.png"
+  },
+  {
+   "id": "newname_typed",
+   "tick": 262,
+   "capture": "tandy/19_newname_typed.png"
+  },
+  {
+   "id": "shack_hint",
+   "tick": 287,
+   "capture": "tandy/20_shack_hint.png"
+  },
+  {
+   "id": "shack",
+   "tick": 405,
+   "capture": "tandy/21_shack.png"
+  },
+  {
+   "id": "hint_controls",
+   "tick": 761,
+   "capture": "tandy/22_hint_controls.png"
+  },
+  {
+   "id": "outside",
+   "tick": 869,
+   "capture": "tandy/23_outside.png"
+  }
+ ]
+}

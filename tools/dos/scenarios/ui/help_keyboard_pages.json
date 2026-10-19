@@ -1,0 +1,30 @@
+{
+ "description": "the clubhouse: F1, Down, Enter (Using the Keyboard), then Enter through the four pages",
+ "start": {
+  "state": "savestates/ega/shack.sav"
+ },
+ "keys": "20:tap:f1, 40:tap:down, 60:tap:enter, 140:tap:enter, 220:tap:enter, 300:tap:enter",
+ "ticks": 360,
+ "checkpoints": [
+  {
+   "tick": 100,
+   "capture": "ega/017_help_keyboard_p1.png",
+   "id": "page1"
+  },
+  {
+   "tick": 180,
+   "capture": "ega/018_help_keyboard_p2.png",
+   "id": "page2"
+  },
+  {
+   "tick": 260,
+   "capture": "ega/019_help_keyboard_p3.png",
+   "id": "page3"
+  },
+  {
+   "tick": 340,
+   "capture": "ega/020_help_keyboard_p4.png",
+   "id": "page4"
+  }
+ ]
+}

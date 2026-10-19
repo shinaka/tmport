@@ -1,0 +1,17 @@
+{
+ "description": "the boot with the Tandy look: Enter on the title and story page 1 after the pointer hid, Enter on story page 2 timed so that the walk-off frame of the capture has no sparkle",
+ "start": {
+  "boot": true,
+  "seed": "0x1EE2"
+ },
+ "look": "tandy",
+ "keys": "660:tap:enter, 720:tap:enter, 780:tap:enter",
+ "ticks": 870,
+ "checkpoints": [
+  {
+   "id": "walkoff",
+   "tick": 857,
+   "capture": "tandy/05_enter_walkoff.png"
+  }
+ ]
+}

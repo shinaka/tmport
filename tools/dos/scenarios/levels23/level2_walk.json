@@ -1,0 +1,96 @@
+{
+ "description": "level 2 walked right from level2_start along the loop: the scenery, decorations and HUD of the Round-1 captures 059, 061, 062 and 067 (player and elves masked)",
+ "start": {
+  "state": "savestates/ega/level2_start.sav"
+ },
+ "keys": "20:down:up, 60:up:up, 61:down:right",
+ "ticks": 1930,
+ "checkpoints": [
+  {
+   "id": "061_level2_doorway",
+   "tick": 759,
+   "capture": "ega/061_level2_doorway.png",
+   "masks": [
+    {
+     "rect": [
+      229,
+      66,
+      275,
+      133
+     ],
+     "reason": "the player: the Round-1 key times between the state and this capture are not known (pose and step)"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "062_level2_nest_tree",
+   "tick": 1036,
+   "capture": "ega/062_level2_nest_tree.png",
+   "masks": [
+    {
+     "rect": [
+      130,
+      86,
+      167,
+      118
+     ],
+     "reason": "an elf: the Round-1 key times between the state and this capture are not known, so the elves walk elsewhere"
+    },
+    {
+     "rect": [
+      227,
+      67,
+      280,
+      132
+     ],
+     "reason": "the player: the Round-1 key times between the state and this capture are not known (pose and step)"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "067_level2_net_cave",
+   "tick": 1593,
+   "capture": "ega/067_level2_net_cave.png",
+   "masks": [
+    {
+     "rect": [
+      12,
+      83,
+      115,
+      132
+     ],
+     "reason": "an elf: the Round-1 key times between the state and this capture are not known, so the elves walk elsewhere"
+    },
+    {
+     "rect": [
+      228,
+      67,
+      279,
+      132
+     ],
+     "reason": "the player: the Round-1 key times between the state and this capture are not known (pose and step)"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "059_level2_signs",
+   "tick": 1928,
+   "capture": "ega/059_level2_signs.png",
+   "masks": [
+    {
+     "rect": [
+      227,
+      66,
+      276,
+      133
+     ],
+     "reason": "the player: the Round-1 key times between the state and this capture are not known (pose and step)"
+    }
+   ],
+   "max_px": 0
+  }
+ ]
+}

@@ -1,0 +1,22 @@
+{
+ "description": "Enter on the rank chest after the all-found run: the clubhouse with end message 34, Enter, hint 13 (ega_r2_end_t6_to_clubhouse.avi); the checkpoints sit in the still picture after each bubble's long frame has presented (the engine shows a long frame's picture when it ends, as DOSBox-X does)",
+ "start": {
+  "state": "savestates/r2/end_t6_rankchest.sav"
+ },
+ "keys": "10:down:enter, 11:up:enter, 260:down:enter, 261:up:enter",
+ "ticks": 280,
+ "checkpoints": [
+  {
+   "id": "end_message",
+   "tick": 30,
+   "capture": "ega/r2_end_t6_clubhouse_message.png",
+   "max_px": 0
+  },
+  {
+   "id": "hint_after",
+   "tick": 276,
+   "capture": "ega/r2_end_t6_clubhouse_after.png",
+   "max_px": 0
+  }
+ ]
+}

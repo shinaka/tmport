@@ -66,6 +66,7 @@ public:
     BackBuffer back;                  // segment 2005: the frame being composed (clip window DS:37DA..37E0)
     BackBuffer screen;                // the picture the player sees (Present_Dirty / Present_Full target)
     LookPalette palette;              // the look's colours (Pal_Apply 1437:0001 happens at presentation)
+    CgaBinding cgaBinding{back, screen, palette};  // CGA look: back and screen keep the 2-bpp picture (looks agent)
     const PanFile* pan = nullptr;     // the PAN in the map/tile buffers (Scene_LoadPan 1460:05e8)
     const PanFile* prevPan = nullptr; // the PAN loaded before it: its blocks still show where the new,
                                       // smaller PAN did not overwrite the buffers (the chute, code_world.md §6.10)
@@ -78,8 +79,20 @@ public:
     bool dissolveRunning = false;  // a dissolve spans frames: the original's one long Frame_Present
     bool dissolveGate = false;     // g_stepDone at the end of the last frame of that long frame
     bool flashGate = false;        // g_stepDone at the end of the last frame of a Button_Flash wait (ui.h)
+    bool searchRunning = false;    // a search ran in the last frame (main_loop.cpp times its frames)
+    uint32_t searchClock = 0;      // where the next search frame begins, in FrameTiming units after the tick
+    bool latchedLoad = false;      // this frame's Frame_Begin latched a scene load (frameBeginTiming)
+    bool latchedRedraw = false;    // ... or a full play-field redraw (no transition, no search band)
+    bool dissolveAfterHud = false; // this frame redrew the HUD (and with it the play field) before its present
+    uint32_t musicPlays = 0;       // tunes started so far (Music_Play with the music on, sound.cpp)
+    uint32_t musicPlaysAtBegin = 0;      // musicPlays at this frame's start and at the one before (a tick
+    uint32_t musicPlaysAtPrevBegin = 0;  // between them started a tune: the dissolve's timing)
     bool shutdownDone = false;     // Game_Shutdown ran
     uint64_t screenVersion = 0;    // copies into `screen` so far (the host shows a new picture)
+    // When the original presented the picture in `screen`, in FrameTiming units of the runtime's PIT
+    // count, where it is later than the runtime's frame end (DosRuntime::frameEndUnits): the title
+    // loop's page draws, which keep their own clock (title.cpp).
+    uint64_t screenShownAt = 0;
 
     // ---- globals held by the services (DS address)
     uint16_t& keys() { return rt.keyboard().isr().keys; }                    // g_keys DS:9105

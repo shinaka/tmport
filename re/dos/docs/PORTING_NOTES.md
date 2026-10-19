@@ -70,7 +70,9 @@ coin count-up, single frames of 38-127 ms for full redraws and dissolves. Game t
 walking, 4 after a search). So the reference game is **tick-paced**: every game tick executes a
 logic step. Measured step timings (exact, from the per-tick logger) are in `code_runtime.md` §9:
 walk 8 px per 5.125 ticks (41 ticks per 8 steps), climb 8 rows per 7.25 ticks, jump 58 ticks, net
-swing 80 ticks, rank chest one row per 4 ticks, attract page 7200 PIT ticks.
+swing 80 ticks, rank chest one row per 4 ticks; an attract page lasts 7201 PIT ticks after its draw,
+then the next page is drawn (title 12.8, story 1 13.3, story 2 7.5, series page 14.3 PIT ticks):
+5770 game ticks per cycle of four pages (wave 4, `code_ui.md` §8.5).
 
 ### 2.3 Engine model [R]
 
@@ -91,7 +93,9 @@ presentation: at each display refresh, show the newest completed back buffer (32
   tick), which is what DOSBox-X showed. Keep the gate implemented: it is the switch for an optional
   "slow machine" mode (more ticks than frames).
 * The original's race between the interrupt-time tick and the frame body disappears; choose
-  "tick before frame body" consistently. Rand() users of both sides then interleave in a fixed
+  "tick before frame body" consistently. (Wave 4: on the reference machine a tick usually lands in
+  the drawing part of a frame, so the next Frame_Begin latches it first; the engine's Frame_Begin,
+  tick, body is the rarer case of the original: §2.5 "Not modelled".) Rand() users of both sides then interleave in a fixed
   order (the original's order was timing dependent, so bit-exact replay of a recording is not
   possible in any case).
 * **Per-frame features under lockstep** (DOSBox-X value in brackets) [O measurements, R choice]:
@@ -99,10 +103,10 @@ presentation: at each display refresh, show the newest completed back buffer (32
   | Feature | Lockstep result | Recommendation |
   |---|---|---|
   | search blink and reveal, 37 frames | 0.78 s (0.79 s) | keep per frame |
-  | HUD coin count-up, 1 coin per frame + effect 4 | 21 ms per coin (13.1 ms) | default: 76 coins/s from an "original frame clock"; option: 1 per frame |
-  | CHAMPION flash, 800 frames, toggle every 80 | 16.9 s (0.7-0.9 s) | default: ~914 flash frames/s (≈ 87 ms per phase); option: 1 per frame |
+  | HUD coin count-up, 1 coin per frame + effect 4 | 21 ms per coin (14.0 ms = 3.32 PIT ticks, r2/fl_countup_after; wave 4) | default: a coin every 3.32 PIT ticks from the tick that changed g_coins (hud.cpp, `code_ui.md` §11.2); option: 1 per frame |
+  | CHAMPION flash, 800 frames, toggle every 80 | 16.9 s (0.87 s) | default: ~918 flash frames/s (640 frames in 0.697 s at the EGA AVIs' 60.29 frames/s; ≈ 87 ms per phase); option: 1 per frame |
   | dissolve, 350 cells in one frame | instant | spread over 127 ms (about 6 frames at 47 Hz, ~58 cells each; 127 ms = 6.01 game ticks, so at the exact rates the last cell lands in a **7th** lockstep frame, wave 2); keep its 700 rand() calls |
-  | title sparkle attempts, chance 1/128 per frame | 0.37/s | see `code_ui.md` (DOSBox-X: ~1690 attempts/s on idle pages) |
+  | title sparkle attempts, chance 1/128 per frame | 0.37/s | DOSBox-X ~1730 attempts/s from 0.75 PIT ticks after the game tick that ended the previous sparkle, spots in rand() order: 233 of 249 sparkles of three AVIs take their first step on the observed tick (`code_ui.md` §8.5, title.cpp) |
   | UI updaters | per frame | per frame (invisible) |
 
   "Original frame clock" = a counter advanced by `rate × dt` per engine frame; a feature runs as many
@@ -111,9 +115,12 @@ presentation: at each display refresh, show the newest completed back buffer (32
   PC" (one step per original frame).
 * Presentation: the original presents dirty spans without retrace sync, so DOSBox-X frames show
   half-drawn scroll steps (two bands over two 60 Hz frames, REFERENCE_CAPTURES §5.4). The engine
-  presents complete frames; fidelity checks compare the settled frames.
+  presents complete frames; fidelity checks compare the settled frames. Wave 4: at the reference
+  speed a long frame's picture appears when the frame ends (§2.5), as on the reference machine.
 * Pacing on slow hosts: if the engine falls behind by more than a few ticks, drop ticks (cap the
   accumulator) rather than run many logic steps per presented frame.
+* Wave 4: the frames the reference machine needed more than a game tick for, and the ticks lost
+  in its disk I/O, are part of the reference timing (§2.5).
 
 ### 2.4 Start-up order [O, R]
 
@@ -130,6 +137,98 @@ On the AdLib device every `Music_Play` with the music on draws one `rand()` (4ac
 orchestration `4·tune + (rand() & 3)`), so the sound device changes the random sequence;
 `DosAudioDevice::musicPlay` draws it from the game's generator (wave 2).
 
+### 2.5 Long frames and disk I/O at the reference speed (wave 4) [O, R]
+
+On the reference machine an idle frame takes a fraction of a PIT tick, so a frame that does more
+starts right after whatever asked for its work, and lasts as long as its work [O frame logs]:
+
+* **Disk I/O** runs with `g_quit` = 1: the game ticks that fall into it return at once (no logic, no
+  counters, no STEP record in the logs). DOSBox-X serves DOS file reads at once; the time is the
+  unpacking of a PAN and the CPU work around a few calls. The lost ticks are known for every kind
+  from the tick counters of every DOSBox-X state (g_ticks / 5 game ticks fired, DS:90FE = 12 -
+  executed Game_Ticks mod 13: `extracted/scratch/dos_w4_timing/lost.py`) and from the STEP gaps of
+  the logs: Title_Run's OPENING load 1 (every state at the sign-in), a MOUNT2N3 or MOUNT3 load 4
+  (r2/fl_climb, fl_bridge_l3, fl_bridge_l3_jump, fl_geyser_slide; the level changes of the EGA
+  climb), MOUNTAIN 5 (r2/fl_bridge_l2), CLOSE 1, SHACK 1, a new player's game start (Users_WriteFile,
+  Quiz_LoadQuestions, MOUNTAIN) 7 (ega/shack_hint1), a resumed level-2 game (Quiz_LoadQuestions,
+  MOUNT2N3) 5 (tandy/level2_resumed), the return from the treasure room (Game_End's write, Game_Start,
+  MOUNTAIN) 7 (r2/end_t6_clubhouse, ega/after_castle), the treasure room from the clubhouse and back 6
+  (r2/tierb_after_troom), the champion's arrival in the clubhouse 6 (r2/fl_crown_wait). Model
+  (`main_loop.cpp`): a PAN costs 3.4 PIT ticks + 0.35 per 1000 bytes of the file, the sprite bank a
+  scene change reads with it (CLOSE.PAK, SHACK.PAK, SPRITES.PAK after one of them) 0.019 per 1000
+  bytes (SPRITES.PAK 2.2), Users_WriteFile 4.5, Quiz_LoadQuestions 7.
+* **Drawing**: a full HUD redraw (Hud_Redraw with DS:922E: frame fills, menu bar, the whole play field,
+  the actors, the status bar, the whole screen presented) 16 PIT ticks (closing the tierc start
+  message, r2/fl_tierc_outside g_ticks 13805..13836); a full play-field redraw a tick asked for (a
+  bridge breaking) 12.5 PIT ticks from that tick (r2/fl_bridge_l3_jump log tick 264); opening a
+  message or hint bubble (its HUD redraw, then the cloud, the text and Flutter) 27.5 PIT ticks from
+  the tick before (r2/fl_tierc_outside log ticks 79..82 blocked); a Button_Flash 72 PIT ticks; a
+  scroll frame 6.5 PIT ticks horizontal, 7 vertical, 7.5 both, from the tick before (the FRAME rings;
+  camera.cpp scrollUpdate); a full HUD redraw in a frame that dissolves 6 (the dissolve presents);
+  the title loop's page draws (OPENING.PAN and the page) title 12.8, story page 1 13.3, story page 2
+  7.5, series page 14.3, the walk-off's backdrop about 12 (title.cpp keeps that clock itself,
+  `code_ui.md` §8.5; the walk-off agrees with `tandy_r3_session.avi`, frames 419-663).
+* **The dissolve** (30 PIT ticks = 127 ms, r2/fl_l2door_after) starts after the rest of its frame,
+  which began right after the teleporting tick (or the frame before it): that frame's I/O and
+  drawing, then 1 PIT tick of play-field redraw (none after a HUD redraw), plus 5 when the
+  teleporting tick started a tune (a Music_Play with the music on: the AdLib driver's set-up; the
+  doors, not the fall shaft or the ice slide). It continues one lockstep frame per game tick after the
+  frame's other work and ends in the frame of the last tick before its end: the doorways (tune) end
+  it after the 7th tick, the end sequence's chute after the 6th, the castle top (CLOSE load) after the
+  7th, the castle gate (SHACK load) after the 8th, the champion's arrival in the clubhouse 65..70 PIT
+  ticks after the gate tick (`main_loop.cpp` setDissolveStart; the cells per frame stay the frame
+  clock's).
+  Menus, Yes/No boxes and the quiz screen left no measurable trace in the logs (no tick was gated
+  behind them) and are not modelled.
+* **Search frames** (a partial play-field redraw and present each): 4.25 PIT ticks, 4.65 while the
+  found treasure or key is shown (the 36 intervals of r2/fl_typematic and r2/fl_search_t), the first
+  0.5 PIT ticks after the starting tick: the 37 frames take 31 game ticks (lockstep 37).
+* **Where a frame starts**: work asked for by this frame's own tick (a key read by Input_Tick) counts
+  from that tick, and the ticks inside the frame start with g_stepDone clear (its Frame_Begin came
+  after the tick); work that Frame_Begin's latches start (a scene the ticks asked for, a full redraw,
+  the end of the previous frame) counts from the previous tick, so the frame's own tick already falls
+  inside it, and inside its I/O when the I/O comes first in the body (Scene_Update): the scene-load
+  stall then loses exactly the ticks the logs lose. Such a frame begins when the frame before it has
+  ended if that is later (a scroll frame that ran past the tick): r2/fl_bridge_l3 gates log tick 1111
+  after a horizontal scroll frame, the breaking bridge's redraw and the fall's first vertical scroll
+  frame ran back to back; the champion's load begins after the chute's last scroll frame.
+* Engine: the game reports each frame's cost to `DosRuntime::frameTiming()` (`FrameTiming`: g_quit
+  sections and drawing time in thousandths of a PIT tick, `fromPreviousTick()`); the runtime runs the
+  ticks inside the frame without a frame of their own (no Frame_Begin: a tick after one that advanced
+  a script or moved the camera is gated) and skips Game_Tick in the I/O. Deterministic: costs come
+  from what the frame loaded and drew, never from host time. The trace (`--dos-trace`) has no row for
+  a tick lost in I/O, like the logs' STEP ring (the events of a frame whose own tick was lost start
+  the next row).
+* **Presentation**: the reference machine presents at the end of a frame, so a long frame's picture
+  (a bubble, a scene load, a HUD redraw, a title page) appears when the frame ends, not when it
+  began. The host (and the frame dumps) show it from the last game tick before that end
+  (`DosRuntime::frameEndUnits`, `DosGame::screenShownAt` for the title's page draws): the AVIs show
+  the message bubbles 4.7-5.5 ticks after their frame began (`ega_r2_crown_to_end_messages.avi`), the
+  walk-off's redrawn title 2-3 ticks after the Enter (`tandy_r3_session.avi` frame 421) and the
+  resumed game's level about 8 ticks after Yes (frame 1185); all three now match at 0 pixels.
+* Checks: frame logs replayed from their start states (`test_dos_mainloop.cpp`, tick for tick in x,
+  y, camera, state, keys, coins, gated and lost ticks): every one matches on every tick: r2/fl_climb
+  640, fl_bridge_l2 746, fl_bridge_l3 1596, fl_bridge_l3_jump 438, fl_geyser_slide 663,
+  fl_l2door_after 190, fl_shack_left 366, fl_slowcpu_walk 1745, fl_walk2 544, fl_jumps 752,
+  fl_typematic 975, fl_tierc_outside 1161 (with the reference run's host mouse moves), fl_end_t2_wait
+  2049 (the whole end sequence), fl_crown_wait 2055; the 21 logs of the fidelity scenarios match in
+  both alignments (`tools/dos/fidelity.py`); the game start's sprite slots equal ega/shack_hint1 (the
+  first start message, `ega/007_after_name` 0 pixels).
+* `frame_speed = period` keeps strict lockstep: every frame fits into its game tick, files load at
+  once and the search runs one frame per tick (the idealised period PC whose loop runs once per tick;
+  the slow-machine mode of the runtime keeps its own grouping of ticks).
+* Not modelled: the rare long Game_Tick (r2/fl_climb: a tick 4 PIT ticks long); the cost of menus,
+  Yes/No and OK boxes, the quiz screen, the sign-in and the rank screen (no log gated a tick behind
+  them); sound calls inside a long frame (they take effect at the frame's start: the resumed game's
+  tune 23 PIT ticks early, the tune after Flutter's first hint 10 early, `tandy_r3_session.avi`); the
+  order of a frame against its tick: the engine runs Frame_Begin, the tick, the frame body, while on
+  the reference machine a tick usually lands in the drawing part of a frame, so the next Frame_Begin
+  is the first to see it (visible where a picture freezes: the walking elf's feet under the hint
+  bubble after a search, 129 pixels in `level1/treasure5_found`; the castle-top tick removes the HUD
+  key icon, which 4 of 5 reference runs keep); the hint bubble that opens right after a search
+  begins after the search's last frame in DOSBox-X (it blocked 4 ticks, the engine gates 3:
+  r2/fl_search_t). Mouse moves of the reference runs are replayed with `--keys` move events.
+
 ---
 
 ## 3. Options and the original switches [O 1460:0463, R names]
@@ -140,7 +239,7 @@ orchestration `4·tune + (rand() & 3)`), so the sound device changes the random 
 | `sound` | `-Si` / `-St` / `-Sa` (`-Ss` = AdLib) | `speaker` (SFX.IBM + TUNES.IBM), `tandy` (SFX.TAN + TUNES.TAN on SN76496), `adlib` (TUNES.TAN on OPL2, effects SFX.IBM on the speaker; every `Music_Play` with music on draws one `rand()`, §2.4), `off` (engine only) | `tandy` (implemented in wave 2) until an OPL2 core exists; the DOSBox-X reference machine was AdLib |
 | `slow_cpu` | `-X` (toggles the 8086 detection) | off / on: 7 elves processed, scroll and the player's scroll step doubled with rows 112..143 not scrolled, search shortened by 32 frames, CHAMPION timer −4 per frame, Esc opens the Exit box directly | off |
 | `music`, `sound effects` | per player (USERS.DAT +0x15E/+0x160), Ctrl+S toggles both | | from the save |
-| `frame_speed` | — (CPU speed) | `reference` (DOSBox-X per-frame rates, §2.3) / `period` (one step per original frame) | `reference` |
+| `frame_speed` | — (CPU speed) | `reference` (DOSBox-X per-frame rates, §2.3, and its long frames and disk I/O, §2.5) / `period` (one step per original frame, every frame within its game tick) | `reference` |
 
 The PS/1 audio card (device 3) is a Tandy PSG on another port: no separate option. Only the second
 character of a switch counts and switches are separate arguments; the engine may accept them on its
@@ -171,7 +270,10 @@ in order) < `--look` / `--sound` / `--slow-cpu` / `--frame-speed`. `-H` (Hercule
 * Mouse: logical coordinates x 0..159 (2-px units), y 0..199; zones per input context (DS:80DB);
   play-field press/hold walks, climbs, jumps or nets relative to the player (unsigned compares near
   the edges kept); status-bar press drops a coin; the pointer hides after 600 ticks idle.
-* Scripted input for tests (`--keys`) should express key down/up in game ticks.
+* Scripted input for tests (`--keys`) should express key down/up in game ticks. Wave 4: a time inside
+  a game tick (`806.4923:down:down`) places a key between two PIT interrupts as DOSBox-X key presses
+  fall; the phase of the press decides its typematic repeats (r2/fl_typematic matches in every column
+  with Down at 807.4923 and PgUp at 195.136, the latter with the optional grey-key artefact).
 
 ---
 
@@ -201,6 +303,10 @@ Keep (they change what the player sees or how the game plays):
 * HUD count-up one coin at a time with effect 4 per coin; CHAMPION flash ending visible; rank chest
   one row per 4 ticks; search length in frames;
 * the dissolve's 700 rand() calls (they shift the random sequence of everything after a transition);
+* the CGA look's per-routine dither phases (tiles from the first row of their column, fills on the
+  even tables, sprites from their first drawn row, text turning one pixel per glyph row,
+  Gfx_ReplaceColorRect's odd-start compare offset; `fmt_graphics.md` §2.4, the CGA plane of
+  `BackBuffer`);
 * hint "seconds" of 60 ticks (1.27 s), paused and phase-shifted by UI modes;
 * music frozen while an effect plays (speaker/Tandy), effect priority by id on the speaker and
   AdLib (`fmt_sound.md`); on the Tandy/PS/1 there is no priority (`Sfx_Play` 491b:06d7 calls

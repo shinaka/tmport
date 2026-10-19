@@ -1,0 +1,36 @@
+{
+ "description": "Round 1: through the mine tunnel to its exit doorway (the exit dissolve; 066 with the elves)",
+ "start": {
+  "state": "savestates/ega/tunnel_inside.sav"
+ },
+ "keys": "136:down:right",
+ "ticks": 460,
+ "checkpoints": [
+  {
+   "id": "065_tunnel_inside",
+   "tick": 60,
+   "capture": "ega/065_tunnel_inside.png",
+   "max_px": 0
+  },
+  {
+   "id": "066_tunnel_exit",
+   "tick": 451,
+   "capture": "ega/066_tunnel_exit.png",
+   "max_px": 0
+  }
+ ],
+ "timings": [
+  {
+   "id": "dissolve",
+   "from": {
+    "event": "dissolve=on"
+   },
+   "to": {
+    "event": "dissolve=off"
+   },
+   "expect_ticks": 6,
+   "tolerance": 0,
+   "source": "the doorway dissolve (r2/fl_l2door_after)"
+  }
+ ]
+}

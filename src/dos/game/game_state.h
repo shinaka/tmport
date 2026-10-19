@@ -486,6 +486,15 @@ struct UiState {
     uint8_t flashButton = 0;        // the button that blinks (g_buttonSel when the flash began)
     uint32_t flashStart = 0;        // g_ticks when the flash began (toggle k at +18k, the end at +72)
     uint16_t titleSavedLineHeight = 0;
+    // The reference machine's clock of Title_Run's loop and of the coin count-up (wave 4; title.cpp,
+    // hud.cpp), in thousandths of a PIT tick on the g_ticks scale (g_ticks n = n * 1000).
+    uint64_t titleLoopAt = 0;       // when the title loop's next iteration runs
+    uint64_t sparkleFrom = 0;       // when the loop's first sparkle attempt of slot 2's idle time ran
+    uint32_t sparkleAttempts = 0;   // attempts made since then
+    bool sparkleIdle = false;       // slot 2 was idle (and attempts running) at the last iteration
+    uint64_t sparkleEndAt = 0;      // the game tick that ended slot 2's script (0 = none pending)
+    uint64_t countUpStart = 0;      // when the running coin count-up drew its first coin
+    uint16_t countUpDone = 0;       // coins it has drawn (0 = no count-up running)
 
     template <class Self, class V>
     static void visit(Self& s, V&& v) {

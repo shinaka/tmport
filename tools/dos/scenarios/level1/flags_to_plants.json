@@ -1,0 +1,16 @@
+{
+ "description": "level 1 (Round 1, Ada): from ega/path_flags a coin at the flags (Down at 83: the press does not change the elves), then Right held from 994 to 1414 (the only walk start between 120 and 2270 that gives ega/path_plants' g_randSeed); the screen and the seed match, 4 hidden elves stand 1-41 px elsewhere (the walk was not one press in the reference session: its inputs are not known)",
+ "start": {
+  "state": "savestates/ega/path_flags.sav"
+ },
+ "keys": "83:tap:down, 994:down:right, 1414:up:right",
+ "ticks": 2696,
+ "checkpoints": [
+  {
+   "id": "path_plants_state",
+   "at_log_end": "savestates/ega/path_plants.sav",
+   "capture_state": "savestates/ega/path_plants.sav",
+   "max_px": 0
+  }
+ ]
+}

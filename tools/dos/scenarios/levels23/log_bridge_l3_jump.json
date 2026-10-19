@@ -1,0 +1,40 @@
+{
+ "description": "tier 2: walking onto the level-3 bridge from the tree, the jump that breaks it",
+ "start": {
+  "state": "savestates/r2/fl_l3_at_tree_tier2.sav"
+ },
+ "keys": "89:down:right, 203:up:right, 204:down:pgup, 208:up:pgup",
+ "ticks": 438,
+ "checkpoints": [
+  {
+   "id": "r2_bridge_l3_00_before",
+   "tick": 60,
+   "capture": "ega/r2_bridge_l3_00_before.png",
+   "max_px": 0
+  },
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_bridge_l3_jump.sav",
+   "capture_state": "savestates/r2/fl_bridge_l3_jump.sav"
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_bridge_l3_jump",
+   "state": "savestates/r2/fl_bridge_l3_jump.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ]
+}

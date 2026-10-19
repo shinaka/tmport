@@ -1,0 +1,15 @@
+{
+ "description": "the crafted 4-star player tierb (state r2/tierb_start_msg) walks out of the clubhouse door: the start-of-game rank message outside. The reference run moved the mouse meanwhile (the pointer shows at the right edge, y 127): reproduced by a move",
+ "start": {
+  "state": "savestates/r2/tierb_start_msg.sav"
+ },
+ "keys": "20:down:right, 30:up:right, 40:down:up, 60:up:up, 80:move:318:127",
+ "ticks": 100,
+ "checkpoints": [
+  {
+   "id": "message",
+   "tick": 100,
+   "capture": "ega/r2_tierb_start_message_outside.png"
+  }
+ ]
+}

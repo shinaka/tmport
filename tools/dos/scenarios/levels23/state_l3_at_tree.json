@@ -1,0 +1,21 @@
+{
+ "description": "load the state; the first engine frame against the state's own screen; the capture checks found from the state (forward, or masked where the capture was taken before the state was saved)",
+ "start": {
+  "state": "savestates/ega/l3_at_tree.sav"
+ },
+ "ticks": 60,
+ "checkpoints": [
+  {
+   "id": "frame1_own_screen",
+   "tick": 1,
+   "capture_state": "savestates/ega/l3_at_tree.sav",
+   "max_px": 0
+  },
+  {
+   "id": "r2_bridge_l3_00_before",
+   "tick": 60,
+   "capture": "ega/r2_bridge_l3_00_before.png",
+   "max_px": 0
+  }
+ ]
+}

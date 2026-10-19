@@ -4,6 +4,15 @@
 
 namespace tmport::dos {
 
+void MouseDriver::startPosition(Look look, uint16_t& x, uint16_t& y) {
+    switch (look) {
+        case Look::Mcga: x = 158; y = 82; break;
+        case Look::Cga: x = kMaxX; y = 146; break;
+        case Look::Ega:
+        case Look::Tandy: x = kMaxX; y = 101; break;
+    }
+}
+
 void MouseDriver::setLogicalPosition(int x, int y) {
     x_ = static_cast<uint16_t>(std::clamp(x / 2, 0, kMaxX));  // driver x unit = 2 logical pixels
     y_ = static_cast<uint16_t>(std::clamp(y, 0, kMaxY));

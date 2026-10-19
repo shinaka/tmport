@@ -1,0 +1,21 @@
+{
+ "description": "load the state; the loaded moment against the capture of that frame (the state reader); the first engine frame against the state's own screen",
+ "start": {
+  "state": "savestates/ega/level2_doorway.sav"
+ },
+ "ticks": 1,
+ "checkpoints": [
+  {
+   "id": "loaded",
+   "tick": 0,
+   "capture": "ega/063_level2_at_doorway.png",
+   "max_px": 0
+  },
+  {
+   "id": "frame1_own_screen",
+   "tick": 1,
+   "capture_state": "savestates/ega/level2_doorway.sav",
+   "max_px": 0
+  }
+ ]
+}

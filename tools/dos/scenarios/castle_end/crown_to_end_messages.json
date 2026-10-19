@@ -1,0 +1,28 @@
+{
+ "description": "Enter on the CHAMPION rank chest: messages 35 (with the name) and 36, then hint 13 (ega_r2_crown_to_end_messages.avi); the checkpoints sit in the still picture after each bubble's long frame has presented (the engine shows a long frame's picture when it ends, as DOSBox-X does)",
+ "start": {
+  "state": "savestates/r2/crown_t2_298_wait.sav"
+ },
+ "keys": "10:down:enter, 11:up:enter, 259:down:enter, 260:up:enter, 469:down:enter, 470:up:enter",
+ "ticks": 490,
+ "checkpoints": [
+  {
+   "id": "end_message",
+   "tick": 30,
+   "capture": "ega/r2_crown_08_end_message.png",
+   "max_px": 0
+  },
+  {
+   "id": "after_message",
+   "tick": 275,
+   "capture": "ega/r2_crown_09_after_message.png",
+   "max_px": 0
+  },
+  {
+   "id": "after_message2",
+   "tick": 485,
+   "capture": "ega/r2_crown_10_after_message2.png",
+   "max_px": 0
+  }
+ ]
+}

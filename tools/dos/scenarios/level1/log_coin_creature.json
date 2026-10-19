@@ -1,0 +1,69 @@
+{
+ "description": "tier 3, no coins (nets poked to 3 in RAM): walking right and back, the gold coin creature touched (+2), then elf dust; ega/coin_creature is on this run (tick 1289) and avi/ega_r2_coin_creature_touch.avi covers ticks 1339-1589 (the HUD Net box is redrawn as in DOSBox-X since the loader sets the full clip window that the rest of the interrupted Sprites_DrawSorted sets, requests/level1.md 1)",
+ "start": {
+  "state": "savestates/r2/fl_tierc_coincreature.sav"
+ },
+ "keys": "56:down:right, 223:up:right, 238:down:left, 452:up:left, 1374:down:left, 1446:up:left",
+ "ticks": 1747,
+ "checkpoints": [
+  {
+   "id": "coin_creature_state",
+   "at_log_end": "savestates/ega/coin_creature.sav",
+   "capture_state": "savestates/ega/coin_creature.sav"
+  },
+  {
+   "id": "touch_a",
+   "tick": 1463,
+   "capture": "ega/r2_coin_creature_03_touch_a.png",
+   "max_px": 0
+  },
+  {
+   "id": "touch_b",
+   "tick": 1493,
+   "capture": "ega/r2_coin_creature_04_touch_b.png",
+   "max_px": 0
+  },
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_coin_after.sav",
+   "capture_state": "savestates/r2/fl_coin_after.sav",
+   "max_px": 0
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_coin_after",
+   "state": "savestates/r2/fl_coin_after.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  },
+  {
+   "id": "coin_creature",
+   "state": "savestates/ega/coin_creature.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ]
+}

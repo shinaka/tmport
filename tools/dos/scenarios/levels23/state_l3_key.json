@@ -1,0 +1,15 @@
+{
+ "description": "load the state; the first engine frame against the state's own screen",
+ "start": {
+  "state": "savestates/ega/l3_key.sav"
+ },
+ "ticks": 1,
+ "checkpoints": [
+  {
+   "id": "frame1_own_screen",
+   "tick": 1,
+   "capture_state": "savestates/ega/l3_key.sav",
+   "max_px": 0
+  }
+ ]
+}

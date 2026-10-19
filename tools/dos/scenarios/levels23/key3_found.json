@@ -1,0 +1,22 @@
+{
+ "description": "Round 1: the coin dropped at the level-3 tree finds the key (095, elves included)",
+ "start": {
+  "state": "savestates/ega/l3_at_tree.sav"
+ },
+ "keys": "142:down:down, 142.5:up:down",
+ "ticks": 360,
+ "checkpoints": [
+  {
+   "id": "r2_bridge_l3_00_before",
+   "tick": 60,
+   "capture": "ega/r2_bridge_l3_00_before.png",
+   "max_px": 0
+  },
+  {
+   "id": "095_level3_key_found",
+   "tick": 355,
+   "capture": "ega/095_level3_key_found.png",
+   "max_px": 0
+  }
+ ]
+}

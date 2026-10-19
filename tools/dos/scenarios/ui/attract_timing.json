@@ -1,0 +1,62 @@
+{
+ "description": "the attract loop without keys: TitleStep_Wait times out 7200 PIT ticks after its first call, which follows the page draw (title 12.8, story 1 13.3, story 2 7.5, series page 14.3 PIT ticks on the reference machine); the page events are the frames whose time-out fires and draws the next page",
+ "start": {
+  "boot": true,
+  "seed": "0x1EE2"
+ },
+ "keys": "",
+ "ticks": 7400,
+ "timings": [
+  {
+   "id": "cycle",
+   "from": {
+    "event": "title=3",
+    "nth": 1
+   },
+   "to": {
+    "event": "title=3",
+    "nth": 2
+   },
+   "expect_ticks": 5770,
+   "tolerance": 1,
+   "source": "avi/tandy_attract_full_cycle.avi: story page 1 at frames 225 and 7529 = 28851 PIT ticks"
+  },
+  {
+   "id": "story1_page",
+   "from": {
+    "event": "title=3"
+   },
+   "to": {
+    "event": "title=5"
+   },
+   "expect_ticks": 1443,
+   "tolerance": 1,
+   "source": "avi/tandy_attract_full_cycle.avi: 7201 + 13.3 PIT ticks between the time-outs"
+  },
+  {
+   "id": "story2_page",
+   "from": {
+    "event": "title=5"
+   },
+   "to": {
+    "event": "title=11"
+   },
+   "expect_ticks": 1442,
+   "tolerance": 1,
+   "source": "avi/tandy_attract_full_cycle.avi: 7201 + 7.5 PIT ticks between the time-outs"
+  },
+  {
+   "id": "series_and_title_pages",
+   "from": {
+    "event": "title=11"
+   },
+   "to": {
+    "event": "title=3",
+    "nth": 2
+   },
+   "expect_ticks": 2886,
+   "tolerance": 1,
+   "source": "avi/tandy_attract_full_cycle.avi: 2 x 7201 + 14.3 + 12.8 PIT ticks between the time-outs"
+  }
+ ]
+}

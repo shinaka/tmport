@@ -1,0 +1,22 @@
+{
+ "description": "level 1, the cave of cell 0xF7 from ega/w_cave_f7 (camera = player x - 0x124 inside): three steps left, then right out of the cave (the dissolve to the path); no elf is on screen inside",
+ "start": {
+  "state": "savestates/ega/w_cave_f7.sav"
+ },
+ "keys": "10:down:left, 25:up:left, 60:down:right, 300:up:right",
+ "ticks": 120,
+ "checkpoints": [
+  {
+   "id": "three_steps_left",
+   "tick": 26,
+   "capture": "ega/r2_w_cave_f7_02_inside_3steps_left.png",
+   "max_px": 0
+  },
+  {
+   "id": "exits_outside",
+   "tick": 78,
+   "capture": "ega/r2_w_cave_f7_03_right_exits_outside.png",
+   "max_px": 0
+  }
+ ]
+}

@@ -51,7 +51,8 @@ public:
     // bits keep the background. Whole bytes of 8 pixels are written, even past the glyph's width, and
     // linearly: a glyph running past byte 159 continues at the start of the next row, as in the
     // original. Records the dirty rectangle (x, y, width >> 1, height) when DS:37AE bit 0 is set.
-    // Colour word 1 only measures. Returns advance(code).
+    // Colour word 1 only measures. Returns advance(code). On a CGA buffer the glyph's CGA pixels
+    // follow 1000:2295 (BackBuffer::enableCga; the colour pattern turns by one pixel per glyph row).
     int drawChar(BackBuffer& buf, uint16_t colour, int x, int y, int code) const;
 
     // The 16-word expansion table 2005:8900 as Font_DrawChar uses it (index = 4 font bits).

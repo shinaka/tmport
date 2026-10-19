@@ -58,6 +58,12 @@ int cgaPixel(const std::array<uint8_t, 16>& dither, uint8_t c, int x, int y) {
     return (dither[c & 15] >> (6 - 2 * p)) & 3;
 }
 
+CgaBinding::CgaBinding(BackBuffer& back, BackBuffer& screen, const LookPalette& pal) {
+    if (pal.look != Look::Cga) return;
+    back.enableCga(pal.cgaDither);
+    screen.enableCga(pal.cgaDither);
+}
+
 Rgb8 LookPalette::at(uint8_t c, int x, int y) const {
     if (look == Look::Cga) return cgaColours()[static_cast<size_t>(cgaPixel(cgaDither, c, x, y))];
     return colours[c & 15];
@@ -93,9 +99,10 @@ void toRgba(const BackBuffer& buf, const LookPalette& pal, std::span<uint8_t> ou
     if (out.size() < static_cast<size_t>(BackBuffer::kWidth) * BackBuffer::kHeight * 4)
         throw std::invalid_argument("toRgba: output buffer too small");
     size_t o = 0;
+    const bool plane = pal.look == Look::Cga && buf.cgaEnabled();
     for (int y = 0; y < BackBuffer::kHeight; ++y)
         for (int x = 0; x < BackBuffer::kWidth; ++x) {
-            const Rgb8 c = pal.at(buf.pixel(x, y), x, y);
+            const Rgb8 c = plane ? cgaColours()[buf.cgaPixel(x, y)] : pal.at(buf.pixel(x, y), x, y);
             out[o++] = c.r;
             out[o++] = c.g;
             out[o++] = c.b;
@@ -109,11 +116,12 @@ void toRgba32(const BackBuffer& buf, const LookPalette& pal, std::span<uint32_t>
     auto pack = [](Rgb8 c) { return static_cast<uint32_t>(c.r) | (static_cast<uint32_t>(c.g) << 8) | (static_cast<uint32_t>(c.b) << 16) | 0xFF000000u; };
     std::array<uint32_t, 16> packed{};
     for (size_t i = 0; i < 16; ++i) packed[i] = pack(pal.colours[i]);
+    const bool plane = pal.look == Look::Cga && buf.cgaEnabled();
     size_t o = 0;
     for (int y = 0; y < BackBuffer::kHeight; ++y)
         for (int x = 0; x < BackBuffer::kWidth; ++x, ++o) {
             const uint8_t c = buf.pixel(x, y);
-            out[o] = pal.look == Look::Cga ? pack(pal.at(c, x, y)) : packed[c];
+            out[o] = plane ? pack(cgaColours()[buf.cgaPixel(x, y)]) : pal.look == Look::Cga ? pack(pal.at(c, x, y)) : packed[c];
         }
 }
 

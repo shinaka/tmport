@@ -1,0 +1,15 @@
+{
+ "description": "level 1, the run of r2/fl_treasure5_found from r2/at_treasure5: Down at 433 (the only press tick that gives the end state's g_randSeed 0x84AB36A1 and elf table), the search, hint 4. Seed, elves and slots match; the elf under the bubble differs (129 px: the bubble frame's sprite snapshot, requests/level1.md 2)",
+ "start": {
+  "state": "savestates/r2/at_treasure5.sav"
+ },
+ "keys": "433:down:down, 435:up:down",
+ "ticks": 836,
+ "checkpoints": [
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_treasure5_found.sav",
+   "capture_state": "savestates/r2/fl_treasure5_found.sav"
+  }
+ ]
+}

@@ -1,0 +1,20 @@
+{
+ "description": "the first elf question (state ega/quiz1): Enter on the first answer (right): the praise bubble with the clue word; Enter closes it: the clue word in the panel, coins counted up, the elves of the original",
+ "start": {
+  "state": "savestates/ega/quiz1.sav"
+ },
+ "keys": "50:tap:enter, 150:tap:enter",
+ "ticks": 260,
+ "checkpoints": [
+  {
+   "id": "praise",
+   "tick": 100,
+   "capture": "ega/031_quiz_right.png"
+  },
+  {
+   "id": "clue_added",
+   "tick": 250,
+   "capture": "ega/032_clue_word_added.png"
+  }
+ ]
+}

@@ -1325,7 +1325,7 @@ row also requests a full redraw. "x/y" are the target before the tick's dx/dy ar
 |---|---|---|---|---|---|---|---|---|---|
 | new game | `Users_LoadPlayer` 47c7:0b7d (and `Users_InitNewPlayer` 47c7:0ab5) | – | (0x140, 0x70) | 02 | 0 | 0xC0 (camY 0) | – | – | 5 |
 | 02 | P12 door | Up, rise < 0x6C, `x&0x78 < 0x5A` | (0x1C0, 0x7F0) | F3 | 0 | 0x120 | 2 | 6 / 9 | 0, 0 |
-| 02 | P12 prize | rise to `y&0x7F == 0x60`, `x&0x78 >= 0x5A` | (0x4F0, 0x4E0) | 99 | 4 | kept | 0 | 0x51 / 1 | – |
+| 02 | P12 prize | rise to `y&0x7F == 0x60`, `x&0x78 >= 0x5A` | (0x4F0, 0x4E0) | 99 | 4 | kept (wave 4: no camera is set, so Player_Move's `x - 2*SI` from the screen x before the move decides the room's scenery: Up at x 0x168 gives camX 0x448, as in the captures, at 0x170 gives 0x440) | 0 | 0x51 / 1 | – |
 | 02 | P12 crown | slot 1 last anim 0xA5 | (0x4F0, 0x4E0) then P71 → (0x680, 0x80) | 1D | 4 | 0x680 | 2 | – / 1 | – |
 | F3 | P11 | rise < 0x68 | (0x140, 0x70) | 02 | 0 | 0xC0 | 2 | 6 / 9 | 5, 1 |
 | 01 | P71 (player doc) | rise to 0x60 | (0x680, 0x80) | 1D | 4 | 0x680 | 2 | – / 1 | – |
@@ -1555,9 +1555,10 @@ the presentation rate; nothing in these modules counts frames for gameplay excep
 
 ## 15. Open points
 
-1. Capture request 6 (slow-CPU horizontal scrolling, `extracted/scratch/dos_requests/world.md`)
-   is unanswered; requests 1–5 are answered and agree with this spec (§12.4). The other cave
-   door (EB) was not tried in a capture.
+1. ~~Capture request 6 (slow-CPU horizontal scrolling)~~: answered by Round 2 (r2/fl_slowcpu_walk,
+   avi/ega_r2_slowcpu_X_walk.avi, the r2_slowcpu_scroll frames): the engine matches them (wave 4).
+   Requests 1–5 are answered and agree with this spec (§12.4). The other cave door (EB) was not
+   tried in a capture.
 2. The look-up animation's dy and the walk animation's dx (player doc) decide exactly when doors
    fire and where edge teleports land.
 3. DS:9136 is taken as the program's drive number (≤ 1 = floppy) [I]; message box 0x16 text not
@@ -1659,7 +1660,57 @@ DOSBox-X save states [O unless marked]:
     follow: (a) at a level boundary the logs lose 4 or 5 ticks (log gaps of 9–10 ticks instead of 5
     between two fall steps): the original loads the new PAN from disk with `g_quit` set, which skips
     whole game ticks; the engine loads instantly and stays that many ticks ahead afterwards (the
-    "Game_Tick overrun" of PORTING_NOTES §6); (b) after the doorway teleport `Player_Update` resumes 8
+    "Game_Tick overrun" of PORTING_NOTES §6; wave 4: the engine now loses the same ticks, PORTING_NOTES
+    §2.5, and the replays match without a remapping); (b) after the doorway teleport `Player_Update` resumes 8
     ticks after the teleport tick, i.e. the dissolve occupies the 7 lockstep frames after the frame
     that latched it — the engine's spread (2755.9 cells/s, the frame clock's dissolve remainder dropped
     while no dissolve runs) gives exactly that.
+
+---
+
+## Wave 4 findings (fidelity)
+
+Every capture, AVI and r2 frame log of levels 2-3 (and of the trunk climb from level 1) was compared
+with the engine, from the DOSBox-X state saved nearest before it, with the Round-1 key times found by
+sweeping them against the captures and AVIs (scenarios `tools/dos/scenarios/levels23/`, run by
+`tools/dos/fidelity.py levels23`; the sweeps and checks in `extracted/scratch/dos_w4_levels23/`).
+[O unless marked]
+
+1. **Handlers confirmed pixel for pixel, elves included**, by captures reached from a state: the trunk
+   lock and climb (P31, P30, the treetop decoration, the level boundary; ega/051-058), the level-2
+   gate and its geyser lift (P39, P40, `Cell_DrawGeyser`, the 1/2 boundary; 078-081: the player stands
+   in the cloud until Up is pressed again), the arch into the castle (P42, P44; 096, 097), the mine
+   tunnel doors (P17, P18, P37, P38; 063-066), the geyser-top slide (P41; 089, 093, the r2 geyser-hole
+   set), the ice cave and its slide down the rock shaft (P60, P62, P23; 090-092), the bridges (P45 at 4
+   stars; the r2 bridge sets), the net shop (P36: 073 and 075 from a copy of `ega/l2_clue1` with the
+   coins and nets of that moment), the key places (077, 095) and the slow-CPU scroll (the r2 slow-CPU
+   frames, rows 112..143 not scrolled). `Scene_Update`'s `Elves_Spawn` gives the original's elves after
+   every level change (081, r2_bridge_l3_02_after). No handler needed a change.
+2. **Scroll frames are long frames** on the reference machine: the FRAME marks of the r2 logs (130f:0097,
+   after the frame's drawing) put the next frame 6-7 PIT ticks after the tick that moved the camera for a
+   horizontal step and 6-8 for a vertical one (90 steps in fl_walk2, fl_countup, fl_bridge_l3_jump,
+   fl_climb, fl_castle_t3_a, fl_geyser_slide). `scrollUpdate` reports 6.5 / 7 PIT ticks (7.5 for both
+   directions, not measured) to the runtime's frame timing, counted from the previous tick. Because the
+   main loop is sequential, a frame begins when the previous one ended: in r2/fl_bridge_l3 the
+   horizontal step (camera moved by log tick 1106), the redraw of the breaking bridge (1107) and the
+   first vertical step of the fall (1109) follow each other, so the vertical step's frame begins before
+   tick 1110 and lasts past 1111, which is gated (1110 advanced the script of an elf on the bridge). The
+   engine reproduces this once the runtime chains its frames (a request of this wave): the log then
+   matches in sequence and the elves after the fall are the original's (the end state's screen 0 px).
+3. **Torn captures.** DOSBox-X presents without retrace sync, so some captures and many AVI frames show a
+   frame half presented: rows above a split from the new frame, rows below it from the one before
+   (ega/053 rows 139..143, 079 rows 126..143, r2_geyser_hole_02 rows 114..143, r2_slowcpu_scroll_avi150
+   rows 16..18), or a sprite or tile column caught mid-copy. Every frame of the AVIs of this group is
+   either equal to an engine frame or such a mix of two consecutive ones, apart from the dissolves.
+   The "clue words wiped one line at a time" during the geyser lift (REFERENCE_CAPTURES §4.1, ega/080)
+   is such a tear of the clue box's single redraw at the level change (`code_ui.md` §11.3: the box is
+   drawn whole when `g_keyState` changes); the AVI shows the box replaced within two video frames.
+4. **The dissolve** (§8.6): ega/064 and the frames of avi/ega_doorway_dissolve.avi show only whole cells
+   of the new picture, each set lying between two of the engine's dissolve frames (two AVI frames miss
+   one or two cells the engine had drawn: cells caught mid-copy); the doorway, the tunnel exit and the
+   castle door dissolve in 6 game ticks after their teleport frame, as in the AVIs (7-8 video frames).
+5. **Long frames present at their end.** DOSBox-X shows a long frame's picture when the frame ends (after
+   its scene load, scroll or redraw), the engine at the tick the frame began: after a PAN load the
+   first scroll step appears about 4.7 ticks later in avi/ega_r2_level_change_up_trunk_climb.avi than
+   in the engine's frame dumps (AVI frames 509-516). The logic and the pictures are unchanged; only the
+   moment the screen updates differs (a presentation detail for the runtime).

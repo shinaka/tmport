@@ -1,0 +1,32 @@
+{
+ "description": "load the state; the first engine frame against the state's own screen; the capture checks found from the state (forward, or masked where the capture was taken before the state was saved)",
+ "start": {
+  "state": "savestates/ega/level2_gate.sav"
+ },
+ "ticks": 1,
+ "checkpoints": [
+  {
+   "id": "frame1_own_screen",
+   "tick": 1,
+   "capture_state": "savestates/ega/level2_gate.sav",
+   "max_px": 0
+  },
+  {
+   "id": "060_level2_gate",
+   "tick": 0,
+   "capture": "ega/060_level2_gate.png",
+   "masks": [
+    {
+     "rect": [
+      0,
+      91,
+      17,
+      131
+     ],
+     "reason": "an elf: the capture was taken before the state was saved, the elves moved in between"
+    }
+   ],
+   "max_px": 0
+  }
+ ]
+}

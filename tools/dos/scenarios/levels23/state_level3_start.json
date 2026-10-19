@@ -1,0 +1,21 @@
+{
+ "description": "load the state; the first engine frame against the state's own screen; the capture checks found from the state (forward, or masked where the capture was taken before the state was saved)",
+ "start": {
+  "state": "savestates/ega/level3_start.sav"
+ },
+ "ticks": 47,
+ "checkpoints": [
+  {
+   "id": "frame1_own_screen",
+   "tick": 1,
+   "capture_state": "savestates/ega/level3_start.sav",
+   "max_px": 0
+  },
+  {
+   "id": "r2_geyser_hole_00_before",
+   "tick": 47,
+   "capture": "ega/r2_geyser_hole_00_before.png",
+   "max_px": 0
+  }
+ ]
+}

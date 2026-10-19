@@ -1,0 +1,25 @@
+{
+ "description": "the sign-in list (state ega/signin): Enter on New Player opens the name box, a d a typed (caret phase of the capture), Enter starts the game: the first start message (the state ega/shack_hint1)",
+ "start": {
+  "state": "savestates/ega/signin.sav"
+ },
+ "keys": "20:tap:enter, 60:tap:a, 80:tap:d, 100:tap:a, 140:tap:enter",
+ "ticks": 200,
+ "checkpoints": [
+  {
+   "id": "name_prompt",
+   "tick": 48,
+   "capture": "ega/005_newname_prompt.png"
+  },
+  {
+   "id": "name_typed",
+   "tick": 104,
+   "capture": "ega/006_newname_typed.png"
+  },
+  {
+   "id": "start_message",
+   "tick": 160,
+   "capture": "ega/007_after_name.png"
+  }
+ ]
+}

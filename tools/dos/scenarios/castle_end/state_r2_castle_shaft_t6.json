@@ -1,0 +1,43 @@
+{
+ "description": "load the state, compare the loaded moment (its own screen) and the first engine frame with the capture (masked: a RAM-crafted state: g_treasuresFound was set without the HUD caches, so the first frame redraws the treasure count and the level markers (as the original does in its next frame))",
+ "start": {
+  "state": "savestates/r2/castle_shaft_t6.sav"
+ },
+ "ticks": 1,
+ "checkpoints": [
+  {
+   "id": "loaded",
+   "tick": 0,
+   "capture": "ega/099_castle_ladder_shaft.png",
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      280,
+      161,
+      302,
+      194
+     ],
+     "reason": "a RAM-crafted state: g_treasuresFound was set without the HUD caches, so the first frame redraws the treasure count and the level markers (as the original does in its next frame)"
+    }
+   ]
+  },
+  {
+   "id": "frame1",
+   "tick": 1,
+   "capture": "ega/099_castle_ladder_shaft.png",
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      280,
+      161,
+      302,
+      194
+     ],
+     "reason": "a RAM-crafted state: g_treasuresFound was set without the HUD caches, so the first frame redraws the treasure count and the level markers (as the original does in its next frame)"
+    }
+   ]
+  }
+ ]
+}

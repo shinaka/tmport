@@ -7,6 +7,8 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <format>
+#include <map>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -21,7 +23,9 @@
 #include "dos/game/init.h"
 #include "dos/game/main_loop.h"
 #include "dos/game/sound.h"
+#include "dos/game/load_state.h"
 #include "dos/game/trace.h"
+#include "dos/save/dosbox_state.h"
 #include "dos_game_fixture.h"
 #include "dos_test_data.h"
 #include "rtl/borland_rand.h"
@@ -573,11 +577,17 @@ TEST_CASE("dos mainloop: the boot shows the title on the unseeded rand, Enter le
     CHECK(hasCall(f.sound(), {Op::MusicLoop, 1}));
     CHECK(hasCall(f.sound(), {Op::MusicPlay, 1}));
     CHECK(g.rand.seed() == 1);  // nothing drew from rand() before the title loop
+    // Title_Run loads OPENING.PAN with g_quit = 1 right after Timer_Install: the first game tick falls
+    // into the load (the reference timing; one tick lost before the sign-in in every DOSBox-X state).
+    f.step(1);
+    CHECK(f.runtime().ticksFrozen() == 1);
+    CHECK(g.ui.titlePhase == 0);
+    CHECK(f.runtime().counters().cycle13 == 12);  // Game_Tick did not run (its counters neither)
     f.step(1);
     CHECK(g.ui.titlePhase == 1);  // TitleStep_DrawTitle ran in the first frame
     CHECK(g.screenVersion > 0);
     CHECK(g.input.context == 5);
-    f.step(49);
+    f.step(48);
     // The sparkle attempts (one rand() each, 1/128 starts one, R(12) its spot) run on the unseeded
     // sequence: at the reference rate about 35.7 attempts per frame while slot 2 is idle.
     const int draws = randDrawsSinceStart(g.rand.seed());
@@ -673,7 +683,7 @@ TEST_CASE("dos mainloop: a headless start-up runs the game with a trace, a state
         }
         ++rows;
     }
-    CHECK(rows == 200);
+    CHECK(rows == 199);  // game tick 1 falls into Title_Run's OPENING load (g_quit): Game_Tick did not run
     CHECK(fs::file_size(dir / "state150.bin") == kDgroupSize);
     CHECK(fs::exists(fs::path(dir / "state150.bin").concat(".fields.tsv")));
     // Screen dumps: at least the final frame (320x200 PNGs), and the sound of the run.
@@ -840,12 +850,226 @@ TEST_CASE("dos mainloop: without keys the attract pages change on their 7200-PIT
         if (g.ui.titlePhase != phase) changes.emplace_back(f.runtime().gameTicks(), phase = g.ui.titlePhase);
     }
     // Title (1) -> story 1 (2, drawn: 3) -> story 2 (4, 5) -> on its time-out the Super Solvers page
-    // (10, 11) -> the title again (12, 0, 1): one page per 7215 PIT ticks (TitleStep_Wait sets its timer
-    // on its first call; REFERENCE_CAPTURES §5.1 measured 30.47 s per page).
-    const std::vector<std::pair<uint64_t, int>> expect = {
-        {1, 1},       {1443, 2},  {1444, 3},  {2886, 4},  {2887, 5},
-        {4329, 10}, {4330, 11}, {5772, 12}, {5773, 0}, {5774, 1}};
+    // (10, 11) -> the title again (12, 0, 1). TitleStep_Wait sets its timer on its first call, after the
+    // page's draw, and fires on the PIT interrupt that passes it; the draw follows in the same frame
+    // (wave 4, code_ui.md §8.5: page draws of 12.8 / 13.3 / 7.5 / 14.3 PIT ticks for the title, story
+    // 1, story 2 and the series page, avi/tandy_attract_full_cycle.avi: 7304 frames = 5770 game ticks
+    // from story page 1 to story page 1). The title's first frame follows Title_Run's OPENING load,
+    // into which game tick 1 falls.
+    const std::vector<std::pair<uint64_t, int>> expect = {{2, 1}, {1444, 3}, {2887, 5}, {4329, 11}, {5772, 1}};
     CHECK(changes == expect);
     CHECK(g.titleRunning);
     CHECK(g.core.uiMode == 0x80);
+}
+
+// ---- the reference frame timing against the DOSBox-X frame logs (wave 4) -------------------------
+
+namespace {
+
+// The rings of the frame logger (extracted/scratch/dos_w1_runtime/framelog.py) in a DOSBox-X state:
+// a STEP record per executed game tick (g_ticks low word, x, y, camera x, y, player state, g_keys,
+// coins) at 8800:0010 (ring of 0x800 records, index 8800:0000, count 8800:0002), the g_ticks of every
+// gated tick at 8000:4200 (ring of 0x1000 words, index 8000:0108, count 8000:010A).
+struct FrameLog {
+    struct Step {
+        uint16_t ticks = 0, x = 0, y = 0, camX = 0, camY = 0, state = 0, keys = 0, coins = 0;
+    };
+    std::vector<Step> steps;
+    std::vector<uint16_t> blocked;
+};
+
+FrameLog readFrameLog(const DosboxState& s) {
+    FrameLog log;
+    constexpr uint32_t kSteps = 0x88000, kRing = 0x80000;
+    const uint16_t sidx = s.wordAt(kSteps), scnt = s.wordAt(kSteps + 2);
+    for (int i = std::min<int>(scnt, 0x800); i >= 1; --i) {
+        const uint32_t o = kSteps + 0x10 + ((static_cast<uint32_t>(sidx) - 16u * static_cast<uint32_t>(i)) & 0x7FF0u);
+        FrameLog::Step st;
+        uint16_t* f[] = {&st.ticks, &st.x, &st.y, &st.camX, &st.camY, &st.state, &st.keys, &st.coins};
+        for (int k = 0; k < 8; ++k) *f[k] = s.wordAt(o + 2u * static_cast<uint32_t>(k));
+        log.steps.push_back(st);
+    }
+    const uint16_t bidx = s.wordAt(kRing + 0x108), bcnt = s.wordAt(kRing + 0x10A);
+    for (int i = std::min<int>(bcnt, 0x1000); i >= 1; --i)
+        log.blocked.push_back(s.wordAt(kRing + 0x4200 + ((static_cast<uint32_t>(bidx) - 2u * static_cast<uint32_t>(i)) & 0x1FFFu)));
+    return log;
+}
+
+struct LogReplay {
+    int ticks = 0, matched = 0;
+    std::string first;
+};
+
+// Replays a frame log: the game from the state the log started at (loadDosboxState), the log's keys
+// (trace convention: an event at tick T shows in the trace row of tick T, the log's record T), its
+// per-tick trace compared with the log's records: a STEP record needs an executed, ungated tick with
+// the same x, y, camera, state, coins (and keys), a BLOCKED one a gated tick, a log tick with neither
+// (Game_Tick returned at once: g_quit during disk I/O) no executed tick.
+LogReplay replayFrameLog(const DosGfxFiles& files, const fs::path& captures, const char* start, const char* logName,
+                         const std::string& keys, bool compareKeys, bool greyKeyArtefact = false) {
+    LogReplay r;
+    const DosboxState st = DosboxState::load(captures / "savestates" / "r2" / (std::string(start) + ".sav"));
+    const FrameLog log = readFrameLog(DosboxState::load(captures / "savestates" / "r2" / (std::string(logName) + ".sav")));
+    REQUIRE_FALSE(log.steps.empty());
+    dosgame::GameFixture f(files);
+    DosGame& g = f.g();
+    if (greyKeyArtefact) {
+        KeyboardOptions ko = f.runtime().keyboard().options();
+        ko.greyKeyE0Artefact = true;
+        f.runtime().keyboard().setOptions(ko);
+    }
+    const LoadedState loaded = loadDosboxState(g, st);
+    std::ostringstream csv;
+    DosTrace trace(g, csv);
+    f.runtime().setClient(&trace);
+    REQUIRE(f.setScript(keys));
+    // The log's game ticks as the engine's: engine game tick n comes at the original's g_ticks
+    // firstTickTicks + 5 (n - 1) (a tick a Game_Tick overrun delayed by a PIT tick keeps its number). A
+    // full ring starts after the start state: its first ticks are not compared.
+    const uint16_t tick1 = static_cast<uint16_t>(loaded.firstTickTicks);
+    auto index = [tick1](uint16_t t) { return static_cast<int>((static_cast<uint16_t>(t - tick1) + 2) / 5) + 1; };
+    std::map<int, const FrameLog::Step*> steps;
+    for (const auto& s : log.steps)
+        if (static_cast<uint16_t>(s.ticks - tick1 + 2) < 0x8000) steps[index(s.ticks)] = &s;
+    REQUIRE_FALSE(steps.empty());
+    const int firstLogged = steps.begin()->first, last = steps.rbegin()->first;
+    std::map<int, bool> blocked;
+    for (uint16_t b : log.blocked)
+        if (static_cast<uint16_t>(b - tick1 + 2) < 0x8000 && index(b) >= firstLogged && index(b) <= last) blocked[index(b)] = true;
+    f.runtime().stepGameTicks(static_cast<uint64_t>(last + 2));
+    f.runtime().setClient(&f);
+    std::map<int, std::vector<std::string>> rows;
+    std::istringstream in(csv.str());
+    std::string line;
+    while (std::getline(in, line)) {
+        if (line.empty() || line[0] == '#' || line[0] == 't') continue;
+        const auto c = splitCsv(line);
+        rows[std::stoi(c[0])] = c;
+    }
+    for (int t = firstLogged; t <= last; ++t) {
+        ++r.ticks;
+        const auto row = rows.find(t);
+        std::string why;
+        if (const auto s = steps.find(t); s != steps.end()) {
+            const FrameLog::Step& e = *s->second;
+            if (row == rows.end()) {
+                why = "frozen";
+            } else if (row->second[2] == "1") {
+                why = "gated";
+            } else {
+                const auto& c = row->second;
+                const uint16_t want[] = {e.x, e.y, e.camX, e.camY, e.state, e.keys, e.coins};
+                for (int k = 0; k < 7; ++k) {
+                    if (k == 5 && !compareKeys) continue;
+                    if (static_cast<uint16_t>(std::stoul(c[static_cast<size_t>(3 + k)])) != want[k]) why = std::format("field {}", k);
+                }
+            }
+        } else if (blocked.count(t)) {
+            if (row == rows.end() || row->second[2] != "1") why = "not gated";
+        } else if (row != rows.end()) {
+            why = "ran in g_quit";
+        }
+        if (why.empty()) ++r.matched;
+        else if (r.first.empty()) r.first = std::format("log tick {}: {}", t, why);
+    }
+    return r;
+}
+
+}  // namespace
+
+TEST_CASE("dos mainloop: frame logs replayed from their start states match tick for tick across loads and long frames") {
+    TM_REQUIRE_DOS_GAME_FILES();
+    TM_REQUIRE_DOS_CAPTURES();
+    struct Case {
+        const char* start;
+        const char* log;
+        const char* keys;
+        bool keysCompared;
+        bool greyKey;
+        int ticks, matched;
+    };
+    // Every log matches on every tick: r2/fl_bridge_l3's gated log tick 1111 comes from frames that ran
+    // back to back (a scroll frame, the bridge's redraw, the fall's first scroll frame), the tierc
+    // door's gated ticks from the host mouse the reference run moved (DS:911E 180 -> 97: the pointer
+    // shows on the message and when it closes), the champion's arrival in r2/fl_crown_wait from the
+    // load beginning after the chute's last scroll frame with the sprite bank (PORTING_NOTES §2.5).
+    static constexpr Case kCases[] = {
+        {"fl_outside2", "fl_walk2", "89:down:right, 280:up:right, 295:down:left, 438:up:left", true, false, 544, 544},
+        // Sub-tick key times: PgUp held from 195.136 (its repeats' E0 bytes give the one gated-out jump
+        // bit of the log at tick 275 with the grey-key artefact on), Down from 807.4923 (the phase of
+        // the Down repeats).
+        {"fl_outside2", "fl_jumps",
+         "56:down:right, 104:up:right, 195.136:down:pgup, 291:up:pgup, 387:down:pgup, 391:up:pgup, 492:down:up, "
+         "493:up:up, 503:down:right, 575:up:right",
+         true, true, 752, 752},
+        {"fl_outside2", "fl_typematic",
+         "56:down:right, 104:up:right, 195.136:down:pgup, 291:up:pgup, 387:down:pgup, 391:up:pgup, 492:down:up, "
+         "493:up:up, 503:down:right, 575:up:right, 807.4923:down:down, 902.2367:up:down",
+         true, true, 975, 975},
+        {"fl_at_lock", "fl_climb", "89:down:up, 104:up:up, 248:down:up, 533:up:up", false, false, 640, 640},
+        {"fl_level3_start", "fl_geyser_slide", "162:down:left, 221:up:left", false, false, 663, 663},
+        {"fl_l2_at_nests_tier2", "fl_bridge_l2", "90:down:right, 257:up:right", false, false, 746, 746},
+        {"fl_l3_at_tree_tier2", "fl_bridge_l3", "147:down:right, 267:up:right, 1082:down:right, 1153:up:right", false, false,
+         1596, 1596},
+        {"fl_l3_at_tree_tier2", "fl_bridge_l3_jump", "89:down:right, 203:up:right, 204:down:pgup, 208:up:pgup", false, false,
+         438, 438},
+        {"fl_l2door", "fl_l2door_after", "56:down:up, 71:up:up", true, false, 190, 190},
+        {"fl_shack", "fl_shack_left", "57:down:left, 294:up:left", false, false, 366, 366},
+        {"fl_tierc_start", "fl_tierc_outside",
+         "60:move:318:97, 430:move:316:97, 431:move:318:97, 56:down:up, 79:up:up, 83:down:up, 85:up:up, 1004:tap:enter", false,
+         false, 1161, 1161},
+        {"fl_slowcpu_clubhouse", "fl_slowcpu_walk",
+         "55:down:up, 80:up:up, 914:down:right, 1199:up:right, 1214:down:left, 1499:up:left", false, false, 1745, 1745},
+        // The end sequences (full rings: the logs' last 2048 executed ticks): castle top, treasures, the
+        // chute, the castle gate with the treasure room's load, the rank screen.
+        {"fl_castle_upper_t2", "fl_end_t2_wait", "82:down:up, 342:up:up", false, false, 2049, 2049},
+        {"fl_castle_upper_t6_294", "fl_crown_wait", "81:down:up, 342:up:up", true, false, 2055, 2055},
+    };
+    for (const Case& c : kCases) {
+        const auto startSav = *captures / "savestates" / "r2" / (std::string(c.start) + ".sav");
+        if (!fs::exists(startSav)) continue;
+        const LogReplay r = replayFrameLog(*gameFiles, *captures, c.start, c.log, c.keys, c.keysCompared, c.greyKey);
+        INFO(std::string(c.log) << ": " << r.matched << " of " << r.ticks << " ticks match; first difference " << r.first);
+        CHECK(r.ticks == c.ticks);
+        CHECK(r.matched == c.matched);
+    }
+}
+
+TEST_CASE("dos mainloop: a new player's game start lasts as in DOSBox-X (the sprite slots of ega/shack_hint1)") {
+    TM_REQUIRE_DOS_GAME_FILES();
+    TM_REQUIRE_DOS_CAPTURES();
+    const auto sav = *captures / "savestates" / "ega" / "shack_hint1.sav";
+    if (!fs::exists(sav)) return;
+    dosgame::FixtureOptions o;
+    o.runGameInit = false;
+    o.layoutSeed = uint16_t{0x1EE2};
+    dosgame::GameFixture f(*gameFiles, o);
+    DosGame& g = f.g();
+    mainStart(g);
+    // The title pages after the pointer hid (600 idle ticks, as in the capture run), the name, Enter.
+    REQUIRE(f.setScript("660:tap:enter, 720:tap:enter, 780:tap:enter, 840:tap:enter, 1000:tap:a, 1020:tap:d, 1040:tap:a, "
+                        "1060:tap:enter",
+                        false));
+    f.step(1060);
+    CHECK(f.runtime().ticksFrozen() == 1);  // Title_Run's OPENING load
+    f.step(20);
+    // USERS.DAT written, Quiz_LoadQuestions, MOUNTAIN.PAN with g_quit = 1: 7 more ticks lost (8 in all
+    // in the DOSBox-X state: DS:90FE and g_ticks); the HUD redraw that follows ran two player ticks
+    // (states 3 -> 4 -> 10), then the start message opened over the player's front pose.
+    CHECK(f.runtime().ticksFrozen() == 8);
+    CHECK(g.core.uiMode == 0x04);
+    CHECK(g.player.playerState == 10);
+    f.step(170);
+    const DosboxState st = DosboxState::load(sav);
+    const auto img = dumpToDgroup(g);
+    const auto ref = st.dgroup();
+    constexpr uint16_t kSlots = 0x8FD6;  // g_spriteSlots: 13 slots of 22 bytes
+    int differ = 0;
+    for (uint16_t i = 0; i < 13 * 22; ++i) differ += img[kSlots + i] != ref[kSlots + i] ? 1 : 0;
+    CHECK(differ == 0);
+    // The lost ticks as the DOSBox-X state counts them: (g_ticks / 5 - executed Game_Ticks) mod 13.
+    const int executed13 = 12 - f.runtime().counters().cycle13;
+    const int lost13 = static_cast<int>((f.runtime().gameTicks() - static_cast<uint64_t>(executed13)) % 13);
+    const int refLost13 = static_cast<int>((st.dsDword(0x3D2B) / 5 - static_cast<uint32_t>(12 - st.dsWord(0x90FE))) % 13);
+    CHECK(lost13 == refLost13);
 }

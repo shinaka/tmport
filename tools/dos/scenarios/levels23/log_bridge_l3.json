@@ -1,0 +1,66 @@
+{
+ "description": "tier 2: the level-3 bridge breaks under the player, the fall to level 2 and the flip on landing; the r2 bridge captures of the same run",
+ "start": {
+  "state": "savestates/r2/fl_l3_at_tree_tier2.sav"
+ },
+ "keys": "147:down:right, 267:up:right, 1082:down:right, 1153:up:right",
+ "ticks": 1596,
+ "checkpoints": [
+  {
+   "id": "r2_bridge_l3_00_before",
+   "tick": 60,
+   "capture": "ega/r2_bridge_l3_00_before.png",
+   "max_px": 0
+  },
+  {
+   "id": "r2_bridge_l3_01_on_bridge",
+   "tick": 1099,
+   "capture": "ega/r2_bridge_l3_01_on_bridge.png",
+   "max_px": 0
+  },
+  {
+   "id": "r2_bridge_l3_01b_break",
+   "tick": 1116,
+   "capture": "ega/r2_bridge_l3_01b_break.png"
+  },
+  {
+   "id": "r2_bridge_l3_01c_falling",
+   "tick": 1139,
+   "capture": "ega/r2_bridge_l3_01c_falling.png"
+  },
+  {
+   "id": "r2_bridge_l3_01d_shaft",
+   "tick": 1174,
+   "capture": "ega/r2_bridge_l3_01d_shaft.png"
+  },
+  {
+   "id": "r2_bridge_l3_02_after",
+   "tick": 1463,
+   "capture": "ega/r2_bridge_l3_02_after.png"
+  },
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_bridge_l3.sav",
+   "capture_state": "savestates/r2/fl_bridge_l3.sav"
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_bridge_l3",
+   "state": "savestates/r2/fl_bridge_l3.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ]
+}

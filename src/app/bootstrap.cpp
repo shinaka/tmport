@@ -5,6 +5,8 @@
 
 #include <cstdio>
 #include <format>
+#include <sstream>
+#include <string_view>
 
 #include "anim/anim_engine.h"
 #include "app/engine_glue.h"
@@ -152,8 +154,15 @@ EditionChoice selectEdition(const LaunchOptions& o, const save::EngineSettings& 
 dos::DosOptions resolveDosOptions(const LaunchOptions& o, const save::EngineSettings& settings,
                                   const std::filesystem::path& prefDir) {
     dos::DosOptions d = dos::dosOptionsFrom(settings.dos);
-    if (!o.dosArgs.empty())
+    if (!o.dosArgs.empty()) {
+        // A look switch (-E -C -T -M -H) counts as a look given on the command line.
+        std::istringstream args(o.dosArgs);
+        for (std::string a; args >> a;)
+            if (a.size() >= 2 && (a[0] == '-' || a[0] == '/') && std::string_view("ECTMHectmh").find(a[1]) != std::string_view::npos)
+                d.lookFromCommandLine = true;
         for (const std::string& a : dos::applyDosSwitches(d, o.dosArgs)) log::warn("--dos-args: '{}' has no effect", a);
+    }
+    if (!o.dosLook.empty()) d.lookFromCommandLine = true;
     if (auto v = dos::parseLookOption(o.dosLook)) d.look = *v;
     if (auto v = dos::parseSoundDevice(o.dosSound)) d.sound = *v;
     if (o.dosSlowCpu) d.slowCpu = true;
@@ -178,6 +187,8 @@ dos::DosOptions resolveDosOptions(const LaunchOptions& o, const save::EngineSett
         const bool hex = s.size() > 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X');
         d.layoutSeed = static_cast<uint16_t>(std::stoul(hex ? s.substr(2) : s, nullptr, hex ? 16 : 10));
     }
+    if (!o.dosLoadState.empty()) d.loadState = pathFromUtf8(o.dosLoadState);
+    d.greyKeyArtefact = o.dosGreyKeyArtefact;
     return d;
 }
 
@@ -390,6 +401,12 @@ void App::initDos(const std::filesystem::path& folder) {
     if (!p.dosOptions.keys.empty()) {
         std::string error;
         if (!dos::ScriptedInput::parse(p.dosOptions.keys, error)) throw StartupError("--keys: " + error);
+    }
+    if (!p.dosOptions.loadState.empty()) {
+        std::error_code ec;
+        if (!std::filesystem::is_regular_file(p.dosOptions.loadState, ec))
+            throw StartupError("--dos-load-state: " + pathToUtf8(p.dosOptions.loadState) + " is not a file");
+        if (p.dosOptions.preview) throw StartupError("--dos-load-state does not work with --dos-preview");
     }
     try {
         (void)dos::DosFiles::open(folder);

@@ -1,0 +1,38 @@
+{
+ "description": "level 1: the jumps run, then Down tapped and held (the coin throw, typematic repeats); keys at the times DOSBox-X saw them (PgUp 0.136 ticks after tick 195, Down 0.4923 after 807: the phase of the typematic repeats) with the grey-key E0 artefact, so the g_keys column matches too",
+ "start": {
+  "state": "savestates/r2/fl_outside2.sav"
+ },
+ "keys": "56:down:right, 104:up:right, 195.136:down:pgup, 291:up:pgup, 387:down:pgup, 391:up:pgup, 492:down:up, 493:up:up, 503:down:right, 575:up:right, 807.4923:down:down, 902.2367:up:down",
+ "ticks": 975,
+ "checkpoints": [
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_typematic.sav",
+   "capture_state": "savestates/r2/fl_typematic.sav"
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_typematic",
+   "state": "savestates/r2/fl_typematic.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "keys",
+    "coins"
+   ]
+  }
+ ],
+ "extra_args": [
+  "--dos-grey-key-artefact"
+ ]
+}

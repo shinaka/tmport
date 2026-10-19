@@ -1,0 +1,55 @@
+{
+ "description": "the boot (layout seed 0x1EE2, the DOS folder roster, AdLib as the reference machine): the title, story page 2 (Enter twice after the pointer hid at 600 idle ticks), the walk-off (Enter timed to the sparkle of the capture), the sign-in, the name box, the name typed (caret phase), the start message over the clubhouse, the clubhouse",
+ "start": {
+  "boot": true,
+  "seed": "0x1EE2"
+ },
+ "extra_args": [
+  "--sound",
+  "adlib"
+ ],
+ "keys": "660:tap:enter, 720:tap:enter, 1162:tap:enter, 1500:tap:enter, 1560:tap:a, 1580:tap:d, 1600:tap:a, 1640:tap:enter, 1800:tap:enter",
+ "ticks": 1820,
+ "checkpoints": [
+  {
+   "id": "title",
+   "tick": 146,
+   "capture": "ega/001_title.png"
+  },
+  {
+   "id": "story2",
+   "tick": 727,
+   "capture": "ega/002_story1.png"
+  },
+  {
+   "id": "walkoff",
+   "tick": 1252,
+   "capture": "ega/003_enter_walkoff.png"
+  },
+  {
+   "id": "signin",
+   "tick": 1362,
+   "capture": "ega/004_signin.png"
+  },
+  {
+   "id": "name_prompt",
+   "tick": 1520,
+   "capture": "ega/005_newname_prompt.png"
+  },
+  {
+   "id": "name_typed",
+   "tick": 1602,
+   "capture": "ega/006_newname_typed.png"
+  },
+  {
+   "id": "start_message",
+   "tick": 1656,
+   "capture": "ega/007_after_name.png"
+  },
+  {
+   "id": "clubhouse",
+   "tick": 1804,
+   "capture": "ega/008_shack.png"
+  }
+ ]
+}

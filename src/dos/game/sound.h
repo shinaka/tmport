@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -37,12 +38,18 @@ public:
     // One PIT tick of the timer interrupt (Timer_ISR step 4); a device that renders by sample count
     // in its audio callback ignores it, an offline renderer advances one tick.
     virtual void pitTick() {}
+    // A DOSBox-X state's driver (wave 4, load_state.cpp): the effect block DS:6448 and the music block
+    // DS:64C0 (0x78 bytes each, the DGROUP layout) and the voice count DS:63BE; the effect and the
+    // tune go on where the state left them (Sequencer::restore). A wrapper facade forwards it.
+    virtual void restoreDriver(std::span<const uint8_t> /*sfxBlock*/, std::span<const uint8_t> /*musicBlock*/,
+                               int /*voices*/) {}
 };
 
 // A facade that only records the calls (tests, headless runs without sound).
 class RecordingSound final : public SoundFacade {
 public:
-    enum class Op : uint8_t { SfxPlay, SfxStop, MusicPlay, MusicStop, SilenceAll, SoundOn, MusicOn, SfxLoop, MusicLoop, MusicGate };
+    enum class Op : uint8_t { SfxPlay, SfxStop, MusicPlay, MusicStop, SilenceAll, SoundOn, MusicOn, SfxLoop, MusicLoop, MusicGate,
+                              Restore };
     struct Call {
         Op op = Op::SfxPlay;
         int arg = 0;
@@ -61,6 +68,9 @@ public:
     void setMusicGate(uint16_t m) override;
     bool sfxActive() const override { return sfxActive_; }
     void pitTick() override { ++pitTicks_; }
+    // Recorded as Restore with the music block's tune id (0xFFFF: none playing); the effect status is
+    // the block's.
+    void restoreDriver(std::span<const uint8_t> sfxBlock, std::span<const uint8_t> musicBlock, int voices) override;
 
     const std::vector<Call>& calls() const { return calls_; }
     void clear() { calls_.clear(); }
@@ -94,6 +104,7 @@ public:
     void setMusicGate(uint16_t m) override;
     bool sfxActive() const override;
     void pitTick() override;
+    void restoreDriver(std::span<const uint8_t> sfxBlock, std::span<const uint8_t> musicBlock, int voices) override;
 
     void keepSamples(bool keep) { keepSamples_ = keep; }
     const std::vector<float>& samples() const { return samples_; }
@@ -128,6 +139,10 @@ void setMusicGate(DosGame& g, uint16_t m); // g_musicGate DS:37CE = m (Sound_Syn
 bool sfxBlockActive(const DosGame& g);     // DS:6448 != 0
 // Pushes every flag of CoreState to the facade (after loadFromDgroup or a state restore).
 void syncSoundFlags(DosGame& g);
+// A DOSBox-X state's sound driver from its DGROUP image (DS:0000..): the blocks DS:6448 / DS:64C0 and
+// the voice count DS:63BE through SoundFacade::restoreDriver (after syncSoundFlags). The AdLib
+// orchestration of the playing tune is not carried (the OPL driver's tables, wave 5).
+void soundRestoreDriver(DosGame& g, std::span<const uint8_t> dgroup);
 // The tune of a music area (code_ui.md §6.2): 0 below area 4, 1 below 7, 2 below 15, else -1.
 int tuneForArea(uint16_t area);
 

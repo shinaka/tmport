@@ -1,0 +1,40 @@
+{
+ "description": "the clubhouse: F1, Enter (About the Game), then Enter (See Next Page) through the six pages",
+ "start": {
+  "state": "savestates/ega/shack.sav"
+ },
+ "keys": "20:tap:f1, 60:tap:enter, 140:tap:enter, 220:tap:enter, 300:tap:enter, 380:tap:enter, 460:tap:enter",
+ "ticks": 520,
+ "checkpoints": [
+  {
+   "tick": 100,
+   "capture": "ega/011_help_about_p1.png",
+   "id": "page1"
+  },
+  {
+   "tick": 180,
+   "capture": "ega/012_help_about_p2.png",
+   "id": "page2"
+  },
+  {
+   "tick": 260,
+   "capture": "ega/013_help_about_p3.png",
+   "id": "page3"
+  },
+  {
+   "tick": 340,
+   "capture": "ega/014_help_about_p4.png",
+   "id": "page4"
+  },
+  {
+   "tick": 420,
+   "capture": "ega/015_help_about_p5.png",
+   "id": "page5"
+  },
+  {
+   "tick": 500,
+   "capture": "ega/016_help_about_p6.png",
+   "id": "page6"
+  }
+ ]
+}

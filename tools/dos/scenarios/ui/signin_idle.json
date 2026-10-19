@@ -1,0 +1,20 @@
+{
+ "description": "the sign-in list left alone (state ega/signin): nothing changes for the 12.8 s of avi/ega_signin_idle.avi (its first and last frames equal ega/004_signin.png)",
+ "start": {
+  "state": "savestates/ega/signin.sav"
+ },
+ "keys": "",
+ "ticks": 610,
+ "checkpoints": [
+  {
+   "id": "idle_300",
+   "tick": 300,
+   "capture": "ega/004_signin.png"
+  },
+  {
+   "id": "idle_606",
+   "tick": 606,
+   "capture": "ega/004_signin.png"
+  }
+ ]
+}

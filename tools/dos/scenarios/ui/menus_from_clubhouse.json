@@ -1,0 +1,30 @@
+{
+ "description": "the clubhouse (state ega/shack): F1, F2 and F3 open the three menus (Esc closes them), then the Options menu, Down, Enter opens the Music box",
+ "start": {
+  "state": "savestates/ega/shack.sav"
+ },
+ "keys": "20:tap:f1, 120:tap:esc, 220:tap:f2, 320:tap:esc, 420:tap:f3, 520:tap:esc, 560:tap:f3, 580:tap:down, 600:tap:enter",
+ "ticks": 650,
+ "checkpoints": [
+  {
+   "id": "help_menu",
+   "tick": 100,
+   "capture": "ega/010_menu_help.png"
+  },
+  {
+   "id": "file_menu",
+   "tick": 300,
+   "capture": "ega/021_menu_file.png"
+  },
+  {
+   "id": "options_menu",
+   "tick": 500,
+   "capture": "ega/022_menu_options.png"
+  },
+  {
+   "id": "music_box",
+   "tick": 640,
+   "capture": "ega/023_options_music.png"
+  }
+ ]
+}

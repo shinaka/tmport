@@ -1,0 +1,40 @@
+{
+ "description": "tier 2: the level-2 bridge breaks, the fall to level 1",
+ "start": {
+  "state": "savestates/r2/fl_l2_at_nests_tier2.sav"
+ },
+ "keys": "90:down:right, 257:up:right",
+ "ticks": 746,
+ "checkpoints": [
+  {
+   "id": "r2_bridge_l2_02_after",
+   "tick": 549,
+   "capture": "ega/r2_bridge_l2_02_after.png",
+   "max_px": 0
+  },
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_bridge_l2.sav",
+   "capture_state": "savestates/r2/fl_bridge_l2.sav"
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_bridge_l2",
+   "state": "savestates/r2/fl_bridge_l2.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ]
+}

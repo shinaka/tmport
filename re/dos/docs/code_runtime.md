@@ -77,7 +77,7 @@ capture:
 | walking with scrolling | 820-880 | mostly 0-1 PIT ticks; scroll frames 6-8 PIT ticks (25-34 ms) | 1 in 5 s |
 | HUD coin count-up (one coin per frame) | 73 | 3-4 PIT ticks (12.7-16.9 ms) | 0 |
 | search (37 frames, partial play-field redraw each) | 55 | 4-5 PIT ticks (17-21 ms) | 4 (behind the final 97 ms frame) |
-| CHAMPION flash on the rank screen | ~914 | ~1.1 ms | 0 |
+| CHAMPION flash on the rank screen | ~918 | ~1.1 ms | 0 |
 | full play-field redraw / door dissolve | 1 frame of 38 ms / 1 frame of 127 ms | | 0-4 |
 
 Game ticks ran at 47.34/s in every log; DS:910D blocked a tick only behind frames longer than
@@ -85,7 +85,8 @@ Game ticks ran at 47.34/s in every log; DS:910D blocked a tick only behind frame
 ran ~4 ticks long, so the re-entrancy guard delayed the next game ticks (`r2/fl_climb`, climb step
 11 ticks instead of 7) [O]. **So in DOSBox-X the logic is effectively ungated: one logic step per
 game tick, while the per-frame features run at the CPU-bound loop rate above.** §10 lists the
-consequences per feature and PORTING_NOTES.md the model the engine should use.
+consequences per feature and PORTING_NOTES.md the model the engine should use. The frames longer than
+a game tick and the ticks lost in disk I/O are measured in "Wave 4 corrections" below (§1.4 there).
 
 ---
 
@@ -448,8 +449,9 @@ state byte DS:8FBD (latched from DS:925D, set to 1 by 176a:102A and cleared by 1
   (DS:013A) at (0x40, 0x2E) in colour 0x6666 (the band colour: invisible), if timer % 160 == 80 in
   0xFFFF (black: visible); timer −= 1 (−4 on a slow CPU); `g_dirty` += 1. Starting at 800 the
   text is visible during 720..641, 560..481, 400..321, 240..161 and from 80 on (it stays): five
-  "blinks" of 80 frames, **ending visible**. Counted in frames (DOSBox-X: 0.70 s for timer 720 ->
-  80, ~914 frames/s, AVI frames 3042-3084 of `avi/ega_r2_crown_nokey.avi`).
+  "blinks" of 80 frames, **ending visible**. Counted in frames (DOSBox-X: 0.697 s for timer 720 ->
+  80, ~918 frames/s, AVI frames 3042-3084 of `avi/ega_r2_crown_nokey.avi` at the EGA AVIs' 60.29
+  frames per emulated second; wave 4).
 
 Timing [O]: the fill steps follow the game tick (4 ticks per row, 84.5 ms; 8 rows for a Trainee in
 `avi/ega_r2_end_t2_nokey.avi` frames 1782-1812), the CHAMPION flash follows the frame rate.
@@ -915,7 +917,10 @@ command 8 selects it at once through the menu code (`code_ui.md`) [O capture, I 
 ---
 ## 9. Timing reference (DOSBox-X, cycles=fixed 6000) [O]
 
-Tick numbers come from the per-tick logger (exact); AVI numbers are 59.9228 Hz frames. "State n"
+Tick numbers come from the per-tick logger (exact); AVI numbers are frames. Wave 4: the EGA AVIs
+run at **60.29 frames per emulated second** (their audio tracks and the frame-by-frame fits of
+`tools/dos/avifit.py`: 0.7852 game ticks per frame), not the 59.9228 of their header, so durations
+taken from EGA AVIs at 59.92 Hz are 0.6 % long; the Tandy AVIs run at their header's 59.92. "State n"
 is `g_playerState` DS:913C.
 
 | What | Driven by | Measured | Source |
@@ -930,15 +935,15 @@ is `g_playerState` DS:913C.
 | net swing (Space) | player script | state 24 for 50 ticks, 25 for 1, 26 for 29: **80 ticks = 1.69 s** | `r2/fl_actions` |
 | coin drop, nothing there | player script | state 28 for 71 ticks then state 5 for 30 ticks (2.13 s); throw pictures every 7 ticks | `r2/fl_typematic` |
 | search (blink and reveal) | **frames** | 37 frames (57 -> 0, §10); DOSBox-X 38 frames in 693 ms (17-21 ms each) + a 97 ms final redraw | `r2/fl_search_t`, `ega_r2_treasure_found.avi` 154-198 |
-| HUD coin count-up | **frames** | one coin per frame; DOSBox-X 13.1 ms per coin (20 coins in 262 ms) | `r2/fl_countup_after` |
+| HUD coin count-up | **frames** | one coin per frame; DOSBox-X 3.32 PIT ticks = 14.0 ms per coin with the player standing (20 coins in 63 PIT ticks, the first right after the change; wave 4, `code_ui.md` §11.2) | `r2/fl_countup_after` |
 | rank chest fill | game tick | one row per 4 ticks (84.5 ms), at most one per frame | `ega_r2_end_t2_nokey.avi` 1782-1812 |
-| CHAMPION flash | **frames** | 800 frames, a toggle every 80; DOSBox-X 640 frames in 0.70 s (~914/s) | `ega_r2_crown_nokey.avi` 3042-3084 |
-| screen dissolve | one frame | 350 cells inside one Frame_Present: 127 ms (7-8 AVI frames) | `r2/fl_l2door_after` |
+| CHAMPION flash | **frames** | 800 frames, a toggle every 80; DOSBox-X 640 frames in 0.697 s (~918/s; 42 frames of the EGA AVI at 60.29/s) | `ega_r2_crown_nokey.avi` 3042-3084 |
+| screen dissolve | one frame | 350 cells inside one Frame_Present: 127 ms (7-8 AVI frames); a long frame's picture appears when it ends (wave 4, PORTING_NOTES §2.5) | `r2/fl_l2door_after` |
 | door (mine doorway) | player script | Up at tick 0, state 13 at +1, two 8-row moves at +14 and +23, teleport at +24, state 9 for 8 ticks | `r2/fl_l2door_after` |
 | geyser-hole slide | player script | +8 rows every 7-8 ticks (7, 7, 8) | `r2/fl_geyser_slide` |
 | bridge fall (tier >= 2) | player script | +8 rows every 5 ticks | `r2/fl_bridge_l3` |
 | elf picture | elf scripts | ~9.1 AVI frames (~7.2 ticks) | REFERENCE_CAPTURES §5.5 |
-| attract page | `TitleStep_Wait` | 0x1C20 = 7200 PIT ticks = 30.42 s (AVI 1826 frames) | REFERENCE_CAPTURES §5.1 |
+| attract page | `TitleStep_Wait` | 0x1C20 = 7200 PIT ticks = 30.42 s after the page's draw, plus the next page's draw (title 12.8, story 1 13.3, story 2 7.5, series page 14.3 PIT ticks): 5770 game ticks per cycle of four (AVI 1825.5-1827 frames per page; wave 4, `code_ui.md` §8.5) | `tandy_attract_full_cycle.avi` |
 | hint "second" | game tick | 60 ticks = 1.2675 s, paused while `g_uiMode` != 0 | §3.3 |
 | mouse pointer hide | game tick | 600 executed ticks = 12.7 s | §3.12 |
 | keyboard repeat | DOSBox-X keyboard | delay 500 ms (24 ticks), then every 33 ms (30.3/s, 1.562 ticks; 0 mismatches against the r2 logs) | `r2/fl_typematic`, `r2/fl_shack_left` |
@@ -953,10 +958,10 @@ and the DOSBox-X result. Everything else in these modules runs per game tick.
 | Feature | Counter (per frame) | Count | DOSBox-X duration | Owner doc |
 |---|---|---|---|---|
 | search blink/reveal | `g_searchTimer` DS:8FA3 −1 (−2 on odd values < 0x2A, −0x20 once on a slow CPU) | 37 frames | ~0.79 s | code_player |
-| HUD coin count-up | DS:9122 ±1 (+ effect 4 per coin) | n frames | 13.1 ms per coin | this doc §3.8 |
+| HUD coin count-up | DS:9122 ±1 (+ effect 4 per coin) | n frames | 14.0 ms per coin (3.32 PIT ticks) | this doc §3.8 |
 | CHAMPION flash | DS:0100 −1 (−4 slow CPU) | 800 frames | ~0.9 s | this doc §3.13 |
 | screen dissolve | 350 Present_Dirty calls in one frame | 1 frame | 127 ms | this doc §3.4 |
-| title sparkles | one start attempt per frame, chance 1/128 | — | ~1690 attempts/s on idle pages | code_ui |
+| title sparkles | one start attempt per frame, chance 1/128 | — | ~1730 attempts/s on idle pages, from 0.75 PIT ticks after the tick that ended the last sparkle (wave 4) | code_ui §8.5 |
 | UI updaters (sign-in, messages, hints, menus, quiz) | per frame | — | event-driven, frame rate invisible | code_ui |
 
 The search is the only per-frame feature whose DOSBox-X frames are expensive enough (a partial
@@ -1083,6 +1088,8 @@ Found while porting the main loop (`src/dos/game/main_loop.cpp`, `init.cpp`, `ga
   frame after the page was drawn, so a page lasts 7205 PIT ticks = 1441 game ticks plus the drawing
   frame; the engine's headless run shows the page changes at game ticks 1443, 2886, 4329, 5772
   (7215 PIT ticks apart, 30.48 s; AVI 1826 frames = 30.47 s) [O engine trace, consistent with §9].
+  (Superseded in wave 4: the time-out fires 7201 PIT ticks after the draw's end and the pages' draws
+  differ, `code_ui.md` §8.5.)
 * **State at the sign-in vs the original**: an engine run (Enter on each title page, AdLib device)
   dumped after game tick 380 equals `ega/signin.sav` in 264 of the 276 registry fields; the 12 that
   differ are timing (g_ticks, g_randSeed, DS:90FE, DS:9100, the mouse idle count and so the pointer's
@@ -1094,3 +1101,133 @@ Found while porting the main loop (`src/dos/game/main_loop.cpp`, `init.cpp`, `ga
   `Game_Tick`, frame body) the engine reproduces `r2/fl_walk2` tick for tick (544 STEP records: x, y,
   camera, state, keys, coins) after a new player left the clubhouse through the door (Up at
   `Cell_P12_StartRoom`, dissolve, cell F3) [O engine test `test_dos_mainloop.cpp`].
+
+---
+
+## Wave 4 corrections (timing)
+
+Found while modelling the reference timing (`src/dos/app/dos_runtime.h` FrameTiming,
+`src/dos/game/main_loop.cpp`; PORTING_NOTES.md §2.5). Tools in `extracted/scratch/dos_w4_timing/`:
+`lost.py` (lost ticks of every state), `longframes.py` / `around.py` (frames, STEP and BLOCKED records
+of a log), `pairs.py` (the start state of every log), `flcmp.py` / `replays.py` (engine trace of a run
+from the start state against the log, tick by tick).
+
+### 1.4 Long frames and lost ticks [O]
+
+* **The frame ring is short.** framelog.py's FRAME ring keeps the last 4096 frame marks, 2.4 s of an
+  idle game (§1.3: 1690 frames/s), so the long frames of most logs are gone; the STEP gaps (ticks
+  whose Game_Tick returned at once) and the BLOCKED ring survive. The frame mark is written at 130f:0097,
+  late in the frame body and before Sprites_DrawSorted / Frame_Present: an interval between two marks
+  is the tail of one frame and the head of the next.
+* **Lost game ticks per kind of I/O.** Every state gives its lost ticks modulo 13: g_ticks / 5 game
+  ticks have fired (the countdown DS:3D34 confirms the phase), DS:90FE = 12 - (executed Game_Ticks
+  mod 13), and only Game_Tick and Game_InitVars write DS:90FE. Along the EGA climb and the r2 states:
+  1 at every sign-in (Title_Run's OPENING load), +7 for a new player's game start (`ega/shack_hint1`),
+  +4 for each MOUNT2N3 / MOUNT3 load (level changes: `ega/level2_start`, `level3_start`,
+  `l2_netfixed2`, `l3_back_net5`; the logs `r2/fl_climb`, `fl_bridge_l3`, `fl_bridge_l3_jump`,
+  `fl_geyser_slide` show 4-tick STEP gaps), +5 for MOUNTAIN (`r2/fl_bridge_l2`), +1 for CLOSE
+  (`ega/castle_top`), +1 for SHACK (`r2/fl_end_t2_wait`), +7 for the return to the clubhouse (Game_End,
+  Game_Start, MOUNTAIN: `r2/end_t6_clubhouse`, `ega/after_castle`), +6 for the treasure room from the
+  clubhouse and back (`r2/tierb_after_troom`), +5 for a resumed level-2 game (`tandy/level2_resumed`).
+  The PAK files (SPRITES.PAK 116 KB) add nothing: DOSBox-X serves DOS reads at once, the cost is the
+  unpacking of the PAN (3.4 PIT ticks + 0.35 per 1000 file bytes fits every case), Users_WriteFile
+  (4.5) and Quiz_LoadQuestions (7).
+* **Where the I/O starts.** A load that Frame_Begin latched starts right after the tick that changed
+  g_level (idle frames last a fraction of a PIT tick): r2/fl_bridge_l3 loses log ticks 1190..1193 after
+  the level change in tick 1189; I/O that the frame body starts for a key (the name's Enter) starts
+  after the tick whose Input_Tick read it.
+* **Frames longer than a tick** [O frame marks, BLOCKED ring]: a full HUD redraw 16 PIT ticks (Enter
+  closing the tierc start message: frame from g_ticks 13805 to ~13836, the tick inside ran
+  Player_Update and the next two were blocked); a full play-field redraw that a bridge break asked
+  for, 12.5 PIT ticks from that tick (r2/fl_bridge_l3_jump log tick 264 blocked); opening a message
+  bubble 27.5 PIT ticks from the tick before (r2/fl_tierc_outside log ticks 79..82 blocked); search
+  frames 4.25 PIT ticks (r2/fl_typematic, nothing found: 36 intervals in 153 PIT ticks), 4.65 with the
+  treasure drawn (r2/fl_search_t); the dissolve 30 (§3.4); scroll frames 6-8 (§1.3).
+* **The game start in DOSBox-X** (`ega/007_after_name`, `ega/shack_hint1`): Enter on the name, then in
+  one frame Users_WriteFile, Game_Start (Quiz_LoadQuestions) and the MOUNTAIN load with g_quit = 1 (7
+  ticks lost), then the full HUD redraw, during which two player ticks ran (state 3 -> 4 -> 10, script
+  6 set: the front pose); the start message opened in the next frame and its bubble drew the frozen
+  actors with the player's shoes. With the reference timing the engine's 13 sprite slots at that
+  moment equal the state's, and the capture differs in 0 pixels (the capture was taken with the mouse
+  pointer hidden, i.e. more than 600 idle ticks after the boot; with a visible pointer Mouse_Poll's
+  Anim_Set on slot 0 gates the second player tick).
+* **The dissolve's end** [O STEP records]: after the doorway (r2/fl_l2door_after) and the clubhouse
+  door (r2/fl_tierc_outside), whose teleporting tick starts the area's tune, Player_Update first runs
+  7 ticks after the teleport; after the end sequence's chute (r2/fl_end_t2_wait, fl_crown_wait), no
+  tune, 6; after the castle top with its CLOSE load 7 (the first lost); after the castle gate with the
+  treasure room's SHACK load 8. The dissolve therefore starts after the rest of its frame (I/O, about
+  3.1 PIT ticks of redraw, about 5 for the AdLib tune set-up in the teleporting tick) and takes 30.
+* **Not seen in any log**: the cost of menus, Yes/No boxes and the quiz screen (no tick was gated
+  behind them in r2/fl_menu_open, fl_box_open, fl_quiz_open). (The one tick r2/fl_bridge_l3 gated at
+  log tick 1111 is explained by frames that ran back to back: Wave 4 corrections (integration).)
+* **The search end** (§10): PlrSt_05 leaves state 5 only on a tick that sees g_searchTimer == 1, so two
+  search frames between two ticks around timer 1 would leave the player in state 5 until a direction
+  key; with the measured frame lengths and the first frame 0.5 PIT ticks after the starting tick, a
+  tick always falls between frames 36 and 37 (the engine also never runs the result frame in the same
+  lockstep frame as the one that left timer 1).
+
+### Mouse and keys [O]
+
+* The DOSBox-X mouse driver starts at (159, 101) in the EGA and Tandy modes, (158, 82) MCGA, (159, 146)
+  CGA (every untouched pointer of the title captures: 0 pixels against `ega/001_title`, `mcga/01_title`,
+  `cga/01_title`, `tandy/01_title` outside the sparkles). The pointer hides 600 executed ticks after the
+  first Mouse_Poll; `ega/004_signin` (pointer hidden) is matched by a run that stays on the title pages
+  that long.
+* Key presses in DOSBox-X land between PIT interrupts; the phase decides the typematic repeats:
+  r2/fl_typematic needs Down at 10.4 ms after its tick (807.4923 in the trace numbering), r2/fl_jumps'
+  one gated-out jump bit (the grey-key E0 artefact, §5.3) a PgUp press 0.136 ticks after tick 195.
+
+## Wave 4 corrections (ui)
+
+* **Button_Flash 43cb:0eb6 is the program's only blocking wait besides the disk boxes** (`code_ui.md`
+  §4.4): four times `DS:A1FD ^= 1; Button_Draw; Present_Dirty; Delay_Ticks(18)`, 72 PIT ticks in all,
+  inside `Dialog_HandleButtons` (47c7:1454), i.e. inside `Menu_Update` (menu boxes) or
+  `SignIn_Update` (the sign-in's exit, remove and saved-game boxes). The timer interrupt keeps running
+  game ticks meanwhile; there is no `Frame_Begin` until the wait ends, so g_stepDone keeps what those
+  ticks set. For the Yes/No boxes `Dialog_Update` has already cleared the dialog bit and set DS:922E =
+  1 before the flash, so the ticks of the wait run with `g_uiMode` = 0 (the player can move) while the
+  box stays on the screen. After the wait the confirm handler runs, then the rest of the interrupted
+  updater (`SignIn_HandleInput`'s game start and `SignIn_Update`'s `g_cmd = -1`; `Menu_Update`'s tail)
+  and the rest of the frame. Engine contract: ui.h `uiFlashPending` / `uiFlashContinue` (toggle k at
+  +18k PIT ticks of the Enter's tick, each presented at once, the handler at +72; ENGINE_MAP §3.4).
+* **Title loop and count-up timing** (§9, §10): measured in wave 4 against the AVIs and
+  `r2/fl_countup_after` (`code_ui.md` §8.5, §11.2); the table rows above are corrected in place.
+
+## Wave 4 corrections (integration)
+
+The requests of the scenario groups applied together (`extracted/scratch/dos_w4/requests/`;
+PORTING_NOTES.md §2.5 has the resulting model):
+
+* **A frame begins when the one before it has ended** [O]: work a frame's Frame_Begin latched counts
+  from the previous tick, or from the end of the frame before it if that ran past that tick
+  (`FrameTiming::startOffset`). r2/fl_bridge_l3 log tick 1111 is gated because a horizontal scroll
+  frame (from tick 1106, 6.5 PIT ticks), the breaking bridge's redraw (12.5) and the fall's first
+  vertical scroll frame (7) ran back to back; the engine now gates the same tick, the level-2 elves
+  draw the same rand() values and the end state equals the engine's frame (0 pixels; the rand seed
+  0x066874EC in both). Scroll frames: 6.5 PIT ticks horizontal, 7 vertical, 7.5 both, from the tick
+  that moved the camera (the logs' FRAME rings).
+* **The champion's arrival in the clubhouse** (r2/fl_crown_wait) [O, R fit]: the castle gate's
+  MOUNTAIN load begins after the chute's last vertical scroll frame and reads SPRITES.PAK with it, so it
+  loses 6 ticks (2033..2038); a full HUD redraw in a frame that dissolves takes 6 PIT ticks (the
+  dissolve presents the screen); the dissolve then ends 65..70 PIT ticks after the gate tick. A
+  sprite bank costs 0.019 PIT ticks per 1000 bytes (SPRITES.PAK 2.2, CLOSE.PAK 1.67, SHACK.PAK 0.96),
+  and with it the dissolve's head of play-field redraw is 1.0 PIT tick (not 3.1). Every r2 log with
+  STEP records that a key script can drive now matches on every tick (21 logs).
+* **The tune that starts the dissolve's 5 PIT ticks**: a Music_Play with the music on in the
+  teleporting tick (counted where it is called, sound.cpp), not any change of g_area: the fall shaft
+  and the ice slide change the area without a tune.
+* **Presentation** [O AVIs]: a frame presents when it ends, so a long frame's picture appears late:
+  message and hint bubbles about 5 ticks after the frame began (`ega_r2_crown_to_end_messages.avi`,
+  `ega_r2_end_t6_to_clubhouse.avi`), the walk-off's redrawn title 2-3 ticks after the Enter and the
+  resumed game's level about 8 ticks after Yes (`tandy_r3_session.avi` frames 421 and 1185). The
+  engine shows a picture from the last game tick before its frame's end (dos_entry.cpp).
+* **The title's last frame**: main's first loop iteration (Frame_Begin, SignIn_Update) runs in the
+  same tick interval as the end of Title_Run (130f:0032), not one game tick later.
+* **The trace**: one row per game tick that ran Game_Tick; the events of a frame whose own tick fell
+  into its I/O start the next row.
+* **Still open** [O]: the order of a frame against its tick (the engine: Frame_Begin, tick, frame
+  body; DOSBox-X: a tick usually lands in the drawing part of a frame, so the next Frame_Begin sees it
+  first): the walking elf under the hint bubble after a search (129 pixels), the castle-top HUD key
+  icon (4 of 5 reference runs keep it); the hint bubble after a search begins after the search's last
+  frame (r2/fl_search_t: 4 blocked ticks, the engine gates 3); sound calls inside a long frame.
+

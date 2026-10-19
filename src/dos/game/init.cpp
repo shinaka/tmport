@@ -36,8 +36,10 @@ void gameInit(DosGame& g) {
     c.slowCpu = g.options.slowCpu ? 1 : 0;
     // getdisk(): a hard disk, so no floppy path applies (Path_InitDrives).
     c.startDrive = 2;
-    // Mouse_Detect 1460:0A5E: -1 when a driver answered.
+    // Mouse_Detect 1460:0A5E: -1 when a driver answered. Its reset leaves the pointer where the
+    // driver centres it in the game's video mode (Mouse_Setup's ranges then clamp x to 159).
     c.mouse = g.rt.mouse().present ? -1 : 0;
+    g.rt.mouse().resetPosition(g.options.look);
     // Video_Init 1000:0361: the mode set, then Gfx_SetDirtyTracking(0xFF) (every primitive adds its
     // rectangle to the dirty list until a routine switches it off around its own drawing).
     g.back.setColor(0xFF);

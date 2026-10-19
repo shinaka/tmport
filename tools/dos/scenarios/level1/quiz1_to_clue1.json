@@ -1,0 +1,28 @@
+{
+ "description": "level 1 (Round 1, Ada): from ega/quiz1 (the first elf question open) the first answer with Enter, the praise bubble closed with Enter at 1007 (pinned by ega/outside_clue1: the hidden elves drift only while no UI mode is open, g_seconds with the wrap quirk), the caught carrier gets up and walks off; the end equals ega/outside_clue1 in g_randSeed, every elf record, g_seconds and the screen",
+ "start": {
+  "state": "savestates/ega/quiz1.sav"
+ },
+ "keys": "10:tap:enter, 1007:tap:enter",
+ "ticks": 1624,
+ "checkpoints": [
+  {
+   "id": "quiz_right",
+   "tick": 10,
+   "capture": "ega/031_quiz_right.png",
+   "max_px": 0
+  },
+  {
+   "id": "clue_word_added",
+   "tick": 1087,
+   "capture": "ega/032_clue_word_added.png",
+   "max_px": 0
+  },
+  {
+   "id": "outside_clue1_state",
+   "at_log_end": "savestates/ega/outside_clue1.sav",
+   "capture_state": "savestates/ega/outside_clue1.sav",
+   "max_px": 0
+  }
+ ]
+}

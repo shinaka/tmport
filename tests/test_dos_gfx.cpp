@@ -17,6 +17,7 @@
 #include "dos/gfx/palettes.h"
 #include "dos/gfx/pan.h"
 #include "dos/gfx/scenery.h"
+#include "dos/text/dos_font.h"
 #include "dos_test_data.h"
 #include "util/error.h"
 #include "util/file_util.h"
@@ -274,6 +275,168 @@ TEST_CASE("DOS back buffer: fill and colour replace work on packed bytes") {
     b.replaceColor(0, 0, 0x9F, 0xC7, 0x500B, 0x7008);
     CHECK(b.byteAt(2, 3) == 0x78);
     CHECK(b.byteAt(0, 0) == 0x00);
+}
+
+// ------------------------------------------------------------------------------- CGA plane
+
+namespace {
+
+// A synthetic dither table (not the game's): 2 = 10 01 10 01, 3 = 00 01 10 11, 12 = white, 14 =
+// 10 00 00 10, 15 = black (a solid 00); the CGA plane test cases below use it.
+std::array<uint8_t, 16> testDither() {
+    std::array<uint8_t, 16> d{};
+    d[2] = 0x99;
+    d[3] = 0x1B;
+    d[12] = 0xFF;
+    d[14] = 0x82;
+    d[15] = 0x00;
+    return d;
+}
+
+// The 2-bit pixels of row y from pixel x0 on.
+std::vector<int> cgaRow(const BackBuffer& b, int y, int x0, int n) {
+    std::vector<int> v;
+    for (int x = x0; x < x0 + n; ++x) v.push_back(b.cgaPixel(x, y));
+    return v;
+}
+
+}  // namespace
+
+TEST_CASE("DOS CGA plane: the tile rule by default, fills on the even tables, raw writers") {
+    BackBuffer b;
+    CHECK(!b.cgaEnabled());
+    b.enableCga(testDither());
+    REQUIRE(b.cgaEnabled());
+    // Nothing drawn by a CGA-aware routine: Tile_DrawColumn's rule (a b c d on even rows, b a d c odd).
+    b.setPixel(0, 0, 14);
+    b.setPixel(0, 1, 14);
+    CHECK(b.cgaPixel(0, 0) == 2);
+    CHECK(b.cgaPixel(0, 1) == 0);
+    // Gfx_FillRect 1000:1707: 7E00/7F00 on every row, so odd rows show a b c d too.
+    b.fillRect(0, 0, 3, 1, 0xEE);
+    CHECK(cgaRow(b, 0, 0, 8) == std::vector<int>{2, 0, 0, 2, 2, 0, 0, 2});
+    CHECK(cgaRow(b, 1, 0, 8) == std::vector<int>{2, 0, 0, 2, 2, 0, 0, 2});
+    // An odd first byte keeps the high half of its CGA byte; pixel for pixel the same rule.
+    b.fillRect(5, 3, 5, 3, 0x22);
+    CHECK(cgaRow(b, 3, 10, 2) == std::vector<int>{2, 1});  // pixels 10, 11 = positions 2, 3 of 10 01 10 01
+    // A raw byte writer that changes a colour without telling: the tile rule again.
+    b.row(1)[0] = 0x22;
+    CHECK(b.cgaPixel(0, 1) == 1);  // b of 10 01 10 01 on an odd row
+    // ... and noteDrawn() resets a rectangle written with the same colour.
+    b.row(1)[1] = 0xEE;
+    b.noteDrawn(1, 1, 1, 1);
+    CHECK(cgaRow(b, 1, 2, 2) == std::vector<int>{2, 0});  // b a d c at positions 2, 3: d, c = 2, 0
+    // clear() forgets the plane.
+    b.fillRect(0, 0, 0x9F, 0xC7, 0xEE);
+    b.clear(0xEE);
+    CHECK(b.cgaPixel(0, 1) == 0);
+}
+
+TEST_CASE("DOS CGA plane: sprites alternate from their first drawn row, save-unders keep whole CGA bytes") {
+    BackBuffer b;
+    b.enableCga(testDither());
+    b.clear(0xFF);
+    // A 2x3 frame of colour 14 drawn at an odd row: its first row takes the even tables.
+    const PakFile pak = PakFile::load(tinyPak({{2, 3, 0, 0, std::vector<uint8_t>(6, 0xEE)}}), "T.PAK");
+    drawSprite(b, pak.frame(0), 2, 5, sprite_flags::kNoHotspot);
+    CHECK(cgaRow(b, 5, 4, 4) == std::vector<int>{2, 0, 0, 2});  // row 5 (odd): a b c d
+    CHECK(cgaRow(b, 6, 4, 4) == std::vector<int>{0, 2, 2, 0});  // row 6 (even): b a d c
+    // Clipped at the top: the first drawn row, not the frame's first row, takes the even tables.
+    b.setClip({0, 0x9F, 9, 0xC7});
+    drawSprite(b, pak.frame(0), 6, 8, sprite_flags::kNoHotspot);
+    CHECK(cgaRow(b, 9, 12, 4) == std::vector<int>{2, 0, 0, 2});
+    b.setClip(kFullScreenClip);
+    // Masked: colour 0 keeps the pixel below.
+    const PakFile holes = PakFile::load(tinyPak({{1, 1, 0, 0, {0xE0}}}), "H.PAK");
+    b.fillRect(20, 20, 20, 20, 0x33);
+    drawSprite(b, holes.frame(0), 20, 20, sprite_flags::kNoHotspot | sprite_flags::kMasked);
+    CHECK(cgaRow(b, 20, 40, 2) == std::vector<int>{2, 1});  // 14 at position 0, colour 3's b kept
+    // Sprite_SaveUnder at an odd byte saves whole CGA bytes (x >> 1, ceil((w + 1) / 2)): restoring
+    // brings back pixels 4 * (x >> 1) .. as they were.
+    b.fillRect(30, 30, 35, 31, 0x33);
+    const auto save = saveUnder(b, 31, 30, 3, 2);
+    REQUIRE(save);
+    CHECK(save->cgaX == 60);
+    CHECK(save->cgaWidth == 8);
+    b.fillRect(30, 30, 35, 31, 0xEE);
+    drawSprite(b, save->image(), 0, 0, sprite_flags::kCgaNormal);
+    CHECK(b.byteAt(30, 30) == 0xEE);  // the 4-bpp picture is restored for its own bytes only
+    CHECK(b.byteAt(31, 30) == 0x33);
+    CHECK(cgaRow(b, 30, 60, 8) == std::vector<int>{0, 1, 2, 3, 0, 1, 2, 3});
+    CHECK(cgaRow(b, 30, 68, 4) == std::vector<int>{2, 0, 0, 2});
+}
+
+TEST_CASE("DOS CGA plane: Gfx_ReplaceColorRect compares with pixel a and writes pixel b") {
+    BackBuffer b;
+    b.enableCga(testDither());
+    b.fillRect(0, 0, 0x9F, 1, 0xCC);  // white
+    b.fillRect(4, 0, 5, 0, 0x22);     // pixels 8..11: 10 01 10 01
+    // White -> colour 3: every 11 becomes b of 00 01 10 11 = 01, anywhere.
+    b.replaceColor(0, 0, 7, 0, 0xCCCC, 0x3333);
+    CHECK(cgaRow(b, 0, 0, 4) == std::vector<int>{1, 1, 1, 1});
+    CHECK(cgaRow(b, 0, 8, 4) == std::vector<int>{2, 1, 2, 1});  // other colours unchanged
+    CHECK(b.pixel(0, 0) == 3);
+    // Colour 2 -> white compares with a of 10 01 10 01 = 10: the 01 pixels of colour 2 stay (the
+    // 4-bpp replace changes both, so the plane holds the original's value for the new colour).
+    b.replaceColor(4, 0, 5, 0, 0x2222, 0xCCCC);
+    CHECK(b.pixel(9, 0) == 12);
+    CHECK(cgaRow(b, 0, 8, 4) == std::vector<int>{3, 1, 3, 1});
+    // An odd first byte (1000:181b): the compare runs one pixel ahead. From black (a = 00) to white on
+    // black pixels, bytes 1..4 (pixels 2..9): the zero pixels match and set the NEXT position, so the
+    // CGA bytes become 11 00 00 11, 11 11 11 11, 00 11 11 00 (worked through the listing by hand).
+    b.fillRect(0, 1, 0x9F, 1, 0xFF);
+    b.replaceColor(1, 1, 4, 1, 0xFFFF, 0xCCCC);
+    CHECK(cgaRow(b, 1, 0, 12) == std::vector<int>{3, 0, 0, 3, 3, 3, 3, 3, 0, 3, 3, 0});
+}
+
+TEST_CASE("DOS CGA plane: the font turns its colour by one pixel per glyph row") {
+    // One glyph, 8 pixels wide, 3 rows of set bits.
+    const std::vector<uint8_t> block = {7, 0, 3, 8, 0, 0, 0xFF, 0xFF, 0xFF};
+    const std::vector<uint16_t> bpr(256, 1);
+    const DosFont font = DosFont::fromBlock(block, bpr);
+    BackBuffer b;
+    b.enableCga(testDither());
+    font.drawChar(b, 0xEEEE, 1, 10, 0);  // an odd x: pixels 2..9
+    CHECK(cgaRow(b, 10, 2, 8) == std::vector<int>{0, 2, 2, 0, 0, 2, 2, 0});  // row 0: a b c d by position
+    CHECK(cgaRow(b, 11, 2, 8) == std::vector<int>{0, 0, 2, 2, 0, 0, 2, 2});  // row 1: d a b c
+    CHECK(cgaRow(b, 12, 2, 8) == std::vector<int>{2, 0, 0, 2, 2, 0, 0, 2});  // row 2: c d a b
+    // A glyph past the right edge: the 4-bpp buffer continues on the next row, the CGA one in the
+    // unseen half of its row, so the next row keeps its CGA pixels.
+    b.fillRect(0, 21, 3, 21, 0x33);
+    font.drawChar(b, 0xEEEE, 0x9E, 20, 0);
+    CHECK(b.pixel(0, 21) == 14);
+    CHECK(cgaRow(b, 21, 0, 4) == std::vector<int>{0, 1, 2, 3});
+}
+
+TEST_CASE("DOS CGA plane: scrolls, presents and the RGBA conversion carry it") {
+    BackBuffer back, screen;
+    back.enableCga(testDither());
+    screen.enableCga(testDither());
+    back.fillRect(6, 17, 9, 17, 0xEE);  // pixels 12..19 of row 17 (odd): a b c d
+    back.scrollPlayfieldLeft(16, 0x8F, false);
+    CHECK(cgaRow(back, 17, 4, 4) == std::vector<int>{2, 0, 0, 2});  // moved 8 pixels, still the fill's phase
+    back.setColor(1);
+    back.fillRect(0, 0, 3, 0, 0x22);
+    back.setColor(0);
+    presentDirty(back, screen);
+    CHECK(cgaRow(screen, 0, 0, 4) == std::vector<int>{2, 1, 2, 1});
+    presentFull(back, screen);
+    CHECK(cgaRow(screen, 17, 4, 4) == std::vector<int>{2, 0, 0, 2});
+    LookPalette pal;
+    pal.look = Look::Cga;
+    pal.cgaDither = testDither();
+    const auto rgba = toRgba32(screen, pal);
+    CHECK(rgba[17 * 320 + 4] == 0xFFFF55FFu);  // light magenta
+    CHECK(rgba[17 * 320 + 5] == 0xFF000000u);  // black
+    // CgaBinding turns the plane on for the CGA look only.
+    BackBuffer a, c;
+    pal.look = Look::Ega;
+    const CgaBinding ega(a, c, pal);
+    CHECK(!a.cgaEnabled());
+    pal.look = Look::Cga;
+    const CgaBinding cga(a, c, pal);
+    CHECK(a.cgaEnabled());
+    CHECK(c.cgaEnabled());
 }
 
 TEST_CASE("DOS back buffer: dirty rectangles use row pairs and even byte bounds") {

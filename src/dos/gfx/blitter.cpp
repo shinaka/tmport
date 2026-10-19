@@ -58,6 +58,8 @@ std::optional<DrawnArea> drawSprite(BackBuffer& buf, const SpriteImage& img, int
     if (!c) return std::nullopt;
     const bool reversed = (flags & (kReverse | kMirror)) != 0;  // 1000:1ca8
     const bool masked = (flags & kMasked) != 0;
+    // CGA: a save-under restore (kCgaNormal) copies the saved CGA bytes; everything else converts.
+    const bool cgaConvert = buf.cgaEnabled() && !(flags & kCgaNormal);
     for (int r = 0; r < c->h; ++r) {
         const int dy = c->y + r;
         if (dy < 0 || dy >= BackBuffer::kHeight) continue;
@@ -70,9 +72,33 @@ std::optional<DrawnArea> drawSprite(BackBuffer& buf, const SpriteImage& img, int
             const uint8_t s = reversed ? swapNibbles(src[img.widthBytes - 1 - c->skipLeft - j]) : src[c->skipLeft + j];
             if (dx < 0 || dx >= BackBuffer::kRowBytes) continue;
             dst[dx] = masked ? static_cast<uint8_t>((dst[dx] & maskOf(s)) | s) : s;
+            if (cgaConvert) {
+                // Sprite_DrawRows: 7E00/7F00 (row r even) or 8000/8100 (odd), by the pixel's position
+                // in its CGA byte; masked draws keep the pixels of colour 0 (tables 8200..8500).
+                for (int k = 0; k < 2; ++k) {
+                    const uint8_t col = static_cast<uint8_t>(k ? (s & 15) : (s >> 4));
+                    if (masked && col == 0) continue;
+                    const int px = 2 * dx + k;
+                    buf.cgaSet(px, dy, buf.cgaPattern(col, (px & 3) ^ (r & 1)));
+                }
+            }
         }
     }
-    buf.noteDrawn(c->x, c->y, c->w, c->h);  // the tail 1000:1911 with the clipped rectangle
+    if (buf.cgaEnabled() && (flags & kCgaNormal) && img.cga) {
+        // 1000:1ca0 with flag 1: the saved CGA bytes at CGA byte cgaX / 4, clipped by the same window
+        // (in CGA bytes against the 4-bpp limits, as the original compares them; the game restores
+        // with the full-screen window, so nothing is cut).
+        const int bx = img.cgaX / 4, bw = img.cgaWidth / 4;
+        const auto cc = clipRect(buf.clip(), bx, img.yOffset, bw, img.height);
+        if (cc)
+            for (int r = 0; r < cc->h; ++r)
+                for (int j = 0; j < 4 * cc->w; ++j) {
+                    const int px = 4 * cc->x + j;
+                    const size_t at = static_cast<size_t>(cc->skipTop + r) * img.cgaWidth + 4 * cc->skipLeft + j;
+                    buf.cgaSet(px, cc->y + r, img.cga[at]);
+                }
+    }
+    buf.recordDirty(c->x, c->y, c->w, c->h);  // the tail 1000:1911 with the clipped rectangle
     return DrawnArea{c->x, c->y, c->w, c->h};
 }
 
@@ -95,6 +121,17 @@ std::optional<SavedRect> saveUnder(const BackBuffer& buf, int x, int y, int widt
             const bool in = dx >= 0 && dx < BackBuffer::kRowBytes && dy >= 0 && dy < BackBuffer::kHeight;
             s.bytes[static_cast<size_t>(r) * c->w + j] = in ? buf.byteAt(dx, dy) : 0;
         }
+    if (buf.cgaEnabled()) {  // 1000:20f8: whole CGA bytes
+        s.cgaX = 4 * (c->x >> 1);
+        s.cgaWidth = 4 * ((c->w + (c->x & 1) + 1) >> 1);
+        s.cga.resize(static_cast<size_t>(s.cgaWidth) * c->h);
+        for (int r = 0; r < c->h; ++r)
+            for (int j = 0; j < s.cgaWidth; ++j) {
+                const int px = s.cgaX + j, py = c->y + r;
+                const bool in = px >= 0 && px < BackBuffer::kWidth && py >= 0 && py < BackBuffer::kHeight;
+                s.cga[static_cast<size_t>(r) * s.cgaWidth + j] = in ? buf.cgaPixel(px, py) : 0;
+            }
+    }
     return s;
 }
 

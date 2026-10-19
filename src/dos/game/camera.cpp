@@ -16,6 +16,18 @@ namespace {
 // colpart(v) = (v >> 7) as 9 bits (ROL16(v & 0xFF80, 1) with the bytes swapped, §3.2).
 uint16_t colpart(uint16_t v) { return static_cast<uint16_t>(((v >> 7) & 0xFF) | ((v >> 15) << 8)); }
 
+// The reference timing of a scroll frame (FrameTiming units, thousandths of a PIT tick: the shift,
+// the uncovered tiles, the sprites and the present of the whole play field the shift marked dirty).
+// The frame began right after the game tick that moved the camera; the FRAME marks of the r2 logs
+// (130f:0097, after the frame's drawing) put the next frame 6-7 PIT ticks after that tick for a
+// horizontal step (r2/fl_walk2, fl_countup, fl_bridge_l3_jump: 14 steps) and 6-8 for a vertical one
+// (r2/fl_climb, fl_castle_t3_a, fl_geyser_slide, fl_bridge_l3_jump: 76 steps). A step in both
+// directions in one frame (one present, two shifts) and the slow CPU's 16-pixel steps (rows
+// 0x10..0x6F) are not measured and take the same values.
+constexpr uint32_t kScrollFrameX = 6500;
+constexpr uint32_t kScrollFrameY = 7000;
+constexpr uint32_t kScrollFrameXY = 7500;
+
 // The map buffer (segment 2897) and the tile buffer (segment 32D7) as Scene_LoadPan leaves them:
 // each PAN writes its decoded data from offset 0 and its packed block at the buffer's end and
 // clears nothing else, so the bytes in between still belong to the PAN loaded before it.
@@ -175,6 +187,7 @@ void scrollUpdate(DosGame& g) {
     if (g.core.uiMode != 0 || g.ui.hudRedraw != 0) return;
     const bool slowCpu = g.core.slowCpu == 1;
     const bool slowScroll = w.slowScroll == 1;
+    bool scrolledX = false, scrolledY = false;
 
     // Horizontal: one tile column (two with g_slowScroll) at the side the camera moved to.
     if (w.frameCamX != w.drawnCamX && w.frameCamStepX != 0 &&
@@ -220,6 +233,7 @@ void scrollUpdate(DosGame& g) {
         w.drawnTileColOff = w.camTileColOff;
         w.drawnCellCol = w.camCellCol;
         ++g.core.dirty;
+        scrolledX = true;
     }
 
     // Vertical: one tile row (two with g_slowScroll) at the edge the camera moved to.
@@ -253,6 +267,18 @@ void scrollUpdate(DosGame& g) {
         w.drawnTileRowOff = w.camTileRowOff;
         w.drawnCellRow16 = w.camCellRow16;
         ++g.core.dirty;
+        scrolledY = true;
+    }
+
+    // The reference timing (long frames, dos_runtime.h FrameTiming): the step was asked for by the
+    // previous game tick. A frame that begins when this one ends (a full redraw the tick inside it
+    // asked for, the next step) starts later: r2/fl_bridge_l3 log tick 1111 is gated because the
+    // horizontal step, the redraw of the breaking bridge and the first vertical step of the fall
+    // follow each other.
+    if (scrolledX || scrolledY) {
+        FrameTiming& t = g.rt.frameTiming();
+        t.fromPreviousTick();
+        t.spend(scrolledX && scrolledY ? kScrollFrameXY : scrolledX ? kScrollFrameX : kScrollFrameY);
     }
 }
 

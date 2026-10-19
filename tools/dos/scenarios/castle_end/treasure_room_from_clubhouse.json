@@ -1,0 +1,51 @@
+{
+ "description": "tierb: Esc closes the Exit box, walk right to x 0x168, Up into the treasure room (the lamp and its partner), Left (the fox), Right (the lamp), Down back to the clubhouse (ega_r2_treasure_room_from_clubhouse.avi fits these keys within 1.2 ticks; the walks in the room come one tick later than first found, since the room entry's long frame (SHACK.PAN with SHACK.PAK) gates a second tick after it)",
+ "start": {
+  "state": "savestates/r2/tierb_exitbox.sav"
+ },
+ "keys": "5:down:esc, 6:up:esc, 20:down:right, 52:up:right, 98:down:up, 128:up:up, 1491:down:left, 1496:up:left, 1701:down:right, 1706:up:right, 1912:down:down, 1916:up:down",
+ "ticks": 1940,
+ "checkpoints": [
+  {
+   "id": "room",
+   "tick": 126,
+   "capture": "ega/r2_treasure_room_from_clubhouse_00.png",
+   "max_px": 0
+  },
+  {
+   "id": "left",
+   "tick": 1547,
+   "capture": "ega/r2_treasure_room_from_clubhouse_01_left.png",
+   "max_px": 0
+  },
+  {
+   "id": "right",
+   "tick": 1800,
+   "capture": "ega/r2_treasure_room_from_clubhouse_02_right.png",
+   "max_px": 0
+  },
+  {
+   "id": "down",
+   "tick": 1927,
+   "capture": "ega/r2_treasure_room_from_clubhouse_03_down.png",
+   "max_px": 0
+  }
+ ],
+ "avi_fits": [
+  {
+   "id": "visit",
+   "avi": "avi/ega_r2_treasure_room_from_clubhouse.avi",
+   "frames": [
+    30,
+    2673
+   ],
+   "ticks": [
+    60,
+    2140
+   ],
+   "max_off": 56,
+   "max_dev": 2.3,
+   "note": "2.3 ticks at the change into the treasure room: DOSBox-X shows the clubhouse until the frame that loads SHACK and redraws has ended, the engine from its start"
+  }
+ ]
+}

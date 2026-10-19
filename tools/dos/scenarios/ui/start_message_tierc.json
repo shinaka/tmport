@@ -1,0 +1,15 @@
+{
+ "description": "the crafted champion tierc (state r2/tierc_start) walks out of the clubhouse door: the champion start message outside; the reference run moved the mouse (pointer at y 97): reproduced by a move",
+ "start": {
+  "state": "savestates/r2/tierc_start.sav"
+ },
+ "keys": "20:down:right, 30:up:right, 40:down:up, 60:up:up, 80:move:318:97",
+ "ticks": 100,
+ "checkpoints": [
+  {
+   "id": "message",
+   "tick": 100,
+   "capture": "ega/r2_tierc_start_message_outside.png"
+  }
+ ]
+}

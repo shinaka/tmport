@@ -1,0 +1,79 @@
+{
+ "description": "tier 3: the castle shaft, the window creature strikes (a coin lost) (r2/fl_castle_t3_a; ega_r2_castle_tier3_climb.avi was recorded in the same run)",
+ "start": {
+  "state": "savestates/r2/fl_castle_shaft_tier3.sav"
+ },
+ "keys": "91:down:up, 92:up:up, 114:down:up, 185:up:up, 202:down:down, 219:down:right, 248:up:right, 297:up:down, 313:down:up, 408:up:up, 424:down:down, 519:up:down, 535:down:up, 631:up:up, 646:down:down, 742:up:down",
+ "ticks": 847,
+ "checkpoints": [
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_castle_t3_a.sav",
+   "capture_state": "savestates/r2/fl_castle_t3_a.sav"
+  },
+  {
+   "id": "appears",
+   "tick": 214,
+   "capture": "ega/r2_castle_creature_01_appears.png",
+   "max_px": 0
+  },
+  {
+   "id": "strike",
+   "tick": 218,
+   "capture": "ega/r2_castle_creature_02_strike.png",
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      234,
+      173,
+      294,
+      194
+     ],
+     "reason": "AVI frame 237 caught Frame_Present before it copied the status bar (coins 31 and the tier-0 markers of the crafted state still on screen); the next AVI frame equals the engine frame of tick 219"
+    }
+   ]
+  },
+  {
+   "id": "hit_coin_lost",
+   "tick": 222,
+   "capture": "ega/r2_castle_creature_03_hit_coin_lost.png",
+   "max_px": 0
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_castle_t3_a",
+   "state": "savestates/r2/fl_castle_t3_a.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ],
+ "avi_fits": [
+  {
+   "id": "climb_and_creature",
+   "avi": "avi/ega_r2_castle_tier3_climb.avi",
+   "frames": [
+    0,
+    1030
+   ],
+   "ticks": [
+    1,
+    847
+   ],
+   "max_off": 13,
+   "max_dev": 0.6
+  }
+ ]
+}

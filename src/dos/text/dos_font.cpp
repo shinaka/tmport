@@ -73,6 +73,17 @@ int DosFont::drawChar(BackBuffer& buf, uint16_t colour, int x, int y, int code) 
     const auto g = glyph(code);
     const int bpr = bytesPerRow(code);
     auto bytes = buf.bytes();
+    // CGA (1000:2295): the colour's low byte through 7E00/7F00 gives the four pixels a b c d of one
+    // CGA byte (pixels 0 and 2 from its high nibble's dither, 1 and 3 from its low nibble's), turned
+    // right by one pixel after every glyph row (ROR CS:[235E] by 2 bits); set bits take the pixel of
+    // that pattern at their position in the CGA byte. The original's CGA rows are 80 bytes of a
+    // 160-byte stride, so a glyph running past the right edge lands in the unseen half instead of on
+    // the next row: those pixels keep their CGA value.
+    const bool cga = buf.cgaEnabled();
+    const uint8_t cb = static_cast<uint8_t>(colour & 0xFF);
+    uint8_t pattern[4] = {};
+    if (cga)
+        for (int i = 0; i < 4; ++i) pattern[i] = buf.cgaPattern(static_cast<uint8_t>((i & 1) ? (cb & 15) : (cb >> 4)), i);
     for (int row = 0; row < height_; ++row) {
         ptrdiff_t at = static_cast<ptrdiff_t>(y + row) * BackBuffer::kRowBytes + x;
         for (int b = 0; b < bpr; ++b) {
@@ -84,12 +95,24 @@ int DosFont::drawChar(BackBuffer& buf, uint16_t colour, int x, int y, int code) 
                     const ptrdiff_t p = at + k;
                     if (p < 0 || p >= static_cast<ptrdiff_t>(bytes.size())) continue;
                     const uint8_t mb = static_cast<uint8_t>(m >> (8 * k)), ib = static_cast<uint8_t>(ink >> (8 * k));
+                    if (!cga) {
+                        bytes[static_cast<size_t>(p)] = static_cast<uint8_t>((bytes[static_cast<size_t>(p)] & ~mb) | ib);
+                        continue;
+                    }
+                    const int py = static_cast<int>(p / BackBuffer::kRowBytes), pb = static_cast<int>(p % BackBuffer::kRowBytes);
+                    const bool wrapped = x + 2 * (2 * b + half) + k >= BackBuffer::kRowBytes;
+                    uint8_t old[2] = {buf.cgaPixel(2 * pb, py), buf.cgaPixel(2 * pb + 1, py)};
                     bytes[static_cast<size_t>(p)] = static_cast<uint8_t>((bytes[static_cast<size_t>(p)] & ~mb) | ib);
+                    for (int q = 0; q < 2; ++q) {
+                        if (!(mb & (q ? 0x0F : 0xF0))) continue;  // a clear bit keeps the pixel
+                        const int px = 2 * pb + q;
+                        buf.cgaSet(px, py, wrapped ? old[q] : pattern[((px & 3) - row) & 3]);
+                    }
                 }
             }
         }
     }
-    buf.noteDrawn(x, y, width(code) >> 1, height_);
+    buf.recordDirty(x, y, width(code) >> 1, height_);
     return adv;
 }
 

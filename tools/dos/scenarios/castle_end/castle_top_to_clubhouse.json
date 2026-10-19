@@ -1,0 +1,28 @@
+{
+ "description": "Round 1: from the chute (Enter skips), the treasure room, the rank chest, Enter to the clubhouse with the reached-the-top message, Enter, the File-menu hint (ega/102-104)",
+ "start": {
+  "state": "savestates/ega/castle_top.sav"
+ },
+ "keys": "10:down:enter, 11:up:enter, 200:down:enter, 201:up:enter, 450:down:enter, 451:up:enter",
+ "ticks": 470,
+ "checkpoints": [
+  {
+   "id": "rank_chest",
+   "tick": 160,
+   "capture": "ega/102_castle_rank_chest.png",
+   "max_px": 0
+  },
+  {
+   "id": "top_reached_message",
+   "tick": 222,
+   "capture": "ega/103_clubhouse_top_reached_msg.png",
+   "max_px": 0
+  },
+  {
+   "id": "hint_after_climb",
+   "tick": 458,
+   "capture": "ega/104_hint_after_climb.png",
+   "max_px": 0
+  }
+ ]
+}

@@ -1,0 +1,36 @@
+{
+ "description": "Round 1: Up opens the level-3 arch, Up again enters the castle (dissolve); key times found against avi/ega_lock3_arch_to_castle.avi (every frame equal except torn and mid-dissolve ones)",
+ "start": {
+  "state": "savestates/ega/l3_at_arch.sav"
+ },
+ "keys": "84:down:up, 110:up:up, 399:down:up",
+ "ticks": 600,
+ "checkpoints": [
+  {
+   "id": "096_level3_arch_open",
+   "tick": 345,
+   "capture": "ega/096_level3_arch_open.png",
+   "max_px": 0
+  },
+  {
+   "id": "097_castle_inside",
+   "tick": 561,
+   "capture": "ega/097_castle_inside.png",
+   "max_px": 0
+  }
+ ],
+ "timings": [
+  {
+   "id": "dissolve",
+   "from": {
+    "event": "dissolve=on"
+   },
+   "to": {
+    "event": "dissolve=off"
+   },
+   "expect_ticks": 6,
+   "tolerance": 0,
+   "source": "avi/ega_lock3_arch_to_castle.avi frames 461-468 (8 video frames, 127 ms)"
+  }
+ ]
+}

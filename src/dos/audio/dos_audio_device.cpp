@@ -116,12 +116,15 @@ void DosAudioDevice::push(Command c) {
 void DosAudioDevice::applyPending() {
     if (!pending_.load()) return;
     std::vector<Command> cmds;
+    std::vector<Restore> restores;
     {
         std::lock_guard lock(queueMutex_);
         cmds.swap(queue_);
+        restores.swap(restores_);
         pending_.store(false);
     }
     Sequencer& s = renderer_->sequencer();
+    size_t nextRestore = 0;
     for (const Command& c : cmds) {
         switch (c.kind) {
             case Command::Kind::SfxPlay: s.sfxPlay(c.a); break;
@@ -134,6 +137,12 @@ void DosAudioDevice::applyPending() {
             case Command::Kind::MusicPaused: s.setMusicPaused(c.a != 0); break;
             case Command::Kind::MusicLoop: s.setMusicLoop(c.a != 0); break;
             case Command::Kind::SfxLoop: s.setSfxLoop(c.a != 0); break;
+            case Command::Kind::Restore:
+                if (nextRestore < restores.size()) {
+                    const Restore& r = restores[nextRestore++];
+                    s.restore(r.sfx, r.music, r.voices, r.variant);
+                }
+                break;
         }
     }
 }
@@ -146,6 +155,14 @@ void DosAudioDevice::setSoundOn(bool on) { push({Command::Kind::SoundOn, on ? 1 
 void DosAudioDevice::setMusicPaused(bool paused) { push({Command::Kind::MusicPaused, paused ? 1 : 0}); }
 void DosAudioDevice::setMusicLoop(bool on) { push({Command::Kind::MusicLoop, on ? 1 : 0}); }
 void DosAudioDevice::setSfxLoop(bool on) { push({Command::Kind::SfxLoop, on ? 1 : 0}); }
+
+void DosAudioDevice::restoreBlocks(std::span<const uint8_t> sfxBlock, std::span<const uint8_t> musicBlock, int voices,
+                                   int adlibVariant) {
+    std::lock_guard lock(queueMutex_);
+    restores_.push_back({Sequencer::blockFromDgroup(sfxBlock), Sequencer::blockFromDgroup(musicBlock), voices, adlibVariant});
+    queue_.push_back({Command::Kind::Restore});
+    pending_.store(true);
+}
 
 void DosAudioDevice::setMusicOn(bool on) {
     musicOnMirror_ = on;

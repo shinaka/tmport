@@ -1,0 +1,15 @@
+{
+ "description": "load the state; the first engine frame against the state's own screen",
+ "start": {
+  "state": "savestates/r2/l2_at_nests_tier2.sav"
+ },
+ "ticks": 1,
+ "checkpoints": [
+  {
+   "id": "frame1_own_screen",
+   "tick": 1,
+   "capture_state": "savestates/r2/l2_at_nests_tier2.sav",
+   "max_px": 0
+  }
+ ]
+}

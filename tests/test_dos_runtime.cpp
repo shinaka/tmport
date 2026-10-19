@@ -185,6 +185,147 @@ TEST_CASE("DOS runtime: slow-machine mode keeps the step gate (DS:910D)") {
     for (const auto& t : idle.ticks) CHECK_FALSE(t.gated);
 }
 
+namespace {
+
+// A client whose frame reports a cost (DosRuntime::frameTiming) on chosen game ticks.
+struct CostClient : Recorder {
+    struct Cost {
+        uint64_t tick = 0;      // the frame of this game tick reports it
+        uint32_t quit = 0;      // a g_quit section first (FrameTiming units)
+        uint32_t spend = 0;     // then drawing
+        bool previous = false;  // fromPreviousTick()
+        bool atBegin = false;   // reported by frameBegin instead of the body
+    };
+    std::vector<Cost> costs;
+    void post(bool begin) {
+        const uint64_t tick = rt->gameTicks();  // the runtime counts the tick before its frame begins
+        for (const Cost& c : costs) {
+            if (c.tick != tick || c.atBegin != begin) continue;
+            rt->frameTiming().quitSection(c.quit);
+            rt->frameTiming().spend(c.spend);
+            if (c.previous) rt->frameTiming().fromPreviousTick();
+        }
+    }
+    void frameBegin() override {
+        trace += 'B';
+        post(true);
+    }
+    void frameBody() override {
+        trace += 'F';
+        post(false);
+    }
+};
+
+std::string withoutSound(const std::string& t) {
+    std::string out;
+    for (char c : t)
+        if (c != 's') out += c;
+    return out;
+}
+
+}  // namespace
+
+TEST_CASE("DOS runtime: long frames at the reference speed (FrameTiming), strict lockstep in period mode") {
+    SUBCASE("drawing past the next ticks: they run without a frame, gated after a step") {
+        DosRuntime rt;
+        CostClient c;
+        c.rt = &rt;
+        c.markGateInTick = true;
+        rt.setClient(&c);
+        // Tick 2's frame (asked for by tick 2 itself) draws for 12.5 PIT ticks: ticks 3 and 4 fall
+        // inside it; Frame_Begin came after tick 2, so tick 3 starts with the gate clear.
+        c.costs.push_back({2, 0, 12500});
+        rt.stepGameTicks(6);
+        CHECK(withoutSound(c.trace) == "BTFBTFTgBTFBTF");
+        CHECK(rt.ticksInLongFrames() == 2);
+        CHECK(rt.ticksFrozen() == 0);
+        CHECK(rt.frames() == 4);
+    }
+    SUBCASE("asked for before the tick: the frame began after the previous tick, the gate carries") {
+        DosRuntime rt;
+        CostClient c;
+        c.rt = &rt;
+        c.markGateInTick = true;
+        rt.setClient(&c);
+        c.costs.push_back({2, 0, 12500, true});  // counts from tick 1: tick 3 (offset 10) inside
+        rt.stepGameTicks(5);
+        CHECK(withoutSound(c.trace) == "BTFBTFgBTFBTF");
+    }
+    SUBCASE("I/O: the ticks inside a g_quit section do not run Game_Tick nor its counters") {
+        DosRuntime rt;
+        CostClient c;
+        c.rt = &rt;
+        rt.setClient(&c);
+        c.costs.push_back({3, 21000, 6000});  // 21 PIT ticks of I/O: ticks 4..7 frozen, 8 inside the drawing
+        rt.stepGameTicks(10);
+        CHECK(withoutSound(c.trace) == "BTFBTFBTFTBTFBTF");
+        CHECK(rt.ticksFrozen() == 4);
+        CHECK(rt.ticksInLongFrames() == 5);
+        CHECK(rt.counters().cycle13 == 12 - 6);  // 6 Game_Ticks ran
+        REQUIRE(c.ticks.size() == 6);
+        CHECK(c.ticks[3].gameTick == 8);
+        CHECK(c.ticks[3].inLongFrame);
+    }
+    SUBCASE("I/O that Frame_Begin's latches start covers the frame's own tick") {
+        DosRuntime rt;
+        CostClient c;
+        c.rt = &rt;
+        rt.setClient(&c);
+        c.costs.push_back({3, 20309, 0, true, true});  // from tick 2: ticks 3..6 frozen, 7 runs
+        rt.stepGameTicks(8);
+        CHECK(withoutSound(c.trace) == "BTFBTFBFBTFBTF");
+        CHECK(rt.ticksFrozen() == 4);
+    }
+    SUBCASE("a cost reported before the first frame counts from PIT tick 0") {
+        DosRuntime rt;
+        Recorder c;
+        rt.setClient(&c);
+        rt.frameTiming().quitSection(9850);  // Title_Run's OPENING load: game tick 1 falls into it
+        rt.stepGameTicks(3);
+        CHECK(withoutSound(c.trace) == "BTFBTF");
+        CHECK(rt.ticksFrozen() == 1);
+        REQUIRE_FALSE(c.ticks.empty());
+        CHECK(c.ticks[0].gameTick == 2);
+    }
+    SUBCASE("period mode and the slow-machine mode ignore the costs") {
+        for (const bool slow : {false, true}) {
+            RuntimeOptions o;
+            if (slow) {
+                o.frameMode = FrameMode::SlowMachine;
+                o.slowMachineTicksPerFrame = 1;
+            } else {
+                o.frameSpeed = FrameSpeed::Period;
+            }
+            DosRuntime rt(o);
+            CostClient c;
+            c.rt = &rt;
+            rt.setClient(&c);
+            c.costs.push_back({2, 21000, 12500});
+            rt.stepGameTicks(5);
+            CHECK(withoutSound(c.trace) == "BTFBTFBTFBTFBTF");
+            CHECK(rt.ticksFrozen() == 0);
+        }
+    }
+}
+
+TEST_CASE("DOS runtime: resumeAt starts the time base at a saved g_ticks and PIT phase") {
+    DosRuntime rt;
+    Recorder c;
+    rt.setClient(&c);
+    rt.resumeAt(0xFFFFFFF0u, 3);  // the countdown DS:3D34 was 2: the next game tick 3 PIT ticks later
+    CHECK(rt.ticks() == 0xFFFFFFF0u);
+    CHECK(c.sounds == 2);
+    CHECK(rt.gameTicks() == 0);
+    rt.stepGameTicks(2);
+    REQUIRE(c.ticks.size() == 2);
+    CHECK(c.ticks[0].gameTick == 1);
+    CHECK(c.ticks[0].ticks == 0xFFFFFFF3u);
+    CHECK(c.ticks[1].ticks == 0xFFFFFFF8u);
+    CHECK(rt.ticks() == 0xFFFFFFF8u);
+    rt.resumeAt(5, 5);  // only before the first tick
+    CHECK(rt.ticks() == 0xFFFFFFF8u);
+}
+
 TEST_CASE("DOS runtime: the 13-tick cycle and the 60-tick hint second (130f:0186)") {
     DosRuntime rt;
     Recorder rec;
@@ -299,14 +440,14 @@ TEST_CASE("DOS original frame clock: reference rates and period mode") {
     auto expected = [&](uint64_t rateMilli) {
         return static_cast<long long>(rateMilli * static_cast<uint64_t>(frames) * 5u * 15123u / (1000ull * 3579545u));
     };
-    CHECK(coins == expected(76'336));
-    CHECK(flash == expected(914'286));
-    CHECK(sparkle == expected(1'690'000));
+    CHECK(coins == expected(71'300));
+    CHECK(flash == expected(918'200));
+    CHECK(sparkle == expected(1'730'000));
     CHECK(dissolve == expected(2'755'906));
     const double secs = frames * 5 * 15123.0 / 3579545.0;
-    CHECK(static_cast<double>(coins) / secs == doctest::Approx(76.336).epsilon(1e-4));
-    CHECK(search == frames);  // the search stays per frame
-    // The count-up alternates 1 and 2 coins per 21.1 ms frame (13.1 ms per coin).
+    CHECK(static_cast<double>(coins) / secs == doctest::Approx(71.3).epsilon(1e-4));
+    CHECK(search == frames);  // one per frame (at the reference speed main_loop.cpp times the search frames)
+    // The slow-machine count-up alternates 1 and 2 coins per 21.1 ms frame (14.0 ms per coin).
     OriginalFrameClock c;
     c.beginFrame(5);
     CHECK(c.steps(FrameFeature::CoinCountUp) == 1);
@@ -355,12 +496,58 @@ TEST_CASE("DOS scripted input: parsing") {
     CHECK_FALSE(s->finished());
     CHECK(s->take(1000).size() == 3);
     CHECK(s->finished());
-    for (const char* bad : {"down:right", "x:down:right", "5:down:nokey", "5:jump:up", "5:tap:up:0", "5:move:1", "+x:up:up"}) {
+    // Sub-tick times: N.F lies between game ticks N and N + 1 (applied before N + 1, its own time).
+    auto sub = ScriptedInput::parse("806.4923:down:down 902.2367:up:down +0.5:tap:a:2 20.0:down:up 3.000001:up:up", err);
+    REQUIRE_MESSAGE(sub, err);
+    const auto& f = sub->events();
+    REQUIRE(f.size() == 6);
+    CHECK(f[0].tick == 4);  // 3.000001
+    CHECK(f[0].phasePpm == 1);
+    CHECK(f[1].tick == 20);  // 20.0 is the whole tick
+    CHECK(f[1].phasePpm == ScriptEvent::kOnTick);
+    CHECK(f[2].tick == 807);
+    CHECK(f[2].phasePpm == 492300);
+    CHECK(f[3].tick == 903);
+    CHECK(f[3].phasePpm == 236700);
+    CHECK(f[4].tick == 903);  // 902.7367 (+0.5)
+    CHECK(f[4].phasePpm == 736700);
+    CHECK(f[4].kind == ScriptEvent::Kind::KeyDown);
+    CHECK(f[5].tick == 905);  // up two ticks later, same phase
+    CHECK(f[5].phasePpm == 736700);
+    for (const char* bad : {"down:right", "x:down:right", "5:down:nokey", "5:jump:up", "5:tap:up:0", "5:move:1", "+x:up:up",
+                            "5.1234567:down:up", "5.:down:up", ".5:down:up"}) {
         INFO(bad);
         CHECK_FALSE(ScriptedInput::parse(bad, err));
         CHECK_FALSE(err.empty());
     }
     CHECK(ScriptedInput::parse("  ", err)->events().empty());
+}
+
+TEST_CASE("DOS scripted input: a sub-tick key down sets the phase of its typematic repeats") {
+    // A key held from 10.0 or from 10.5 game ticks: the first repeat 500 ms later, then every 33 ms;
+    // the repeat bytes reach the keyboard before the first tick at or after their time.
+    auto repeatsBy = [](const char* script, uint64_t ticks) {
+        DosRuntime rt;
+        std::string err;
+        rt.setScript(*ScriptedInput::parse(script, err));
+        rt.stepGameTicks(ticks);
+        return rt.keyboard().repeatsGenerated();
+    };
+    // 500 ms = 23.67 game ticks: from 10.0 the first repeat is due by tick 34, from 10.5 by tick 35.
+    CHECK(repeatsBy("10:down:a", 33) == 0);
+    CHECK(repeatsBy("10:down:a", 34) == 1);
+    CHECK(repeatsBy("10.5:down:a", 34) == 0);
+    CHECK(repeatsBy("10.5:down:a", 35) == 1);
+    // The key itself is seen by tick 11.
+    DosRuntime rt;
+    InputLogger log;
+    log.rt = &rt;
+    rt.setClient(&log);
+    std::string err;
+    rt.setScript(*ScriptedInput::parse("10.5:down:right", err));
+    rt.stepGameTicks(11);
+    CHECK(log.log[9].keys == 0);
+    CHECK(log.log[10].keys == 0x08);
 }
 
 TEST_CASE("DOS rand: Turbo C 2.0 rand is rtl/borland_rand (seed*0x015A4E35+1, bits 16..30, seed 1)") {

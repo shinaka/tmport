@@ -1,0 +1,34 @@
+{
+ "description": "the clubhouse: holding Left against the wall (typematic re-arming of the cleared bit)",
+ "start": {
+  "state": "savestates/r2/fl_shack.sav"
+ },
+ "keys": "57:down:left, 294:up:left",
+ "ticks": 366,
+ "checkpoints": [
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_shack_left.sav",
+   "capture_state": "savestates/r2/fl_shack_left.sav"
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_shack_left",
+   "state": "savestates/r2/fl_shack_left.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ]
+}

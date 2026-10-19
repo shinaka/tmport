@@ -1,0 +1,15 @@
+{
+ "description": "the clubhouse (state ega/shack): walk right to the prize picture, hold Up: the player looks up at it before the treasure room opens (checkpoint in the still picture after the frame that draws it has presented)",
+ "start": {
+  "state": "savestates/ega/shack.sav"
+ },
+ "keys": "20:down:right, 56:up:right, 70:down:up, 100:up:up",
+ "ticks": 100,
+ "checkpoints": [
+  {
+   "id": "prize_button",
+   "tick": 100,
+   "capture": "ega/069_prize_button.png"
+  }
+ ]
+}

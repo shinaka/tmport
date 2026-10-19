@@ -1,0 +1,32 @@
+{
+ "description": "the boot with the Tandy look (no AdLib rand draw): the title with the pointer, story page 1 and story page 2 after the pointer hid (Enter at 660 and 720), S on story page 2: the series page",
+ "start": {
+  "boot": true,
+  "seed": "0x1EE2"
+ },
+ "look": "tandy",
+ "keys": "660:tap:enter, 720:tap:enter, 900:tap:s",
+ "ticks": 920,
+ "checkpoints": [
+  {
+   "id": "title",
+   "tick": 136,
+   "capture": "tandy/01_title.png"
+  },
+  {
+   "id": "story1",
+   "tick": 688,
+   "capture": "tandy/02_story1.png"
+  },
+  {
+   "id": "story2",
+   "tick": 845,
+   "capture": "tandy/03_story2.png"
+  },
+  {
+   "id": "series_page",
+   "tick": 905,
+   "capture": "tandy/04_other_titles_ad.png"
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "description": "load the state; the first engine frame against the state's own screen; the capture checks found from the state (forward, or masked where the capture was taken before the state was saved)",
+ "start": {
+  "state": "savestates/ega/l3_ice_doorway.sav"
+ },
+ "ticks": 198,
+ "checkpoints": [
+  {
+   "id": "frame1_own_screen",
+   "tick": 1,
+   "capture_state": "savestates/ega/l3_ice_doorway.sav",
+   "max_px": 0
+  },
+  {
+   "id": "086_level3_ice_doorway",
+   "tick": 198,
+   "capture": "ega/086_level3_ice_doorway.png",
+   "max_px": 0
+  }
+ ]
+}

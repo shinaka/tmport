@@ -1,0 +1,16 @@
+{
+ "description": "Round 1: after the net refill, right along the level-2 loop to the open gate with its geyser (093, elves included)",
+ "start": {
+  "state": "savestates/ega/l2_netfixed2.sav"
+ },
+ "keys": "10:down:right, 645:up:right",
+ "ticks": 650,
+ "checkpoints": [
+  {
+   "id": "093_level2_gate_open_geyser",
+   "tick": 646,
+   "capture": "ega/093_level2_gate_open_geyser.png",
+   "max_px": 0
+  }
+ ]
+}

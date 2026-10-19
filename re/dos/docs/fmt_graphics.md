@@ -130,25 +130,53 @@ right pixel `l = b & 15`) and the table `T` at DS:0174, 1000:1087 builds:
 | `2005:8100[b]` | `(T[h] & 0x03) << 2 \| (T[l] & 0x0C) >> 2` | pixels 2, 3, odd table |
 
 So with `T[c]` = pixels `a b c d`, a logical colour at pixel x shows `a b c d`[x mod 4] with the
-even tables and `b a d c`[x mod 4] with the odd ones. Per routine:
+even tables and `b a d c`[x mod 4] with the odd ones. The CGA buffer keeps the 4-bpp row table
+(`CS:01C9`, 0xA0 bytes per row) and uses the first 80 bytes of each row (CGA byte = 4-bpp byte x >> 1).
+Per routine (wave 4, looks agent; the disassembly of each CGA branch):
 * `Tile_DrawColumn` (1000:1a33): even tables for the first row of the column, then alternating
-  (`XOR BH,0FEh`) — the play field and the title start on even rows, so even rows = `a b c d`.
-* `Gfx_FillRect` (1000:1707): the even tables on every row (an odd start byte keeps the high half
-  of the first CGA byte).
-* `Gfx_XorRect` (1000:17d9): converts its two colour words with the even tables and compares and
-  replaces 2-bit pixels.
-* `Font_DrawChar` (1000:2295): the colour converted with the even tables, then rotated by one
-  pixel (`ROR` by 2 bits) after every glyph row; set bits expand through the 2-bit table 2005:8700.
-* `Sprite_Draw` (1000:1e30, `Sprite_DrawRows` 1000:1f46): each row decoded to 4 bpp at 2005:7D20,
-  then converted, the even tables for the first drawn row and alternating per row
-  (`XOR CS:[235E],0FE00h`) whatever the row's y parity; masked draws use the tables 4 pages higher.
-  Flag 0x01 forces the byte-copy path (restoring a 2-bpp save-under).
+  (`XOR BH,0FEh`) — the play field and the title start on even rows, so even rows = `a b c d`. The
+  alternation runs on across the tiles of the column.
+* `Gfx_FillRect` (1000:1707): the fill byte through 7E00/7F00 on **every** row, so a dithered fill
+  shows `a b c d`[x mod 4] on odd rows too. An odd first byte keeps the high half of its CGA byte
+  (`AND 0F0h`), an odd last byte the low half: pixel for pixel the same rule.
+* `Gfx_ReplaceColorRect` (1000:17d9): the compare value is pixel `a` of the "from" word's low byte
+  through 7E00/7F00, the new value pixel `b` of the "to" word's low byte through **7F00 and 8000**
+  (BH is still 7F when the second conversion starts); both are cut to their top two bits (`AND
+  DX,0C0C0h`) and rotated by one pixel per pixel step, so every 2-bit pixel equal to `a(from)`
+  becomes `b(to)`, whatever its position. A rectangle starting at an odd byte rotates them by two
+  pixels (1000:181b) and enters the loop at its pixel-2 step, which rotates once more: the compare
+  then looks one pixel ahead (a match needs a zero pixel and a zero `a`, and writes `b` to the next
+  position), and the offset carries into the following rows (DX is not reloaded per row). The menu
+  and sign-in highlights (`exchangeColors`: white → 3 → black ...) only meet solid colours, where
+  the rule is the 4-bpp one; colours 3, 4 and 6 are all magenta in CGA (0xAA), so a magenta pixel
+  inside a highlighted rectangle turns black there.
+* `Font_DrawChar` (1000:2295): the colour word's low byte through 7E00/7F00 gives one CGA byte
+  `a b c d` (pixels 0 and 2 from its high nibble's entry, 1 and 3 from its low nibble's), copied to
+  both bytes of a word and rotated right by one pixel (`ROR` by 2 bits) after every glyph row: row r
+  shows `a b c d`[(x − r) mod 4] at its set bits (expanded through the 2-bit table 2005:8700, 8
+  pixels per glyph byte; an odd x shifts the expansion by two pixels with `ROR BL,2` and masks the
+  halves). The rotation restarts with each glyph. A glyph past x byte 159 lands in the unseen half
+  of the CGA row instead of on the next row.
+* `Sprite_Draw` (1000:1e30, `Sprite_DrawRows` 1000:1f46): each clipped row is decoded to 4 bpp at
+  2005:7D20 (mirrored rows with `ROR AL,4`), then converted by the pixel's position in its CGA byte,
+  the even tables for the **first drawn row** (after clipping) and alternating per row (`XOR
+  CS:[235E],0FE00h`) whatever the row's y parity: a sprite starting on an odd row (the status-bar
+  panels at y 147, many actors) shows its dithered colours in the opposite phase from the tiles.
+  Masked draws AND with the tables 4 pages higher (2005:8200..85FF, initialised data in SST.EXE:
+  11 where the 4-bpp pixel is colour 0, for both phases). Flag 0x01 forces the 4-bpp byte path,
+  which on a CGA buffer copies a save-under's CGA bytes back as they are.
+* `Sprite_SaveUnder` (1000:20f8): whole CGA bytes, from byte x >> 1, ceil((width + (x & 1)) / 2)
+  bytes per row (header x and width in CGA bytes; the restore's dirty rectangle doubles them back,
+  1000:1e16).
+* The scrolls (1000:18b3 ff.) move the same pixels (CGA bytes 1/3/5 for the 4-bpp bytes 2/6/10),
+  the presents copy the CGA bytes of the dirty spans (1000:13b1) or the whole buffer (1000:158f).
 
-Only colours with a dithered entry differ between these rules (V 1.0: 2 = 0x99, 5 = 0x88, 8 = 0x11,
-9 = 0x77, 14 = 0x82; the others are solid). The engine converts the 4-bpp buffer at presentation
-with the tile rule (`cgaPixel`, §11); this reproduces `cga/01_title` and `cga/05_signin` with 0
-differing pixels. Fills and text in dithered colours, and sprites in dithered colours starting on
-an odd row, would need the per-routine rules (not in the CGA captures; deviation listed in §11).
+Only colours with a dithered entry differ between the phases (V 1.0: 2 = 0x99, 5 = 0x88, 8 = 0x11,
+9 = 0x77, 14 = 0x82; the others are solid). The engine (§11, wave 4) keeps the CGA picture next to
+the 4-bpp buffer: `BackBuffer::enableCga` turns on a per-pixel plane that every primitive writes
+with its routine's rule above (and the scrolls, presents and save-unders move); a pixel that no
+CGA-aware routine set, or that a raw byte writer changed, shows the tile rule. The game's buffers get
+it through `CgaBinding` (a `DosGame` member, look CGA only).
 
 ## 3. `.PAN` tile pictures
 
@@ -503,8 +531,9 @@ Namespace `tmport::dos`; addresses of the ported routines are in the code commen
 | `src/dos/text/ui_draw.h` | `hline`/`vline`/`frameRect` (43cb:0ab9/0ada/0b18), `exchangeColors`, `msgBoxGeometry` / `drawMsgBox` (43cb:0592), `drawBoxFrame` 43cb:0848, `drawButton` 43cb:0d50, `drawMenuTitle` 43cb:0f1d, `highlightMenuItem` 43cb:04ff |
 | `src/dos/gfx/dos_screens.h`, `dos_gfx_cli.h` | the reference composer and `tmport --dos-pan / --dos-pak / --dos-screen` |
 
-Deviations: the CGA picture is converted at presentation with the tile rule (§2.4), not per
-drawing routine; the clip window starts at the full screen instead of 0,0,0,0; out-of-buffer
+Deviations: the CGA picture is the 4-bpp buffer plus the CGA plane of §2.4 (the original has
+only the 2-bpp buffer: what the plane holds equals it as long as every write goes through a
+CGA-aware primitive or `BackBuffer::noteDrawn`); the clip window starts at the full screen instead of 0,0,0,0; out-of-buffer
 writes are clipped to the buffer (valid calls are unaffected); a frame index past the loaded
 pack draws nothing; the dirty-span lists are kept as a per-row-pair bitmap (the union the original
 merges); reads past the PAN buffers return 0 / a zero tile.
@@ -530,3 +559,20 @@ has cell 0xEF = block 0x4C (the ladder), the capture shows block 0x40 (locked tr
 `picture[0xEF] = 0x40` the scenery matches; it is not an overlay painted by the cell handler
 (as SCOPING.md §3/§8 guessed). The decoded PAN maps and tiles, PAK frames and the font hash equal
 the Python decoders' (`tests/test_dos_gfx.cpp`, `tests/test_dos_text.cpp`).
+
+### 11.1 Wave 4: the looks through the real game (looks agent)
+
+Every `tandy/`, `mcga/` and `cga/` capture is reproduced through the game, not the composer
+(`tools/dos/scenarios/looks/`, fidelity runner group `looks`): boot runs with the roster of the
+capture run (Tandy: `USERS_after_exit_level2_Ada.DAT`; MCGA and CGA: `USERS_after_tandy_newplayer_Ben.DAT`),
+the pointer hidden after 600 idle ticks where the capture has none, and the Tandy states
+`savestates/tandy/*` with key ticks found by search (Ben's layout from `srand(0x27ED)`, the time()
+of the guest clock when USERS.DAT was written). Result: **0 differing pixels in all 22 Tandy, 5
+MCGA and 6 CGA captures**; the only masks are the 12 title-sparkle spots on the title pages (the
+original tries a sparkle in every loop frame, ~1690/s on the reference machine, so its rand() count
+cannot be shared). Round 3 (REFERENCE_CAPTURES.md) adds 24 CGA and 24 MCGA UI frames (sign-in boxes,
+name box, saved-game prompt, Flutter's hint, the three menus with moved highlights, help pages,
+Yes/No boxes with either button): 0 pixels each (one elf masked in the last frame of each set).
+Before the CGA plane the CGA frames differed by 2273 pixels in Round 3 (hint cloud 690, About page 1
+997, every frame with the status bar 51: sprites drawn from odd rows) and by 269 / 51 in
+`cga/04_enter_walkoff` / `cga/06_level2`. The MCGA palette (`(v*255+31)/63`) needed no change.

@@ -1,0 +1,43 @@
+{
+ "description": "load the state, compare the loaded moment (its own screen) and the first engine frame with the capture (masked: the capture is of the Round-1 game (no treasure found), the state of the two-found run: the count and the markers)",
+ "start": {
+  "state": "savestates/r2/end_t2_enter_after.sav"
+ },
+ "ticks": 1,
+ "checkpoints": [
+  {
+   "id": "loaded",
+   "tick": 0,
+   "capture": "ega/102_castle_rank_chest.png",
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      226,
+      122,
+      302,
+      194
+     ],
+     "reason": "the capture is of the Round-1 game (no treasure found), the state of the two-found run: the count and the markers"
+    }
+   ]
+  },
+  {
+   "id": "frame1",
+   "tick": 1,
+   "capture": "ega/102_castle_rank_chest.png",
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      226,
+      122,
+      302,
+      194
+     ],
+     "reason": "the capture is of the Round-1 game (no treasure found), the state of the two-found run: the count and the markers"
+    }
+   ]
+  }
+ ]
+}

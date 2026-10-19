@@ -30,10 +30,15 @@ void RecordingSound::setMusicOn(bool on) { calls_.push_back({Op::MusicOn, on ? 1
 void RecordingSound::setSfxLoop(bool on) { calls_.push_back({Op::SfxLoop, on ? 1 : 0}); }
 void RecordingSound::setMusicLoop(bool on) { calls_.push_back({Op::MusicLoop, on ? 1 : 0}); }
 void RecordingSound::setMusicGate(uint16_t m) { calls_.push_back({Op::MusicGate, m}); }
+void RecordingSound::restoreDriver(std::span<const uint8_t> sfxBlock, std::span<const uint8_t> musicBlock, int /*voices*/) {
+    const auto word = [](std::span<const uint8_t> b, size_t i) { return b.size() > 2 * i + 1 ? b[2 * i] | (b[2 * i + 1] << 8) : 0; };
+    calls_.push_back({Op::Restore, word(musicBlock, 0) != 0 ? word(musicBlock, 1) : 0xFFFF});
+    sfxActive_ = word(sfxBlock, 0) != 0;
+}
 
 std::string RecordingSound::describe() const {
     static constexpr const char* kNames[] = {"sfx", "sfxstop", "music", "musicstop", "silence",
-                                             "soundon", "musicon", "sfxloop", "musicloop", "gate"};
+                                             "soundon", "musicon", "sfxloop", "musicloop", "gate", "restore"};
     std::string s;
     for (const Call& c : calls_) {
         if (!s.empty()) s += ", ";
@@ -79,6 +84,13 @@ bool DosAudioSound::sfxActive() const {
     return st.sfxStatus != 0;
 }
 
+void DosAudioSound::restoreDriver(std::span<const uint8_t> sfxBlock, std::span<const uint8_t> musicBlock, int voices) {
+    device_.restoreBlocks(sfxBlock, musicBlock, voices);
+    const bool active = sfxBlock.size() >= 2 && (sfxBlock[0] | sfxBlock[1]) != 0;
+    pending_ = active ? Pending::Play : Pending::Stop;  // the status shows it after the next tick
+    pendingTicks_ = device_.status().ticks;
+}
+
 void DosAudioSound::pitTick() {
     if (!offline_) return;  // the audio thread renders by sample count
     scratch_.clear();
@@ -91,7 +103,11 @@ void DosAudioSound::pitTick() {
 void sfxPlay(DosGame& g, int id) { g.sound.sfxPlay(id); }
 void sfxStop(DosGame& g) { g.sound.sfxStop(); }
 void musicPlay(DosGame& g, int tune) {
-    if (tune >= 0) g.sound.musicPlay(tune);
+    if (tune < 0) return;
+    g.sound.musicPlay(tune);
+    // A tune that starts (the driver's set-up runs only with the music on, 491b:07b9): the frame
+    // timing of a dissolve the same tick latched (main_loop.cpp setDissolveStart).
+    if (g.core.musicOn != 0) ++g.musicPlays;
 }
 void musicStop(DosGame& g) { g.sound.musicStop(); }
 void soundSilenceAll(DosGame& g) { g.sound.silenceAll(); }
@@ -124,6 +140,13 @@ void syncSoundFlags(DosGame& g) {
     g.sound.setSfxLoop(g.core.sfxLoop != 0);
     g.sound.setMusicLoop(g.core.musicLoop != 0);
     g.sound.setMusicGate(g.core.musicGate);
+}
+
+void soundRestoreDriver(DosGame& g, std::span<const uint8_t> dgroup) {
+    constexpr size_t kSfxBlock = 0x6448, kMusicBlock = 0x64C0, kVoices = 0x63BE, kBlockBytes = 0x78;
+    if (dgroup.size() < kMusicBlock + kBlockBytes) return;
+    g.sound.restoreDriver(dgroup.subspan(kSfxBlock, kBlockBytes), dgroup.subspan(kMusicBlock, kBlockBytes),
+                          dgroup[kVoices] | (dgroup[kVoices + 1] << 8));
 }
 
 // 43cb:03cb / 43cb:046e / 47c7:08b5: the tune of an area.

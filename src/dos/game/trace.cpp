@@ -61,8 +61,8 @@ std::vector<std::string> TraceSound::takeEvents() {
 // ---- DosTrace -----------------------------------------------------------------------------------
 
 DosTrace::DosTrace(DosGame& g, std::ostream& out, TraceSound* sound) : g_(g), out_(out), sound_(sound) {
-    out_ << "# tmport DOS trace 1: one row per game tick; x..coins at the start of the tick (framelog.py STEP),"
-            " the rest after its frame\n"
+    out_ << "# tmport DOS trace 1: one row per game tick that ran Game_Tick; x..coins at the start of the tick"
+            " (framelog.py STEP), the rest after its frame\n"
          << kHeader << '\n';
     prev_ = watch();
     if (sound_) (void)sound_->takeEvents();  // calls made before the first tick (start-up) are not traced
@@ -100,6 +100,7 @@ void DosTrace::gameTick(const TickInfo& info) {
     if (row_.valid) writeRow();  // a tick without its own frame (slow-machine mode)
     row_ = Row{};
     row_.valid = true;
+    row_.events.swap(pendingEvents_);
     row_.tick = info.gameTick;
     row_.ticks = info.ticks;
     row_.gated = info.gated;
@@ -119,9 +120,12 @@ void DosTrace::gameTick(const TickInfo& info) {
 
 void DosTrace::frameBody() {
     g_.frameBody();
-    if (!row_.valid) return;
+    // A frame whose own tick fell into its I/O (g_quit) has no row: its events start the next one.
+    const bool own = row_.valid;
+    auto& ev = own ? row_.events : pendingEvents_;
+    if (!own && sound_)
+        for (std::string& e : sound_->takeEvents()) ev.push_back(std::move(e));
     const Watched w = watch();
-    auto& ev = row_.events;
     if (w.uiMode != prev_.uiMode) ev.push_back(std::format("ui={:#04x}", w.uiMode));
     if (w.level != prev_.level) ev.push_back(std::format("level={}", w.level));
     if (w.scene != prev_.scene) ev.push_back(std::format("scene={}", w.scene));
@@ -136,7 +140,7 @@ void DosTrace::frameBody() {
     if (w.writes != prev_.writes && g_.users.lastMoment()) ev.push_back(std::format("save={}", describe(*g_.users.lastMoment())));
     if (w.quit && !prev_.quit) ev.push_back("quit");
     prev_ = w;
-    writeRow();
+    if (own) writeRow();
 }
 
 void DosTrace::writeRow() {

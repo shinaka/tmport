@@ -1,0 +1,19 @@
+{
+ "description": "load the state, compare the loaded moment (its own screen) and the first engine frame with the capture taken there (0 px between the state and the capture)",
+ "start": {
+  "state": "savestates/ega/w_cave_eb.sav"
+ },
+ "ticks": 1,
+ "checkpoints": [
+  {
+   "id": "loaded",
+   "tick": 0,
+   "capture": "ega/r2_w_cave_eb_01_inside.png"
+  },
+  {
+   "id": "frame1",
+   "tick": 1,
+   "capture": "ega/r2_w_cave_eb_01_inside.png"
+  }
+ ]
+}

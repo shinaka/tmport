@@ -1,0 +1,19 @@
+{
+ "description": "load the state, compare the loaded moment (its own screen) and the first engine frame with the capture taken there (0 px between the state and the capture)",
+ "start": {
+  "state": "savestates/ega/shack_hint1.sav"
+ },
+ "ticks": 1,
+ "checkpoints": [
+  {
+   "id": "loaded",
+   "tick": 0,
+   "capture": "ega/007_after_name.png"
+  },
+  {
+   "id": "frame1",
+   "tick": 1,
+   "capture": "ega/007_after_name.png"
+  }
+ ]
+}

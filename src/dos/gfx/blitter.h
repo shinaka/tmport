@@ -33,6 +33,10 @@ inline constexpr uint8_t kNoHotspot = 0x80;   // draw at (x, y) exactly
 struct SpriteImage {
     int widthBytes = 0, height = 0, xOffset = 0, yOffset = 0;
     const uint8_t* rows = nullptr;  // height * widthBytes bytes
+    // A saved background of a CGA buffer (BackBuffer::enableCga): the 2-bit pixels of the whole CGA
+    // bytes Sprite_SaveUnder stored, cgaWidth pixels from pixel cgaX on, `height` rows.
+    const uint8_t* cga = nullptr;
+    int cgaX = 0, cgaWidth = 0;
     static SpriteImage of(const PakFrame& f);
 };
 
@@ -43,6 +47,9 @@ struct DrawnArea {
 
 // 1000:1b8d Sprite_Draw: draws `img` at (x, y) with `flags` through buf.clip(); returns the drawn
 // area (also recorded as dirty when DS:37AE bit 0 is set), nothing when the image is clipped away.
+// CGA (1000:1e30, Sprite_DrawRows 1000:1f46): each clipped row is decoded to 4 bpp and converted
+// with the even tables for the first drawn row, alternating per row whatever the row's y; with
+// kCgaNormal a saved background's CGA bytes are copied back as they are.
 std::optional<DrawnArea> drawSprite(BackBuffer& buf, const SpriteImage& img, int x, int y, uint8_t flags);
 std::optional<DrawnArea> drawSprite(BackBuffer& buf, const PakFrame& frame, int x, int y, uint8_t flags);
 
@@ -50,7 +57,13 @@ std::optional<DrawnArea> drawSprite(BackBuffer& buf, const PakFrame& frame, int 
 struct SavedRect {
     int x = 0, y = 0, widthBytes = 0, height = 0;
     std::vector<uint8_t> bytes;
-    SpriteImage image() const { return {widthBytes, height, x, y, bytes.data()}; }
+    // CGA buffer: the original saves whole CGA bytes (1000:20f8: x >> 1, ceil((width + (x & 1)) / 2)
+    // bytes), the 2-bit pixels of cgaWidth pixels from cgaX per row; empty otherwise.
+    std::vector<uint8_t> cga;
+    int cgaX = 0, cgaWidth = 0;
+    SpriteImage image() const {
+        return {widthBytes, height, x, y, bytes.data(), cga.empty() ? nullptr : cga.data(), cgaX, cgaWidth};
+    }
     // Bytes the original's save heap uses for it: a 16-byte frame header and a length byte per row.
     int heapBytes() const { return 16 + height * (widthBytes + 1); }
 };

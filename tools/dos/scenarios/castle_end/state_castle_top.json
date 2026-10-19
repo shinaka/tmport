@@ -1,0 +1,21 @@
+{
+ "description": "Round 1 in the chute (no capture shows this moment): the loaded moment and the first engine frame against the state's own screen",
+ "start": {
+  "state": "savestates/ega/castle_top.sav"
+ },
+ "ticks": 1,
+ "checkpoints": [
+  {
+   "id": "loaded",
+   "tick": 0,
+   "capture_state": "savestates/ega/castle_top.sav",
+   "max_px": 0
+  },
+  {
+   "id": "frame1",
+   "tick": 1,
+   "capture_state": "savestates/ega/castle_top.sav",
+   "max_px": 0
+  }
+ ]
+}

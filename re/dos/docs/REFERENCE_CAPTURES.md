@@ -113,7 +113,15 @@ Tandy runs have identical tick timing, see §5.9).
     exact 2x2 block. The curated PNGs in `ega\` are reduced to 320x200 after a lossless check
     that the doubling is exact. The untouched DOSBox-X files are in `ega\raw\`.
   - Tandy, CGA and MCGA screenshots and AVIs are 320x200 already (`raw\` copies are identical).
-- Refresh, from the AVI headers: EGA 59.92 Hz, Tandy 59.92 Hz, MCGA 70.24 Hz.
+- Refresh, from the AVI headers: EGA 59.92 Hz, Tandy 59.92 Hz, MCGA 70.24 Hz. Wave 4: the EGA AVIs
+  hold more frames than that: **60.29 frames per emulated second** by their audio tracks
+  (`ega_r2_end_t2_nokey` 2991 frames in 49.613 s, `ega_r2_crown_nokey`, `ega_castle_ladder_climb`) and
+  by the frame-by-frame fits of the engine's per-tick pictures (`tools/dos/avifit.py`: k = 47.339 /
+  60.29 game ticks per frame puts 1216 of 1224 frames of `ega_r2_end_t2_nokey` on their tick); the
+  Tandy AVIs run at their header's 59.92. Single recordings drift around that (the tierc
+  standing-elves AVI fits 0.7946 ticks per frame, the level 2-3 AVIs -0.45..-0.92 %), so a timing
+  taken from an AVI is fitted per recording; durations measured from EGA AVIs at 59.92 Hz are about
+  0.6 % long.
 - Aspect: DOSBox-X logs `pixratio 1.200` with `Aspect ratio: 640 x 480` for the game's mode.
   Pixels are 1.2x taller than wide, so the intended display is 4:3 (320x240 with square pixels).
   None of the captures applies aspect correction (`aspect=false`).
@@ -144,10 +152,10 @@ fast-grab loop (see §7), and those have no separate raw copy where none existed
 | 047-050 | Coin dropped at the key place: POOF, the place blinks and a key appears, the key icon turns yellow, key-found hint |
 | 051-057 | At the lock; the trunk turns into a ladder; climbing the trunk, the treetop and a rope ladder (vertical scrolling); arriving on level 2 |
 | 058-067 | Level 2: path, "FLYING FISH" signs, a cave gated by a portcullis (the lock), a wooden doorway, a tree with two big nests, at the doorway, the dissolve transition, inside the mine tunnel, the tunnel exit (another doorway), the level 2 net cave |
-| 068-069 | Clubhouse rank screen (treasure chest with thresholds 300/230/170/115/70/25/5, rank "Trainee", Total Treasures 0); prize button with no prizes yet |
+| 068-069 | Clubhouse rank screen (treasure chest with thresholds 300/230/170/115/70/25/5, rank "Trainee", Total Treasures 0); prize button with no prizes yet (the player looking up at the prize picture, the frame before the treasure room opens; wave 4) |
 | 070a-c | File > Exit and Save; confirm dialog; Yes (the game then returns to the DOS prompt) |
 | 071-077 | Level 2 quiz; worn-out-net hint; net cave: the rock counter goes 4→3→... and the rock slides open; net repaired (0→5); three clue words; level 2 key found (key icon turns pink) |
-| 078-081 | Level 2 lock opened: a geyser cloud lifts the player (vertical scroll) while the clue words are wiped one line at a time; arriving on level 3 (snow) |
+| 078-081 | Level 2 lock opened: a geyser cloud lifts the player (vertical scroll) while the clue box is redrawn (whole, when g_keyState changes at the level change, `code_ui.md` §11.3; 080 is a torn present: its rows from 166 still show the old box, the AVI replaces the box within frames 520-521); arriving on level 3 (snow) |
 | 082-088 | Level 3: shovels and sleds, snowmen and a rope bridge over a gap, the bridge, the stone arch with a blue portcullis and keyhole (the castle lock), an ice doorway, snowballs, a level 3 quiz |
 | 089-093 | Walking onto the geyser top on level 3 drops the player back to level 2; inside the ice cave (a slide-down tunnel); falling down a rock shaft; landing on level 2 at the mine-tunnel exit; the open level 2 gate with the geyser |
 | 094-096 | Level 3 clue words; key found (key icon turns green); arch opened |
@@ -177,6 +185,17 @@ and 2, walk-off, sign-in, a level 2 game frame.
 `ega_castle_ladder_jump_top`, `tandy_opening_title`, `tandy_attract_story2_ad`,
 `tandy_attract_full_cycle` (150 s, a whole attract loop), `tandy_net_catch`,
 `mcga_opening_title`.
+
+Where some of them start (wave 4, matched frame by frame against engine runs from the states):
+`ega_walk_and_scroll` is `ega/outside_clue1` with Right held from tick 83 to 273 (`ega/path_flags` was
+saved 2267 ticks later in the same session); `ega_coin_drop_nothing` starts at the `ega/path_flags`
+screen; `ega_net_swings_repeated` at `ega/outside2` (swings starting at AVI frames 43, 165, 286, 406,
+528, 649); `ega_r2_jumps_path` is the run of the log `r2/fl_jumps`; `ega_r2_bonus_coins` the run
+`ega/w_bonus` -> `r2/w_bonus_after`; `ega_r2_coin_creature_touch` ticks 1339-1589 of
+`r2/fl_tierc_coincreature` -> `fl_coin_after` (`r2_coin_creature_03/04` = AVI frames 155/193);
+`ega_r2_tierc_standing_elves` from tick 408 of `r2/fl_tierc_outside` -> `fl_tierc_dust1`
+(`r2_elf_dust_01..03` = AVI frames 1485, 1491, 1510). `r2_w_bonus_02` and `_03` are identical
+pictures. The scenario files of `tools/dos/scenarios/` give the key times found for each run.
 
 ### 4.5 USERS.DAT snapshots (for the format checks)
 
@@ -217,6 +236,8 @@ after_castle`. Tandy: `signin level2_resumed level2_caught outside`. Each `.sav`
 - Pages: title → story 1 → story 2 → "other Super Solvers adventures" → title ... Each page
   stays up for **1826 frames ≈ 30.5 s** (measured in `tandy_attract_full_cycle.avi`; the EGA
   title also lasted about 31 s). Small sparkles animate on the mountain the whole time.
+  (Wave 4: 1825.5 to 1827 frames by page, 7201 PIT ticks plus the page's draw, 7304 frames = 5770
+  game ticks per cycle of four; the sparkles' order follows the rand() sequence: `code_ui.md` §8.5.)
 - Enter skips to the next page (CGA test: title → story 1 → story 2). Enter on story page 2 starts
   the walk-off and then the sign-in. (Round 1 thought the EGA walk-off followed an Enter on
   story 1; the frame taken as story 1, `ega/002`, is story page 2, and the code advances one page
@@ -316,7 +337,8 @@ The mouse is supported according to the help menu, but it cannot be driven from 
   which says to leave through the door for another game. The clue words and key are reset.
 - Wooden doorways on level 2 (↑) lead into a mine tunnel. Walking through it comes out at
   another doorway elsewhere on the same level. The cut into the tunnel is a **block dissolve**
-  over ~7 frames (~120 ms) in roughly 8x8-px cells (`ega_doorway_dissolve.avi`, frames 74-81).
+  over ~7 frames (~120 ms) in 20x8-px cells (10 bytes x 8 rows, `code_world.md` §8.6;
+  `ega_doorway_dissolve.avi`, frames 74-81).
 - The level 3 ice doorway is a **slide-down tunnel**: an ice cave, then a fall down a rock shaft,
   then landing on level 2 at the mine-tunnel exit. The slid-down-a-tunnel hint
   was not shown, presumably because hints only appear on first occurrences (inferred).
@@ -334,7 +356,8 @@ The mouse is supported according to the help menu, but it cannot be driven from 
   25, 70, 115, 170, 230, 300, with the name and "Total Treasures".
 - After Exit and Save the game returns to the DOS prompt (`C:\TM>`) in text mode.
 
-### 5.9 Timing summary (all measured from AVIs at 59.92 Hz)
+### 5.9 Timing summary (all measured from AVIs at 59.92 Hz; the EGA AVIs run at 60.29, §3: their
+durations are about 0.6 % shorter than given)
 
 | Thing | Period |
 |---|---|
@@ -372,9 +395,18 @@ structures (clubhouse, net caves, locks, doorways) looked the same.
   0x6d≈27, 0x9e≈39, 0xb6≈45, 0xe7≈57 and 0x79≈30 (inferred). It runs at 70 Hz (mode 13h-like).
   The palette table in the EXE was not looked up.
 - **CGA** uses palette 1 high intensity (black, cyan, magenta, white). The 16-colour art is
-  converted at run time to 4 colours with dithering (the screen looks dithered; how it is
-  converted was not analysed).
+  converted at run time to 4 colours with dithering: each drawing routine converts its 4-bpp
+  colours through the tables of `Gfx_BuildCgaColorMap` with its own row phase (tiles alternate from
+  their first row, fills use the even tables on every row, sprites alternate from their first drawn
+  row, text turns its colour pattern by one pixel per glyph row; `fmt_graphics.md` §2.4, wave 4).
 - Hercules (type 4) was not captured.
+- Wave 4 (looks agent): every Tandy, MCGA and CGA capture is reproduced through the engine's game
+  with 0 differing pixels (`fmt_graphics.md` §11.1). The rosters of the capture runs: Tandy
+  `USERS_after_exit_level2_Ada.DAT` (Rascal, Ada with a level-2 saved game), MCGA and CGA (taken
+  after the Tandy session) `USERS_after_tandy_newplayer_Ben.DAT` (Rascal, Ada, Ben); `cga/06_level2`
+  and `mcga/05_level2` show Ada's resumed game after Flutter's first hint was closed. The pointer is
+  missing from every capture taken more than 600 idle ticks after the start (all but the titles).
+  `tandy/14_net_catch` and `tandy/15_after_catch` are frames 328 and 389 of `avi/tandy_net_catch.avi`.
 
 ## 7. How the play-through was driven (for reproduction)
 
@@ -417,7 +449,8 @@ Second capture pass, made for the wave-1 logic specs and the requests of the oth
 (DOSBox-X 2026.10.01, `tools/dosbox_tmdos.conf`, EGA, `cycles=fixed 6000`, host sound muted,
 window parked, keyboard posted). All names below are relative to `extracted/captures/dos/`.
 Native PNGs are 320x200 (2x2 doubling checked and removed), DOSBox-X originals in `ega/raw/`;
-AVIs are 59.9228 fps ZMBV with a 48 kHz stereo PCM track.
+AVIs are ZMBV with a 48 kHz stereo PCM track; their header says 59.9228 fps, the EGA ones run at
+60.29 frames per emulated second (§3, wave 4).
 
 ### R2.1 New tools and techniques
 
@@ -450,7 +483,7 @@ AVIs are 59.9228 fps ZMBV with a 48 kHz stereo PCM track.
 
 | Scene | Files | How / notes |
 |---|---|---|
-| **Treasure found** (2-of-3 place) | `avi/ega_r2_treasure_found.avi`; `ega/r2_treasure_00_before` … `_07_closed_count1`, `ega/r2_treasure_01_found_hint` | Ada, level 0, cell 0xE9 (treasure 5). Throw AVI 61-152, POOF ~125, blink 154-171, opened with the treasure sprite 172-197, closed + HUD count 198, hint 4 at 204. State before the drop: `savestates/ega/r2_treasure_spot` (press Down) |
+| **Treasure found** (2-of-3 place) | `avi/ega_r2_treasure_found.avi`; `ega/r2_treasure_00_before` … `_07_closed_count1`, `ega/r2_treasure_01_found_hint` | Ada, level 0, cell 0xE9 (treasure 5). Throw AVI 61-152, POOF ~125, blink 154-171, opened with the treasure sprite 172-197, closed + HUD count 198, hint 4 at 204. State before the drop: `savestates/ega/r2_treasure_spot`; the AVI run pressed Down 488 ticks after it (pinned by an elf entering at AVI frame 64); `r2_treasure_02..07` and `_01` are AVI frames 100, 125, 152, 156, 173, 198 and 205. `r2/fl_search_t` is a separate run (Down at 114), `r2/fl_treasure5_found` another (from `r2/at_treasure5`, Down at 433; wave 4) |
 | **End sequence, 2 found** | `avi/ega_r2_end_t2_nokey.avi`, `avi/ega_r2_end_t2_enter_skip.avi`; `ega/r2_end_01_castle_top_horn` … `_08_rank_chest_fill` | crafted from `ega/castle_shaft` (treasures marked found in RAM). Runs on without keys: castle top, treasures fly into the chest, chute, fall (AVI 1212-1657), dissolve, treasure room, dissolve, rank chest fill (8 rows, 4 ticks each) |
 | **All found (6 at tier 0) and star rank-up** | `avi/ega_r2_end_t6_allfound_nokey.avi`, `avi/ega_r2_end_t6_to_clubhouse.avi`; `ega/r2_end_allfound_01/02_mom_reaction`, `ega/r2_end_t6_rank_chest_1star`, `ega/r2_end_t6_clubhouse_message`, `ega/r2_end_t6_clubhouse_after` | total 0 -> 6: the chest gets the 1-star coin row; the band label still reads "Trainee" on that screen; end message 34 and hint 13 afterwards |
 | **Crown / champion ending (total 300)** | `avi/ega_r2_crown_nokey.avi` (all found, 294 -> 300), `avi/ega_r2_crown_t2_total300_nokey.avi` (2 found, 298 -> 300); `ega/r2_crown_01_chest_glow` … `_07_rank_champion_hidden`, `ega/r2_crown_a`, `ega/r2_crown_b` | chest glow, Master of Mischief loses the crown, crown on the pedestal, fall, treasure room with two figures, rank chest with stars and CHAMPION; flash visible at AVI 3042/3053/3063/3074/3084 |
@@ -466,8 +499,8 @@ AVIs are 59.9228 fps ZMBV with a 48 kHz stereo PCM track.
 | **Treasure room from the clubhouse** | `avi/ega_r2_treasure_room_from_clubhouse.avi`; `ega/r2_treasure_room_from_clubhouse_00` … `_03_down` | tierb: Up at x 0x168 of the start room enters scene 4; Left/Right change the treasure on the shelf; Down leaves |
 | **Cave doors, bonus coins** | `ega/r2_w_cave_f7_00` … `_03`, `ega/r2_w_cave_eb_00/01`, `ega/r2_w_bonus_00` … `_03`; `avi/ega_r2_bonus_coins.avi` | camera x = player x − 0x124 after the 0xF7 door (state `savestates/ega/w_cave_f7`), player x − 0x20 after the 0xEB door (`savestates/ega/w_cave_eb`); bonus spot +5 once (state `savestates/ega/w_bonus`) |
 | **Slow-CPU mode (-X)** | `avi/ega_r2_slowcpu_X_walk.avi`; `ega/r2_slowcpu_scroll_avi150/151/157/158` | 16-px scroll steps, rows 112..143 not scrolled (tearing); DS:A212 = 7 |
-| **Start-of-game rank messages** | `ega/r2_tierb_start_message_outside` (4 stars), `ega/r2_tierc_start_message_outside` (champion) | shown when walking out of the clubhouse door, not at sign-in |
-| **UI boxes and pages** | `ega/r2_ui_help_mouse_*` (4 pages, PgUp/PgDn), `ega/r2_ui_help_hints_p1`, `ega/r2_ui_box_start_over(_after_left)`, `ega/r2_ui_box_new_player_hints`, `ega/r2_ui_box_sound`, `ega/r2_ui_signin_*` (Esc box, Ctrl+R remove list and confirmation, identical name, 9 players, list full), `ega/r2_signin_crafted_list` | |
+| **Start-of-game rank messages** | `ega/r2_tierb_start_message_outside` (4 stars), `ega/r2_tierc_start_message_outside` (champion) | shown when walking out of the clubhouse door, not at sign-in (from `r2/tierb_start_msg` / `r2/tierc_start`); the reference run had moved the mouse: the pointer shows at the right edge, rows 127 / 97 |
+| **UI boxes and pages** | `ega/r2_ui_help_mouse_*` (4 pages, PgUp/PgDn), `ega/r2_ui_help_hints_p1`, `ega/r2_ui_box_start_over(_after_left)`, `ega/r2_ui_box_new_player_hints`, `ega/r2_ui_box_sound`, `ega/r2_ui_signin_*` (Esc box, Ctrl+R remove list and confirmation, identical name, 9 players, list full), `ega/r2_signin_crafted_list` | Help "Using the Mouse": `r2_ui_help_mouse_p1` is page 0, `_p2` and `_after_pgdn` page 1 (PgDn on page 0), `_next` page 2, `_next2` page 3, `_next3` the Help drop-down reopened after Done, `_p2_after_pgup` page 0 again (PgUp on page 1). The boxes and help pages were taken in the clubhouse of `savestates/r2/tierb_after_troom` (camera 0xC8, the tierb HUD; the boxes open with the player's settings hints No, music Yes, sound Yes); the sign-in captures on a boot with `USERS_crafted_tierb_layout.DAT` (the crafted list, Esc / Ctrl+R / identical name, `r2_kbd_*`) or with the nine-player roster `extracted/scratch/dos_w1_runtime/USERS_9players.DAT` (`_9players`, `_list_full_*`), more than 600 ticks after the boot (pointer hidden). All reproduced at 0 pixels in wave 4 (`tools/dos/scenarios/ui/`) |
 | **Keyboard check** | `ega/r2_kbd_shift_test_name_entry` ("XYz"), `ega/r2_kbd_shift_test_first_letter` ("Bc") | only shifted A is dropped by the name box; other shifted letters work |
 | **Title, 60 s** | `avi/ega_r2_title_60s_nokeys.avi` | title page then story page 1, sparkles |
 
@@ -497,9 +530,10 @@ as well (in the game it is set by `Title_Run` and by every scene load, `Scene_Up
   coin count-up, 55/s during the search; game ticks always 47.34/s; DS:910D blocked a tick only
   behind slow frames.
 * Walk 8 px per 5.125 ticks (41 per 8 steps); climb 8 rows per 7.25 ticks; jump 58 ticks; net swing
-  80 ticks; coin throw 71 + 30 ticks; search 37 frames (0.79 s); count-up 13.1 ms per coin; rank
-  chest 4 ticks per row; CHAMPION flash ~914 frames/s; dissolve 127 ms; keyboard repeat 500 ms then
-  ~30/s.
+  80 ticks; coin throw 71 + 30 ticks; search 37 frames (0.79 s); count-up 14.0 ms per coin (3.32 PIT
+  ticks; wave 4, the 13.1 first given miscounted the intervals); rank chest 4 ticks per row; CHAMPION
+  flash ~918 frames/s (0.697 s for 640 frames at the EGA AVIs' 60.29 frames/s); dissolve 127 ms;
+  keyboard repeat 500 ms then ~30/s.
 
 ### R2.5 Save states added
 
@@ -529,6 +563,40 @@ sessions (`speaker_clubhouse`, `slowcpu_clubhouse`), the sound-test states (`snd
 
 * A quiz answer paying +2 coins (the count-up was measured with a RAM edit and with the bonus spot).
 * An elf-dust miss (jumping over the dust).
-* Hercules mode; the MCGA and CGA looks of the Round 2 scenes; Tandy captures of the Round 2 scenes
-  (Tandy pixels equal EGA, §6).
+* Hercules mode; the MCGA and CGA looks of the Round 2 play scenes (their UI scenes: Round 3); Tandy
+  captures of the Round 2 scenes (Tandy pixels equal EGA, §6; a Tandy session with sound: Round 3).
 * Mouse input (cannot be injected without the host mouse).
+
+---
+
+## Round 3 (wave 4, looks agent)
+
+Third capture pass for the looks and the sound, same setup as §1 (DOSBox-X 2026.10.01,
+`tools/dosbox_tmdos.conf`, `cycles=fixed 6000`, host sound muted, window parked, keyboard posted),
+`--machine cga`, `mcga` or `tandy`, the roster `USERS_after_tandy_newplayer_Ben.DAT` copied to
+`extracted/dos_c/TM/USERS.DAT` for the session and the shipped file put back afterwards. Driver
+scripts: `extracted/scratch/dos_w4_looks/r3_session.py` (CGA, MCGA) and `r3_tandy_av.py` (Tandy).
+
+### R3.1 CGA and MCGA UI frames (`cga/r3_NN_*.png`, `mcga/r3_NN_*.png`, 24 each, 320x200)
+
+01 story page 1 (the title had timed out during the start), 02 sign-in, 03 the sign-in's Esc box, 04
+the name box with three letters typed, 05 Ada highlighted, 06 the saved-game prompt, 07 the resumed
+level-2 game with Flutter's first hint, 08 the game, 09-11 the Help menu with items 1, 2 and 4
+highlighted, 12-13 About the Game pages 1 and 2, 14 the game after Esc, 15 Using the Keyboard page 1,
+16-17 the File menu (items 1 and 2), 18 the Options menu, 19 the New Player Hints box, 20-21 the
+Music box with either button, 22-23 the Exit and Save box with either button, 24 the game. The
+keys and their engine ticks: `tools/dos/scenarios/looks/boot_r3_cga.json` / `boot_r3_mcga.json`.
+States at the end: `savestates/r3/cga/r3_level2_end`, `savestates/r3/mcga/r3_level2_end` (CGA and
+MCGA states cannot be loaded by the engine: the CGA back buffer is 2 bpp).
+
+### R3.2 Tandy session with sound (`avi/tandy_r3_session.avi`, 45.19 s, 2708 frames, PSG audio)
+
+From the attract (story page 1) through the walk-off, the sign-in, Ada's saved game, Flutter's
+hint, a coin toss, a net swing and the Help menu (state at the end: `savestates/r3/r3_session_end`).
+The AVI's time maps to engine PIT ticks as `AVI seconds x 236.695 + 10336` (the title tune's
+position at the AVI's start, `tools/dos/audiocmp.py align`); frames saved as `tandy/r3_session_fNNNNN.png` for the
+scenario `boot_r3_tandy_session`. Timing findings (engine against the AVI, keys placed at the tick
+the AVI shows them): the coin toss and the net swing frame for frame; the walk-off's figure 3 game
+ticks late unless its Enter is placed 3 ticks before the redrawn title appears (72 of 80 frames
+exact then: the original's title redraw is a long frame); the resumed game's screen about 8 ticks
+early; sound in `fmt_sound.md` §11.6.

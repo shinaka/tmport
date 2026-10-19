@@ -74,6 +74,14 @@ struct DosOptions {
     uint64_t runTicks = 0;              // --dos-ticks <n>: a headless run lasts at least n game ticks
     bool preview = false;               // --dos-preview (hidden): the wave-2 screen preview instead of the game
     std::optional<uint16_t> layoutSeed; // --dos-layout-seed <n>: Layout_Generate's srand value instead of time()
+    // --dos-load-state <file.sav>: start from a DOSBox-X save state instead of the boot (dos/game/
+    // load_state.h); the state's sibling <name>.users becomes the preference folder's DOS save. The
+    // game then uses the state's sound device and, unless lookFromCommandLine, the state's look.
+    std::filesystem::path loadState;
+    bool lookFromCommandLine = false;   // --look or a look switch of --dos-args was given
+    // --dos-grey-key-artefact: the E0 prefix bytes of the grey keys reach Kbd_ISR as on DOSBox-X
+    // (dos/input/keyboard.h KeyboardOptions::greyKeyE0Artefact), to replay its frame logs.
+    bool greyKeyArtefact = false;
 
     bool operator==(const DosOptions&) const = default;
 };

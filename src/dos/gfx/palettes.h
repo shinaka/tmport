@@ -52,13 +52,22 @@ struct LookPalette {
 // Reads the tables from SST.EXE. Never fails for a validated DosExe.
 LookPalette lookPalette(const DosExe& exe, Look look);
 
-// CGA: the 2-bit pixel that logical colour c becomes at pixel (x, y). Gfx_BuildCgaColorMap
-// (1000:1087) turns each entry (pixels a b c d from the most significant bits) into XLAT tables
-// used by Tile_DrawColumn (1000:1a33): rows alternate between a b c d (the first row of a column,
-// even y on the play field and the title) and b a d c, by pixel x mod 4.
+// CGA: the 2-bit pixel that logical colour c becomes at pixel (x, y) by the tile rule.
+// Gfx_BuildCgaColorMap (1000:1087) turns each entry (pixels a b c d from the most significant bits)
+// into XLAT tables used by Tile_DrawColumn (1000:1a33): rows alternate between a b c d (the first
+// row of a column, even y on the play field and the title) and b a d c, by pixel x mod 4. The other
+// routines have their own phases (back_buffer.h, the CGA plane).
 int cgaPixel(const std::array<uint8_t, 16>& dither, uint8_t c, int x, int y);
 
-// The whole buffer as RGBA bytes (see the pixel convention above).
+// Turns on the CGA plane of a game's two buffers when the look is CGA (BackBuffer::enableCga): a
+// DosGame member declared after its palette, so the buffers keep the original's 2-bpp picture from
+// the first drawing on.
+struct CgaBinding {
+    CgaBinding(BackBuffer& back, BackBuffer& screen, const LookPalette& pal);
+};
+
+// The whole buffer as RGBA bytes (see the pixel convention above). CGA: the buffer's CGA plane when
+// it has one (BackBuffer::enableCga), else the tile rule (cgaPixel) for every pixel.
 std::vector<uint8_t> toRgba(const BackBuffer& buf, const LookPalette& pal);
 void toRgba(const BackBuffer& buf, const LookPalette& pal, std::span<uint8_t> out);  // out: 320*200*4 bytes
 // The same as packed pixels (R | G << 8 | B << 16 | A << 24, SDL_PIXELFORMAT_RGBA32), the form

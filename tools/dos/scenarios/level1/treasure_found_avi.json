@@ -1,0 +1,67 @@
+{
+ "description": "level 1, Ada at the signs (cell 0xE9, treasure 5; hint4 6 ticks after the hint opens: its bubble frame presents about 5 ticks later): the run of avi/ega_r2_treasure_found.avi (Down at 488 after ega/r2_treasure_spot, pinned by the elf entering at AVI frame 64): coin throw, POOF, the blink with the treasure, the close with the HUD count, hint 4. The AVI frames match the engine at 0 px up to the close; in the AVI the search ends about 5 ticks and the hint 9 ticks later than in the engine, while the logged runs of the same search agree with the engine (requests/level1.md 3); the elf under the bubble is drawn from the snapshot before its step (requests/level1.md 2: 129 px)",
+ "start": {
+  "state": "savestates/ega/r2_treasure_spot.sav"
+ },
+ "keys": "488:down:down, 490:up:down",
+ "ticks": 600,
+ "checkpoints": [
+  {
+   "id": "coin_throw",
+   "tick": 520,
+   "capture": "ega/r2_treasure_02_coin_throw.png",
+   "max_px": 0
+  },
+  {
+   "id": "poof",
+   "tick": 539,
+   "capture": "ega/r2_treasure_03_poof.png",
+   "max_px": 0
+  },
+  {
+   "id": "blink_a",
+   "tick": 562,
+   "capture": "ega/r2_treasure_04_blink_a.png",
+   "max_px": 0
+  },
+  {
+   "id": "blink_b",
+   "tick": 563,
+   "capture": "ega/r2_treasure_05_blink_b.png",
+   "max_px": 0
+  },
+  {
+   "id": "opened",
+   "tick": 577,
+   "capture": "ega/r2_treasure_06_opened_with_treasure.png",
+   "max_px": 0
+  },
+  {
+   "id": "closed_count",
+   "event": "sfx=7",
+   "nth": 1,
+   "capture": "ega/r2_treasure_07_closed_count1.png"
+  },
+  {
+   "id": "hint4",
+   "event": "ui=0x10",
+   "nth": 1,
+   "offset": 6,
+   "capture": "ega/r2_treasure_01_found_hint.png"
+  }
+ ],
+ "timings": [
+  {
+   "id": "throw_to_hint",
+   "from": {
+    "event": "key=5000"
+   },
+   "to": {
+    "event": "ui=0x10"
+   },
+   "expect_ticks": 113,
+   "tolerance": 1,
+   "source": "avi/ega_r2_treasure_found.avi: Down at frame 61, hint 4 at frame 204; 143 frames x 0.7946 ticks per EGA AVI frame"
+  }
+ ]
+}

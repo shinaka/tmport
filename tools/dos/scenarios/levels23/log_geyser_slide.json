@@ -1,0 +1,95 @@
+{
+ "description": "level 3: walking left into the geyser hole, the slide down to level 2; the r2 geyser-hole captures",
+ "start": {
+  "state": "savestates/r2/fl_level3_start.sav"
+ },
+ "keys": "162:down:left, 220:up:left",
+ "ticks": 663,
+ "checkpoints": [
+  {
+   "id": "r2_geyser_hole_00_before",
+   "tick": 47,
+   "capture": "ega/r2_geyser_hole_00_before.png",
+   "max_px": 0
+  },
+  {
+   "id": "r2_geyser_hole_01_slide_start",
+   "tick": 192,
+   "capture": "ega/r2_geyser_hole_01_slide_start.png",
+   "max_px": 0
+  },
+  {
+   "id": "r2_geyser_hole_02_sliding",
+   "tick": 301,
+   "capture": "ega/r2_geyser_hole_02_sliding.png",
+   "masks": [
+    {
+     "rect": [
+      0,
+      113,
+      319,
+      143
+     ],
+     "reason": "the capture caught a scroll step half presented (DOSBox-X presents without retrace sync)"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "r2_geyser_hole_02_sliding_old_rows",
+   "tick": 298,
+   "capture": "ega/r2_geyser_hole_02_sliding.png",
+   "masks": [
+    {
+     "rect": [
+      0,
+      0,
+      319,
+      113
+     ],
+     "reason": "only the rows the torn capture still took from the frame before the scroll step"
+    },
+    {
+     "rect": [
+      0,
+      144,
+      319,
+      199
+     ],
+     "reason": "only the rows the torn capture still took from the frame before the scroll step"
+    }
+   ],
+   "max_px": 0
+  },
+  {
+   "id": "r2_geyser_hole_03_landed",
+   "tick": 544,
+   "capture": "ega/r2_geyser_hole_03_landed.png",
+   "max_px": 0
+  },
+  {
+   "id": "log_end",
+   "at_log_end": "savestates/r2/fl_geyser_slide.sav",
+   "capture_state": "savestates/r2/fl_geyser_slide.sav"
+  }
+ ],
+ "logs": [
+  {
+   "id": "fl_geyser_slide",
+   "state": "savestates/r2/fl_geyser_slide.sav",
+   "since": true,
+   "align": [
+    "ticks",
+    "seq"
+   ],
+   "fields": [
+    "x",
+    "y",
+    "camx",
+    "camy",
+    "state",
+    "coins"
+   ]
+  }
+ ]
+}

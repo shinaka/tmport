@@ -1,0 +1,56 @@
+{
+ "description": "the boot with the crafted roster (tierc, tierb, Rascal, Ada): the list, Esc (exit box), Esc (back), Ctrl+R (remove mode), Enter (remove box), Esc, Esc; a name already on the list (box); typing with Shift (a shifted first letter, then shifted letters inside the name)",
+ "start": {
+  "boot": true,
+  "seed": "0x1EE2",
+  "users": "USERS_crafted_tierb_layout.DAT"
+ },
+ "extra_args": [
+  "--sound",
+  "adlib"
+ ],
+ "keys": "660:tap:enter, 720:tap:enter, 780:tap:enter, 840:tap:enter, 1000:tap:esc, 1100:tap:esc, 1200:down:lctrl, 1202:tap:r, 1206:up:lctrl, 1300:tap:enter, 1400:tap:esc, 1500:tap:esc, 1600:tap:a, 1620:tap:d, 1640:tap:a, 1660:tap:enter, 1760:tap:enter, 1860:down:lshift, 1862:tap:b, 1864:up:lshift, 1880:tap:c, 1960:tap:esc, 2060:down:lshift, 2062:tap:x, 2080:tap:y, 2084:up:lshift, 2100:tap:z",
+ "ticks": 2140,
+ "checkpoints": [
+  {
+   "id": "list",
+   "tick": 960,
+   "capture": "ega/r2_signin_crafted_list.png"
+  },
+  {
+   "id": "exit_box",
+   "tick": 1060,
+   "capture": "ega/r2_ui_signin_esc_exit_box.png"
+  },
+  {
+   "id": "after_esc_esc",
+   "tick": 1160,
+   "capture": "ega/r2_ui_signin_after_esc_esc.png"
+  },
+  {
+   "id": "remove_mode",
+   "tick": 1260,
+   "capture": "ega/r2_ui_signin_ctrl_r_remove.png"
+  },
+  {
+   "id": "remove_box",
+   "tick": 1360,
+   "capture": "ega/r2_ui_signin_remove_confirm.png"
+  },
+  {
+   "id": "identical_name",
+   "tick": 1720,
+   "capture": "ega/r2_ui_signin_identical_name_box.png"
+  },
+  {
+   "id": "shift_first_letter",
+   "tick": 1920,
+   "capture": "ega/r2_kbd_shift_test_first_letter.png"
+  },
+  {
+   "id": "shift_name",
+   "tick": 2120,
+   "capture": "ega/r2_kbd_shift_test_name_entry.png"
+  }
+ ]
+}

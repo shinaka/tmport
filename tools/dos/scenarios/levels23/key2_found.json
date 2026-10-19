@@ -1,0 +1,27 @@
+{
+ "description": "Round 1: the coin dropped at the level-2 nest tree finds the key (077; the Round-1 player had stepped 8 pixels left first, at a time not found: his sprite masked)",
+ "start": {
+  "state": "savestates/ega/l2_at_nests.sav"
+ },
+ "keys": "180:down:down, 180.5:up:down",
+ "ticks": 395,
+ "checkpoints": [
+  {
+   "id": "077_level2_key_found",
+   "tick": 391,
+   "capture": "ega/077_level2_key_found.png",
+   "masks": [
+    {
+     "rect": [
+      212,
+      68,
+      275,
+      132
+     ],
+     "reason": "the player: one step left of the Round-1 position"
+    }
+   ],
+   "max_px": 0
+  }
+ ]
+}

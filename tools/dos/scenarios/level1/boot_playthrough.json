@@ -1,0 +1,29 @@
+{
+ "description": "the boot playthrough of tools/dos/scenarios/level1/pt_full_script.txt (seed 0x1EE2): places of the Round-1 climb on the same layout (the player's route and the elves differ from the captures)",
+ "start": {
+  "boot": true,
+  "seed": "0x1EE2"
+ },
+ "keys_file": "pt_full_script.txt",
+ "ticks": 10914,
+ "checkpoints": [
+  {
+   "tick": 900,
+   "capture": "ega/024_outside1.png",
+   "id": "outside1",
+   "info": "the boot playthrough's route and elves differ from the Round-1 run; the same layout"
+  },
+  {
+   "tick": 2450,
+   "capture": "ega/030_quiz_question.png",
+   "id": "quiz",
+   "info": "the boot playthrough's route and elves differ from the Round-1 run; the same layout"
+  },
+  {
+   "tick": 5607,
+   "capture": "ega/076_level2_three_clues.png",
+   "id": "level2_clues",
+   "info": "the boot playthrough's route and elves differ from the Round-1 run; the same layout"
+  }
+ ]
+}

@@ -1,0 +1,22 @@
+{
+ "description": "level 1 (Round 1, Ada): from ega/outside_clue1, Right held from 83 to 273 (pinned by avi/ega_walk_and_scroll.avi: an elf enters at frame 47, the walk starts at 55; 64 of its 86 changed frames match at 0 px, the rest are torn scroll steps), then standing 2000 ticks with the elves: the end equals ega/path_flags in g_randSeed, every elf record and the screen",
+ "start": {
+  "state": "savestates/ega/outside_clue1.sav"
+ },
+ "keys": "83:down:right, 273:up:right",
+ "ticks": 2267,
+ "checkpoints": [
+  {
+   "id": "path_flags_capture",
+   "tick": 408,
+   "capture": "ega/033_path_flags.png",
+   "max_px": 0
+  },
+  {
+   "id": "path_flags_state",
+   "at_log_end": "savestates/ega/path_flags.sav",
+   "capture_state": "savestates/ega/path_flags.sav",
+   "max_px": 0
+  }
+ ]
+}

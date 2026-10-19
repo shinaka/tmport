@@ -27,14 +27,7 @@ const DosGfxFiles* dosGfxFiles() {
     return files.get();
 }
 
-std::optional<std::filesystem::path> dosCapturesPath() {
-    const auto data = dosDataPath();
-    if (!data) return std::nullopt;
-    std::error_code ec;
-    const auto p = data->parent_path() / "extracted" / "captures" / "dos";
-    if (std::filesystem::is_directory(p, ec)) return p;
-    return std::nullopt;
-}
+// dosCapturesPath(): dos_test_data.cpp (TM_DOS_CAPTURES).
 
 }  // namespace testdata
 

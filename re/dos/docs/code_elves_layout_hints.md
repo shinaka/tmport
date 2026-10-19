@@ -1082,6 +1082,64 @@ the port follows the code where this document was silent or loose [O unless mark
     2206 after the state) and ends with the same rand() seed (0x2BC5650F) and elf table as
     `fl_tierc_dust1`; from `fl_tierc_coincreature` with the logged keys of `fl_coin_after` the coin
     creature gives +2 during tick 1421 and dust takes one during tick 1504, again ending with
-    DOSBox-X's seed, player x and elf table (`tests/test_dos_elves.cpp`, run with
-    `TM_DOS_ELF_REPLAY` pointing at DGROUP dumps written with `savmem.py`). So the per-tick model
+    DOSBox-X's seed, player x and elf table (`tests/test_dos_elves.cpp`; since wave 4 the tests load
+    the states themselves with `loadDosboxState`, `TM_DOS_CAPTURES`). So the per-tick model
     (lockstep, rand() order of spawn / think / handlers, scripts, dust) is exact in these runs.
+
+---
+
+## Wave 4 verification (fidelity, level1 group)
+
+Scenarios in `tools/dos/scenarios/level1/` (fidelity runner, `tools/dos/README.md`); evidence tools in
+`extracted/scratch/dos_w4_level1/`. Every check of this module against DOSBox-X matches; the remaining
+picture differences of the group come from the frame timing and the state loader (requests in
+`extracted/scratch/dos_w4/requests/level1.md`) [O].
+
+1. **Long elf runs end in DOSBox-X's state.** From `ega/outside_clue1` with Right held from tick 83 to
+   273 (the press pinned by `avi/ega_walk_and_scroll.avi`: an elf enters the view 8 AVI frames before
+   the walk starts) the engine reaches `ega/path_flags` after 2267 ticks with the same g_randSeed, all
+   15 elf records, g_seconds, camera and screen (0 px; `walk_to_flags`, test "replay of the Round-1
+   walk to the flags"). Several elves get sprites at the view edges, walk, pause (the 1/16 pause rolls
+   and the two-rand pause ends), leave the view and drift hidden for 2000 ticks.
+2. **The search freeze (§4.8 step 2) waits for the end of the walk script.** In the treasure runs
+   (`treasure_found_avi`, `treasure5_found`) an elf walks on screen during the whole 32-tick search:
+   its 71-tick walk script does not end, so `Elf_CheckNet` never sees the slot idle and the elf is not
+   frozen; it keeps drawing its `Elf_WalkCommon` rand() every tick. With Down at tick 433 after
+   `r2/at_treasure5` the end state `r2/fl_treasure5_found` (hint 4 open) has DOSBox-X's seed and elf
+   table (test "replay of r2/fl_treasure5_found"). Hidden elves drift through the throw and the
+   search (they stop only with `g_uiMode` != 0, i.e. when the hint opens): in `r2/fl_search_t` their
+   x values pin the Down press at tick 114 after `ega/r2_treasure_spot`, and the hint then opens at
+   g_ticks 331520 in the engine and in the FRAME ring.
+3. **Hint 4** (`Search_Update` arms it, `Hints_PickNext` shows it) opens in the frame after the
+   search's last frame, in both runs; its bubble, Flutter and the prompt icon match
+   (`r2/fl_search_t` 0 px). The elf drawn under the bubble comes from that frame's sprite snapshot,
+   which the engine takes before the frame's tick (129 px in `treasure5_found` and
+   `ega/r2_treasure_01_found_hint`; requests/level1.md 2: not an elves or hints matter).
+4. **Dust and the coin creature in the AVIs.** `avi/ega_r2_tierc_standing_elves.avi` is the run of
+   `r2/fl_tierc_outside` -> `fl_tierc_dust1` (578 of its 714 changed frames match the engine at 0 px;
+   the captures `r2_elf_dust_01..03` at ticks 1588, 1593, 1608), `avi/ega_r2_coin_creature_touch.avi`
+   covers ticks 1339-1589 of `r2/fl_tierc_coincreature` -> `fl_coin_after` (`r2_coin_creature_03/04`
+   at 1463, 1493; `ega/coin_creature` lies on the same run at tick 1289), the bonus spot run
+   (`ega/w_bonus` -> `r2/w_bonus_after` -> `w_bonus_after2`) replays tick for tick (`log_bonus_coins`).
+5. **The start-of-game rank message** of `r2/fl_tierc_start` -> `fl_tierc_outside`: with Enter at
+   tick 1004 (not 1006 as first inferred from the log) and the host mouse moves of the reference run
+   (`log_tierc_door`), the log matches in both alignments including DOSBox-X's blocked ticks, and the
+   message capture `ega/r2_tierc_start_message_outside` and `ega/r2_tierc_outside` are 0 px.
+6. **A catch and its question (Round 1).** From `ega/outside_caught1` one net swing with Space at
+   tick 865 (the only press tick that reproduces the next state) pulls the clue carrier of question
+   slot 2 into the net (ElfSt_62/65 -> 63/66 -> `Elf_NetCatch`): nets 9 -> 8, coins 6 -> 7,
+   `g_caughtSlot` 2, the question opens; the end equals `ega/quiz1` in the seed, all elf records and
+   the screen (`catch_to_quiz1`, test "replay of the Round-1 catch of a clue carrier"; the state was
+   saved inside Game_Tick, so the tick counters end one tick behind). From `ega/quiz1` the first answer
+   (Enter at 10) and the praise bubble closed at 1007 lead to `ega/outside_clue1` with the same seed,
+   elf records, g_seconds (paused with the byte-wrap quirk of §2.1 while the question and the bubble
+   are open) and screen; the carrier gets up through ElfSt_03 with the stale `g_elfAnimSel`
+   (`quiz1_to_clue1`, captures `030`-`032` at 0 px; test "replay of the Round-1 first question").
+   Together with item 1 the Round-1 states `outside_caught1` -> `quiz1` -> `outside_clue1` ->
+   `path_flags` chain tick for tick; `path_flags` -> `path_plants` (a coin at the flags, then a walk
+   from 994 to 1414) reaches the seed and the screen, with 4 hidden elves 1-41 px off (the reference
+   walk was more than one key press).
+7. **Captures of Round 1.** Those a state can reach match: `030`-`036` (above), `r2_w_cave_f7_02/03`
+   (`cave_f7`) and every state whose screen is a capture. The others (`024`, `026`-`029`, `037`-`044`,
+   `046`-`048`, `050`) were taken before the next state was saved: no free run from a state matches
+   them, and the inputs between the states (menus, the catcher's net swings) are not known.
