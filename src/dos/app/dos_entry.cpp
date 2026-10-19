@@ -146,6 +146,15 @@ int runDosEdition(platform::Host& host, const DosOptions& options, const std::fi
     };
     host.setHandlers(std::move(h));
 
+    // A --keys script also drives a windowed run (on top of the player's keys), so the interactive
+    // loop can be smoke-tested, e.g. on SDL's offscreen video driver.
+    if (!options.keys.empty()) {
+        std::string error;
+        auto script = ScriptedInput::parse(options.keys, error);
+        if (!script) throw Error("--keys: " + error);
+        runtime.setScript(std::move(*script));
+    }
+
     uint64_t last = host.nowNs();
     while (runtime.running() && !host.quitRequested()) {
         host.pump();
