@@ -30,7 +30,6 @@ bool idle(DosGame& g) { return slot1(g).anim == 0; }  // slot 1 runs no script
 // "Facing left": the last script was the left stand (2) or the left walk (4).
 bool facingLeft(DosGame& g) { return slot1(g).prev == 2 || slot1(g).prev == 4; }
 uint16_t& keys(DosGame& g) { return g.keys(); }
-bool onPathLine(const DosGame& g) { return (g.player.obj.y & 0x7F) == 0x70; }
 void setState(DosGame& g, uint16_t s) { g.player.playerState = s; }
 void nextState(DosGame& g, int delta = 1) { g.player.playerState = static_cast<uint16_t>(g.player.playerState + delta); }
 void setSlotPos(DosGame& g, int s, int x, int y) {

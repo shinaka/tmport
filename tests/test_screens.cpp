@@ -285,10 +285,6 @@ struct Rig {
     }
 };
 
-void copyFile(const std::filesystem::path& from, const std::filesystem::path& to) {
-    std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing);
-}
-
 // A users.dat with the given names (totals as given), every other byte zero.
 void writeRoster(const std::filesystem::path& p, const std::vector<std::pair<std::string, uint32_t>>& players,
                  uint8_t soundOn = 1) {

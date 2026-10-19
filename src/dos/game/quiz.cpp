@@ -102,7 +102,7 @@ void quizUpdate(DosGame& g) {
                 hudRedraw(g);  // shows the new prompt icon
             } else if (cmd > 8 && cmd < 12) {  // the mouse over an answer row
                 quizSetFocus(g, cmd - kFirstAnswerZone);
-            } else if (cmd > 5 && cmd < 8) {  // Up / Down skip the greyed answers
+            } else if (cmd == kCmdUp || cmd == kCmdDown) {  // Up / Down skip the greyed answers
                 int p = ui.quizFocus;
                 for (int k = 0; k < 3; ++k) {
                     p += g.tables.ui.quizFocusStep[static_cast<size_t>(cmd - kCmdUp)];

@@ -10,8 +10,6 @@ namespace tmport::dos {
 
 namespace {
 
-constexpr uint8_t kCR = 0x0D;
-
 [[noreturn]] void badPuzzles(const std::string& why) { throw FormatError("ALL_PUZS: " + why); }
 
 }  // namespace

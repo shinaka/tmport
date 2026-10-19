@@ -107,8 +107,6 @@ const std::vector<StringTable>& stringTables() {
     return s;
 }
 
-std::string asString(std::span<const uint8_t> b) { return std::string(b.begin(), b.end()); }
-
 // --- applying --------------------------------------------------------------------------------------
 
 struct Plan {
