@@ -42,6 +42,9 @@ Labels: **[obs]** = read from bytes, disassembly or decoder output. **[inf]** = 
   DGROUP, 4 random orchestrations per tune) and plays effects from **SFX.IBM on the PC
   speaker** [obs]. This document specifies the AdLib note mapping and table locations, but
   not a full OPL2 rendering.
+* Verified (§11): the engine's driver (`src/dos/audio/`) renders all 30 entries sample for
+  sample like `tools/dos/dos_sound.py`, and its timing, pitches, levels and the Tandy noise
+  register agree with the DOSBox-X recordings of all 12 effects and 3 tunes [obs].
 
 ---
 
@@ -255,6 +258,26 @@ Consequences: a note of D ticks holds the speaker on for `D - release` ticks and
 `release` ticks; if `D < release` it sounds for the full D (no gap). A pitch is written to
 the hardware at the tick the note is fetched.
 
+The voice-owned mask (DS:63c6) is cleared at the start of every tick and, for the music run on
+the speaker and the Tandy, loaded from the effect block's active flags (491b:008a). The music
+only runs when no effect is active, and both `Sound_AllVoicesDone` and `Sfx_Stop` clear those
+flags, so the mask is never non-zero in practice [obs].
+
+### 5.2a Entry points called by the game (491b:06d7..0854) [obs, disassembly]
+
+| Routine | What it does (beyond §7) |
+|---|---|
+| `Sfx_Play` 06d7 | returns if `g_soundOn` (DS:63b4) is 0; AdLib: voice count = 1; ignores the call if `id > current id` (unsigned; idle = 0xFFFF); stores the id; **Tandy: calls `Sfx_Stop`, which sets the current id back to 0xFFFF, so on the Tandy (and PS/1) there is no priority: every effect replaces the running one**; sets the stream pointers and starts, status 1. **The block is not cleared**: tempo, envelope pointers and sustain of the previous effect remain until the new streams set them (every shipped effect sets its tempo and envelopes first, so it is not audible) |
+| `Sfx_Stop` 074b | status 0, id 0xFFFF; speaker and AdLib: `port 0x61 &= 0xFC` directly and active[0] = 0; Tandy: for each voice active = 0, owned = 0, `Sound_VoiceOff` (attenuation 15 + period 0) |
+| `Music_Play` 0791 | **zeroes the whole music block**, stores the tune id, then returns if `g_musicOn` (DS:63b6) is 0 (the block stays cleared: the music is stopped); AdLib: `AdLib_PlayTune(t)` (**one `rand()` per call**, which shifts the game's random sequence) and voice count 4; pointers; status 1. A call while the same tune plays restarts it |
+| `Music_Stop` 0811 | status 0, id 0xFFFF; voice count 4 on AdLib (temporarily); for each voice active = 0, owned = 0, `Sound_VoiceOff`. On the speaker this also cuts a playing effect's current note (the gate is shared) until its next note |
+| `Sound_SilenceAll` 0854 | `Sound_VoiceOff` on every voice (4 on AdLib, where it keys off the OPL voices, not the speaker) |
+
+Side effect of `Sound_VoiceOff` on the PSG: it writes period 0 (491b:0600). When an effect ends
+on the Tandy (`Sound_AllVoicesDone` turns all four voices off) the frozen music resumes with its
+attenuation restored by the next volume pass, but each voice keeps period 0 (= 1024, about
+109 Hz) until its next note [obs code; not captured in a recording].
+
 ### 5.3 Tandy attenuation pass (`491b:033d`) [obs]
 
 For voices 0..3, attenuation register latch `0x90 + 0x20*v`, skipping voices owned by an
@@ -327,22 +350,44 @@ no shipped stream does this (checked by `dos_sound.py`).
 
 ---
 
-## 6. Hardware output models (as used by `dos_sound.py`)
+## 6. Hardware output models
 
 ### 6.1 PC speaker [obs driver, inf model]
 
 PIT channel 2, mode 3 square wave, frequency `1193182 / divisor` (divisor 0 = 65536), audible
-while port 0x61 bits 0 and 1 are both set. The renderer box-filters the ideal square wave
+while port 0x61 bits 0 and 1 are both set. `dos_sound.py` box-filters the ideal square wave
 per output sample (44.1 kHz) and holds the parameters for each tick.
+
+Details that the DOSBox-X recordings show [obs, §11]: the speaker output is unipolar (the
+silent level when the gate is off, a square between that level and the high level when on),
+low-passed at roughly 6 kHz; a rising gate restarts the counter (each note starts with a
+full high half period). In mode 3 a new divisor written while counting takes effect at the
+end of the current half period, so a pitch change inside a note (glides, legato) lands up to
+half an old period late.
 
 ### 6.2 SN76496 (Tandy 1000 / PCjr; PS/1 at port 0x205) [obs driver, inf model]
 
 Clock 3579545 Hz. Latch byte `1 rrr dddd` (r: 0/2/4 tone period of voice 0/1/2, 1/3/5/7
 attenuation of voice 0..3, 6 noise control), data byte `0 x dddddd` = upper 6 period bits.
 Tone frequency = clock / (32 N) (N = 0 treated as 1024); attenuation 2 dB per step, 15 =
-off; noise shift rate clock/512, /1024, /2048 or tone-3 rate; white noise = 15-bit LFSR with
-taps 0 and 1 (TI SN76489 behaviour [inf]; the Tandy's NCR 8496 may differ), periodic =
-15-step pulse.
+off; noise shift rate clock/512, /1024, /2048 or tone-3 rate (= the voice 2 tone frequency);
+periodic noise = 15-step pulse. `dos_sound.py` models the white noise as the TI SN76489
+register (15 bits, feedback bit 0 XOR bit 1, restarted by every noise-control write).
+
+**Tandy 1000 (NCR 8496), from the DOSBox-X recording** [obs, §11]: the white noise of effect 1
+decodes (one bit per shift period) to a sequence that satisfies `o[n+16] = NOT(o[n+1] XOR
+o[n+5])` for all 3 368 decoded bits, i.e. a **16-bit register with taps 0x0002 and 0x0020 and
+XNOR feedback** (output bit 0, inverted at the output), as MAME models the NCR 8496; the 506
+bits after the first noise write equal the engine's sequence started from 0x8000. The later
+tied noise notes of the same effect rewrite the same noise control (0xE7) **without restarting
+the register**: the NCR 8496 restarts it only on a latch write that flips the white/periodic
+bit (MAME's rule, matched bit for bit by the engine over all five noise notes). The shift rate
+is the voice 2 tone frequency (5 327 Hz for period 21, 9.01 samples per bit at 48 kHz).
+
+The tone counters behave like the PIT: a new period starts when the current half period ends.
+After `Sound_VoiceOff`'s period 0 (= 1024, a 4.58 ms half period) the first note of the next
+effect therefore starts up to 1.08 ticks late; the recording shows onset delays of 0..0.96
+tick, consistent with period 0 = 1024 (a period 0 taken as 1 would leave no delay) [obs, §11].
 
 ---
 
@@ -356,7 +401,8 @@ taps 0 and 1 (TI SN76489 behaviour [inf]; the Tandy's NCR 8496 may differ), peri
 * **Effects**: `491b:06d7(id)` (if sound is on, `DS:63b4`) starts effect *id* only if
   `id <= current id` (current = 0xFFFF when idle): **lower ids have priority** and an
   effect is never interrupted by a higher-numbered one. On Tandy the running effect is
-  stopped first (`491b:074b`). Effects do not loop.
+  stopped first (`491b:074b`), which also resets the current id: on the Tandy any effect
+  replaces any other (§5.2a). Effects do not loop.
 * Stop functions: `491b:074b` stop effect, `491b:0811` stop music, `491b:0854` silence all
   voices.
 * Effect ids used by code: 3 and 4 (`130f:0edf`, `130f:07a5`), 6 and 7 (`4a03:0003`),
@@ -400,10 +446,77 @@ Outputs (`python -P tools/dos/dos_sound.py all`): `tunes_ibm_00..02.wav`,
 * The user may prefer Tandy sound over the speaker on a modern PC: device choice is a
   backend option (the data for both exists for every entry).
 * AdLib needs an OPL2 core and the instrument tables; it is optional for a first version.
+* The engine implementation (§11): `src/dos/audio/` — `sound_data` (files, DGROUP tables),
+  `sequencer` (491b, device independent, `timerTick()` = one PIT interrupt), `speaker_synth`,
+  `psg_synth`, `opl_backend` (interface for the wave-5 OPL2 driver and a square-wave stand-in),
+  `dos_sound_renderer` (sequencer + models advanced by sample count), `dos_audio_device` (SDL3
+  pull stream, thread-safe command queue, offline mode) and the `--dos-sound` tool.
 
 ## 10. Open questions
 
 * The exact OPL parameter order in the instrument records (needs `4ac9:08db`, which Ghidra
-  decompiled badly), and what the 0x16 bytes after each 0x38-byte record hold.
-* Tandy 1000 noise LFSR taps (NCR 8496 vs SN76496); the renderer uses the TI pattern.
-* Whether a real Tandy's PSG period-0 behaviour (written on every rest) is audible.
+  decompiled badly), and what the 0x16 bytes after each 0x38-byte record hold. The .dro log
+  of the sound test (§11.4) has every register write of the three tunes for wave 5.
+* ~~Tandy 1000 noise LFSR taps~~: answered for the DOSBox-X reference (§6.2: NCR 8496, 16 bits,
+  taps 0x0002/0x0020, XNOR, restart only when the mode bit flips). A real NCR 8496 was not
+  measured.
+* Whether a real Tandy's PSG period-0 behaviour is audible: during rests it is silent
+  (attenuation 15); after an effect it is audible as a ~109 Hz tone on each resumed music voice
+  until its next note (§5.2a), at least in the emulation; no recording covers that case yet.
+
+## 11. Engine implementation and verification [obs]
+
+Scripts and outputs: `extracted/scratch/dos_w2_dos_audio/` (`py/cmp_raw.py`,
+`py/cmp_speaker.py`, `py/cmp_tandy.py`, `py/cmp_opl.py`, `py/noise_taps2.py`,
+`py/noise_seq.py`; reports `cmp_*.txt`). Engine renders: `tmport --dos-sound <device>
+<sfx N|tune N|soundtest|all> OUT [--raw] [--state-log TXT]`.
+
+### 11.1 Against `dos_sound.py`
+
+`--raw` (44 100 Hz, TI noise, dos_sound.py's normalisation) renders of all 12 effects and 3
+tunes on the speaker and on the Tandy: **30 of 30 WAV files identical, 0 differing samples**
+(14 076 858 samples in all). Tick lengths as in §8.
+
+### 11.2 Against the DOSBox-X recordings (`extracted/captures/dos/audio/*_soundtest_*.wav`)
+
+The engine runs the recording schedule (Music_Stop +100 ticks, effects 0..11 every 600 ticks,
+tunes 0, 1, 2 at +700, +12 900, +17 300, Music_Stop +6 000, music loop flag DS:63ba = 1 as in
+the recorded states) and logs the speaker/PSG state per tick; the recording is aligned by one
+offset (recording sample = A + tick × 48000 / 236.6974).
+
+| Check | Speaker | Tandy |
+|---|---|---|
+| note onsets after silence | 896 notes, all within **0.115 tick** (0.49 ms) of the engine tick, median 0.000 | 427 onsets, delay 0..0.96 tick (median 0.006): the tone counter finishing its old half period (§6.2) |
+| note ends (followed by silence) | 895 notes, median −0.035 tick; the outliers are low notes whose last edge precedes the gate-off by up to half a period | – |
+| pitch | 1 111 segments with ≥ 2 periods: mean −0.014, median −0.007, max 3.7 cents | 633 one-voice runs (DFT peak): median 0.0, max 4.0 cents; 1 435 of 1 435 polyphonic tune notes ≥ 12 ticks strongest at the expected pitch (against ±1 semitone) |
+| levels | – | one-voice peak-to-peak by attenuation 2..10: −4.01, −6.01, −8.01, −10.00, −12.00, −13.99, −15.99, −17.98, −19.98 dB (2 dB steps) |
+| extra or missing sound | 0 of 61 023 recorded edges outside an engine note | 4 of 9 818 silent ticks / 13 of 18 383 sounding ticks differ, all next to a change or inside a flat half period of a ~110 Hz tone |
+| music loops | tunes 0, 1 and 2 each restart once before the next command, as recorded | same |
+
+The AdLib recording's effects (on the speaker): 121 onsets within 0.364 tick, 102 pitch
+segments within 8 cents (1-tick segments), 0 stray edges.
+
+### 11.3 Tandy noise
+
+See §6.2: the engine's `NoiseType::Ncr8496` reproduces the recorded noise bits exactly (5 notes,
+506 + 683 + 687 + 682 + 687 bits, 100 %); the TI and 17-bit registers match 56 %.
+
+### 11.4 AdLib music timing (`adlib_soundtest_sfx0-11_tunes0-2.dro`)
+
+The engine's AdLib-device sequencer calls `AdLib_NoteOn` 1 465 times for voices 0-2 in the
+sound test; every call has a key-on (register 0xB0+ch bit 5) in its channel group (voice 0 →
+channels 0-2, 1 → 3-5, 2 → 6-8) within 20 ms: 1 462 within 0.5 tick, max 1.0 tick (the .dro has
+1 ms resolution). The OPL pitch (F-number, block) equals the engine's semitone `note - 1 + 12 ×
+octave` plus 0 or ±12 semitones per channel (the orchestration transposition) and a tuning
+offset of −5.6 cents on average (max 9 cents) from the F-number table.
+
+### 11.5 Deviations of the engine (by design)
+
+* Smooth mode (the default for listening): bipolar outputs instead of DOSBox-X's unipolar
+  ones (no DC steps at note on/off), a 7 kHz 2-pole low-pass and a 12 Hz DC blocker; counter
+  reloads at half periods and PIT gate restarts as in §6.1/§6.2; NCR 8496 noise.
+* A stream whose events never take time (it would hang the original's interrupt) is cut after
+  4 096 events; a block whose streams end at once restarts at most once per tick when looping.
+* AdLib (wave 5 not done): the tunes play on a square-wave stand-in at the Tandy pitches; the
+  AdLib timing rules (music not frozen by effects, effects on the speaker, one `rand()` per
+  `Music_Play`) are those of the original.

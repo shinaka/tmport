@@ -85,6 +85,23 @@ Without `--data` the engine uses the environment variable `TM_DATA`. Without tha
 the current directory and the executable's directory (and their parents) for a `TMTWINCD`
 folder, or a single `.cue`/`.iso` file. File names are matched case-insensitively.
 
+**The 1990 DOS edition** (`SST.EXE` V 1.0, still being built: for now the engine checks every
+file and starts a preview of the screens and sound that work, see the README's "DOS edition (in
+progress)") is played from its own folder, the one
+holding `SST.EXE`, `SPRITES.PAK`, `ALL_PUZS` and the other `.PAK`/`.PAN` files. `--data` may point
+at that folder, at `SST.EXE`, or at a folder that contains it. The edition is detected from the
+files: `TMTWINCD.EXE` or a CD image means the Windows CD edition, `SST.EXE` the DOS edition (an
+`SST.EXE` of another version is refused with a message saying why). When a path holds both
+editions (for example a folder with `TM-DOS\` and `TMTWINCD\`), choose one with
+`--edition win|dos` or `edition = win|dos` in the `[engine]` section of `tmport.ini`; otherwise
+the engine stops with a message that names both.
+
+| Edition chosen | Where the data path comes from, in order |
+|---|---|
+| none (detect) | `--data`, `TM_DATA`, `[engine] data`, the Windows auto-detection above; then `TM_DATA_DOS`, `[dos] data`, a folder with `SST.EXE` next to the executable or the current directory (or one of their parents, or a subfolder of one of them). While the DOS edition is in development the Windows edition wins when both are found this way |
+| `--edition win` | `--data`, `TM_DATA`, `[engine] data`, the Windows auto-detection |
+| `--edition dos` | `--data`, `TM_DATA_DOS`, `[dos] data`, the DOS auto-detection |
+
 ## A ready-to-play copy
 
 `scripts\package.bat` (Windows) and `scripts/package.sh` (Linux, macOS) build the engine and put
@@ -155,6 +172,12 @@ run. The switch at run time is not saved. The window icon is the game's own icon
 If the game data cannot be found or a file is missing, `tmport` shows a message box naming the
 missing file and how to point it at the data, and exits (exit code 3).
 
+The DOS edition's 320x200 picture is shown at 4:3, as on a monitor of its time (each pixel 1.2
+times as tall as wide), letterboxed, in a 960x720 window by default (`window_scale =` in `[dos]`:
+320x240 times this). With `--integer-scale` (`[engine] integer_scale`) every pixel becomes 5x6
+screen pixels (1600x1200, exactly 4:3), or the largest whole-number size that fits the screen;
+`--square-pixels` shows it unstretched. It has no in-engine menu bar: the DOS game draws its own.
+
 Game options (any other argument selects the command-line tools below; `tmport --help` lists them):
 
 | Option | What it does |
@@ -171,10 +194,17 @@ Game options (any other argument selects the command-line tools below; `tmport -
 | `--show-treasure`, `--debug` | debug: boxes around the hiding places that hold a treasure (gold) or the key (cyan), drawn over the picture by the presenter (the game's own frame is unchanged); `--debug` only enables F9, which switches them on and off (`[debug] show_treasure` / `keys` in `tmport.ini`). `--room-run` takes `--show-treasure` too |
 | `--verbose` | debug logging |
 | `--headless` | no window, no message boxes, no sound (automation); errors go to stderr; the run ends when the `--keys` script is used up |
-| `--keys <script>` | scripted input: comma-separated steps `enter`, `esc`, `space`, arrows, `f1`..`f12`, `alt`, letters/digits, `alt+o`/`ctrl+s`/`shift+a`, `click:<x>:<y>`, `move:<x>:<y>` (canvas coordinates), `wait:<ms>`, `shot:<file.png>` (writes the 640x480 canvas), `quit` |
-| `--frame-dump <png>` | writes the 640x480 canvas when the game ends |
+| `--keys <script>` | scripted input: comma-separated steps `enter`, `esc`, `space`, arrows, `f1`..`f12`, `alt`, letters/digits, `alt+o`/`ctrl+s`/`shift+a`, `click:<x>:<y>`, `move:<x>:<y>` (canvas coordinates), `wait:<ms>`, `shot:<file.png>` (writes the 640x480 canvas), `quit`. The DOS edition counts in game ticks (47.34 per second): items `TICK:down:KEY`, `TICK:up:KEY`, `TICK:tap:KEY[:N]`, `TICK:move:X:Y`, `TICK:click:X:Y`, `TICK:buttons:MASK` (`+N` = N ticks after the previous item; keys `enter`, `esc`, `space`, `up`, `kp8`, `lctrl`, `a`, `5`, `minus`, ...), e.g. `--keys "50:tap:enter, +50:tap:enter, +10:tap:3"` |
+| `--frame-dump <png>` | writes the 640x480 canvas when the game ends (the DOS edition: its 320x200 canvas). DOS edition: a folder (an existing one, or a name without an extension) receives a PNG of every screen shown, `NN_<screen>_<look>.png`, and with `--headless` the sound of the run as `sound.wav` |
 | `--mods <dir>`, `--no-mods` | also load this mod folder (repeatable, after the `[mods]` folders of `tmport.ini`) / load no mods at all (`docs/MODDING.md`) |
 | `--play` | accepted and ignored (`tmport --play` = `tmport`) |
+| `--edition win\|dos\|auto` | which edition to play when the data holds both (default: `edition =` in `[engine]` of `tmport.ini`, else detected; see "Pointing the engine at the game data") |
+| `--look ega\|tandy\|mcga\|cga` | DOS edition: the picture of that video adapter (EGA and Tandy look the same; MCGA has softer colours; CGA is dithered to 4 colours; `hercules` is accepted and looks like CGA, as in the original); default `ega`, `[dos] look` |
+| `--sound tandy\|speaker\|adlib\|off` | DOS edition: the sound device (Tandy 3-voice, PC speaker, AdLib music); default `tandy`, `[dos] sound`; `--no-audio` = `off` |
+| `--slow-cpu` | DOS edition: the original's slow-machine mode (`-X`: fewer elves, coarser scrolling); `[dos] slow_cpu` |
+| `--frame-speed reference\|period` | DOS edition: effects that the original counted in drawn frames run at the speed of the reference recordings (default) or one step per frame, like a period PC; `[dos] frame_speed` |
+| `--dos-args "<switches>"` | DOS edition: the original's switches, e.g. `"-T -St"`: `-E -C -T -H -M` look, `-X` slow CPU (toggles), `-Si -St -Sa` sound; only the second letter counts, later ones win; `--look`, `--sound`, `--slow-cpu`, `--frame-speed` win over them |
+| `--square-pixels` | DOS edition: show the 320x200 picture with square pixels (16:10) instead of 4:3; `[dos] square_pixels` |
 
 On the first start the original's saves (`C:\TLCWIN\TMTWINCD\users.dat`) are copied once into the
 preference directory; the original file is never changed. `users.dat` (same format as the original's)
@@ -377,12 +407,16 @@ described in "Music" above.
 ```
 set TM_DATA=C:\path\to\TMTWINCD
 set TM_IMAGE=C:\path\to\cd.cue
+set TM_DATA_DOS=C:\path\to\TM-DOS
 build\tmtests.exe
 ```
 
 * Tests that need game data read `TM_DATA` (a folder or an image) and skip themselves when it
   is not set; the data-free tests (PNG writer, CRC/Adler, RUND codec, frame buffer primitives,
   palette, Borland RNG, id routing, icon decoder, ...) always run. This is what CI runs.
+* The tests of the 1990 DOS edition (file checks, decoders, screens, sound, input, saves, the
+  runtime and the preview) read the DOS folder from `TM_DATA_DOS` (the folder with `SST.EXE`) and
+  skip themselves without it. They too store only sizes, counts and hashes.
 * No test opens a window or plays sound. The app-area tests write their PNGs (the decoded window
   icon, scripted-run screenshots) to a temporary folder; set `TM_APP_SHOTS=<folder>` to keep them.
 * The image comparison test needs `TM_DATA` to be the extracted folder and `TM_IMAGE` the CD

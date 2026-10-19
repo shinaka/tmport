@@ -3,6 +3,9 @@
 #include <format>
 #include <string_view>
 
+#include "edition/dos_options.h"
+#include "edition/edition.h"
+
 namespace tmport::app {
 
 namespace {
@@ -20,6 +23,8 @@ constexpr Flag kFlags[] = {
     {"--frame-dump", 1},   {"--fullscreen", 0},  {"--windowed", 0},
     {"--mods", 1},         {"--no-mods", 0},
     {"--debug", 0},        {"--show-treasure", 0},
+    {"--edition", 1},      {"--look", 1},        {"--sound", 1},       {"--slow-cpu", 0},
+    {"--frame-speed", 1},  {"--dos-args", 1},    {"--square-pixels", 0},
 };
 
 const Flag* findFlag(std::string_view a) {
@@ -93,6 +98,36 @@ std::optional<LaunchOptions> parseLaunchArgs(int argc, char** argv, std::string&
             o.midiBackend = v;
         } else if (a == "--soundfont") {
             o.soundFont = v;
+        } else if (a == "--edition") {
+            if (v != "auto" && !parseEditionKey(v)) {
+                error = std::format("--edition: '{}' is not win, dos or auto", v);
+                return std::nullopt;
+            }
+            o.edition = v;
+        } else if (a == "--look") {
+            if (!dos::parseLookOption(v)) {
+                error = std::format("--look: '{}' is not ega, tandy, mcga or cga", v);
+                return std::nullopt;
+            }
+            o.dosLook = v;
+        } else if (a == "--sound") {
+            if (!dos::parseSoundDevice(v)) {
+                error = std::format("--sound: '{}' is not tandy, speaker, adlib or off", v);
+                return std::nullopt;
+            }
+            o.dosSound = v;
+        } else if (a == "--frame-speed") {
+            if (!dos::parseFrameSpeed(v)) {
+                error = std::format("--frame-speed: '{}' is not reference or period", v);
+                return std::nullopt;
+            }
+            o.frameSpeed = v;
+        } else if (a == "--slow-cpu") {
+            o.dosSlowCpu = true;
+        } else if (a == "--dos-args") {
+            o.dosArgs = v;
+        } else if (a == "--square-pixels") {
+            o.squarePixels = true;
         }
     }
     return o;
@@ -133,8 +168,28 @@ std::string launchUsage() {
            "  --keys <script>      scripted input, comma-separated steps: key names (enter, esc,\n"
            "                       space, tab, up, down, left, right, home, end, pgup, pgdn, f1..f12,\n"
            "                       alt, a..z, 0..9; prefixes alt+ ctrl+ shift+), click:<x>:<y> and\n"
-           "                       move:<x>:<y> (640x480 canvas), wait:<ms>, shot:<file.png>, quit\n"
-           "  --frame-dump <png>   write the 640x480 canvas when the game ends\n";
+           "                       move:<x>:<y> (640x480 canvas), wait:<ms>, shot:<file.png>, quit.\n"
+           "                       DOS edition, in game ticks: TICK:down|up|tap:KEY, TICK:move:X:Y,\n"
+           "                       TICK:click:X:Y (+N = N ticks later), e.g. \"50:tap:enter, +10:tap:3\"\n"
+           "  --frame-dump <png>   write the 640x480 canvas when the game ends (DOS edition: the\n"
+           "                       320x200 canvas; a folder: a PNG per screen, headless also sound.wav)\n"
+           "\n"
+           "Editions:\n"
+           "  --edition win|dos    which edition to play when the data holds both (default: [engine]\n"
+           "                       edition in tmport.ini; detected from the data: TMTWINCD.EXE or a CD\n"
+           "                       image = Windows CD edition, SST.EXE = 1990 DOS edition). Without\n"
+           "                       --data the DOS edition's folder comes from TM_DATA_DOS, [dos] data,\n"
+           "                       or a folder with SST.EXE next to the executable\n"
+           "\n"
+           "1990 DOS edition (also in the [dos] section of tmport.ini):\n"
+           "  --look ega|tandy|mcga|cga   the picture of that video adapter (default ega)\n"
+           "  --sound tandy|speaker|adlib|off      the sound device (default tandy)\n"
+           "  --slow-cpu           the original's slow-machine mode (-X)\n"
+           "  --frame-speed reference|period       per-frame effects at the speed of the reference\n"
+           "                       recordings (default) or one step per frame like a period PC\n"
+           "  --dos-args \"<sw>\"    the original's switches, e.g. \"-T -St\" (-E -C -T -H -M look, -X\n"
+           "                       slow CPU, -Si -St -Sa sound); --look, --sound, --slow-cpu win\n"
+           "  --square-pixels      square pixels (320x200 at 16:10) instead of the 4:3 picture\n";
 }
 
 }  // namespace tmport::app

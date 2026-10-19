@@ -1,7 +1,10 @@
 # DOS edition (1990, SST.EXE): picture formats, palettes, video modes and font
 
-Status: scoping pass, graphics agent. Covers `*.PAN`, `*.PAK`, the text font, the adapter
-palettes and how the first screens are put together. Decoders: `tools/dos/pan.py`,
+Status: scoping pass (graphics agent), corrected and completed by the wave-2 engine pass (dos_gfx
+agent, §11: the engine code in `src/dos/gfx/` and `src/dos/text/` reproduces 13 reference screens
+in all four looks and 14 UI captures with 0 differing pixels). Covers `*.PAN`, `*.PAK`, the text
+font, the adapter palettes, the back-buffer primitives and how the screens are put together.
+Decoders: `tools/dos/pan.py`,
 `tools/dos/pak.py`, `tools/dos/dos_font.py`, `tools/dos/dos_gfx_common.py` (they read the user's
 files at run time and contain no game data). Previews: `extracted/previews/dos/gfx/` (every
 picture, block and frame) and `extracted/previews/dos/screens/` (2x composed screens).
@@ -58,7 +61,7 @@ except the pixels covered by sprites and text the game draws on top.
 | 3 | Tandy 1000 / PCjr | byte `DS:1300` == 21h (the Tandy ID byte) | `1000:0957`: mode **09h** (320x200x16) |
 | 4 | Hercules | 3BAh status bit 7 toggles | falls into the CGA branch of `1000:0738` |
 | 5 | MCGA | display code >= 0Bh | `1000:07bf`: mode **13h** (320x200x256) |
-| -1 | none | | `1460:0003` prints the "needs a graphics adapter" message (DS:0693) |
+| -1 | none | | `1460:0003` prints the no-graphics-adapter message (DS:0693) |
 
 VGA reports display code 8, falls through to the AH=12h test and runs as **EGA**.
 
@@ -84,9 +87,9 @@ through a table in DGROUP:
 |---|---|---|---|
 | EGA/VGA | `DS:3C4A`, 16 bytes + overscan byte `00` | INT 10h AX=1002h at `1000:0852` | attribute palette register. Mode 0Eh is a 200-line mode, so the monitor (or the VGA's default DAC) reads it as **RGBI**: bit0 B, bit1 G, bit2 R, **bit4 = intensity**; bits 3 and 5 are ignored |
 | Tandy | `DS:3D1B`, 16 bytes | `OUT 3DAh/3DEh` loop at `1000:097d` (palette regs 10h..1Fh) | IRGB nibble |
-| MCGA | `DS:0144`, 16 x (r,g,b) 6-bit | `1460:0003` -> `1437:0001` copies it to `DS:38EA`, `1000:1144` loads it | DAC values. Each colour fills a block of 16 DAC entries (`16*i .. 16*i+15`), so a screen byte's **high nibble** selects the colour |
+| MCGA | `DS:0144`, 16 x (r,g,b) 6-bit | `1460:0003` -> `1437:0001` copies it to `DS:38EA`, `1000:1144` loads it | DAC values. Each colour fills a block of 16 DAC entries (`16*i .. 16*i+15`), so a screen byte's **high nibble** selects the colour. DOSBox-X shows a 6-bit value v as **(v*255+31)/63** (rounded; `v*255/63` is one lower in some channels, e.g. 0x9D for 0x9E) [obs: 0 differing pixels on `mcga/01`, `mcga/04`] |
 | MCGA (first) | `DS:3C1A`, 16 x (r,g,b) | `1000:07bf` at mode set | replaced by `DS:0144` immediately after |
-| CGA | `DS:0174`, 16 bytes | `1437:0027` -> `1000:1087` builds XLAT tables `2005:7E00..81FF` | four 2-bit CGA pixels per entry: a 2x2 ordered-dither pattern, alternating rows use the other half (`XOR BH,0FEh`) |
+| CGA | `DS:0174`, 16 bytes | `1437:0027` -> `1000:1087` builds XLAT tables `2005:7E00..81FF` | four 2-bit CGA pixels `a b c d` (from the most significant bits) per logical colour, shown on 4 consecutive pixels; the next row uses `b a d c` (§2.4). Mode 4, palette 1, high intensity: black, light cyan, light magenta, white |
 
 **[obs]** The EGA and Tandy tables give the **same RGBI colour for every logical colour**, so
 the 16-colour look is identical on both. Resulting colours (standard RGBI values, brown for 6):
@@ -109,7 +112,43 @@ Initialised data in `SST.EXE` (segment `2005`):
 * `2005:8900` (16 words): expands 4 font bits to 4 pixel nibbles (`F` per set bit, MSB = left),
   used by `1000:2180`.
 * `2005:8700` (256 words): 2-bit expansion for the CGA glyph path. `2005:7E00..81FF`: CGA
-  XLAT tables, built at run time.
+  XLAT tables, built at run time (§2.4).
+* The engine computes the mask and expansion tables; `tests/test_dos_text.cpp` checks them against
+  the bytes at 2005:8600 and 2005:8900 of the user's SST.EXE.
+
+### 2.4 CGA conversion (`Gfx_BuildCgaColorMap` 1000:1087) [obs]
+
+In CGA mode the back buffer itself is 2 bpp (80 bytes per row, 4 pixels per byte) and every
+drawing routine converts 4-bpp data when it writes. For an input byte `b` (left pixel `h = b >> 4`,
+right pixel `l = b & 15`) and the table `T` at DS:0174, 1000:1087 builds:
+
+| Table | Value | Used for |
+|---|---|---|
+| `2005:7E00[b]` | `(T[h] & 0xC0) \| (T[l] & 0x30)` | pixels 0, 1 of a CGA byte, even table |
+| `2005:7F00[b]` | `(T[h] & 0x0C) \| (T[l] & 0x03)` | pixels 2, 3, even table |
+| `2005:8000[b]` | `(T[h] & 0x30) << 2 \| (T[l] & 0xC0) >> 2` | pixels 0, 1, odd table |
+| `2005:8100[b]` | `(T[h] & 0x03) << 2 \| (T[l] & 0x0C) >> 2` | pixels 2, 3, odd table |
+
+So with `T[c]` = pixels `a b c d`, a logical colour at pixel x shows `a b c d`[x mod 4] with the
+even tables and `b a d c`[x mod 4] with the odd ones. Per routine:
+* `Tile_DrawColumn` (1000:1a33): even tables for the first row of the column, then alternating
+  (`XOR BH,0FEh`) — the play field and the title start on even rows, so even rows = `a b c d`.
+* `Gfx_FillRect` (1000:1707): the even tables on every row (an odd start byte keeps the high half
+  of the first CGA byte).
+* `Gfx_XorRect` (1000:17d9): converts its two colour words with the even tables and compares and
+  replaces 2-bit pixels.
+* `Font_DrawChar` (1000:2295): the colour converted with the even tables, then rotated by one
+  pixel (`ROR` by 2 bits) after every glyph row; set bits expand through the 2-bit table 2005:8700.
+* `Sprite_Draw` (1000:1e30, `Sprite_DrawRows` 1000:1f46): each row decoded to 4 bpp at 2005:7D20,
+  then converted, the even tables for the first drawn row and alternating per row
+  (`XOR CS:[235E],0FE00h`) whatever the row's y parity; masked draws use the tables 4 pages higher.
+  Flag 0x01 forces the byte-copy path (restoring a 2-bpp save-under).
+
+Only colours with a dithered entry differ between these rules (V 1.0: 2 = 0x99, 5 = 0x88, 8 = 0x11,
+9 = 0x77, 14 = 0x82; the others are solid). The engine converts the 4-bpp buffer at presentation
+with the tile rule (`cgaPixel`, §11); this reproduces `cga/01_title` and `cga/05_signin` with 0
+differing pixels. Fills and text in dithered colours, and sprites in dithered colours starting on
+an odd row, would need the per-routine rules (not in the CGA captures; deviation listed in §11).
 
 ## 3. `.PAN` tile pictures
 
@@ -126,7 +165,10 @@ Initialised data in `SST.EXE` (segment `2005`):
 Loader `1460:05e8(file_index)`: reads the 4 header words, reads block 1 to the **end** of a
 `0xA400`-byte buffer at segment `2897` (`DS:37B8`), reads block 2 to the end of a `0xE880`-byte
 buffer at segment `32d7` (`DS:37B4`), then decompresses both in place toward offset 0
-(`1000:2368` with BX=width, CX=height, and `1000:240e`).
+(`1000:2368` with BX=width, CX=height, and `1000:240e`). After loading, each buffer holds the
+decoded data from offset 0 and, after it, the part of the packed block that was not overwritten
+(the engine keeps both buffers exactly like that, so any read past the decoded map or tiles sees
+the same bytes, except where the original would see leftovers of an earlier file).
 
 ### 3.2 Block 1: tile map, word RLE (`1000:2368`, inner routine `1000:23b9`) [obs]
 
@@ -151,6 +193,10 @@ for picture p = 0, 1, ... until the input is used up:          (1000:23ab: SI ==
 ```
 
 The back-reference therefore only works for 16-wide pictures. OPENING (40 wide) uses none [obs].
+The next picture starts at the word after the last row's end minus one row stride (`1000:239d`:
+`AX = DI_end - 2*height + 2`), i.e. at `p*width*height` when every row wrote `width` entries
+(a row copy always writes 16). The outer loop tests for the end of the input only after a whole
+picture; the input pointer must end exactly at 0xA400.
 
 A map entry `v` is a **paragraph offset into the tile buffer**: the tile starts at byte `v*16`
 (`1000:1a15`: `DS = tileseg + [BX]`). Tiles are 32 bytes, so all entries are even and tile number =
@@ -254,7 +300,8 @@ CLOSE.PAK/SHACK.PAK (file index `scene + 13`, `1437:0034`). BEGIN.PAK is loaded 
 ```
 
 Row encoding (read by `1000:1cbb`):
-* length byte `L`. If `L & 0x80`: **raw row**, `L & 0x7F` bytes of packed pixels follow (always equal to the width).
+* length byte `L`. If `L & 0x80`: **raw row**, `L & 0x7F` bytes of packed pixels follow (always equal to the width;
+  so a raw row is at most 127 bytes: frames wider than that, e.g. the 153-byte SPRITES 57, use run rows only).
 * else `L` bytes of **(count, pixel-pair byte)** pairs follow, and the counts add up to the width.
 * Rows clipped off the top are skipped with `SI += (L & 0x7F) + 1` (`1000:1c6d`).
 
@@ -265,13 +312,24 @@ Inputs: `ES` = frame segment (callers do `MOV DX,BX` after `2159`), `BX` = x byt
 
 | flag | effect |
 |---|---|
-| `80h` | ignore the hotspot (draw at BX,CX) |
+| `80h` | ignore the hotspot (draw at BX,CX); also skips the mirror placement |
 | `20h` | mirror horizontally, and place with `x -= width + x_off` |
-| `10h`/`20h` | draw each row reversed with nibbles swapped (`ROR AL,4`) |
-| `40h` | masked through `2005:8600`: colour 0 is transparent. Without it rows are copied opaque |
+| `10h`/`20h` | draw each row reversed with nibbles swapped (`ROR AL,4`); `10h` alone keeps the normal placement `x + x_off` |
+| `40h` | masked through `2005:8600`: colour 0 is transparent (`dst = (dst & mask[s]) \| s`, s after the nibble swap). Without it rows are copied opaque |
 | `01h` | forces the normal path in CGA mode |
 
-Clipping uses the window `DS:37DA..37E0` (x bytes min/max, y min/max). The actor renderer
+Clipping uses the window `DS:37DA..37E0` (x bytes min/max, y min/max, inclusive) [obs 1000:1be7]:
+left: if `x < xmin` the first `xmin - x` bytes are skipped (for a reversed row: the last bytes of the
+source); right: `x + width` (one past the end) is compared with `xmax` and `x + width - xmax - 1`
+bytes are dropped; top and bottom likewise in rows; nothing left = no draw. The common tail
+(1000:1911) adds the **clipped** rectangle as a dirty rectangle when DS:37AE bit 0 is set. The
+window's DGROUP words are 0 in the file: it is first set by `Sprites_DrawSorted` and left at the
+full screen (0..0x9F, 0..0xC7) after it, which is what every HUD/panel draw sees.
+
+`Sprite_SaveUnder` 1000:2056 (SI x, DI y, CX width, DX height, AX = 1: restart the heap at DS:37CC,
+segment 1AE7): clips like the blitter, stores an opaque frame (header `{0, w, h, x, y}`, rows with
+`L = w | 0x80`) at DS:37CA:37C8 and returns the new heap end, 0 when clipped away. It is restored
+with `Sprite_Draw(AL = 1, 0, 0)`: the frame's hotspot is its own position. The actor renderer
 `4306:0497` draws actors from the table at `DS:9145` (14-byte entries: x bytes, y, depth,
 frame code with bit 0 = mirror, parent link). It uses flags `40h` or `60h`, saves the
 background under each sprite first (`1000:2056`), and opens the clip window to the full screen
@@ -337,12 +395,24 @@ labels in normal and inverted form (14/15 "Help"/"F1", 18/19 "File"/"F2", 22/23
 `2005:8900` and merges `(dst & ~mask) | (colour & mask)`. Set bits take the colour and clear bits
 keep the background. The colour word is four equal nibbles (`0xCCCC` = white,
 `0xFFFF` = black). It returns `width/2`, the advance in bytes, so text is placed on 2-pixel steps.
-`AX=1` only measures. Text layout `43cb:0b63(x bytes, y, far string)`:
-* `CR`/`LF`: new line, `y += [DS:5B3C]` (12, sometimes 10)
-* `~XXXYYY`: absolute position, x = XXX/2 bytes, y = YYY pixels
-* `TAB d d`: advance two digits in bytes
-* `|` skips 2 characters, and the back-quote character is ignored
-* colour in `DS:9215`; clipped at x >= 0x9A
+`AX=1` only measures. Details [obs 1000:2203, verified]: each glyph byte becomes two words through
+`2005:8900` (index = 4 font bits, `F` nibble per set bit, MSB = leftmost); each word is written as
+`(dst & ~mask) | (colour & mask)`, so pixel 0/1 of a pair take the low byte's high/low nibble of the
+colour word and pixels 2/3 the high byte's (only visible with `|NN` colours whose nibbles differ).
+**Whole bytes** are written (`bytes per row` from DS:3C5B), so set bits past the glyph's width would
+be drawn, and the addressing is linear: a glyph that runs past byte 159 continues at the start of
+the next row. The dirty rectangle is `(x, y, width >> 1, height)`.
+
+Text layout `43cb:0b63(x bytes, y, far string)` (full rules: `code_ui.md` §3.1, verified):
+* `CR`/`LF`: x = margin, `y += [DS:5B3C]` (12, or 10 on the title and help pages)
+* `~XXXYYY`: absolute position, x = margin = XXX/2 bytes (signed division), y = YYY pixels
+* `` ` ``: toggles red (0x4444) and back to the ink DS:9215
+* `|NN`: colour word = byte `(n << 4) | n` (8-bit) in both bytes, n = 10*d1 + d2
+* `TAB d d`: advance 10*d1 + d2 bytes
+* digits are `(signed char) byte - '0'`, unchecked; glyph code = byte & 0x7F
+* clipped at x >= 0x9A (signed): such glyphs are skipped without advancing
+(The scoping text said "`|` skips 2 characters, and the back-quote character is ignored": that was
+the decompiler's view, which hides the colour register; corrected.)
 
 ## 7. Which picture is used where
 
@@ -358,7 +428,8 @@ keep the background. The colour word is four equal nibbles (`0xCCCC` = white,
 
 ## 8. Composition of the game screen (verified)
 
-Drawn by `130f:07a5` when `DS:922E` != 0 (all fills via `1000:169b`, x in bytes inclusive):
+Drawn by `130f:07a5` when `DS:922E` != 0 (all fills via `1000:169b`, x in bytes inclusive;
+order and HUD rules in `code_ui.md` §11 and `code_runtime.md` §3.8):
 1. Frame fills `130f:07bc..08a8`: rows 0..10 colour 15, rows 11..14 colour 0, a black rounded
    2-pixel border around the viewport (fills with bytes `FF`, `0F`, `F0` at x bytes 1..3 and 0x9C..0x9E,
    rows 0x0E..0x91), the rest colour 0 down to row 199.
@@ -370,9 +441,19 @@ Drawn by `130f:07a5` when `DS:922E` != 0 (all fills via `1000:169b`, x in bytes 
    else; net 67/68/69 for net >3 / >0 / else; 70; treasure markers `192` (or 193..195 when found)
    at x bytes 0x8D/0x90 alternating, y 0xA4+6i, for `rank+2` slots; numbers in colour 12 at
    x bytes 0x6E/0x7D/0x8F, y 0xBA (`130f:0d00`, leading zeros skipped, 2 bytes each); 58; key
-   frame `50 + [9120]/2` at (6,0xBE); 59; prompt frame `60 + [90F8]/2` if `[90F8]` != 0
-   (`130f:0c2e`).
+   frame `50 + [9120]/2` at (6,0xBE) if the key state is not 0; the clue words (colour 0xCCCC,
+   x 0x0C, y 0xA0/0xAD/0xBA); 59; prompt frame `60 + [90F8]/2` if `[90F8]` != 0 (`130f:0c2e`).
 5. Actors (`4306:0497`), e.g. the player, SPRITES 82, at (66, 128) on a new game.
+
+Title page (`4ba4:0045` + the title loop `4ba4:0434`) [obs, 0 differing pixels in all four looks]:
+OPENING.PAN by 40 `Tile_DrawColumn` calls, `Text_Draw(0x11, 0xA0, DS:8A48)` in ink 0 with line
+height 10, then `Sprites_DrawSorted(0, 3)` in title mode (full-screen clip) over BEGIN.PAK: slot 1
+the figure (script 0x5B: frame code 6 = BEGIN 3, at 0,0), slot 2 a sparkle (script 0x5C: BEGIN
+36..40 at one of the 12 spots DS:8A18/DS:8A30), slot 0 the mouse pointer (script 1: BEGIN 2 at the
+mouse position). All z are 0, so the order is slot 2, 1, 0: the sparkle is drawn **under** the
+figure and the pointer last. In the captures the pointer sits where the mouse driver left it
+(EGA/Tandy at x byte 159, y 101; MCGA 158, 82; CGA 159, 146) and the sparkles are spot 0 frame 40
+(EGA), spot 0 frame 38 (Tandy), spot 10 frame 40 (MCGA), spot 5 frame 37 (CGA).
 
 Hint bubble (`49a6:0565`): SPRITES 71 and 72 at their own positions with flag 40h, the text
 in colour 15 with `~XXXYYY` placement, and prompt frame 63.
@@ -388,10 +469,10 @@ OPENING reproduces the kid in `01_title.png`.
 
 * PAK header words `62, 58` and frame fields `+0A/+0C/+0E`: purpose unknown (not used for drawing).
 * Font byte 0 (7): unknown.
-* How scenes 3 (CLOSE) and 4 (SHACK) and levels 2/3 lay out their blocks: the camera and
-  scene transition code was not found among the 353 analysed functions. The `04c`/`05c`
-  previews are illustrative (block order taken from the PAN files).
-* The CGA dither path and the EGA latch present routine are described only in outline.
+* How scenes 3 (CLOSE) and 4 (SHACK) and levels 2/3 lay out their blocks: answered by the wave-1
+  world spec (`code_world.md` §3.3: all scenes use the one 16x16 grid DS:0CAA with the scene's PAN).
+* The CGA dither tables are decoded (§2.4); the EGA latch present routine is described only in
+  outline (not needed: the engine presents complete RGB frames).
 * Hercules (`912C`=4) takes the CGA branch of `1000:0738` [inf: probably unusable].
 
 ## 10. Outputs
@@ -404,3 +485,48 @@ OPENING reproduces the kid in `01_title.png`.
 * `extracted/previews/dos/screens/` (2x): `01_title_opening`, `01b_..._with_begin_frame3`,
   `02_mountain_level1_start` (pixel-exact vs capture), `02b_..._hint`,
   `03_mountain_ds0caa_grid_overview`, `04*_shack_*`, `05*_close_*`.
+
+## 11. Engine implementation and verification (wave 2)
+
+Namespace `tmport::dos`; addresses of the ported routines are in the code comments.
+
+| File | Contents |
+|---|---|
+| `src/dos/gfx/pan.h` | `PanFile::load` (1460:05e8, 1000:2368/23b9 map, 1000:240e tiles, in place, both buffers kept as the game holds them), `mapWord`, `tile`, `picturePixels` |
+| `src/dos/gfx/pak.h` | `PakFile::load` (offset table, raw/run rows, header fields), `PakFrame` (decoded packed rows) |
+| `src/dos/gfx/palettes.h` | `Look`, `lookPalette` (EGA DS:3C4A RGBI, Tandy DS:3D1B, MCGA DS:0144 rounded, CGA DS:0174), `cgaPixel`, `toRgba` / `toRgba32` (320x200, bytes R,G,B,A = `SDL_PIXELFORMAT_RGBA32`, the convention of `gfx::Presenter::presentFrame`) |
+| `src/dos/gfx/back_buffer.h` | `BackBuffer` (160x200 packed bytes = segment 2005), clip window DS:37DA, DS:37AE flag, `DirtyRegions` (1000:1181), `fillRect` 1000:169b, `replaceColor` 1000:176c, the four scrolls 1000:18b3/196d/1a86/1aef, `drawTileColumn` 1000:19cf, `presentDirty` / `presentFull` |
+| `src/dos/gfx/blitter.h` | `drawSprite` 1000:1b8d, `saveUnder` 1000:2056, `SpriteRenderer::drawSorted` 4306:0497 / `eraseAll` 4306:06dd with the save-heap bookkeeping of DS:929F |
+| `src/dos/gfx/scenery.h` | `SceneryCamera::at` (Frame_Begin 130f:025a), `drawPlayfield` (130f:0326), `scrollColumns` / `scrollRows` (130f:04e5), `drawFullScreenPicture` (47c7:042d) |
+| `src/dos/text/dos_font.h` | `DosFont::fromExe` (1000:2447), `drawChar` 1000:2180 |
+| `src/dos/text/text_draw.h` | `textDraw` 43cb:0b63, `textWidth` 43cb:0cfc, `drawNumber` 130f:0d00 |
+| `src/dos/text/ui_draw.h` | `hline`/`vline`/`frameRect` (43cb:0ab9/0ada/0b18), `exchangeColors`, `msgBoxGeometry` / `drawMsgBox` (43cb:0592), `drawBoxFrame` 43cb:0848, `drawButton` 43cb:0d50, `drawMenuTitle` 43cb:0f1d, `highlightMenuItem` 43cb:04ff |
+| `src/dos/gfx/dos_screens.h`, `dos_gfx_cli.h` | the reference composer and `tmport --dos-pan / --dos-pak / --dos-screen` |
+
+Deviations: the CGA picture is converted at presentation with the tile rule (§2.4), not per
+drawing routine; the clip window starts at the full screen instead of 0,0,0,0; out-of-buffer
+writes are clipped to the buffer (valid calls are unaffected); a frame index past the loaded
+pack draws nothing; the dirty-span lists are kept as a per-row-pair bitmap (the union the original
+merges); reads past the PAN buffers return 0 / a zero tile.
+
+Verification (`extracted/scratch/dos_w2_dos_gfx/`: `render_all.sh` renders with
+`tmport-cli --dos-screen`, `compare_screens.py` and `ui_compare.py` compare by RGB, EGA captures
+reduced from 640x400 after checking the 2x2 doubling):
+
+| Screen | Captures | Differing pixels |
+|---|---|---|
+| title | `ega/001`, `tandy/01`, `mcga/01`, `cga/01` | 0 each (scoping: 479 / 36 on the EGA title: sparkle and pointer) |
+| sign-in | `ega/004` (shipped USERS.DAT), `tandy/06`, `mcga/04`, `cga/05` (their USERS.DAT snapshots) | 0 each |
+| clubhouse (new game) | `ega/008`, `tandy/21` | 0 each |
+| elf question (puzzle 61) | `ega/030` | 0 |
+| level-1 path at the trunk gate | `ega/042` | 0 (scoping 2242: player, clue word and the cell picture) |
+| castle ladder shaft | `ega/099` | 0 (scoping 1427: player and clue words) |
+| drop-downs Help/File/Options, File item 3 | `ega/010`, `021`, `022`, `070a`, `tandy/10`, `tandy/16` | 0 each |
+| Yes/No boxes (Music, Exit and Save, Start New Player, saved game) | `ega/023`, `ega/070b`, `tandy/13`, `tandy/17`, `tandy/07` | 0 each |
+| name entry (empty, "Ada", "Ben" with the cursor off) | `ega/005`, `ega/006`, `tandy/19` | 0 each |
+
+The level-1 path capture was taken before the trunk was unlocked: the saved game used for the grid
+has cell 0xEF = block 0x4C (the ladder), the capture shows block 0x40 (locked trunk). With
+`picture[0xEF] = 0x40` the scenery matches; it is not an overlay painted by the cell handler
+(as SCOPING.md §3/§8 guessed). The decoded PAN maps and tiles, PAK frames and the font hash equal
+the Python decoders' (`tests/test_dos_gfx.cpp`, `tests/test_dos_text.cpp`).

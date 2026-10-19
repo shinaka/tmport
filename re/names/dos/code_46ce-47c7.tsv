@@ -30,7 +30,7 @@
 47c7:04a4	Users_NameExists	int far Users_NameExists(void)	Case-insensitive duplicate check of the typed name
 47c7:0514	Users_ReadFile	void far Users_ReadFile(void)	USERS.DAT (file 9): 0xCAB bytes into DS:ba14
 47c7:055a	Users_WriteFile	void far Users_WriteFile(void)	Writes the whole 0xCAB-byte USERS.DAT (retries)
-47c7:05a9	SignIn_DrawCaret	void far SignIn_DrawCaret(void)	
+47c7:05a9	SignIn_DrawTypedChar	void far SignIn_DrawTypedChar(u8 x,u8 y,u8 ch)	draws one typed character of the new name with the ink DS:9215 (code_ui.md 9.3)
 47c7:05d4	SignIn_DrawField	void far SignIn_DrawField(char on)	
 47c7:06d4	SignIn_HighlightRow	void far SignIn_HighlightRow(void)	
 47c7:071a	SignIn_MoveHighlight	void far SignIn_MoveHighlight(void)	

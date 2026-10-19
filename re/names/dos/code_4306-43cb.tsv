@@ -1,14 +1,14 @@
-4306:0022	Anim_Tick	void far Anim_Tick(void)	Advances the animation scripts of the 13 sprite slots (DS:8fd6, 22 bytes): frame lists with ops -2 dx, -3 dy, -4 obj y, -5 sfx, -6 strike flag (DS:9264), -7 move, -10 stop
-4306:02c0	Anim_InitSlots	void far Anim_InitSlots(void)	Clears the 13 slots and draw records (DS:9145)
-4306:0393	Sprites_Snapshot	void far Sprites_Snapshot(int from,int to)	Copies slot positions/frames to the draw records when the scene is current
-4306:0497	Sprites_DrawSorted	void far Sprites_DrawSorted(int from,int to)	Draws changed sprites back to front by y, saving the background under each
-4306:06dd	Sprites_EraseAll	void far Sprites_EraseAll(int from,int to)	Restores the saved backgrounds in reverse order
-4306:0784	Anim_SetIfIdle	void far Anim_SetIfIdle(int slot,int anim)	Starts anim only if the slot has none
-4306:07b9	Anim_Queue	void far Anim_Queue(int slot,int anim)	Changes to anim unless it is already the previous one
-4306:07fa	Anim_Set	void far Anim_Set(int slot,int anim)	Stops the current animation and starts anim (DS:4f5a far pointer table of scripts)
-4306:0844	Anim_Stop	void far Anim_Stop(int slot)	Remembers and stops the current animation
-4306:088e	Anim_Start	void far Anim_Start(int slot,int anim)	Initialises the slot(s) used by anim
-4306:092f	Anim_Clear	void far Anim_Clear(int slot)	Clears the slot (no sprite)
+4306:0022	Anim_Tick	void far Anim_Tick(void)	Advances the scripts of 13 slots (1 when a modal UI is up); ops -2..-7, -10; held at delay 0 while a step is pending
+4306:02c0	Anim_InitSlots	void far Anim_InitSlots(void)	Clears 13 slots and draw records, order table identity, save-heap reset flag
+4306:0393	Sprites_Snapshot	void far Sprites_Snapshot(int from,int to)	Copies slot x,y,depth,frame to draw records (skips stopped animations), flags a change
+4306:0497	Sprites_DrawSorted	void far Sprites_DrawSorted(int from,int to)	Draws records by descending depth, children offset by their owner, saving the background; raises DS:929f
+4306:06dd	Sprites_EraseAll	void far Sprites_EraseAll(int from,int to)	Restores saved backgrounds in reverse draw order
+4306:0784	Anim_SetIfIdle	void far Anim_SetIfIdle(int slot,int anim)	Sets the anim id only if the slot is idle (first frame at the next tick)
+4306:07b9	Anim_Queue	void far Anim_Queue(int slot,int anim)	Stops and sets anim id unless it equals the previous anim
+4306:07fa	Anim_Set	void far Anim_Set(int slot,int anim)	Restarts slot with anim (no-op if already running it)
+4306:0844	Anim_Stop	void far Anim_Stop(int slot)	prev = anim, pos = delay = 0 (anim id kept)
+4306:088e	Anim_Start	void far Anim_Start(int slot,int anim)	Sets anim id and the first frame(s) of the slot group
+4306:092f	Anim_Clear	void far Anim_Clear(int slot)	anim = prev = pos = delay = 0, frame = -1 (hidden)
 43a0:0002	Kbd_Install	void far Kbd_Install(void)	Hooks INT 9 with Kbd_ISR, ctrlbrk callback 43a0:02ab
 43a0:0043	Kbd_Remove	void far Kbd_Remove(void)	Restores INT 9 and flushes the BIOS buffer
 43a0:0071	Kbd_ISR	void interrupt Kbd_ISR(void)	Scan codes -> held-key bits DS:9105: Up 1, Down 2, Left 4, Right 8, Space 0x10, Home=Up+Left, PgUp=Up+Right; Up+Left/Right -> jump 0x20; Tandy arrow codes on Tandy keyboards; Ctrl -> DS:92fa; other keys go to the BIOS
@@ -40,5 +40,5 @@
 43cb:107a	Help_LoadFile	int far Help_LoadFile(void)	Loads HELP.DAT (0xED8 bytes) into DS:9325 once
 43cb:10c4	Help_DrawPage	void near Help_DrawPage(int topic,int page,char far *data)	Draws a help page with Done/See Next Page/Go Back a Page buttons and its pictures
 43cb:1273	Help_Open	void near Help_Open(int topic)	Opens help topic (page count DS:9325)
-43cb:12cf	HotZones_Setup	void near HotZones_Setup(int type,char x1,char x2,int y2)	Sets the mouse zones and key table for a dialog type (input context DS:922c)
+43cb:12cf	Box_SetupInput	void near Box_SetupInput(int type,u8 x1,u8 x2,int y2)	selects input context 1/2/4 by box type and rewrites its zone and key lists (footer, buttons, menu items, PgUp/PgDn); g_cmd = -1, queue cleared (code_ui.md 4.5)
 43cb:156b	Null_Handler2	void far Null_Handler2(void)	Empty far function (RETF); "no handler" entry of the elf table (also addressed as 4521:000b)

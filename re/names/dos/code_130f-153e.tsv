@@ -1,4 +1,4 @@
-130f:0007	main	int far main(void)	Game_Init, Kbd_Install, Timer_Install, Title_Run; then the frame loop until g_quit (DS:912e): Frame_Begin, (when no full redraw pending) SignIn_Update, Gameover_UpdateMessages, Hints_Update, Menu_Update, Scene_Update, Scroll_Update, Search_Update, Quiz_Update, Sound_SyncState, Game_HandleHotkeys, Screen_DrawOverlay, Playfield_Redraw, Treasures_DrawFound, Rank_Update, sprites draw/present/erase; Game_Shutdown
+130f:0007	main	int far main(void)	Game_Init, Kbd_Install, Timer_Install, Title_Run; then the frame loop until g_quit (DS:912e): Frame_Begin, (when no full redraw pending) SignIn_Update, Gameover_UpdateMessages, Hints_Update, Menu_Update, Scene_Update, Scroll_Update, Search_Update, Quiz_Update, Sound_SyncState, Game_HandleHotkeys, Screen_DrawOverlay, Playfield_Redraw, ShelfRoom_DrawShelf, RankChest_Update, sprites draw/present/erase; Game_Shutdown
 130f:00db	Game_Shutdown	void far Game_Shutdown(void)	Stops music and sfx, Timer_Remove, Kbd_Remove, text mode 3, exit
 130f:00fe	Game_Tick	void far Game_Tick(void)	47.3 Hz from Timer_ISR: player screen position (DS:568e7/568e9), Mouse_Poll, Input_Tick, Anim_Tick; when the scene is loaded: Input_MouseWalk, Player_Update, Elves_Update, Cells_UpdateVisible; counters DS:90fe (mod 13) and DS:9100 (60 ticks -> DS:9115 "seconds")
 130f:01c2	Frame_Present	void far Frame_Present(void)	Presents the frame: delay loop when nothing changed, else dirty or full present; slow-CPU 8-bit fade loop
@@ -6,15 +6,15 @@
 130f:0326	Playfield_Redraw	void far Playfield_Redraw(void)	Full play-field redraw from the tile map when DS:8fbb is set (camera position, optional partial range)
 130f:04e5	Scroll_Update	void far Scroll_Update(void)	Incremental scrolling: shifts the play-field and draws the newly exposed tile columns/rows
 130f:07a5	Hud_Redraw	void far Hud_Redraw(void)	Status bar: coins (counted up with sfx 4), nets, treasures found, per-level treasure slots (found mask DS:9209), key icon (DS:9120), clue words of the level
-130f:0c2e	Hud_DrawHintIcon	void far Hud_DrawHintIcon(void)	Draws the status icon selected by DS:90f8
+130f:0c2e	Hud_DrawPromptIcon	void far Hud_DrawPromptIcon(void)	SPRITES 59 (message box) and prompt frame 60 + DS:90f8/2 (61 move box/select, 62 drop coin, 63 press Enter); caches DS:91fb
 130f:0c73	Screen_DrawOverlay	void far Screen_DrawOverlay(void)	Calls the screen painter DS:0104[g_screen DS:913e] (0 Hud_Redraw, 1 Quiz_DrawScreen, 2 SignIn_Draw) or restores the menu bar
 130f:0d00	Hud_DrawNumber	void far Hud_DrawNumber(int x,int y,int color,int value)	Draws a 1-3 digit number with Font_DrawChar
 130f:0d94	Mouse_Poll	void far Mouse_Poll(void)	INT33/3 position and buttons -> DS:911a/911e/90f4; pointer sprite visibility and 600-tick idle hide
-130f:0edf	Rank_Update	void far Rank_Update(void)	Treasure-chest/rank display: draws the total, steps the chest fill (DS:0110 thresholds) with sfx 3, then flashes CHAMPION (DS:013a) while DS:0100 counts down
-130f:1261	Rank_DrawChestCoin	void far Rank_DrawChestCoin(int x,int y,int c)	Draws one chest-fill item
+130f:0edf	RankChest_Update	void far RankChest_Update(void)	chest view (scene 4) name, total, fill rows (colour 7->6, one row per 4-tick boundary, sfx 3), gold pieces, CHAMPION flash (code_ui.md 11.4)
+130f:1261	RankChest_DrawStar	void far RankChest_DrawStar(int x,int y,int frame)	Draws one star of the rank chest (Sprite_Draw flag 0x40, frame argument = SHACK frame*2) at x, y
 1437:0001	Pal_Apply	void far Pal_Apply(void)	MCGA: copies palette DS:0144 and Vga_SetDac16; CGA: Gfx_BuildCgaColorMap
 1437:0034	Scene_Update	unsigned far Scene_Update(void)	When g_scene (DS:8fca) differs from the loaded scene (DS:8fbe): saves/ends game if requested, Quiz_ReorderSlots + Elves_Spawn for mountain levels, Scene_LoadPan, loads SPRITES.PAK (levels) or CLOSE/SHACK.PAK (scenes 3/4) into the sprite bank, forces a redraw
-1460:0003	Game_Init	int far Game_Init(void)	Allocates the 0x1C908-byte sprite bank, harderr, Hw_Detect, ParseCommandLine, needs a graphics adapter, disk/path set-up, network checks (ssrnet.dat/ssrquiet.dat), Mouse_Detect, buffers, Video_Init, Pal_Apply, Mouse_Setup, Sound_LoadData, Help_LoadFile, Quiz_LoadDictionary, Sprites_LoadBegin, Game_InitVars
+1460:0003	Game_Init	int far Game_Init(void)	Allocates the 0x1C908-byte sprite bank, harderr, Hw_Detect, ParseCommandLine, no-graphics-adapter exit, disk/path set-up, network checks (ssrnet.dat/ssrquiet.dat), Mouse_Detect, buffers, Video_Init, Pal_Apply, Mouse_Setup, Sound_LoadData, Help_LoadFile, Quiz_LoadDictionary, Sprites_LoadBegin, Game_InitVars
 1460:022a	Sound_LoadData	int far Sound_LoadData(void)	Loads SFX.TAN (Tandy/PS1) or SFX.IBM into 415f:0000 and TUNES.IBM (speaker) or TUNES.TAN into 41ca:0000; Sound_Init
 1460:02c6	Sprites_LoadBegin	int far Sprites_LoadBegin(void)	Loads BEGIN.PAK (file 15) into the sprite bank
 1460:033a	Game_InitVars	void far Game_InitVars(void)	Initial values of the frame/UI globals; Anim_InitSlots

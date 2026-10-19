@@ -168,8 +168,8 @@ loop:
   if g_fullRedraw(8FBB) == 0 and DS:8FB2 == 0 and DS:8FC8 == 0:
       SignIn_Update(); Gameover_UpdateMessages(); Hints_Update(); Menu_Update()
   Scene_Update(); Scroll_Update(); Search_Update(); Quiz_Update(); Sound_SyncState()
-  Game_HandleHotkeys(); Screen_DrawOverlay(); Playfield_Redraw(); Treasures_DrawFound()
-  Rank_Update()
+  Game_HandleHotkeys(); Screen_DrawOverlay(); Playfield_Redraw(); ShelfRoom_DrawShelf()
+  RankChest_Update()
   DS:9283 = (g_uiMode == 0) ? 13 : 1                    (number of sprite slots to draw)
   Sprites_DrawSorted(0, DS:9283); Frame_Present(); Sprites_EraseAll(0, DS:9283)
 until g_quit != 0
@@ -193,8 +193,8 @@ The saved BIOS keyboard flags DS:061B (§5.1) are not restored.
 ```
 if g_quit != 0: return
 if g_stepDone == 0:
-    DS:8FA7 = (g_playerX DS:37E2 - g_cameraX DS:37EA) >> 1          (signed shift: screen x, bytes)
-    DS:8FA9 =  g_playerY DS:37E4 - g_cameraY DS:37EC                  (screen y, rows)
+    DS:8FA7 = (g_player.x DS:37E2 - g_cameraX DS:37EA) >> 1          (signed shift: screen x, bytes)
+    DS:8FA9 =  g_player.y DS:37E4 - g_cameraY DS:37EC                 (screen y, rows)
     if DS:8FA7 > 0x400 (unsigned):                                    (player in another row of the strip)
         DS:8FA7 += ((playerY & 0xFF80) - (cameraY & 0xFF80)) * 8
         DS:8FA9  =  (playerY & 0x7F) - (cameraY & 0x7F)
@@ -300,7 +300,7 @@ Runs every frame; does nothing unless `g_fullRedraw` (DS:8FBB) != 0.
   at byte `c + r`; `Tile_DrawColumn` (1000:19CF, register args SI = x, DI = y, DX = y + 7,
   CX = block map segment, BX = entry offset) draws that one 8x8 tile.
   (Block column overflow past 15 is not wrapped here; it never happens with cameras < 0x800.)
-* Colour 0 is set before (`Gfx_SetColor(0)`) and colour 1 after; then `Dirty_AddRect(x0, 0x10,
+* Colour 0 is set before (`Gfx_SetDirtyTracking(0)`) and colour 1 after; then `Dirty_AddRect(x0, 0x10,
   w = x1 − x0 + 1, h = 0x80)`.
 * Bookkeeping: DS:9297 = cx, DS:9299 = DS:920D, DS:9270 = DS:9124, DS:929B = cy, DS:929D =
   DS:920F, DS:9272 = DS:9126 (the "last drawn" camera used by `Scroll_Update`); DS:37F6 = DS:37F8
@@ -353,7 +353,7 @@ Drawing details: `code_ui.md`; the logic and order are:
 1. If DS:922E != 0 (full HUD redraw requested): frame fills (rows 0..10 colour 0xFF pattern,
    11..14, play-field border, rows 0x91..0xC7), `MenuBar_DrawTitle(0..2, 0)`, `g_fullRedraw` = 1 and
    `Playfield_Redraw()`; if any of DS:8F9F..8FA2 (tunnel flags) is set, copy them to DS:7D7C,
-   7D7E, 7D80, 7D82 and call `Treasures_DrawFound()`; unless DS:922E == 1, `Sprites_DrawSorted(1, 13)`;
+   7D7E, 7D80, 7D82 and call `ShelfRoom_DrawShelf()`; unless DS:922E == 1, `Sprites_DrawSorted(1, 13)`;
    DS:922E = DS:925B = 0; `g_dirty` += 1; and force every cached value below to mismatch
    (DS:928D, 924D, 9259, 9268, 91FB each += 1).
 2. If coins != DS:928D or nets != DS:924D or found != DS:9259 or coins != DS:9122:
@@ -369,12 +369,12 @@ Drawing details: `code_ui.md`; the logic and order are:
    (6, 0xBE) unless 0, and if the scene is < 3 the revealed clue words of the current level
    (`Text_Draw` colour 0xCCCC at x 0x0C, y 0xBA − 13 k for slots 2, 1, 0, skipping words with bit 7
    set) from DS:5EB2[word]; DS:9268 = keyState; `g_dirty` += 1.
-4. If DS:90F8 (prompt) != DS:91FB: `Hud_DrawHintIcon()`.
+4. If DS:90F8 (prompt) != DS:91FB: `Hud_DrawPromptIcon()`.
 
 Note the count-up compares with DS:9122 (displayed coins) separately from the cache DS:928D, so the
 bag picture and numbers are redrawn every frame until the display has caught up.
 
-### 3.9 `Hud_DrawHintIcon` 130f:0C2E [O]
+### 3.9 `Hud_DrawPromptIcon` 130f:0C2E [O]
 
 Draws frame 0x76/2 = 59 (middle panel) and, if DS:90F8 != 0, the prompt frame `60 + DS:90F8 / 2`
 (DS:90F8 = 4: "Press ↓ to drop coin", 6: "Press Enter to go on", 2: the move/select prompt);
@@ -422,7 +422,7 @@ The pointer hides after **600 executed game ticks (12.7 s)** without mouse activ
 on the next movement or button change. `Anim_Set/SetIfIdle/Clear` are 4306:07FA/0784/092F
 (`code_player.md`). DS:8FE2 is slot 0's current script [I].
 
-### 3.13 `Rank_Update` 130f:0EDF (per frame) [O]
+### 3.13 `RankChest_Update` 130f:0EDF (per frame) [O]
 
 Drives the rank chest screen (clubhouse chest picture and the screen after the castle) through the
 state byte DS:8FBD (latched from DS:925D, set to 1 by 176a:102A and cleared by 176a:10B9):
@@ -433,12 +433,12 @@ state byte DS:8FBD (latched from DS:925D, set to 1 by 176a:102A and cleared by 1
   70..114 -> 32, 115..169 -> 40, 170..229 -> 48, 230..299 -> 56, 300..399 -> 66, >= 400 -> 86);
   DS:92A8 = fill; DS:92B0 = DS:9100 & 0xFC; DS:92A6 = 0 (rows done); DS:925D += 1 (-> 2).
 * **State != 0, != 1**: when `(DS:9100 & 0xFC) != DS:92B0` — i.e. **every 4 game ticks**, at most
-  once per frame — DS:92B0 = that value and one row is added: `Gfx_XorRect` (1000:176C, register
+  once per frame — DS:92B0 = that value and one row is added: `Gfx_ReplaceColorRect` (1000:176C, register
   args AX = 0x7777, BX = 0x6666, SI = 0x1A, CX = 0x98, DI = y, DX = y + 1 with y = 0x6F − n,
   n = DS:92A6; the XOR of the two patterns turns logical colour 7 into 6, the cyan band into the
   pink fill; the exact rectangle convention is in `code_ui.md`); when n equals DS:0116 (= 8), DS:011A (16), DS:011E
   (24), DS:0122 (32), DS:0126 (40) or DS:012A (48) the coin row for that rank is drawn with
-  `Rank_DrawChestCoin(x, y, 0xFA)` (SPRITES frame 0xFA/2 = 125, masked): n = 8: (0x51, 0x67);
+  `RankChest_DrawStar(x, y, 0xFA)` (SPRITES frame 0xFA/2 = 125, masked): n = 8: (0x51, 0x67);
   16: (0x4E, 0x5F), (0x54, 0x5F); 24: (0x4B,0x57), (0x51,0x57), (0x57,0x57); 32: x 0x48, 0x4E,
   0x54, 0x5A at y 0x4F; 40: x 0x45, 0x4B, 0x51, 0x57, 0x5D at y 0x47; 48: x 0x42, 0x48, 0x4E,
   0x54, 0x5A, 0x60 at y 0x3F; then `Sfx_Play(3)` (every row), `g_dirty` += 1, n += 1. When n ==
@@ -453,7 +453,7 @@ state byte DS:8FBD (latched from DS:925D, set to 1 by 176a:102A and cleared by 1
 Timing [O]: the fill steps follow the game tick (4 ticks per row, 84.5 ms; 8 rows for a Trainee in
 `avi/ega_r2_end_t2_nokey.avi` frames 1782-1812), the CHAMPION flash follows the frame rate.
 
-### 3.14 `Rank_DrawChestCoin(x, y, frame2)` 130f:1261 [O]
+### 3.14 `RankChest_DrawStar(x, y, frame2)` 130f:1261 [O]
 
 `Sprite_Draw(frame2 / 2, x bytes, y, flags 0x40)` (masked, honours the frame's hotspot).
 
@@ -830,7 +830,7 @@ command 8 selects it at once through the menu code (`code_ui.md`) [O capture, I 
 
 | DS | Layout | Use |
 |---|---|---|
-| 0100 | u16 | `g_champFlashTimer` (Rank_Update) |
+| 0100 | u16 | `g_champFlashTimer` (RankChest_Update) |
 | 0102 | u16 | full-screen picture pending (Screen_DrawOverlay); 37C8/37CA/37CC its frame data |
 | 0104 | far[3] | screen painters by `g_screen`: Hud_Redraw, Quiz_DrawScreen, SignIn_Draw |
 | 0110 | u16 pairs (threshold, fill) ×10, then 0xFFFF | rank chest fill (§3.13); e.g. (5,1) (25,8) ... (400,56) (9999,66) (9999,86) |
@@ -859,14 +859,14 @@ command 8 selects it at once through the menu code (`code_ui.md`) [O capture, I 
 | 3D2B | g_ticks | u32 PIT interrupt counter |
 | 3D31 | g_slowScroll | 1 = double scroll steps (= g_slowCpu at start) |
 | 3D33 / 3D34 | — | BIOS-chain (12..0) and game-tick (4..0) countdowns, bytes |
-| 37E2/37E4 | g_playerX/Y | player world position (pixels) |
+| 37E2/37E4 | g_player (+0 x, +2 y) | player world position (pixels) |
 | 37EA/37EC | g_cameraX/Y | camera (pixels; low 3 bits ignored by the scenery) |
 | 37EE/37F0 | — | camera delta of the last Player_Move (x bytes, y rows) |
 | 37F2..37F8 | — | frame latches: camera x, y, delta x, delta y |
 | 8F9F..8FA2 | — | frame latch of the tunnel-seen flags DS:9201..9204 |
 | 8FA7/8FA9 | — | player screen x (bytes) / y (rows) of this tick |
 | 8FB2 | — | frame latch of g_transition (dissolve) |
-| 8FBA | — | set when the play-field was fully redrawn (read by Treasures_DrawFound 4a03:0775) |
+| 8FBA | — | set when the play-field was fully redrawn (read by ShelfRoom_DrawShelf 4a03:0775) |
 | 8FBB | g_fullRedraw | frame latch of DS:924F |
 | 8FBD | — | frame latch of the rank state DS:925D |
 | 8FBE | g_loadedScene | scene in memory (0xFF none) |
@@ -971,8 +971,8 @@ CPU cost.
 | 43a0 kbd.asm | 4 / 4 |
 | 4a85 input.c | 6 / 6 |
 
-Rename proposals: none needed; the names in `re/names/dos/` fit the behaviour. Proposed names for
-unnamed globals are in `re/names/dos/wave1_runtime.tsv`.
+Rename proposals: none needed; the names in `re/names/dos/` fit the behaviour. The names proposed for
+unnamed globals are canonical in `re/names/dos/dgroup.tsv` since the wave 2 merge.
 
 ---
 

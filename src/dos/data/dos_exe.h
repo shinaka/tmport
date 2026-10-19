@@ -40,6 +40,8 @@ public:
     int16_t dsS16(uint16_t off) const { return static_cast<int16_t>(ds16(off)); }
     // NUL-terminated string at DS:off (without the NUL).
     std::string_view dsString(uint16_t off) const;
+    // The n bytes at DS:off (a table of dgroup_offsets.h). Throws std::out_of_range past the image.
+    std::span<const uint8_t> dsBytes(uint16_t off, size_t n) const;
 
     // Resolves the far pointer stored at DS:off to image bytes (empty when it points outside).
     std::span<const uint8_t> farPtrAtDs(uint16_t off) const;

@@ -204,6 +204,28 @@ EngineSettings EngineSettings::fromIni(const IniFile& ini) {
     if (auto v = ini.get("saves", "import_from")) s.importFrom = *v;
     boolKey("debug", "keys", s.debugKeys);
     boolKey("debug", "show_treasure", s.showTreasure);
+    if (auto v = ini.get("engine", "edition")) {
+        const std::string m = toLowerAscii(trim(*v));
+        if (m.empty() || m == "auto") s.edition.reset();
+        else if (auto e = parseEditionKey(m)) s.edition = *e;
+        else warnBad("engine", "edition", *v);
+    }
+    if (auto v = ini.get("dos", "data")) s.dosDataPath = *v;
+    if (auto v = ini.get("dos", "look")) {
+        if (auto l = dos::parseLookOption(trim(*v))) s.dos.look = *l;
+        else warnBad("dos", "look", *v);
+    }
+    if (auto v = ini.get("dos", "sound")) {
+        if (auto d = dos::parseSoundDevice(trim(*v))) s.dos.sound = *d;
+        else warnBad("dos", "sound", *v);
+    }
+    boolKey("dos", "slow_cpu", s.dos.slowCpu);
+    if (auto v = ini.get("dos", "frame_speed")) {
+        if (auto f = dos::parseFrameSpeed(trim(*v))) s.dos.frameSpeed = *f;
+        else warnBad("dos", "frame_speed", *v);
+    }
+    boolKey("dos", "square_pixels", s.dos.squarePixels);
+    intKey("dos", "window_scale", s.dos.windowScale, 1, 16);
     return s;
 }
 
@@ -226,6 +248,14 @@ void EngineSettings::toIni(IniFile& ini) const {
     ini.set("saves", "import_from", importFrom);
     ini.set("debug", "keys", b(debugKeys));
     ini.set("debug", "show_treasure", b(showTreasure));
+    ini.set("engine", "edition", edition ? editionKey(*edition) : "auto");
+    ini.set("dos", "data", dosDataPath);
+    ini.set("dos", "look", dos::lookName(dos.look));
+    ini.set("dos", "sound", dos::iniValue(dos.sound));
+    ini.set("dos", "slow_cpu", b(dos.slowCpu));
+    ini.set("dos", "frame_speed", dos::iniValue(dos.frameSpeed));
+    ini.set("dos", "square_pixels", b(dos.squarePixels));
+    ini.set("dos", "window_scale", std::to_string(dos.windowScale));
 }
 
 // ------------------------------------------------------------------------------------- Paths

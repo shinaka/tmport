@@ -7,12 +7,16 @@
 //
 //   [engine]  data = <game folder or CD image>   window_scale = 2   integer_scale = false
 //             fullscreen = false   pause_on_focus_loss = true   cursor_scale = 0 (0 = follow window)
+//             edition = auto | win | dos (which edition to play when the data holds both)
 //   [input]   mode = lossless | first-event      tap_latch = false
 //   [audio]   midi_set = E | B                   midi_backend = auto | winmm | soundfont | null
 //             soundfont = <General MIDI .sf2 file>  music_volume = 0..100 (SoundFont output)
 //             (midi = ... is accepted as another name of midi_backend and wins when both are set)
 //   [saves]   imported_original = false          import_from = C:\TLCWIN\TMTWINCD\users.dat
 //   [debug]   keys = false (F9 toggles the treasure boxes)   show_treasure = false (start with them on)
+//   [dos]     data = <folder of the 1990 DOS edition>   look = ega | tandy | mcga | cga (hercules = cga)
+//             sound = tandy | speaker | adlib | off      slow_cpu = false   frame_speed = reference | period
+//             square_pixels = false   window_scale = 3 (320x240 x this)   (edition/dos_options.h)
 //
 // IniFile keeps comments, unknown keys and the order of the user's file when values are updated.
 
@@ -21,6 +25,9 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include "edition/dos_options.h"
+#include "edition/edition.h"
 
 namespace tmport::save {
 
@@ -70,6 +77,9 @@ struct EngineSettings {
     std::string importFrom;          // empty: the platform default (Windows: C:\TLCWIN\TMTWINCD\users.dat)
     bool debugKeys = false;          // [debug] keys: F9 toggles the treasure boxes
     bool showTreasure = false;       // [debug] show_treasure: start with the treasure boxes on
+    std::optional<Edition> edition;  // [engine] edition: nullopt = auto (detect; see edition/edition.h)
+    std::string dosDataPath;         // [dos] data: the DOS edition's folder (used when it is chosen)
+    dos::DosSettings dos;            // [dos] the DOS edition's options
 
     // Reads known keys; malformed values keep their defaults (a warning is logged).
     static EngineSettings fromIni(const IniFile& ini);

@@ -37,6 +37,11 @@ argv[0]); the disk numbers in the file table DS:0476 only matter for floppies. A
 the original at start-up (`Game_Init` returns 0, nothing is printed for most files); the engine
 should name the file.
 
+Implemented in wave 2 by `DosFiles` (`src/dos/data/dos_files.h`): names are found without regard
+to case through the EXE's file table, every check above runs at start-up, a missing file raises
+`MissingFileError` with the file's name, a broken one `FormatError` starting with the name, and a
+USERS.DAT of the wrong size is ignored with a warning (it is only imported).
+
 ---
 
 ## 2. Runtime model

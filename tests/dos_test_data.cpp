@@ -21,4 +21,14 @@ const tmport::dos::DosExe* dosExe() {
     return exe.get();
 }
 
+const tmport::dos::DosFiles* dosFiles() {
+    static std::unique_ptr<tmport::dos::DosFiles> files;
+    static bool tried = false;
+    if (!tried) {
+        tried = true;
+        if (auto p = dosDataPath()) files = std::make_unique<tmport::dos::DosFiles>(tmport::dos::DosFiles::open(*p));
+    }
+    return files.get();
+}
+
 }  // namespace testdata

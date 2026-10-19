@@ -24,6 +24,8 @@
 #include "cli/text_ui_commands.h"
 #include "cli/tool_mods.h"
 #include "data/dgroup_offsets.h"
+#include "dos/audio/dos_sound_cli.h"
+#include "dos/gfx/dos_gfx_cli.h"
 #include "gfx/image_export.h"
 #include "mods/mods_cli.h"
 #include "platform/engine.h"
@@ -429,6 +431,7 @@ constexpr HelpTopic kHelpTopics[] = {
     {"game", app::launchUsage},           {"inspect", inspectUsage},       {"text", textUiUsage},
     {"anim", anim::animUsage},            {"screen", game::screensUsage},  {"scene", game::scenes::scenesUsage},
     {"room", game::room::roomUsage},      {"audio", audio::audioCliUsage}, {"mods", mods::modsUsage},
+    {"dos-sound", dos::dosSoundUsage},   {"dos-gfx", dos::dosGfxUsage},
 };
 
 constexpr char kHelpHeader[] =
@@ -482,6 +485,8 @@ int run(int argc, char** argv) {
     if (auto rc = game::scenes::runScenesCommand(argc, argv)) return *rc;
     if (auto rc = game::room::runRoomCommand(argc, argv)) return *rc;
     if (auto rc = autoplay::runAutoplayCommand(argc, argv)) return *rc;  // --autoplay (area autoplay)
+    if (auto rc = dos::runDosSoundCommand(argc, argv)) return *rc;      // --dos-sound (area dos_audio)
+    if (auto rc = dos::runDosGfxCommand(argc, argv)) return *rc;        // --dos-pan/-pak/-screen (area dos_gfx)
     std::string error;
     auto opts = parseArgs(argc, argv, error);
     if (!opts) {

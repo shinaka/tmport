@@ -1,9 +1,11 @@
 #pragma once
-// Engine: owns the frame buffer, palette, presenter, input model, cursors, timers and RNG for one
-// run, and (in interactive mode only) the SDL window. Designed for the original's nested blocking
-// loops (docs/DESIGN.md "Runtime model"): game code runs as ordinary nested functions on the
-// main thread and every wait primitive calls Engine::pump(), which processes SDL events and
-// presents the window picture at most once per display refresh.
+// Engine: the Windows CD edition's runtime. Owns the frame buffer, palette, input model, cursors,
+// timers and RNG for one run, on top of an edition-neutral platform::Host (platform/host.h: the
+// SDL window, the presenter, the event pump, focus pause, fullscreen, screenshots, the clock).
+// Designed for the original's nested blocking loops (docs/DESIGN.md "Runtime model"): game code
+// runs as ordinary nested functions on the main thread and every wait primitive calls
+// Engine::pump(), which processes SDL events and presents the window picture at most once per
+// display refresh.
 //
 // Input timing follows the original (re/docs/code_1008-1030.md §6, PORTING_NOTES.md §3/§4.7):
 // pump() only *posts* input to the application message queue; messages are dispatched (held
@@ -27,13 +29,12 @@
 #include "input/cursors.h"
 #include "input/hotspot_table.h"
 #include "input/input_queue.h"
+#include "platform/host.h"
 #include "res/game_files.h"
 #include "rtl/borland_rand.h"
 #include "timing/clock.h"
 #include "timing/deadline_timers.h"
 
-struct SDL_Window;
-struct SDL_Renderer;
 union SDL_Event;
 
 namespace tmport {
@@ -73,7 +74,9 @@ public:
     // Headless commands never call this. Returns false (and logs) on failure.
     bool openWindow();
     void closeWindow();
-    bool hasWindow() const { return window_ != nullptr; }
+    bool hasWindow() const { return host_.hasWindow(); }
+    // The platform layer under the engine (window, presenter, event pump, clock).
+    platform::Host& host() { return host_; }
 
     // --- pump and input fetch ---------------------------------------------------------------------
     // Processes pending SDL events (and events queued with postEvent): window events at once,
@@ -101,14 +104,14 @@ public:
     void timerWait(int slot);
     // 10a8:0066 Timer_Expired for spin loops: pumps, and yields up to 1 ms while not expired.
     bool timerExpired(int slot);
-    Clock& clock() { return *clock_; }
+    Clock& clock() { return host_.clock(); }
 
     // --- presentation -----------------------------------------------------------------------------
     // Gfx_BlitToWindow(0,0,512,384) and Gfx_FlushDirtyRects.
-    void presentAll() { presenter_.blitAll(frame_); }
-    void flushDirtyRects() { presenter_.flushDirtyRects(frame_); }
+    void presentAll() { presenter().blitAll(frame_); }
+    void flushDirtyRects() { presenter().flushDirtyRects(frame_); }
     // F12: game area (512x384) as PNG into the screenshot directory.
-    bool screenshot();
+    bool screenshot() { return host_.screenshot(); }
 
     void setPalette(const gfx::Palette& p);
     void setTitle(std::string_view title);
@@ -118,16 +121,16 @@ public:
     // Alt+Enter and F11 toggle it. Those keys are taken before the event filter, so neither the menu
     // bar nor the game sees them (nor the Alt release that follows Alt+Enter). The window icon is the
     // EXE's RT_GROUP_ICON 15000 (platform/exe_icon.h). Headless: only the flag changes.
-    bool fullscreen() const { return fullscreen_; }
-    void setFullscreen(bool on);
-    void toggleFullscreen() { setFullscreen(!fullscreen_); }
+    bool fullscreen() const { return host_.fullscreen(); }
+    void setFullscreen(bool on) { host_.setFullscreen(on); }
+    void toggleFullscreen() { host_.toggleFullscreen(); }
 
     // --- window / app state -----------------------------------------------------------------------
     // Sticky: a window close / quit request arrived (tools; the game reacts to input code 0x1B).
-    bool quitRequested() const { return quit_; }
-    void clearQuitRequest() { quit_ = false; }
-    bool paused() const;
-    bool appActive() const { return appActive_; }
+    bool quitRequested() const { return host_.quitRequested(); }
+    void clearQuitRequest() { host_.clearQuitRequest(); }
+    bool paused() const { return host_.paused(); }
+    bool appActive() const { return host_.appActive(); }
     // App_Deactivate / App_Activate (1010:05c8 / 05db): called with false when the engine freezes
     // (focus loss, minimised, holdWhile = the menu loop) and true when it resumes. The app installs
     // audio.appDeactivate() / appActivate() here (app/engine_glue.h).
@@ -137,10 +140,10 @@ public:
     void setEventFilter(std::function<bool(const SDL_Event&)> filter) { eventFilter_ = std::move(filter); }
     // Queues an SDL event for the next pump() (scripted input, tests; works headless). Mouse
     // events with windowID 0 are taken as 640x480 canvas coordinates (not converted).
-    void postEvent(const SDL_Event& e);
+    void postEvent(const SDL_Event& e) { host_.postEvent(e); }
     // Evt_PostKey: queues a key event with this input code.
     void postKey(uint16_t code) { input_.push(code); }
-    size_t pendingPostedEvents() const { return posted_.size(); }
+    size_t pendingPostedEvents() const { return host_.pendingPostedEvents(); }
 
     // --- per-pump services --------------------------------------------------------------------------
     // Service hooks stand for the window-procedure duties of the original that are not input:
@@ -166,7 +169,7 @@ public:
     gfx::ColorMode colorMode() const { return mode_; }
     gfx::FrameBuffer& frame() { return frame_; }
     const gfx::Palette& palette() const { return palette_; }
-    gfx::Presenter& presenter() { return presenter_; }
+    gfx::Presenter& presenter() { return host_.presenter(); }
     InputQueue& input() { return input_; }
     HotspotTable& hotspots() { return input_.hotspots(); }
     CursorSet& cursors() { return cursors_; }
@@ -179,36 +182,27 @@ public:
     void setShowTreasure(bool on) { config_.showTreasure = on; }
 
 private:
-    bool handleHotkey(const SDL_Event& e);
-    void applyWindowIcon();
-    void handleEvent(const SDL_Event& e);
-    void processPendingEvents();
+    void applyWindowIcon(SDL_Window* window);
+    void handleWindowEvent(const SDL_Event& e);
+    void handleInputEvent(const SDL_Event& e);
     void pumpPhase(PumpPhase phase);
     void runPumpHooks(PumpPhase phase);
-    bool processOnePostedEvent();
-    void renderIfDue();
-    void setAppActive(bool active);
     void updateCursorScale();
     bool liveMousePos(int& x, int& y) const;
 
     GameFiles& files_;
     gfx::ColorMode mode_;
     EngineConfig config_;
+    platform::Host host_;
     Clock* clock_;
     gfx::Palette palette_;
     gfx::FrameBuffer frame_;
-    gfx::Presenter presenter_;
     InputQueue input_;
     CursorSet cursors_;
     CursorController cursorCtl_;
     DeadlineTimers timers_;
     BorlandRand rng_;
 
-    struct PostedEvent {
-        alignas(8) unsigned char raw[128];  // an SDL_Event (128 bytes, checked in engine.cpp)
-        std::string text;                   // owned copy of SDL_EVENT_TEXT_INPUT text
-    };
-    std::deque<PostedEvent> posted_;  // events queued with postEvent
     std::function<void(bool)> activationHook_;
     std::function<bool(const SDL_Event&)> eventFilter_;
     struct PumpHookEntry {
@@ -218,21 +212,6 @@ private:
     std::vector<PumpHookEntry> pumpHooks_;
     int nextPumpHookId_ = 1;
     bool holding_ = false;
-
-    SDL_Window* window_ = nullptr;
-    SDL_Renderer* renderer_ = nullptr;
-    bool sdlVideoInit_ = false;
-    bool quit_ = false;
-    uint32_t closeCount_ = 0;
-    bool focused_ = true;
-    bool minimized_ = false;
-    bool exposed_ = false;
-    bool appActive_ = true;
-    bool fullscreen_ = false;
-    uint32_t eatKeyUp_ = 0;      // SDL_Keycode of a hot key whose release is swallowed too
-    bool swallowAltUp_ = false;  // after Alt+Enter: the Alt release must not open the menu bar
-    uint64_t refreshNs_ = 16'666'667;
-    uint64_t lastPresentNs_ = 0;
 };
 
 }  // namespace tmport

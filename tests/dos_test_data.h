@@ -7,12 +7,15 @@
 #include <optional>
 
 #include "dos/data/dos_exe.h"
+#include "dos/data/dos_files.h"
 
 namespace testdata {
 
 std::optional<std::filesystem::path> dosDataPath();
 // Shared unpacked SST.EXE from TM_DATA_DOS (nullptr when TM_DATA_DOS is unset).
 const tmport::dos::DosExe* dosExe();
+// Shared DosFiles of TM_DATA_DOS: every data file, checked (nullptr when TM_DATA_DOS is unset).
+const tmport::dos::DosFiles* dosFiles();
 
 }  // namespace testdata
 
@@ -24,3 +27,12 @@ const tmport::dos::DosExe* dosExe();
         return;                                                        \
     }                                                                  \
     (void)dosExe
+
+// The same, defining a local 'dosFiles' pointer (the opened DOS folder).
+#define TM_REQUIRE_DOS_FILES()                                         \
+    const auto* dosFiles = testdata::dosFiles();                       \
+    if (!dosFiles) {                                                   \
+        MESSAGE("TM_DATA_DOS is not set: test skipped");               \
+        return;                                                        \
+    }                                                                  \
+    (void)dosFiles

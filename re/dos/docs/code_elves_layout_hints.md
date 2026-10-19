@@ -3,9 +3,8 @@
 Scope: every function of the three DOS-edition modules `elves.c` (segment `4521`, 53 functions),
 `layout.c` (`1a54`, 11 functions) and `hints.c` (`49a6`, 6 functions) of `SST.EXE` (1990, V 1.0),
 written so that wave 3 can implement them without reading the decompiled code. Names follow
-`re/names/dos/*.tsv`; renames and new DGROUP names proposed by this pass are in
-`re/names/dos/wave1_elves.tsv` (the names below already use them where they differ, with the old
-name in brackets the first time).
+`re/names/dos/*.tsv`, the canonical names merged in wave 2 (decision table in
+`re/names/dos/README.md`).
 
 Evidence: `re/dos/ghidra_export/` (`functions/*.c`, `disassembly.asm`), the unpacked image
 `extracted/SST_unpacked.EXE` (DGROUP bytes), the SPRITES.PAK frame previews, the USERS.DAT
@@ -464,8 +463,8 @@ different ticks cost one each. This corrects ARCHITECTURE §5.9 ("first elf caug
   record slot = 0; `Anim_Clear(s)`; child slot s+1: frame = none, x = y = 0 [O]. The released elf
   stays where it is, hidden.
 * `Elf_Turn` (4521:181a): calls handler[base + 3] (`ElfSt_04/12/20/28`). Called from the cell
-  handlers `Cell_P41_V41` (1568:141c; type 41 is only cell 0x7E: an elf moving right in the left
-  half of the cell, or left in the right half, turns) and `Cell_P45_V45` (1568:15bc; type 45 =
+  handlers `Cell_P41_V41_GeyserTop` (1568:141c; type 41 is only cell 0x7E: an elf moving right in the left
+  half of the cell, or left in the right half, turns) and `Cell_P45_V45_Bridge` (1568:15bc; type 45 =
   cells 0x84 and 0xB7, fast CPU only, §5.4) [O callers, cell types from DS:0eaa]. Hidden elves
   ignore turns and walk through.
 * `Elves_ShiftNearby(dx, dy)` (4521:12df): called by `Cell_ConveyLeft/Right` (176a:0019/0110) only
@@ -510,7 +509,7 @@ Elves are processed in record order every tick; each record's calls happen insid
 |---|---|---|
 | 11aa | `u16 g_hidingCells[48]` | cell indices; **slots 0–10 = level 2 (11 places), 13–26 = level 1 (14), 29–47 = level 0 (19)**; slots 11, 12 (cells 0x86, 0x87) and 27, 28 (0xC0, 0xC1) are mirror cells: never chosen by `Layout_PutInSlot`, they get copies through `Layout_MirrorSharedCells` and are cleared and saved with the others. Example: slot 0 = cell 0x77 |
 | 0caa / 0faa | `u16 g_cellPicture[256]`, `g_cellContent[256]` | per cell; hiding places: picture 1..count, content 0x80 empty, 6+2k treasure k (k 0..47), 0x66/0x68/0x6A key of level 0/1/2; bit 0x80 = searched |
-| 120a | `u16 g_variableCells[9]` (was `g_castleCells`) | cells whose picture changes during play and is saved: 0x26 bonus coins, 0x79 level-2 gate (0x88 its mirror), 0xAE level-1 gate, 0xEF level-0 gate, 0xBC/0xEA net-shop doors, 0x84/0xB7 animated obstacles |
+| 120a | `u16 g_variableCells[9]` | cells whose picture changes during play and is saved: 0x26 bonus coins, 0x79 level-2 gate (0x88 its mirror), 0xAE level-1 gate, 0xEF level-0 gate, 0xBC/0xEA net-shop doors, 0x84/0xB7 animated obstacles |
 | 121c | `u16 g_variableCellDefaults[9]` | default pictures (example: cell 0x26 → 0x4B) |
 | 122e | `u16 g_levelPicData[3][4]` = {picture count, key picture, unused, places} | level 0 = 50, –, 0, 18; level 1 = 38, –, 0, 13; level 2 = 31, –, 0, 10. "places" excludes the key; word [1] is written by the generator; word [2] is never written (0) but saved |
 | 1246 | `far attr[3]` → DS:0184 / 0250 / 02ec | 4-byte attribute record per picture, record 0 unused (§5.3) |
@@ -629,11 +628,11 @@ valid key) has at least 2 candidates per class, so the loops terminate [O `stats
   `Game_Restore`. (0x79 → 0x88 copies the level-2 gate picture; cells 0xC2, 0xFD–0xFF are not saved
   and are restored only through this copy.)
 * **`Layout_UnmarkSharedCells`** (1a54:078b): content &= 0x7F for cells 0xFD–0xFF, 0xC0–0xC2,
-  0x86–0x88. Called by `PlrSt_48` (end sequence). Quirk: empty places (0x80) become **0x00**; seen in
+  0x86–0x88. Called by `PlrSt_48_EndFlightInit` (end sequence). Quirk: empty places (0x80) become **0x00**; seen in
   `USERS_after_castle_climb_Ada.DAT` (slots 11, 12, 27, 28 hold 0) [O].
 * **`Layout_ClearSlots`** (1a54:07d6): all 48 cells of DS:11aa: picture 0, content 0x80. Called by
   `Game_NewSetup` and by `Scene_Update` at the end of a game.
-* **`Cells_ResetVariable`** (was `Castle_ResetCells`, 1a54:085f): the 9 cells of DS:120a get
+* **`Cells_ResetVariable`** (1a54:085f): the 9 cells of DS:120a get
   picture = default (DS:121c), content 0x80. Called by `Game_NewSetup` and `Scene_Update` (end of
   game). Their pictures are saved at record +0xBB+48 and restored by `Game_Restore`, so the bonus-coin
   spot (cell 0x26) is once per game, also across save/restore [O; corrects ARCHITECTURE §4.4/§6].
@@ -709,9 +708,9 @@ duplicate) reproduces Rascal's 9 dealt questions in the saved order, and the sam
 | c6d4 | u16 | key state copied at a reset; never read |
 | c6d6 | u16 | saved status prompt |
 | c6da | u16 | mouse buttons at the moment the bubble opened |
-| 90f8 | `g_statusPrompt` | status-bar prompt frame 60 + v/2; 6 = SPRITES 63 "Press Enter to go on" |
+| 90f8 | `g_promptIcon` | status-bar prompt frame 60 + v/2; 6 = SPRITES 63 "Press Enter to go on" |
 | 90f4 / 9143 | u16 / u16 | mouse buttons now / previous tick (`Mouse_Poll`) |
-| 9238 | `g_inputReady` | 0 while a frame-side handler reads `g_cmd`; `Input_Poll` (interrupt time) then queues one command in DS:90f6 |
+| 9238 | `g_cmdConsumed` | 0 while a frame-side handler reads `g_cmd`; `Input_Poll` (interrupt time) then queues one command in DS:90f6 |
 | 7ca3 | `far text[37]` | message texts (ids in fmt_data §7.3) |
 | 7d37 | `u16[7]` | rank thresholds 5..300 (same values as DS:629d) |
 | 7d45 | `i8[8]` | start message per rank: 23..30 |
@@ -727,18 +726,18 @@ duplicate) reproduces Rascal's 9 dealt questions in the saved order, and the sam
 Runs only if `g_hintsOn` == 1, (`g_uiMode` & 0xEF) == 0, DS:922e == 0 (no overlay redraw
 pending), DS:926c == 0 (no teleport/search transition) and `g_transition` == 0.
 
-1. With interrupts off: `cmd = g_cmd`; `g_inputReady` = 0.
+1. With interrupts off: `cmd = g_cmd`; `g_cmdConsumed` = 0.
 2. If `g_hintTimerReset` == 1: `g_seconds` = 0, c6d8 = 0, `g_hintTimerReset` = 0, c6d4 = key state,
    c6d0 = 0.
 3. **No bubble open** (`g_uiMode` & 0x10 == 0): `Hints_CheckTriggers()`; `id = Hints_PickNext()`;
    if id ≠ −1: `g_uiMode` |= 0x10; if not a slow CPU: DS:922e = 2 and `Screen_DrawOverlay()`;
-   `Flutter_Show(id)`; c6d6 = `g_statusPrompt`; `g_statusPrompt` = 6; if id == 13 and buttons ≠
+   `Flutter_Show(id)`; c6d6 = `g_promptIcon`; `g_promptIcon` = 6; if id == 13 and buttons ≠
    previous buttons: previous = 0; c6da = buttons.
 4. **Bubble open**: close if `cmd` == 8 (Enter) or 0 (Esc), or the mouse buttons changed this tick
    while c6da == 0. Closing: `g_cmd` = −1, `g_fullRedraw` = 1 (the play-field is redrawn, which
-   removes the bubble), `g_uiMode` &= ~0x10, `g_statusPrompt` = c6d6. Else, if buttons == 0 and
+   removes the bubble), `g_uiMode` &= ~0x10, `g_promptIcon` = c6d6. Else, if buttons == 0 and
    c6da == 1 (a button held when the bubble opened has been released): c6da = 0, previous = 0.
-5. `g_inputReady` = 1.
+5. `g_cmdConsumed` = 1.
 
 While the bubble is open the game is paused: `Elves_Update` and `Player_Update` do nothing
 (`g_uiMode` ≠ 0), `Anim_Tick` runs slot 0 only, `g_seconds` stops (with the wrap quirk of §2.1),
@@ -776,9 +775,9 @@ If none is due and every flag has bit 7 set, `g_hintsOn` = 0 — which never hap
 | 3 | 9241 | 49a6:0121 | 2 clue words of the level known, no coin dropped for 5 more seconds |
 | 4 | 9242 | `Search_Update` 4a03:01c0 | a treasure found (skipped if the new count equals the HUD's cached count DS:9259, a corner case right after a forced HUD refresh) |
 | 5 | 9243 | 49a6:0121 | a net swing retracted with 0 nets |
-| 6 | 9244 | `PlrSt_10` 18cf:0a94/0af4 | drop-coin key with no coins and no nets |
-| 7 | 9245 | `PlrSt_10` 18cf:0a88/0ae8 | drop-coin key with no coins |
-| 8 | 9246 | `Cell_P31` 1568:0ff3, `Cell_P39_V39` 1568:13f0 | Up held (DS:923a bit 0) at the level-0 or level-1 gate without its key |
+| 6 | 9244 | `PlrSt_10_OnPath` 18cf:0a94/0af4 | drop-coin key with no coins and no nets |
+| 7 | 9245 | `PlrSt_10_OnPath` 18cf:0a88/0ae8 | drop-coin key with no coins |
+| 8 | 9246 | `Cell_P31_GateL0` 1568:0ff3, `Cell_P39_V39_GateL1` 1568:13f0 | Up held (DS:923a bit 0) at the level-0 or level-1 gate without its key |
 | 9 | 9247 | `Search_Update` 4a03:022e/025d/028c | a key found |
 | 10, 11, 12 | 9248–924a | – | never armed |
 | 13 | 924b | `Gameover_UpdateMessages` 49a6:052a | an end-of-game message shown |
@@ -795,7 +794,7 @@ Runs only if (`g_uiMode` & 0xFB) == 0.
 
 **Message open** (`g_uiMode` & 4): read `cmd` as in §6.2; close on Enter/Esc or a button change
 with c6da == 0: `g_messagePending` −= 1, `g_cmd` = −1, DS:922e = 1 (overlay redraw),
-`g_uiMode` &= ~4, `g_statusPrompt` = c6d6, DS:923a = 0. The button-release rule is as in §6.2.
+`g_uiMode` &= ~4, `g_promptIcon` = c6d6, DS:923a = 0. The button-release rule is as in §6.2.
 
 **No message open**: show one if `g_messagePending` ≠ 0, DS:922e == 0, DS:926c == 0,
 `g_transition` == 0 and (`g_area` ≠ 5 or games played == 0 or pending == 2) — so after the first
@@ -907,7 +906,7 @@ effect: the "all hints done → hints off" branch of `Hints_PickNext` is dead.
 | 1a54:078b | Layout_UnmarkSharedCells | 75 | 5.4 |
 | 1a54:07d6 | Layout_ClearSlots | 45 | 5.4 |
 | 1a54:0803 | Cells_AdjustForCpu | 92 | 5.4 |
-| 1a54:085f | Cells_ResetVariable (Castle_ResetCells) | 51 | 5.4 |
+| 1a54:085f | Cells_ResetVariable | 51 | 5.4 |
 | 1a54:0892 | Castle_PickLayout | 66 | 5.4 |
 | 1a54:08dc | Castle_ApplyLayout | 71 | 5.4 |
 | 49a6:0001 | SoundPort_Out | 14 | 6.7 |
@@ -998,7 +997,7 @@ including the dissolve's 700 calls and the AdLib choice.
 * The search freeze length depends on the frame rate (`g_searchTimer` counts frames).
 * Hints and messages are evaluated per frame, but their timers count ticks (`g_seconds`), paused
   whenever `g_uiMode` ≠ 0, with the byte-wrap quirk (§2.1).
-* `Input_Poll` runs at interrupt time; the `g_inputReady` handshake means at most one command is
+* `Input_Poll` runs at interrupt time; the `g_cmdConsumed` handshake means at most one command is
   queued while a hint/message handler reads `g_cmd`. In the engine (single thread) read the command
   once per frame and keep the one-deep queue semantics.
 

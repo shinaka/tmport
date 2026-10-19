@@ -21,8 +21,10 @@ Game text is identified by offset with at most a few words quoted.
 
 ## 1. File table and loading [obs]
 
-The EXE names its 18 data files in a table at **DS:0476**, 22-byte records:
-`name[13]` (NUL-padded), `disk` (u8: 1 or 2), 8 bytes never read by the loader.
+The EXE names its 18 data files in a table at **DS:0476** (`g_fileTable`), 22-byte records:
+`name[13]` (NUL-padded), `disk` (u8: 1 or 2), 8 bytes never read by the loader; an all-zero
+record follows at DS:0602. The engine reads it with `FileTable` (`src/dos/data/file_table.h`) and
+looks every file up through it (`DosFiles`, §9).
 
 | # | File | Disk | Loaded by | Into |
 |---|---|---|---|---|
@@ -217,8 +219,8 @@ Start-up (`1460:0003`, code at `1460:011f..01ca`) builds paths in the program di
 1. `ssrnet.dat`: if it exists (`access()` = `4c9e:0005`), DS:061a = 1 (network allowed).
 2. `ssrquiet.dat`: if it does **not** exist, nothing more happens. If it exists and DOS is
    3.10 or later, the game asks `1460:05a3` whether the current drive or the program drive is
-   remote; if either is and `ssrnet.dat` was absent, it prints the "cannot be used on a
-   network" message (DS:070b) and exits.
+   remote; if either is and `ssrnet.dat` was absent, it prints the network
+   message (DS:070b) and exits.
 3. `1460:05a3` is **stubbed**: it returns 0 at once; the original body after it (dead code
    at `1460:05ad`) used INT 21h AX=4409h and tested bit 12 of DX ("drive is remote"). So the
    network refusal can never trigger in this build.
@@ -277,7 +279,8 @@ pixels vertically [inf from the /2 and the clip value].
 
 ### 7.1 Addressing [obs]
 
-* `SST.EXE` is EXEPACK-compressed; `tools\unexepack.py` restores the 297680-byte image.
+* `SST.EXE` is EXEPACK-compressed; `tools\unexepack.py` restores a 297680-byte file (the 0x21F0-byte header plus
+  the 288992-byte load image).
   Header 0x21F0 bytes, so a Ghidra address `SSSS:OOOO` is file offset
   `0x21F0 + (SSSS - 0x1000) * 16 + OOOO`, and DS:xxxx is file offset `0x3fb30 + xxxx`.
 * DGROUP: 0x8FA0 bytes initialised (to the end of the file), BSS to 0xCC1F, stack at
@@ -290,14 +293,16 @@ pixels vertically [inf from the /2 and the clip value].
 
 | DS range | Content | Used by |
 |---|---|---|
-| 0000-00FF | Turbo C RTL: copyright (0004), "Divide error"/"Abnormal program termination" (002f), argc/argv (006b/006d), DOS version (007d), errno (007f) | RTL |
-| 0100-0139 | u16 pairs (5,1) (25,8) (70,16) (115,24) (170,32) (230,40) (300,48) (400,56) (9999,66) (9999,86), 0xFFFF — treasure thresholds with a value [inf: chest fill steps] | 130f |
+| 0000-00F5 | Turbo C RTL: copyright (0004), "Divide error"/"Abnormal program termination" (002f), argc/argv (006b/006d), DOS version (007d), errno (007f) | RTL |
+| 00F6-00FF | treasure-room display state with its initial values (`g_shackSavedShown` .. `g_shackPartner2X`) | 176a |
+| 0100-010F | CHAMPION flash timer (0100), slow-CPU box-saved flag (0102), screen painters far[3] (0104) | 130f |
+| 0110-0139 | `g_rankTable`: u16 pairs (5,1) (25,8) (70,16) (115,24) (170,32) (230,40) (300,48) (400,56) (9999,66) (9999,86), 0xFFFF — treasure threshold and rank chest rows (`RankChest_Update`, end sequence) | 130f |
 | 013A | "CHAMPION" | 130f |
-| 0146-0183 | 16 RGB triplets (6-bit) and fill patterns | graphics |
+| 0144-0173, 0174-0183 | MCGA palette (16 × RGB, 6-bit), CGA dither patterns (16 bytes) | graphics |
 | 0184-036B | three tables of 4-byte hiding-place attribute records at 0184, 0250, 02ec (far pointers at 1246), per mountain level | clue logic `46ce:079c` |
 | 036E, 03C9 | program / disk-2 directory buffers | §1 |
 | 0424, 044D | expected disk labels | §5 |
-| 0476-05FF | file table (18 × 22) | §1 |
+| 0476-0617 | file table (18 × 22 and an all-zero record) | §1 |
 | 0618-061B | saved video mode, boot drive, network flag, saved keyboard flags | `1460:0003` |
 | 0620-0630 | `-S` letters and device map | `fmt_sound.md` §2.2 |
 | 0631-0638 | far pointers to 036E / 03C9 | `1460:06c8` |
@@ -350,12 +355,12 @@ pixels vertically [inf from the /2 and the clip value].
 |---|---|
 | 0-8 | number words one..nine |
 | 9-14 | digits 1..6 |
-| 15-18 | shapes (triangle, round, square, rectangle) |
+| 15-18 | shape words (4) |
 | 19-28 | objects, singular (10) |
 | 29-33 | objects that only occur in the plural (5) |
 | 34 | empty string |
 | 35-44 | the 10 objects, plural |
-| 45-48 | size adjectives (big, small, tall, short) |
+| 45-48 | size adjectives (4) |
 | 49-52 | superlatives |
 
 The clue words stored in USERS.DAT +0x81 are indices into this table (a number, a size and
@@ -388,7 +393,7 @@ total treasures (record +0x0A) reach. The string "CHAMPION" (DS:013a) is separat
 
 | DS | Content |
 |---|---|
-| 8FA0-9324 | game state variables (e.g. 9101/9107/91fd/921a/9228/9138 record pointers, 910b room, 912c video, 9136 boot drive, 923c CPU flag) |
+| 8FA0-9324 | game state variables (e.g. 9101/9107/91fd/921a/9228/9138 record pointers, 910b room, 912c video, 9136 start-up drive, 923c CPU flag) |
 | 9325-A1FC | HELP.DAT buffer (0xED8) |
 | A22A-A2F8, A293 | three answer strings (35 bytes each), question text |
 | A684-A6B7 | 9 far pointers to expanded puzzles, history counts (a6ac), level range (a6aa, a224) |
@@ -413,16 +418,23 @@ total treasures (record +0x0A) reach. The string "CHAMPION" (DS:013a) is separat
 * Everything above can be read from the user's files at runtime. The DGROUP tables
   (hints, menus, dialogs, words, ranks, envelopes, levels) live in the EXEPACKed SST.EXE, so
   the backend needs an in-memory EXEPACK unpacker (a few dozen lines, `tools\unexepack.py`)
-  and should verify the image (e.g. size 297680 and the copyright at DS:0004) before using
+  and should verify the image (load image of 288992 bytes and the copyright at DS:0004) before using
   fixed DS offsets.
 * The DOS edition has 9 save slots and its own record layout; the backend should keep its
   own save file rather than writing USERS.DAT (or write it only on request, in the exact
   layout of §4).
 * The puzzle deal, history, choice masks and points are data-driven by the DS tables cited;
   reproduce the 70 % level-up and the fall-back chain exactly.
+* Engine (wave 2, `src/dos/data/`): `DosFiles` opens the folder (case-insensitive names, the checks
+  of `PORTING_NOTES.md` §1, errors that name the file); `FileTable` (§1); `PuzzleFile`,
+  `Dictionary`, `splitPuzzle` and `QuizTiers` (§2: offsets, `Dict_Expand`, `Quiz_SplitText`, the
+  0x7B00 windows and DS:5fd2 with word 5 computed); `HelpFile` and `helpPagePictures` (§3);
+  `dgroup_offsets.h` (every DGROUP table and global of §7 under its canonical name).
 
 ## 10. Open questions
 
-* Meaning of USERS.DAT fields marked * and of 0x08A / 0x124 / 0x130 / 0x133 (game logic).
-* What DS:929f (header byte 1) measures.
-* Exact role of DS:0100 pairs and of the code-pointer tables at DS:08a6.
+* ~~USERS.DAT fields 0x08A / 0x124 / 0x130 / 0x133~~: answered by wave 1 (collected treasure ids,
+  per-level picture data, found-treasure masks, shelf bits; `ARCHITECTURE.md` §6, `code_ui.md` §9.8).
+* ~~DS:929f~~: the high-water mark of the sprite save heap (`g_saveHeapHigh`, `code_player.md` §3.1).
+* ~~DS:0100 pairs, code pointers at DS:08a6~~: the rank chest table DS:0110 and the cell handler
+  tables (`code_world.md` §3.1).

@@ -1,114 +1,429 @@
+4d94:0004	s_turboCCopyright	char[]	Turbo C 2.0 copyright string, checked by DosExe::load
+4d94:00f6	g_shackSavedShown	i16	Treasure room: shown treasure stashed during a fly animation (-1 none)
+4d94:00f8	g_shackPartner1	i16	Treasure room: frame code of partner treasure 1 (slot 8), -1 none
+4d94:00fa	g_shackPartner2	i8	Treasure room: frame code of partner treasure 2 (slot 10), 0xff none
+4d94:00fb	g_shackState	u8	Treasure room: bit 7 display started (sfx 2 played), low bits carousel busy
+4d94:00fc	g_shackPartner1X	u16	Treasure room: x (bytes, cell-relative) of partner 1, rest 0x50
+4d94:00fe	g_shackPartner2X	u16	Treasure room: x of partner 2, rest 0x50
 4d94:0100	g_champFlashTimer	u16	CHAMPION flash countdown (800)
+4d94:0102	g_boxSaved	u16	Slow CPU: a box background was saved (Sprite_SaveUnder); Screen_DrawOverlay restores it
 4d94:0104	g_screenPainters	far[3]	Screen painters by DS:913e: Hud_Redraw, Quiz_DrawScreen, SignIn_Draw
 4d94:0110	g_rankTable	i16[20]	Pairs (threshold, chest fill): 5,1 25,8 70,16 115,24 170,32 230,40 300,48 400,56 9999,66 9999,86, -1
 4d94:013a	s_CHAMPION	char[]	CHAMPION
+4d94:0144	g_palMcga	u8[16][3]	MCGA DAC colours (6-bit r, g, b), applied after the mode set
+4d94:0174	g_palCga	u8[16]	CGA 2x2 dither pattern per logical colour
+4d94:0184	g_pictureAttrL0	u8[51][4]	Level 0: 4-byte attribute record per hiding-place picture (record 0 unused)
+4d94:0250	g_pictureAttrL1	u8[39][4]	Level 1
+4d94:02ec	g_pictureAttrL2	u8[32][4]	Level 2
 4d94:036e	g_pathDisk1	char[]	Disk 1 path (A:\TLC\sst\, drive patched)
 4d94:03c9	g_pathDisk2	char[]	Disk 2 path
-4d94:0476	g_fileTable	rec22[19]	Data files: name[13], disk number (0 mountain.pan .. 17 shack.pak)
+4d94:0476	g_fileTable	rec22[19]	18 data files: name[13], disk number u8, 8 unused bytes; record 18 is all zero
+4d94:0618	g_savedVideoMode	u8	Video mode at start (INT 10h AH=0Fh), restored by Video_RestoreMode
+4d94:0619	g_savedLogicalFloppy	u8	Saved BIOS byte 0040:0504
+4d94:061a	g_netAllowed	u8	1 when ssrnet.dat exists
+4d94:061b	g_savedKbdFlags	u8	BIOS keyboard flags 0040:0017 at start (bits 5/6 cleared in the BIOS copy, never restored)
 4d94:0620	s_soundSwitchChars	char[]	iItTaAsS
 4d94:0629	g_soundSwitchMap	u8[8]	0 0 1 1 2 2 2 2
+4d94:0631	g_diskPathPtrs	far[3]	{null, DS:036e, DS:03c9} by disk number (File_OpenByIndex)
 4d94:08a6	g_cellPlayerHandlers	far[75]	Terrain handler per cell type for an object in that cell (returns the mask)
 4d94:09d2	g_cellVisibleHandlers	far[74]	Per-tick handler per visible cell type (decorations, castle creature)
+4d94:0afa	g_creatureMask	u16[4]	rand() mask per tier for the castle creature: 0, 0x1ff, 0xff, 0x3f (Castle_CreatureSpawn)
+4d94:0b02	g_playerSlotPtr	far	Far pointer to sprite slot 1 (DS:8fec), the player
+4d94:0b06	g_endFlightPathY	i16[]	End sequence: y of each treasure flight step, -1 terminated (26 steps)
+4d94:0b3c	g_endShowcasePathY	i16[]	End sequence: y of each showcase flight step, -1 terminated (16 steps)
+4d94:0b5e	g_endRankSparkleX	i16[6]	End sequence: x of the rank sparkles
+4d94:0b6a	g_endRankSparkleY	i16[6]	End sequence: y of the rank sparkles
+4d94:0b76	g_endChampSparkleX	i16[5]	Champion branch: x of the sparkles
+4d94:0b80	g_endChampSparkleY	i16[5]	Champion branch: y of the sparkles
 4d94:0b8a	g_playerStateHandlers	far[72]	Player state machine (DS:913c)
 4d94:0caa	g_cellPicture	u16[256]	Per cell: scenery block (low 7 bits = 128x128 block number of the scene PAN); hiding-place and castle cells get theirs from the layout; the search animation toggles it
 4d94:0eaa	g_cellType	u8[256]	World map 16x16 cells of 128x128 px: cell type
 4d94:0faa	g_cellContent	u16[256]	Per cell: hidden content (0x80 empty, 6+2k treasure k, 0x66/0x68/0x6a key of level 0/1/2; bit 7 = searched)
 4d94:11aa	g_hidingCells	u16[48]	Cells that hold a hiding place (level 2: 0..10, level 1: 13..26, level 0: 29..47)
-4d94:120a	g_castleCells	u16[9]	Castle wall cells with variable pictures
-4d94:121c	g_castleDefaultPics	u16[9]	Default castle pictures, followed by per-level picture data (count, key picture, ?, places)
+4d94:120a	g_variableCells	u16[9]	Cells whose picture changes in play and is saved (record +0xBB+48): 0x26 bonus coins, 0x79/0x88 level-2 gate, 0xae level-1 gate, 0xef level-0 gate, 0xbc/0xea net shops, 0x84/0xb7 animated obstacles
+4d94:121c	g_variableCellDefaults	u16[9]	Default pictures of DS:120a
+4d94:122e	g_levelPicData	u16[3][4]	Per mountain level: picture count, key picture (set by Layout_PlaceKey), unused (always 0, saved), places excluding the key (18/13/10)
 4d94:1246	g_pictureAttrTables	far[3]	Per level: 4-byte attribute records of the hiding-place pictures
-4d94:1252	g_castleLayouts	u16[]	Castle ladder layouts, 20 cells each
+4d94:1252	g_castleLayouts	u16[4][20]	Castle ladder layouts, 20 cells each
 4d94:1300	g_machineId	u8	F000:FFFE byte, 0x21 = Tandy 1000
 4d94:1309	g_inGameTick	u16	Re-entrancy guard of Game_Tick
 4d94:37b4	g_tilesPtr	far	Unpacked tiles (32d7:0000)
 4d94:37b8	g_mapPtr	far	Unpacked map (2897:0000)
 4d94:37bc	g_spriteBank	far	0x1C908-byte sprite bank (PAK)
+4d94:37ce	g_musicGate	u16	0xFFFF music runs, 0 music paused (UI mode active); ANDed with the music status in the timer ISR
 4d94:37e2	g_player	Obj	Player object: +0 world x, +2 world y, +4 dx, +6 dy ...
 4d94:37e6	g_playerDX	i16	Movement request x
 4d94:37e8	g_playerDY	i16	Movement request y
 4d94:37ea	g_cameraX	u16	Camera world x
 4d94:37ec	g_cameraY	u16	Camera world y (multiple of 0x80 = one cell row)
+4d94:37ee	g_camStepX	i16	Camera x step of the last Player_Move (0 = no scroll); latched in DS:37f6
+4d94:37f0	g_camStepY	i16	Camera y step of the last Player_Move; latched in DS:37f8
+4d94:37f2	g_frameCamX	u16	Camera x latched by Frame_Begin for this frame
+4d94:37f4	g_frameCamY	u16	Camera y latched by Frame_Begin for this frame
+4d94:37f6	g_frameCamStepX	i16	Latched camera delta x (sign selects the scroll direction; 0 in redraw frames)
+4d94:37f8	g_frameCamStepY	i16	Latched camera delta y
 4d94:37fa	g_elves	Elf[15]	Elves, 32 bytes: +0 x, +2 y, +4 dx, +8 base state, +0xa state, +0xc question slot (0 = none), +0xe sprite slot
+4d94:3c1a	g_palMcgaModeSet	u8[16][3]	MCGA colours loaded by the mode set (Video_SetModeMCGA), replaced by g_palMcga
+4d94:3c4a	g_palEga	u8[17]	EGA attribute registers (RGBI) + overscan byte
+4d94:3c5b	g_fontRowBytes	u16[]	Bytes per glyph row, indexed by glyph width (Font_DrawChar)
+4d94:3d1b	g_palTandy	u8[16]	Tandy palette registers (IRGB)
 4d94:3d2b	g_ticks	u32	236.7 Hz tick counter
-4d94:3d31	g_slowScroll	u16	Copy of the slow-CPU flag used by scrolling
-4d94:4f5a	g_animScripts	far[]	Animation script table
-4d94:59cc	g_msgBoxes	rec16[]	Message/dialog boxes
+4d94:3d31	g_slowScroll	u16	Double scroll/camera steps (copy of the slow-CPU flag; 0 in the castle)
+4d94:3d33	g_biosChainCount	u8	Timer_ISR countdown 12..0: chain the BIOS INT 8 every 13th interrupt
+4d94:3d34	g_gameTickCount	u8	Timer_ISR countdown 4..0: Game_Tick every 5th interrupt
+4d94:3d36	g_animScriptData	i16[]	The script words (delay, slot count, entries, -10 end)
+4d94:48de	g_animScript88Frame	i16	Frame word of script 0x88, patched at run time (treasure flight)
+4d94:4f5a	g_animScripts	far[194]	Animation script table; ids 0..0xbe valid
+4d94:5256	g_boxFooterText	far[3]	Footer strings of the boxes
+4d94:5262	s_menuHelpItems	char[]	Help drop-down items (CR-separated)
+4d94:52a7	s_menuFileItems	char[]	File drop-down items
+4d94:52d1	s_menuOptionsItems	char[]	Options drop-down items
+4d94:52ee	g_helpTopicTitles	far[4]	Help topic titles
+4d94:59cc	g_msgBoxes	rec16[23]	Message/dialog boxes
+4d94:5b3c	g_lineHeight	u16	Text_Draw line height (12; 10 on the title and help pages)
+4d94:5b3e	g_dialogShown	u16	Dialog/help box already drawn
+4d94:5b40	g_menuStepH	i8[17]	Drop-down change by command (left/right)
+4d94:5b51	g_menuStepV	i8[18]	Item change by command (up/down)
+4d94:5b63	g_menuWrap	i8[]	Drop-down index wrap: element 0 here, indexed -2..5 (elements -2 and -1 are the last two bytes of g_menuStepV)
+4d94:5b69	g_menuFirstDialog	u16[3]	First dialog id per drop-down {0, 8, 11}
 4d94:5b6f	g_menuHandlers	far[14]	Menu command handlers
-4d94:5d34	g_elfCounts	u16[4][4]	Elves per tier: type A, type D (coin), type B (thrower), type C
+4d94:5ba7	g_dialogBox	i16[14]	Box per dialog id (-1 = help page)
+4d94:5bc3	g_helpPageStep	i8[2]	Help page step by button {-1, +1}
+4d94:5bc5	g_soundChanged	u16	Music/sound option changed: Sound_SyncState restarts or stops the music
+4d94:5bc7	g_menuTitleX0	u16[3]	Menu title left x (bytes)
+4d94:5bcd	g_menuTitleX1	u16[3]	Menu title right x
+4d94:5bd3	g_menuTitleGlyph1	u16[6]	First glyph of each menu title: 3 normal, 3 highlighted
+4d94:5bdf	g_menuTitleGlyph2	u16[6]	Second glyph (the key cap): 3 normal, 3 highlighted
+4d94:5beb	g_helpLoaded	u16	HELP.DAT loaded
+4d94:5bed	g_helpPicFrame1	i16[15]	Help page: first picture (frame*2, -1 none)
+4d94:5c0b	g_helpPicFrame2	i16[15]	Help page: second picture
+4d94:5c29	g_helpPicX1	i16[15]	Help page: x of the first picture
+4d94:5c47	g_helpPicX2	i16[15]	Help page: x of the second picture
+4d94:5c65	g_helpPicY	i16[15]	Help page: y of both pictures
+4d94:5c83	g_menuZoneCounts	u8[3]	Mouse zones per drop-down
+4d94:5c86	g_buttonZoneWidths	u8[3]	Button zone width per box type
+4d94:5c89	g_footerZoneX	u8[8]	Footer zone x offset per box type
+4d94:5d00	s_btnNo	char[]	Button label (box type 1, button 0)
+4d94:5d03	s_btnYes	char[]	Button label (box type 1, button 1)
+4d94:5d07	s_box5GlyphLeft	char[]	Type-5 box corner glyph string
+4d94:5d09	s_box5GlyphRight	char[]	Type-5 box corner glyph string
+4d94:5d0b	s_btnDone	char[]	Help button on the last page
+4d94:5d16	s_btnNextPage	char[]	Help button
+4d94:5d24	s_btnPrevPage	char[]	Help button from page 1 on
+4d94:5d34	g_elfCounts	u16[4][4]	Elves per tier, columns: A walker/carrier, B thrower, C walker, D coin creature (3/0..6/3/3); spawn order A, D, B, C
 4d94:5d54	g_levelXRange	u16[3][4]	Per level: x base, y, random mask for elf placement
 4d94:5d6c	g_elfStateHandlers	far[76]	Elf state machine
 4d94:5e9c	g_answerPerms	u8[6][3]	Answer orders
+4d94:5eae	g_historyMasks	u8[4]	2-bit history mask by question index % 4
 4d94:5eb2	g_clueWordText	far[]	Clue word strings
+4d94:5f86	g_quizFocusStep	i16[2]	Focus step for up/down {-1, +1}
+4d94:5f8a	g_answerBit	u8[3]	Choice-mask bit by answer index (Quiz_Update)
+4d94:5f8d	g_answerBit2	u8[3]	Identical copy (Quiz_SetupAnswers)
+4d94:5f90	g_answerBit3	u8[3]	Identical copy (Quiz_DrawAnswers)
 4d94:5f93	g_quizReward	u8[8]	Coins by remaining answer mask: 6 -> 2, 4/2 -> 1, else 0
-4d94:5fd2	g_quizTierStart	u16[5]	Question index ranges: 0, 63, 180, 303, 360
+4d94:5f9b	g_clueAttrMask	u8[3]	Attribute masks M of attributes 0..2
+4d94:5f9e	g_clueSizeMask	u8[4]	Size field masks {0xc0, 0x30, 0x0c, 0x03}
+4d94:5fa2	g_clueAttrShift	u8[3]	Attribute shifts S of attributes 0..2
+4d94:5fa5	g_clueSizeShift	u8[4]	Size field shifts {6, 4, 2, 0}
+4d94:5fa9	g_clueAttrByte	u8[5]	Byte of the attribute record per attribute 0..4
+4d94:5fae	g_clueWordBase	u8[5]	First word-table index per attribute
+4d94:5fb3	g_clueSchemes	u8[3][3]	Attributes described by each clue scheme
+4d94:5fbc	g_clueRevealOrders	u8[6][3]	Reveal orders (Clue_Reveal)
+4d94:5fd2	g_quizTierStart	u16[7]	First question per tier {0, 63, 180, 303, 360, X, 360}; words 5 (DS:5fdc) and 6 written by Quiz_FindTierEnd
+4d94:5fdc	g_quizTier5Start	u16	First question of tier 5 (computed by Quiz_FindTierEnd, 123 with the shipped file)
+4d94:5fe0	g_dealTemplate	u8[9]	Wanted history status per dealt slot {0,3,2, 0,3,2, 0,3,2}
+4d94:5fe9	g_dealFallback	u8[3]	Fallback statuses
+4d94:5fec	g_dealFallbackIndex	u8[4]	Index into g_dealFallback by status
+4d94:5ff0	g_historyResetMasks	u8[4]	Masks of Quiz_ResetHistory by start % 4
+4d94:5ff4	s_clueWords	char[]	First of the clue word strings (through DS:6131)
 4d94:6132	g_userRecOffsets	u16[9]	Record offsets in USERS.DAT (3 + 360*i)
+4d94:6144	g_userNamePtrs	far[9]	Far pointers to the record names in the USERS.DAT image
+4d94:6168	g_signinInit	u8	1 = reinitialise the sign-in screen on the next frame
+4d94:6169	g_usersLoaded	u8	USERS.DAT image valid in memory
 4d94:616a	g_signinHandlers	far[7]	Sign-in input handlers by sub-state (DS:6186 keys)
+4d94:6186	g_signinStateKeys	u16[7]	Sub-state values of g_signinHandlers {1, 3, 5, 9, 0x0d, 0x11, 0x21}
+4d94:6194	g_signinZones	zones	Mouse zone list of input context 4 (count byte + 8-byte records)
+4d94:622d	g_signinZone0Template	u8[8]	Copied to zone 0 by SignIn_SetupZones
+4d94:6235	g_signinZone8Template	u8[32]	Copied to zones 8..11 by SignIn_SetupZones
+4d94:6255	g_signinHeadings	far[2]	Sign-in headings (remove mode, select mode)
+4d94:625d	g_rankNames	char[8][8]	Rank labels: Trainee, 1..6 stars, the crown glyph
 4d94:629d	g_signinRankThresholds	u16[7]	5 25 70 115 170 230 300
-4d94:62b7	g_dialogYesHandlers	far[38]	Confirm handler per dialog id (DS:9323): help pages, menu boxes, sign-in boxes
+4d94:62ab	g_recPicDataRestore	u8[6]	G_levelPicData word indices restored from record +0x124
+4d94:62b1	g_recPicDataPack	u8[6]	G_levelPicData word indices packed into record +0x124
+4d94:62b7	g_dialogYesHandlers	far[19]	Confirm handler per dialog id (DS:9323): help pages, menu boxes, sign-in boxes
 4d94:6303	g_dialogNoHandlers	far[19]	Cancel (Esc) handler per dialog id
+4d94:6375	s_newPlayer	char[]	Last row of the sign-in list
+4d94:6380	s_signinKeyLine	char[]	Key prompt line of the sign-in screen
+4d94:63a4	g_sfxData	far	Effects file buffer (segment 415f)
+4d94:63a8	g_tunesData	far	Music file buffer (segment 41ca)
+4d94:63ac	g_adlibPitch	u16[4]	AdLib pitch per voice
 4d94:63b4	g_soundOn	u16	Sound effects on
 4d94:63b6	g_musicOn	u16	Music on
+4d94:63b8	g_sfxLoop	u16	Effects loop flag (never set)
+4d94:63ba	g_musicLoop	u16	Music loop flag
 4d94:63bc	g_soundDevice	u16	0 speaker, 1 Tandy, 2 AdLib, 3 IBM PS/1
+4d94:63be	g_voiceCount	u16	Voices driven: 1 speaker, 4 otherwise
+4d94:63c0	g_sndDoingMusic	u16	1 while the music block is processed
+4d94:63c2	g_sndBlockPtr	u16	Block being processed (near pointer)
+4d94:63c4	g_sndBlockSize	u16	State block size (0x78)
+4d94:63c6	g_sfxOwnsVoice	u16[4]	Voice owned by an effect this tick
+4d94:63ce	g_sndWork	u8[0x78]	Work copy of the block being processed (field offsets in namespace sndblock)
+4d94:6448	g_sfxBlock	u8[0x78]	Effect state block
+4d94:64c0	g_musicBlock	u8[0x78]	Music state block
+4d94:6538	g_speakerPeriods	u16[12]	PIT divisors of the lowest octave, C..B
+4d94:6550	g_psgPeriods	u16[12]	SN76496 periods, C..B
+4d94:6568	g_periodTables	near[2]	Near pointers to the two period tables by device
 4d94:656c	g_soundPort	u16	Sound chip port (Tandy 0xC0 / AdLib 0x388)
+4d94:656e	g_envelopes	near[36]	Near pointers to the 0xff-terminated attenuation envelopes
+4d94:65c3	g_envelopeData	u8[]	Envelope bytes (through DS:6bbd)
 4d94:7ca3	g_flutterText	far[]	Hint/message texts
+4d94:7d37	g_hintRankThresholds	u16[7]	Rank thresholds (same values as DS:629d)
+4d94:7d45	g_rankStartMsg	i8[8]	Start-of-game message per rank (23..30)
+4d94:7d4d	g_msgDigitOffsets	i16[12]	Offset of the two-digit count in messages, per rank then end messages (-1 none)
+4d94:7d65	g_msgPluralOffsets	i16[8]	Offset of the plural letter per rank
+4d94:7d75	g_endMsgIds	i8[4]	End-of-game messages: none, one, some, all found
+4d94:7d79	g_crownMsgToggle	u16	Initial 1; alternates the two champion end messages (35, then 36)
+4d94:7d7c	g_shelfRoomRedraw	u8[2*4]	Per treasure shelf room k: byte 7d7c+2k = draw its shelves; 7d7d+2k = first collected-list index of the room
+4d94:7d84	g_keysPlay	keylist	Keys of contexts 0, 3, 5 (u16 count, then BIOS key codes)
+4d94:7da0	g_cmdsPlay	cmdlist	Commands of contexts 0, 3, 5 (entry 0 = -1, then one per key)
+4d94:7dbe	g_keysMenu	keylist	Keys of context 1 (menu bar)
+4d94:7dd2	g_cmdsMenu	cmdlist	Commands of context 1
+4d94:7de6	g_keysDialog	keylist	Keys of context 2 (dialogs, help)
+4d94:7dfe	g_cmdsDialog	cmdlist	Commands of context 2
+4d94:7e16	g_keysName	keylist	Keys of context 4 (sign-in, name entry)
+4d94:7ea2	g_cmdsName	cmdlist	Commands of context 4
+4d94:7f2e	g_zonesPlay	zones	Mouse zones of context 0 (count byte + 8-byte records)
+4d94:7f87	g_zonesMenu	zones	Mouse zones of context 1
+4d94:8010	g_zonesDialog	zones	Mouse zones of context 2
+4d94:8069	g_zonesQuiz	zones	Mouse zones of context 3
+4d94:80b2	g_quizAnswerZones	u8[3][8]	Zones 9..11 of context 3: the answer rows
+4d94:80ca	g_zonesTitle	zones	Mouse zones of context 5 (title pages)
+4d94:80da	g_titleBottomZoneCmd	i8	Release command of context-5 zone 1: 13 in the file, 8 from the title page on, 13 again on story page 2
+4d94:80db	g_zoneLists	far[6]	Zone list per input context
+4d94:80f3	g_keyLists	far[6]	Key list per input context
+4d94:810b	g_cmdLists	far[6]	Command list per input context
+4d94:8124	g_oplSlotMap	u8[9][2]	Modulator and carrier slot per OPL channel
+4d94:8136	g_oplSlotOffsets	u8[18]	Operator register offset per slot
+4d94:816c	g_oplInstruments	rec4e[24]	Instrument records (timbre layout, namespace oplinstr)
+4d94:88bc	g_oplInstrumentPtrs	far[24]	Far pointer per instrument
+4d94:891c	g_oplOrchInstrument	u8[][9]	Instrument per OPL channel for arrangement k = 4*tune + (rand() & 3) (0xff unused)
+4d94:8988	g_oplOrchTranspose	i8[][9]	Transposition (semitones) per channel and arrangement
+4d94:89f4	g_oplOrchUnused	u8[][9]	Third row: addressed but never read
+4d94:8a14	g_ssPage	u16	Super Solvers page shown (Esc returns to the title instead of quitting)
 4d94:8a16	g_titlePhase	u16	Title phase index into DS:8d83
-4d94:8d83	g_titlePhases	near[10]	Title phase functions (segment 4ba4), 0-terminated
+4d94:8a18	g_titleSparkleX	i16[12]	Sparkle spots, x bytes
+4d94:8a30	g_titleSparkleY	i16[12]	Sparkle spots, y
+4d94:8a48	s_titlePrompt	char[]	The prompt line under the title pages
+4d94:8a5a	s_story1	char[]	Story page 1 (LF/TAB markup)
+4d94:8b54	s_story2	char[]	Story page 2
+4d94:8c49	s_story2Keys	char[]	Key line of story page 2 (series page)
+4d94:8c6f	s_ssPage1	char[]	Super Solvers page, heading
+4d94:8cca	s_ssPage2	char[]	Super Solvers page, first title line
+4d94:8cf0	s_ssPage3	char[]	Super Solvers page, second block
+4d94:8d2b	s_ssPage4	char[]	Super Solvers page, third block
+4d94:8d83	g_titlePhases	near[14]	Title phase functions (segment 4ba4): phases 0..8, 0 (end of the title), 10..12, 0
+4d94:8f48	g_randSeed	u32	Turbo C rand() seed, 1 in the file (rand 4d12:001f, srand only in Layout_Generate)
 4d94:8f9e	g_castleLayout	u8	Chosen castle layout (record +0x166)
+4d94:8f9f	g_frameInShelfRoom	u8[4]	Frame latch of g_inShelfRoom DS:9201..9204 (Frame_Begin); read by ShelfRoom_DrawShelf and Hud_Redraw
 4d94:8fa3	g_searchTimer	i16	Hiding-place search countdown
+4d94:8fa5	g_slowCpuSaved	u16	Real slow-CPU flag kept while the castle forces fast mode
+4d94:8fa7	g_playerScrX	i16	Player x relative to the camera, bytes (Game_Tick)
+4d94:8fa9	g_playerScrY	i16	Player y relative to the camera, rows (Game_Tick)
 4d94:8fab	g_curObj	far	Object being processed (player or elf)
+4d94:8faf	g_shackNoCase	u8	Treasure room: shown treasure had no display case
 4d94:8fb0	g_shownTreasure	i16	Treasure shown in the treasure room (record +0x164)
+4d94:8fb2	g_frameTransition	u16	Frame latch of g_transition (dissolve in Frame_Present)
 4d94:8fb6	g_shelfBits	far	Collected-treasure shelf bits (record +0x133)
+4d94:8fba	g_playfieldRedrawn	u8	Set by Playfield_Redraw, read and cleared by ShelfRoom_DrawShelf
 4d94:8fbb	g_fullRedraw	u8	Request a full play-field redraw (counter)
+4d94:8fbd	g_frameRankState	u8	Frame latch of the rank chest state DS:925d
 4d94:8fbe	g_loadedScene	u16	Scene currently loaded (0xff none)
 4d94:8fc0	g_cellScreenX	i16	Screen x (bytes) of the cell being handled by Cells_UpdateVisible
+4d94:8fc2	g_cellScreenY	i16	Screen y of the top of the visible cell row (0x10 - (camY & 0x7f))
+4d94:8fc4	g_decorCount	u16	Decorations/creature placed by visible handlers this tick (0 -> slot 12 hidden)
 4d94:8fc6	g_searchCell	u16	Cell being searched
+4d94:8fc8	g_framePartialRedraw	u16	Frame latch of DS:9278: redraw only the searched cell's columns
 4d94:8fca	g_sceneWanted	u16	Scene to show (copy of DS:928f each frame)
 4d94:8fd2	g_quizHistory	far	2 bits per question (record +0x0c)
 4d94:8fd6	g_spriteSlots	Slot[13]	Sprite/animation slots, 22 bytes: x, y, ?, frame, slot, anim, prev, pos, delay, far obj
 4d94:9002	g_slot2X	i16	Sprite slot 2 x (coin / search content sprite)
+4d94:90f4	g_mouseButtons	u16	Mouse buttons (INT 33h AX=3 BX), this tick
+4d94:90f6	g_cmdQueued	i16	One-deep command queue of Input_Poll (also used to inject Enter / F1)
+4d94:90f8	g_promptIcon	u16	HUD message-box prompt: 0 none, 2 move box/select, 4 drop coin, 6 press Enter (record +0x14c)
+4d94:90fa	g_castleCellIdx	u16	Counts the visible castle cells within one Cells_UpdateVisible call
+4d94:90fc	g_menuOpen	i16	Open drop-down 0 Help, 1 File, 2 Options, -1 none
+4d94:90fe	g_tick13	i16	Counts 12..0 per game tick (caret blink)
+4d94:9100	g_secondTicks	u8	Game ticks left in the current hint "second" (60 per second, only counted down to a reset while g_uiMode == 0)
 4d94:9101	g_quizTier	far	Quiz tier byte (record +0x13f)
 4d94:9105	g_keys	u16	Held keys: 1 up 2 down 4 left 8 right 0x10 net 0x20 jump 0x40 coin; high byte = cell mask
 4d94:9107	g_answerMasks	far	9 enabled-answer masks (record +0x78)
 4d94:910b	g_area	u16	Area/music id (record +0x156)
 4d94:910d	g_stepDone	u16	Set when an animation advanced or the camera moved; cleared by Frame_Begin; blocks further logic ticks until the next frame
 4d94:910f	g_nets	u16	Nets (record +0x146)
+4d94:9111	g_menuItem	u16	Highlighted drop-down item
 4d94:9113	g_treasuresFound	u16	Treasures found this game (record +0x148)
 4d94:9115	g_seconds	u16	1.27 s counter
 4d94:9119	g_uiMode	u8	0 play; 0x80 title; 0x40 menu; 0x20 dialog; 0x10 hint; 8 sign-in; 4 message; 2 quiz
+4d94:911a	g_mouseX	u16	Mouse x 0..159 (byte units)
 4d94:911c	g_messagePending	u16	1 start-of-game message, 2 end-of-game message
+4d94:911e	g_mouseY	u16	Mouse y 0..199
 4d94:9120	g_keyState	u16	2/4/6 key of level 0/1/2 held, 8 new game, 10/12 key of level 1/2 hidden
+4d94:9122	g_coinsShown	u16	Coin number shown on the HUD (counts up/down one per frame towards g_coins)
+4d94:9124	g_camCellCol	u16	Camera cell column (Frame_Begin)
+4d94:9126	g_camCellRow16	u16	Camera cell row * 16 (Frame_Begin)
+4d94:9128	g_searchPicture	u8	Closed picture of the cell being searched
+4d94:9129	g_shelfCamRoom	u8	Shelf room entered from its left end (shelf x relative to camX 0x440); other values: entered from the right (0x480)
+4d94:912a	g_mouse	i16	-1 when a mouse driver answered INT 33h AX=0
 4d94:912c	g_videoType	i16	1 EGA, 2 CGA, 3 Tandy, 4 Hercules, 5 MCGA; -1 none
 4d94:912e	g_quit	u16	Leave the frame loop
 4d94:9130	g_tier	u16	Rank tier 0..3 by total treasures (record +0x140)
+4d94:9132	g_elfSpriteCount	u16	Elves holding a sprite (+1 on a slow CPU); a new sprite only while < 3
 4d94:9134	g_coins	u16	Coins (record +0x144)
+4d94:9136	g_startDrive	u16	Current drive at start (getdisk)
 4d94:9138	g_totalTreasures	far	Total treasures (record +0x0a)
 4d94:913c	g_playerState	u16	Player state
 4d94:913e	g_screen	u16	Screen painter index
+4d94:913f	g_hintTimerReset	u16	1 = Hints_Update resets g_seconds and the hint timers (set by Game_Start and the Options hint switch)
+4d94:9143	g_mouseButtonsPrev	u16	Buttons of the previous Mouse_Poll
+4d94:9145	g_drawRecs	Drec[13]	Draw records, 14 bytes: x, y, depth, frame, owner (bit 15 = drawn), far save pointer
+4d94:91fb	g_hudPrompt	u16	HUD cache of g_promptIcon
 4d94:91fd	g_clueWords	far	9 clue word bytes, 3 per level (record +0x81)
+4d94:9201	g_inShelfRoom	u8[4]	Player is in treasure shelf room 0..3
 4d94:9205	g_gameInProgress	u16	Set after the start message; copied to record +9 when leaving with the game kept
 4d94:9209	g_foundMasks	far	Per level found-treasure bits (record +0x130)
+4d94:920d	g_camTileColOff	u16	(camX & 0x78) << 2: tile column offset in a block map
+4d94:920f	g_camTileRowOff	u16	(camY >> 2) & 0x1e: tile row offset in a map column
+4d94:9211	g_shackY	i16	Treasure room: pedestal treasure y offset (rest 0x44)
+4d94:9213	g_shackX	u16	Treasure room: pedestal treasure x offset (rest 0x1a, off-screen 0x50)
+4d94:9215	g_textInk	u16	Text colour word used by Text_Draw
 4d94:9217	g_transition	u16	Teleport/transition in progress (1/2)
+4d94:9219	g_showcasePick	u8	Showcase treasure chosen at the castle top (bit 7 = new pick); 0xff after hand-over
 4d94:921a	g_quizSlots	far	9 question ids (record +0x66)
 4d94:921e	g_caughtSlot	u16	Question slot of the caught elf (0 none)
+4d94:9220	g_quizClosed	u16	1 = no elf question shown
 4d94:9224	g_hintsOn	u16	New Player Hints
 4d94:9226	g_cmd	i16	Current input command
 4d94:9228	g_userRec	far	Selected 360-byte record
 4d94:922c	g_inputContext	u16	Key/zone table set
+4d94:922e	g_hudRedraw	u16	HUD full redraw request (1, or 2 = also redraw the sprites)
 4d94:9232	g_lastGameTreasures	u16	Treasures found in the game just finished (end message)
 4d94:9234	g_endState	u16	End of game: 1 at the castle gate, 2 when leaving the treasure room (Scene_Update then runs Game_End and a new game)
+4d94:9238	g_cmdConsumed	u16	1 = g_cmd consumed by a UI handler; Input_Poll may load the next command
+4d94:923a	g_keysUnmasked	u16	g_keys before the terrain mask was applied this tick
 4d94:923c	g_slowCpu	u16	1 on an 8088/8086 (or toggled with X)
 4d94:923e	g_hintFlags	u8[15]	0 pending, 0x80 shown
+4d94:924d	g_hudNets	u16	HUD cache of g_nets
+4d94:924f	g_fullRedrawReq	u16	Full play-field redraw request (latched into g_fullRedraw)
+4d94:9251	g_shackFlags	u8	Treasure room: 1 carousel move, 0x80 right/fly started, 2 swap done, 0x10 fly phase 2, 0x20 display anim owns slot 3, 0x40 pair/fly running
+4d94:9254	g_storedShowcase	i8	Showcase treasure put away while outside the clubhouse (Cell_P12_StartRoom / Cell_P11_ClubDoor)
 4d94:9255	g_dirty	u16	Something was drawn this frame (present needed)
+4d94:9257	g_jumpFromDiagonal	u16	Jump bit 0x20 came from a diagonal or a mouse jump; the next key event clears it
+4d94:9259	g_hudFound	u16	HUD cache of g_treasuresFound
+4d94:925b	g_hudRedrawReq2	u16	Extra HUD redraw request ORed into DS:922e at Frame_Begin
+4d94:925d	g_rankState	u8	Rank chest screen state: 0 off, 1 start, 2 filling
+4d94:925e	g_mouseXPrev	u16	Mouse x of the previous tick
 4d94:9264	g_creatureStrike	u16	Set by animation op -6 (castle creature strike)
+4d94:9266	g_mouseYPrev	u16	Mouse y of the previous tick
+4d94:9268	g_hudKeyState	u16	HUD cache of g_keyState (moved to force a clue-box redraw)
+4d94:926a	g_playerMask	u16	Terrain mask of the player's cell, applied to g_keys next tick
+4d94:926c	g_menuLock	u16	Menu bar cannot be opened (searches, end sequence)
 4d94:926e	g_gamesPlayed	u16	Games played (record +0x162)
+4d94:9270	g_drawnCellCol	u16	Camera block column of the last drawn play-field
+4d94:9272	g_drawnCellRow16	u16	Camera block row * 16 of the last drawn play-field
 4d94:9274	g_cellCallKind	u16	1 = visible-cell call, 2 = object-in-cell call
 4d94:9276	g_searchSide	i16	-1/0/+1: search the left/own/right cell
+4d94:9278	g_partialRedrawReq	u16	Partial redraw request (searched cell)
+4d94:927a	g_keyCellL1	u16	Cell of the level-1 key (Layout_PutInSlot); written, never read
+4d94:927c	g_keyCellL2	u16	Cell of the level-2 key (Layout_PutInSlot); written, never read
 4d94:927e	g_collected	far	48 collected treasure ids (record +0x8a)
+4d94:9282	g_shackStay	u8	Treasure room: do not auto-advance to the rank screen
+4d94:9283	g_spriteSlotsDrawn	u16	Sprite slots drawn this frame: 13 in play, 1 (pointer only) with a UI mode
+4d94:9285	g_lastBiosKey	u16	Last BIOS key read by Input_Poll (0 none)
+4d94:9287	g_creatureCell	u16	0 = no castle creature, else the visible castle-cell index where it appeared
+4d94:9289	g_lastGameTier	u16	Tier at Game_End (for the found-all end message)
+4d94:928d	g_hudCoins	u16	HUD cache of g_coins
 4d94:928f	g_level	u16	0..2 mountain level, 3 castle top, 4 treasure room
+4d94:9295	g_keyPicture	i8	Key picture of the level being laid out (Layout_PlaceKey -> Clue_BuildWords)
 4d94:9296	g_clueScheme	u8	Clue scheme 0..2
+4d94:9297	g_drawnCamX	u16	camX as last drawn (Scroll_Update / Playfield_Redraw); 9299 = 920d, 9270 = 9124, 929b = camY, 929d = 920f, 9272 = 9126 as drawn
+4d94:9299	g_drawnTileColOff	u16	Tile column offset of the last drawn play-field
+4d94:929b	g_drawnCamY	u16	Camera y of the last drawn play-field
+4d94:929d	g_drawnTileRowOff	u16	Tile row offset of the last drawn play-field
+4d94:929f	g_saveHeapHigh	u16	High-water mark of the sprite save heap offset; low byte saved as USERS.DAT header byte 1
 4d94:92a1	g_shopCoinsOwed	i16	Net-shop price still to pay (4..0, -1 = net taken; record +0x158)
+4d94:92a6	g_rankRowsDone	u16	Rank chest rows drawn so far
+4d94:92a8	g_rankRowsWanted	u16	Rank chest rows to draw (fill value of the next rank pair)
+4d94:92ac	g_mousePtrVisible	u16	Mouse pointer shown (hidden after 600 idle ticks)
+4d94:92ae	g_mouseIdleTicks	u16	Ticks without mouse change
+4d94:92b0	g_rankTickPhase	u16	DS:9100 & 0xfc at the last chest row (one row per 4 game ticks)
+4d94:92b2	g_floppyCount	u8	Floppy drives from the equipment word
+4d94:92c1	g_critErr	u16	Critical error flag set by HardErr_Handler
+4d94:92c3	g_critErrCode	u16	Critical error errval
+4d94:92c5	g_critErrAx	u16	Critical error AX (AL = drive)
+4d94:92c8	g_borderColor	u8	Overscan colour counter of Cell_P0_Void
 4d94:92c9	g_cellMask	u16	Terrain mask returned by the cell handlers
+4d94:92cb	g_curCell	u16	Cell index of the object in the last Cell_GetMask
+4d94:92d0	g_endCount	i16	End sequence: sparkles still to show
+4d94:92d2	g_endSeqDone	u16	End sequence finished
+4d94:92d4	g_endScanIdx	u16	End sequence: next hiding slot to scan
+4d94:92d6	g_endAllFound	u16	End sequence: all treasures of the game found
+4d94:92d8	g_endPathIdx	u16	End sequence: index into the flight/sparkle tables
+4d94:92da	g_endTreasureCount	u16	End sequence: treasures flown into the chest
+4d94:92dc	g_drawOrder	u16[13]	Draw record indices in drawing order (for the erase)
+4d94:92f6	g_spritesChanged	u16	A draw record changed since the last erase
+4d94:92f8	g_saveHeapReset	u16	Next save-under starts a new save heap
+4d94:92fa	g_ctrlReleased	u16	Kbd_ISR Ctrl flag (1 after Ctrl release, 0 after press); no reader
+4d94:92fc	g_oldInt9	far	Saved INT 09h vector
+4d94:9300	g_lastUiMode	u8	g_uiMode seen by Sound_SyncState
+4d94:9301	g_helpPage	i8	Current help page of the topic
+4d94:930c	g_uiCmd	i16	Command being handled by the UI code (copy of g_cmd)
+4d94:930e	g_buttonLabel	far[2]	Button labels (0 No / Go Back, 1 Yes / See Next Page / Done)
+4d94:9316	g_buttonX	u16[2]	Button x (bytes)
+4d94:931a	g_buttonY	u16[2]	Button y
+4d94:931e	g_boxWidth	u16	Width of the last box (bytes)
+4d94:9322	g_helpPageCount	u8	Pages of the open help topic
+4d94:9323	g_dialogId	u16	Dialog id: 0..7 help topics, 8..13 menu boxes, 14..18 sign-in boxes
 4d94:9325	g_helpData	u8[0xed8]	HELP.DAT
+4d94:a1fd	g_buttonSel	u16	Selected button (0 No / back, 1 Yes / next)
+4d94:a1ff	g_boxTextY	u16	y of the first text line of the last box
+4d94:a201	g_boxLines	u16	Text lines of the last box (= drop-down item count)
+4d94:a204	g_elfRelX	i16	Elf x relative to the camera, bytes (strip-linear)
+4d94:a206	g_elfRelY	i16	Elf y within the cell relative to the camera
+4d94:a208	g_playerRelX	i16	Player sprite x - 2 (slot 1), bytes
+4d94:a20a	g_netCatchesThisTick	u16	Catches resolved in this Elves_Update (first one uses a net); reset at its end
+4d94:a20c	g_elfNetClass	u16	Elf_Think result: 0 none, 1 released, 2 got a sprite, 3 visible, 4 net edge (dodge), 5 net, 6 net centre
+4d94:a20e	g_elfCallCounter	u16	+1 per Elf_Think call; bit 1 gates hidden-elf drift; 0 when a search freeze ends
+4d94:a210	g_elfAnimSel	u16	Scratch: animation id offset (0 / 0x16 carrier) shared by the elf handlers; ElfSt_03 reads the stale value
+4d94:a212	g_elfActiveCount	u16	Elves processed: 15, or 7 on a slow CPU (set by Elves_Spawn)
+4d94:a214	g_quizFocus	i16	Focused answer row 0..2
+4d94:a216	g_quizQuestion	u16	Question index of the open slot
+4d94:a21c	g_quizSlot	u16	Slot of the open question (g_caughtSlot - 1)
+4d94:a21e	g_quizOrder	u16	Answer display order 0..5 (DS:5e9c)
+4d94:a220	g_praiseWord	far	Clue word revealed by the right answer
+4d94:a224	g_tierEnd	u16	End (exclusive) of the tier
+4d94:a22a	g_answerText	char[3][35]	The three answers of the open question
+4d94:a293	g_questionText	char[]	Question text of the open question
+4d94:a67b	g_dealPlan	u8[9]	Wanted history status per slot (Quiz_PlanStatuses)
+4d94:a684	g_puzzleText	far[9]	Expanded text of the 9 dealt questions
+4d94:a6a8	g_answerWidth	u16	Widest answer (bytes)
+4d94:a6aa	g_tierFirst	u16	First question of the tier
+4d94:a6ac	g_statusCount	u16[4]	Questions of the tier per history status
 4d94:b1f8	g_quizCoins	u16	Coins including the pending quiz reward
+4d94:b1fa	g_quizAnswered	u16	The open question was answered
 4d94:b204	g_dictionary	u8[]	PRG_DICT
+4d94:ba04	g_quizMask	u8	Answer mask of the open question at opening
+4d94:ba06	g_signinChar	u8	Character of the current sign-in command (first letter upper-cased)
+4d94:ba07	g_signinState	u16	1 list, 3 name entry, 5 remove, 9 exit box, 0x0d remove box, 0x11 saved-game box, 0x21 OK box
+4d94:ba09	g_caretArmed	u8	Caret blink armed (toggles when DS:90fe <= 6)
+4d94:ba0a	g_newName	char[9]	New player name being typed
+4d94:ba13	g_signinRow	i8	Highlighted sign-in row
 4d94:ba14	g_usersFile	u8[0xcab]	USERS.DAT image: 3-byte header + 9 records of 360 bytes
+4d94:c6bf	g_newNameLen	i8	Length of g_newName
+4d94:c6c0	g_signinAny	u8	At least one player exists
+4d94:c6c1	g_signinRecIdx	u8[9]	Record index per sorted row
+4d94:c6ca	g_caretOn	u8	Name cursor block drawn
+4d94:c6cb	g_signinStart	u8	A player was chosen: start the game
+4d94:c6cc	g_signinCount	i8	Number of players
+4d94:c6ce	g_hint3Level	u16	Level of g_hint3Start
+4d94:c6d0	g_hint3Start	u16	g_seconds+1 when the second clue word of a level was seen (hint 3)
+4d94:cb7e	g_titleTimer	u32	Title page time-out (g_ticks + 7200), 0 = not armed

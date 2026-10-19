@@ -3,4 +3,5 @@
 target_sources(tmtests PRIVATE
     tests/dos_test_data.cpp
     tests/test_dos_exe.cpp
+    tests/test_dos_data.cpp
 )

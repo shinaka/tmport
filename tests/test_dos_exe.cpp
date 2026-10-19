@@ -27,4 +27,6 @@ TEST_CASE("DosExe: unpacks the user's SST.EXE and resolves Ghidra addresses") {
     CHECK(p.seg == 0x1568);
     CHECK(dosExe->farPtrAtDs(0x08A6).data() == dosExe->at(0x1568, p.off).data());
     CHECK(dosExe->at(0x0fff, 0).empty());
+    CHECK(reinterpret_cast<const char*>(dosExe->dsBytes(0x0004, 7).data()) == dosExe->dsString(0x0004).data());
+    CHECK_THROWS_AS(dosExe->dsBytes(0x8F00, 0x200), std::out_of_range);
 }

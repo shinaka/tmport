@@ -24,8 +24,8 @@ in pixels (0..199). Rectangles are inclusive. A "colour word" such as `0xCCCC` i
 4-bit logical colours (logical colours: `fmt_graphics.md` §2.2; 0 blue, 3 light red, 4 red,
 6 light magenta, 7 cyan, 10 light cyan, 11 yellow, 12 white, 13 light grey, 15 black); fills use
 its low byte, so `0xFDFD` fills each byte with left pixel 15 and right pixel 13. Game text is
-referred to by DGROUP offset. Function names follow `re/names/dos/`; renames proposed by this
-pass are in `re/names/dos/wave1_ui.tsv` and are used below in brackets where they help.
+referred to by DGROUP offset. Function names follow `re/names/dos/` (canonical names of the wave 2
+merge, decision table in `re/names/dos/README.md`).
 
 ---
 
@@ -52,7 +52,7 @@ u32) and every 5th interrupt runs `Game_Tick` (130f:00fe) = **47.3 Hz**; the fra
 
 | Per game tick (47.3 Hz, interrupt time) | Per drawn frame (main loop) |
 |---|---|
-| `Input_Tick` (4a85:03ac): reads one key or the mouse zone into `g_cmd`, opens the menu bar from play. It runs every tick, also while the step-done flag DS:910d is set (130f:0190). Nothing runs while `g_quit` (DS:912e) ≠ 0 (130f:00fe), which the I/O routines set around disk access. | `main` order (130f:0037..00cf): `Frame_Begin`; **only if** `g_fullRedraw`, DS:8fb2 and DS:8fc8 are all 0: `SignIn_Update`, `Gameover_UpdateMessages` (49a6), `Hints_Update` (49a6), `Menu_Update`; then always `Scene_Update`, `Scroll_Update`, `Search_Update`, `Quiz_Update`, `Sound_SyncState`, `Game_HandleHotkeys`, `Screen_DrawOverlay` (painter: HUD / quiz / sign-in), `Playfield_Redraw`, `Treasures_DrawFound`, `Rank_Update`, `Sprites_DrawSorted(0, n)`, `Frame_Present`, `Sprites_EraseAll(0, n)` with n = 13 when `g_uiMode` = 0 else 1 (only the mouse pointer slot 0 is drawn while any UI mode is active). Loop until `g_quit` ≠ 0, then `Game_Shutdown`. |
+| `Input_Tick` (4a85:03ac): reads one key or the mouse zone into `g_cmd`, opens the menu bar from play. It runs every tick, also while the step-done flag DS:910d is set (130f:0190). Nothing runs while `g_quit` (DS:912e) ≠ 0 (130f:00fe), which the I/O routines set around disk access. | `main` order (130f:0037..00cf): `Frame_Begin`; **only if** `g_fullRedraw`, DS:8fb2 and DS:8fc8 are all 0: `SignIn_Update`, `Gameover_UpdateMessages` (49a6), `Hints_Update` (49a6), `Menu_Update`; then always `Scene_Update`, `Scroll_Update`, `Search_Update`, `Quiz_Update`, `Sound_SyncState`, `Game_HandleHotkeys`, `Screen_DrawOverlay` (painter: HUD / quiz / sign-in), `Playfield_Redraw`, `ShelfRoom_DrawShelf`, `RankChest_Update`, `Sprites_DrawSorted(0, n)`, `Frame_Present`, `Sprites_EraseAll(0, n)` with n = 13 when `g_uiMode` = 0 else 1 (only the mouse pointer slot 0 is drawn while any UI mode is active). Loop until `g_quit` ≠ 0, then `Game_Shutdown`. |
 | Counters: DS:90fe counts 12, 11, .., 0, 12 .. (one step per tick; the name-entry caret blinks on it, §9.5); DS:9100 (byte) counts down; when it reaches 0 **and** `g_uiMode` = 0 it is reloaded with 60 and `g_seconds` (DS:9115) += 1, otherwise it keeps decrementing through 255 [O 130f:019a..01bd]. | The title runs its own loop (`Title_Run`, §8) with the same Sprites/Frame_Present tail. |
 
 Blocking waits exist only in `Button_Flash` (4 × 18 ticks, §4.4); ticks keep running meanwhile.
@@ -97,7 +97,7 @@ ctx 0, zones DS:80ca. The engine reads all of them from the EXE.
 Zones that matter [O]: ctx 0: menu titles x 0..25 / 26..51 / 52..84, y 0..10 → 1/2/3 on press,
 hold and release; play-field x 0..159 y 16..143: press/held 9, release 10; status bar y 146..199:
 press/held 11, release 10. ctx 5: zone 0 (y 0..189) release → 8, zone 1 (y 189..199) release → 8
-(byte DS:80da, set to 13 on story page 2). Boxes, menus, help, quiz answers and sign-in rows
+(byte DS:80da: 13 in the file, 8 from the title page on, 13 again on story page 2). Boxes, menus, help, quiz answers and sign-in rows
 rewrite zones at run time (§4.5, §9.3, §10.4). A zone with x1 = 200 can never match (mouse x ≤
 159): this is how entries are disabled.
 
@@ -161,7 +161,7 @@ went down), +7 (held) or +8 (released) [O 4a85:0130].
 | Routine | Arguments | Behaviour [O] |
 |---|---|---|
 | `Gfx_FillRect` 1000:169b | SI x1, DI y1, CX x2, DX y2 (bytes, inclusive), AL fill byte | every byte of the rectangle = AL; CGA translates through 2005:7E00; adds a dirty rectangle when DS:37ae bit 0 |
-| `Gfx_XorRect` 1000:176c [`Gfx_SwapColor`] | SI, DI, CX, DX as above, AX "from" colour word, BX "to" colour word | per pixel: if the pixel equals the "from" colour it becomes the "to" colour. Not an XOR. Highlights call it three times to exchange two colours through a temporary (colour 3) |
+| `Gfx_ReplaceColorRect` 1000:176c | SI, DI, CX, DX as above, AX "from" colour word, BX "to" colour word | per pixel: if the pixel equals the "from" colour it becomes the "to" colour. Not an XOR. Highlights call it three times to exchange two colours through a temporary (colour 3) |
 | `Font_DrawChar` 1000:2180 | AX colour word (1 = measure only), BX x bytes, CX y, DX glyph code | draws the glyph's 1-bpp rows (whole bytes of 8 pixels from x·2) with set bits in the colour and clear bits leaving the background; returns `width >> 1` (advance in bytes, glyph width from the font, `fmt_graphics.md` §6) |
 | `Sprite_GetHeader` 1000:2159 / `Sprite_Draw` 1000:1b8d | AX = frame·2; BX x bytes, CX y, AL flags (0 opaque with hotspot, 0x40 masked colour 0 transparent, 0x20 mirror, 0x80 no hotspot) | `fmt_graphics.md` §5.3. Status-bar, panel and title frames have absolute positions in their hotspot and are drawn at (0,0) |
 | `Tile_DrawColumn` 1000:19cf | BX map pointer, SI x bytes, DI y top, DX y bottom | one 8-px tile column of the loaded PAN picture; `Screen_DrawBackdrop` (47c7:042d) and the title call it 40 times (x 0..0x9C step 4, map pointer += 0x32) to draw OPENING.PAN full screen |
@@ -264,7 +264,7 @@ if type == 1:
     button 1 "Yes" (DS:5d03) at x = x2 - 0x3A, button 0 "No" (DS:5d00) at x = x2 - 0x1C,
     both y = y2 - 0x23 (DS:9316/9318 = x of 0/1, DS:931a/931c = y, DS:930e/9312 = label pointers)
     Button_Draw(0); Button_Draw(1)
-HotZones_Setup(type, x1, x2, y2)               # §4.5
+Box_SetupInput(type, x1, x2, y2)               # §4.5
 ty = y1 + 9 (+0x0E with a title); DS:a1ff = ty
 DS:a201 = Text_Draw(x1 + 7, ty, text)          # line count = item count of a drop-down
 if slow CPU and not (g_uiMode & 0x40): Present_Dirty()
@@ -309,7 +309,7 @@ selected; total 72 ticks = 0.304 s, blocking.
 `Delay_Ticks(u32 n)` (43cb:0ee8) [O]: `t = g_ticks + n; while g_ticks < t: wait` (32-bit
 compare of the 236.7 Hz counter).
 
-### 4.5 `HotZones_Setup` (43cb:12cf) [`Box_SetupInput`] `(type, x1, x2, y2)` [O]
+### 4.5 `Box_SetupInput` (43cb:12cf) `(type, x1, x2, y2)` [O]
 
 Selects the context and rewrites its zone (`z`) and key (`k`) lists:
 
@@ -476,7 +476,7 @@ ink black; `Box_DrawFrame(2, 8, 0x13, 0x96, 0xBD, title DS:52ee[topic])`; DS:a1f
    else "See Next Page" (DS:5d16); `Button_Draw(1)`; if page ≠ 0: button 0 = "Go Back a Page"
    (DS:5d24) at x 0x10, `Button_Draw(0)`; on page 0 button 0 is set equal to button 1 (same x and
    label) and not drawn;
-4. `HotZones_Setup(2, 8, 0x96, 0xBD)`;
+4. `Box_SetupInput(2, 8, 0x96, 0xBD)`;
 5. pictures: p1 = DS:5bed[idx], p2 = DS:5c0b[idx] (frame·2, −1 = none), x1 = DS:5c29[idx], x2 =
    DS:5c47[idx], y = DS:5c65[idx] (all i16[15]); p1 drawn at (x1, y), p2 at (x2, y), flags 0x40
    (masked, hotspot applied), from the **currently loaded sprite bank**. Pages with pictures:
@@ -579,9 +579,9 @@ which the walk-off animation uses [O; behaviour of those updates: player spec].
 | 1, 3, 5, 11 | `TitleStep_Wait` 00b2 | see 8.3 |
 | 2 | `TitleStep_Story1` 017f | `Title_ClearBox()`; `Text_Draw(6, 0x20, DS:8a5a)` (story 1, LF and TAB markup); `Title_DrawSprite(0x0C, 0x48, frame 32, 0x40)`; `Text_Draw(0x11, 0xA0, DS:8a48)`; phase++; `g_dirty++` |
 | 4 | `TitleStep_Story2` 01cc | `Title_ClearBox()`; `Text_Draw(6, 0x20, DS:8b54)`; `Text_Draw(10, 0xBD, DS:8c49)` (the S-key line for the series page); `Title_DrawSprite(8, 0x55, frame 33, 0x40)`; `Text_Draw(0x11, 0xA0, DS:8a48)`; phase++; `g_dirty++`; DS:80da = 13 (bottom-line click = S) |
-| 6 | `TitleStep_Finish` 0233 [`TitleStep_StartWalkoff`] | OPENING.PAN redrawn (removes the box and texts); `Sprites_EraseAll(1, 1)`; `Anim_Set(1, 0x5A)` (walk-off); phase++ |
-| 7 | `TitleStep_Clear` 027a [`TitleStep_WaitWalkoff`] | if slot-1 script id DS:8ff6 = 0 (script ended) or `g_cmd` = 8: phase++, DS:8ff2 = −1, DS:8ff8 = 0, `Anim_Clear(1)` (Enter does not consume the command) |
-| 8 | `TitleStep_Done` 02a3 [`TitleStep_WaitActorGone`] | if actor-table frame DS:9159 = −1: phase = 9 |
+| 6 | `TitleStep_StartWalkoff` 0233 | OPENING.PAN redrawn (removes the box and texts); `Sprites_EraseAll(1, 1)`; `Anim_Set(1, 0x5A)` (walk-off); phase++ |
+| 7 | `TitleStep_WaitWalkoff` 027a | if slot-1 script id DS:8ff6 = 0 (script ended) or `g_cmd` = 8: phase++, DS:8ff2 = −1, DS:8ff8 = 0, `Anim_Clear(1)` (Enter does not consume the command) |
+| 8 | `TitleStep_WaitActorGone` 02a3 | if actor-table frame DS:9159 = −1: phase = 9 |
 | 9 | 0 | end of the title, `main` enters the sign-in |
 | 10 | `Title_SuperSolversPage` 02b1 | 8.4 |
 | 12 | `Title_ResetPhase` 042b | phase = 0, DS:8a14 = 0 (back to the title page) |
@@ -710,10 +710,10 @@ ranges 0x4D..0x56 and 0x59..0x62 (12-px spacing) while the rows are drawn 11 px 
 rows 3+ keep 0x62+11k.
 
 `SignIn_DrawNameEntry` (0189): `SignIn_DrawPanel(); MsgBox_Draw(15)`; ba07 |= 2;
-`Gfx_FrameRect(0x30, 0x6F, 0x70, 0x84, 0xFF)`; if ba06 ≠ 0: `SignIn_DrawCaret(0x35, 0x75, ba06)`;
+`Gfx_FrameRect(0x30, 0x6F, 0x70, 0x84, 0xFF)`; if ba06 ≠ 0: `SignIn_DrawTypedChar(0x35, 0x75, ba06)`;
 c6ca = 1; `SignIn_DrawField(1)`.
 
-`SignIn_DrawCaret(x, y, ch)` (05a9) [`SignIn_DrawTypedChar`]: `Font_DrawChar(ink, x, y, ch)` (x,
+`SignIn_DrawTypedChar(x, y, ch)` (05a9): `Font_DrawChar(ink, x, y, ch)` (x,
 y as u8); `g_dirty = 1`. It draws a typed character, not a caret.
 
 `SignIn_DrawField(on)` (05d4): w = (u8)`Text_Width(ba0a)`; x1 = (u8)(w + 0x36), x2 = x1 + 4; fill
@@ -746,7 +746,7 @@ DS:9323 = 15; Esc → ba07 = 1, `UI_ForceRedraw()`, DS:922e = 1; ↑/↓ with wr
 | 0 Esc | no players: clear the name, c6bf = 0, `UI_ForceRedraw()`, `SignIn_DrawPanel()`, ba07 = 9, `MsgBox_Draw(9)`, DS:9323 = 14; else ba07 = 1 and DS:6168 = 1 (back to the list) |
 | ba06 = 0x1F (Backspace), c6bf ≠ 0 | c6ca = 0; `SignIn_DrawField(0)` (cursor block white); c6bf−−; ba0a[c6bf] = 0; c6ca = 1; `SignIn_DrawField(1)`. The deleted glyph is only covered by the new cursor block (glyph column x−1 and row 0x75 are not cleared) [O, reproduce by drawing the same way] |
 | other non-printable (also "no command") | caret blink: if ba09 ≠ 0 and DS:90fe ≤ 6: c6ca ^= 1, `SignIn_DrawField(0)`, ba09 = 0; elif DS:90fe > 6: ba09 = 1. One toggle per 13-tick cycle: the cursor blinks with period 26 ticks (0.55 s) [O; capture `tandy/19` shows the off phase] |
-| printable 0x20..0x7A, c6bf < 8, not a leading space | w = (u8)`Text_Width(ba0a)`; c6ca = 0; `SignIn_DrawField(0)`; `SignIn_DrawCaret(w + 0x35, 0x75, ba06)`; ba0a[c6bf++] = ba06; c6ca = 1; `SignIn_DrawField(1)` |
+| printable 0x20..0x7A, c6bf < 8, not a leading space | w = (u8)`Text_Width(ba0a)`; c6ca = 0; `SignIn_DrawField(0)`; `SignIn_DrawTypedChar(w + 0x35, 0x75, ba06)`; ba0a[c6bf++] = ba06; c6ca = 1; `SignIn_DrawField(1)` |
 
 Accepted characters: digits, letters, space (not leading), at most 8. Shifted keys never arrive
 in DOSBox-X (REFERENCE_CAPTURES §5.1); the first letter is upper-cased by 9.2.
@@ -800,7 +800,7 @@ every game (`Game_End`). No write at level changes or on the title [O, matches R
 |---|---|---|
 | +0x0BB+i, i = 0..47 | low byte of `g_cellPicture[g_hidingCells[i]]` (DS:0caa, DS:11aa) | u16 = byte (zero-extended) |
 | +0x0F4+i, i = 0..47 | low byte of `g_cellContent[g_hidingCells[i]]` (DS:0faa) | same |
-| +0x0EB+j (= +0x0BB+48+j), j = 0..8 | low byte of `g_cellPicture[g_castleCells[j]]` (DS:120a) | same |
+| +0x0EB+j (= +0x0BB+48+j), j = 0..8 | low byte of `g_cellPicture[g_variableCells[j]]` (DS:120a) | same |
 | +0x124+2k, k = 5..0 | u16 DS:122e[DS:62b1[k]] (index bytes {1, 2, 5, 6, 9, 10}) | DS:122e[DS:62ab[k]] (same indices) |
 | +0x140 | `g_tier` | `g_tier` |
 | +0x142 | `g_level` | `g_level` |
@@ -857,7 +857,7 @@ return r != 0
 
 `Game_NewSetup` (0bd6): `g_treasuresFound` = 0; `g_keyState` = 8; DS:90f8 = 4; `g_shopCoinsOwed` =
 4; slots (18 bytes) = 0xFF; masks (9) = 7; clue words (9) = 0; found masks (3) = 0;
-`Layout_ClearSlots(); Castle_ResetCells(); Layout_Generate()`; DS:8fa5 = `g_slowCpu`.
+`Layout_ClearSlots(); Cells_ResetVariable(); Layout_Generate()`; DS:8fa5 = `g_slowCpu`.
 
 `Game_End` (09a2): `g_gamesPlayed++`; `g_lastGameTreasures` (DS:9232) = `g_treasuresFound`;
 DS:9289 = `g_tier`; record +9 = 0; record +0x15A = `g_nets`; record +0x15C = `g_coins` (banked
@@ -1088,7 +1088,7 @@ Fills (bytes, rows): (0, 0)-(0x9F, 0x0A) 0xFF; (0, 0x0B)-(0x9F, 0x0E) 0x00; (3, 
 0x12)-(1, 0x8D) 0xFF; (0x9F, 0x0E)-(0x9F, 0x91) 0x00; (0x9E, 0x0F)-(0x9E, 0x90) 0xF0; (0x9E,
 0x12)-(0x9E, 0x8D) 0xFF; (0, 0x91)-(0x9F, 0xC7) 0x00; (3, 0x91)-(0x9C, 0x91) 0xFF; (2, 0x90)-(0x9D,
 0x90) 0xFF. Then the three menu titles off; `g_fullRedraw = 1; Playfield_Redraw()`; if any of
-DS:8f9f..8fa2 ≠ 0: copy them to DS:7d7c/7d7e/7d80/7d82 and `Treasures_DrawFound()`; if DS:922e ≠ 1:
+DS:8f9f..8fa2 ≠ 0: copy them to DS:7d7c/7d7e/7d80/7d82 and `ShelfRoom_DrawShelf()`; if DS:922e ≠ 1:
 `Sprites_DrawSorted(1, 13)`; DS:922e = 0; DS:925b = 0; `g_dirty++`; the caches DS:928d (coins),
 924d (nets), 9259 (found), 9268 (key state), 91fb (prompt) are each incremented so that the parts
 below redraw.
@@ -1127,17 +1127,17 @@ level 0/1/2 for states 8/10/12); if `g_sceneWanted` < 3: ink 0xCCCC, for k = 2 d
 0xAD, 0xBA); DS:9268 = `g_keyState`; `g_dirty++`. The box is redrawn only when the key state
 changes or someone moves the cache (quiz close, level change, full redraw).
 
-If DS:90f8 ≠ DS:91fb: `Hud_DrawHintIcon()` (0c2e) [`Hud_DrawPromptIcon`]: frame 59 (message box)
+If DS:90f8 ≠ DS:91fb: `Hud_DrawPromptIcon()` (0c2e): frame 59 (message box)
 at (0, 0) opaque; if DS:90f8 ≠ 0: frame 60 + DS:90f8/2 (61 "move box / select", 62 "Press ↓ to
 drop coin", 63 "Press Enter to go on"); DS:91fb = DS:90f8; `g_dirty++`. Writers of DS:90f8: 4 at a
 new game, quiz close, and from `Input_MouseWalk` (4 where a coin can be dropped, else 0); 2 while
 a question is open; 6 after an answer; 0 while the menu bar is open; saved in the record.
 
-### 11.4 Rank chest screen: `Rank_Update` (0edf) [RankChest], per frame [O, verified for totals 0, 6, 300]
+### 11.4 Rank chest screen: `RankChest_Update` (0edf), per frame [O, verified for totals 0, 6, 300]
 
 Driven by DS:8fbd, a per-frame copy of DS:925d (`Frame_Begin` 130f:0285). DS:925d is set to 1 by
-`Cell_P71_V71` (176a:102a) when the player enters the chest view (scene 4, SHACK.PAN/SHACK.PAK;
-reached from the clubhouse rank picture and after the castle), and cleared by `Cell_P72`
+`Cell_P71_V71_ToRankScreen` (176a:102a) when the player enters the chest view (scene 4, SHACK.PAN/SHACK.PAK;
+reached from the clubhouse rank picture and after the castle), and cleared by `Cell_P72_RankScreen`
 (176a:10b9; 176a:110f also clears the CHAMPION timer) when he leaves; cells spec. No painter runs
 in scene 4, so this screen has no HUD or menu titles.
 
@@ -1161,7 +1161,7 @@ in scene 4, so this screen has no HUD or menu titles.
   frames; it ends visible [O; runtime capture `avi/ega_r2_crown_nokey.avi`: visible at AVI frames
   3042, 3053, 3063, 3074, 3084, i.e. about 914 loop frames/s on that screen].
 
-`Rank_DrawChestCoin(x, y, frame2)` (1261): `Sprite_Draw` frame frame2/2 at (x, y), flags 0x40.
+`RankChest_DrawStar(x, y, frame2)` (1261): `Sprite_Draw` frame frame2/2 at (x, y), flags 0x40.
 
 ---
 
@@ -1173,16 +1173,16 @@ equal or lower id) and their triggers [O, call sites from `sndcalls.py`, script 
 
 | Effect | Triggers |
 |---|---|
-| 0 | coin toss: second effect of scripts 0x1A/0x1B (`PlrSt_10` 18cf:0a73/0ad3 when a coin is dropped) |
-| 1 | player slides into a gap: `PlrSt_29` 18cf:1308, `PlrSt_30` 18cf:1379 |
-| 2 | elf dust thrown: scripts 0x27/0x28 (`ElfSt_52` 4521:0802, `ElfSt_56` 4521:0a59); end sequence `PlrSt_44` 18cf:0133; treasure room `Cell_P70` 176a:0625 |
-| 3 | rank chest step `Rank_Update` 130f:11b5; script 0x4F (`Elf_CheckNet` 4521:1731, a net catch); scripts 0x57/0x58 (`CoinElf_Check` 4521:0dc2..) |
+| 0 | coin toss: second effect of scripts 0x1A/0x1B (`PlrSt_10_OnPath` 18cf:0a73/0ad3 when a coin is dropped) |
+| 1 | player slides into a gap: `PlrSt_29_PassageUp` 18cf:1308, `PlrSt_30_SlideDown` 18cf:1379 |
+| 2 | elf dust thrown: scripts 0x27/0x28 (`ElfSt_52` 4521:0802, `ElfSt_56` 4521:0a59); end sequence `PlrSt_44_EndSparkle` 18cf:0133; treasure room `Cell_P70_TreasureRoom` 176a:0625 |
+| 3 | rank chest step `RankChest_Update` 130f:11b5; script 0x4F (`Elf_CheckNet` 4521:1731, a net catch); scripts 0x57/0x58 (`CoinElf_Check` 4521:0dc2..) |
 | 4 | HUD coin count-up step `Hud_Redraw` 130f:0aee; bonus coins cell 1568:1ef8; script 0x59 (`CoinElf_Check` 4521:0e07, coin elf pays) |
 | 5 | castle creature hit 1568:192c; first effect of the coin-toss scripts 0x1A/0x1B; elf dust hit, scripts 0x29/0x2A (`ElfSt_53` 4521:08c2/0939, `ElfSt_57` 4521:0b19/0b90) |
-| 6 | key found `Search_Update` 4a03:0228/0257/0286 (level 0/1/2); `PlrSt_69` 18cf:0743 |
-| 7 | treasure found `Search_Update` 4a03:01d0; `PlrSt_64` 18cf:05fc; `Cell_P70` 176a:0f01 |
-| 8 | gate opens: `Cell_P31` 1568:0fa8, `Cell_P39_V39` 1568:13c8, `Cell_P42` 176a:0362; `PlrSt_42` 18cf:00cf, `PlrSt_45` 18cf:015e |
-| 9 | `Cell_P45_V45` 1568:164d, `Cell_P62` 1568:1a9a, `PlrSt_66` 18cf:06b3 |
+| 6 | key found `Search_Update` 4a03:0228/0257/0286 (level 0/1/2); `PlrSt_69_ChampCrowned` 18cf:0743 |
+| 7 | treasure found `Search_Update` 4a03:01d0; `PlrSt_64_ChampChest` 18cf:05fc; `Cell_P70_TreasureRoom` 176a:0f01 |
+| 8 | gate opens: `Cell_P31_GateL0` 1568:0fa8, `Cell_P39_V39_GateL1` 1568:13c8, `Cell_P42_GateL2` 176a:0362; `PlrSt_42_EndHorn` 18cf:00cf, `PlrSt_45_EndChestOpen` 18cf:015e |
+| 9 | `Cell_P45_V45_Bridge` 1568:164d, `Cell_P62_IceSlide` 1568:1a9a, `PlrSt_66_ChampScream` 18cf:06b3 |
 | 10 | right answer `Quiz_Correct` 46ce:0638 |
 | 11 | wrong answer `Quiz_Wrong` 46ce:06c8 |
 
@@ -1190,10 +1190,10 @@ Music (`Music_Play(t)` 491b:0791; t by `g_area`: < 4 → 0, < 7 → 1, < 15 → 
 
 | Tune | Started by |
 |---|---|
-| 1 | `Title_Run` 4ba4:0473 (loop flag DS:63ba = 1 for the title only); end sequence `PlrSt_48` 18cf:01fe; `Cell_P11` 1568:03ca (area 5) |
+| 1 | `Title_Run` 4ba4:0473 (loop flag DS:63ba = 1 for the title only); end sequence `PlrSt_48_EndFlightInit` 18cf:01fe; `Cell_P11_ClubDoor` 1568:03ca (area 5) |
 | by area | `Game_Start` 47c7:0954/0967/097a; Ctrl+S on (43cb:0408..042e); option change via DS:5bc5 (`Sound_SyncState` 43cb:04b4..04da) |
-| 2 | `Cell_P5` 1568:0073 (area 7), `Cell_P9` 01f9 (0x0B), `Cell_P35` 037c (9), `Cell_P17` 0b7c (0x0A), `Cell_P18` 0c3f (0x0B), `Cell_P60` 19a1 (0x0C), `Cell_P42` 176a:03aa (0x0D, castle) |
-| 0 | `Cell_P6` 012a, `Cell_P10` 02f9, `Cell_P12` 046b, `Cell_P37` 0bf1, `Cell_P38` 0cb4, `Cell_P44` 0d17, `Cell_P61` 1a16 (all set area 0; P12 and P44 call `Music_Stop` first) |
+| 2 | `Cell_P5_CaveDoorW` 1568:0073 (area 7), `Cell_P9_CaveDoorE` 01f9 (0x0B), `Cell_P35_UpperRoomDown` 037c (9), `Cell_P17_MineDoorW` 0b7c (0x0A), `Cell_P18_MineDoorE` 0c3f (0x0B), `Cell_P60_IceDoor` 19a1 (0x0C), `Cell_P42_GateL2` 176a:03aa (0x0D, castle) |
+| 0 | `Cell_P6_CaveExitW` 012a, `Cell_P10_CaveExitE` 02f9, `Cell_P12_StartRoom` 046b, `Cell_P37_MineExitW` 0bf1, `Cell_P38_MineExitE` 0cb4, `Cell_P44_CastleDoor` 0d17, `Cell_P61_IceCaveExit` 1a16 (all set area 0; P12 and P44 call `Music_Stop` first) |
 
 Areas set without a music call: 2 (1568:0af3, 0f51), 3 (13a5, 144c), 0x0E (0dd3, 1a8a), 0 (1b8d,
 18cf:1327/1398), 4 (sign-in), 6 (title). Stops: `Music_Stop` in `Game_Start`, `Game_Shutdown`, the
@@ -1242,7 +1242,7 @@ ARCHITECTURE §5.15.
 | 59cc | 23 × 16 bytes | box table (§4.1) |
 | 5b3c | u16 | line height (12) |
 | 5b40 / 5b51 | i8[17] / i8[18] | menu ←/→ and ↑/↓ steps by command |
-| 5b63 | i8[] (index −2..5) | menu index wrap |
+| 5b63 | i8[] (index −2..5; elements −2, −1 are the last bytes of 5b51) | menu index wrap |
 | 5b69 | u16[3] | first dialog id per menu {0, 8, 11} |
 | 5b6f | far ptr[14] | unused copy of handlers 0..13 |
 | 5ba7 | i16[14] | dialog id → box (−1 = help) |
@@ -1312,7 +1312,7 @@ ARCHITECTURE §5.15.
 | 43cb:107a | Help_LoadFile | `int far(void)` | §6.1 |
 | 43cb:10c4 | Help_DrawPage | `void near(int topic,int page,u8 far *data)` | §6.1 |
 | 43cb:1273 | Help_Open | `void near(int topic)` | §6.1 |
-| 43cb:12cf | HotZones_Setup [Box_SetupInput] | `void near(int type,u8 x1,u8 x2,int y2)` | §4.5 |
+| 43cb:12cf | Box_SetupInput | `void near(int type,u8 x1,u8 x2,int y2)` | §4.5 |
 | 43cb:156b | Null_Handler2 | `void far(void)` | `RETF` only; the "no handler" entry of the elf state table (also addressed as 4521:000b) |
 
 ### 15.2 Segment 4ba4 (title.c)
@@ -1325,9 +1325,9 @@ ARCHITECTURE §5.15.
 | 4ba4:0156 | Title_DrawSprite | `void near(int x,int y,int frame2,u8 flags)` | BEGIN frame |
 | 4ba4:017f | TitleStep_Story1 | `void near(void)` | Phase 2 |
 | 4ba4:01cc | TitleStep_Story2 | `void near(void)` | Phase 4 |
-| 4ba4:0233 | TitleStep_Finish [TitleStep_StartWalkoff] | `void near(void)` | Phase 6 |
-| 4ba4:027a | TitleStep_Clear [TitleStep_WaitWalkoff] | `void near(void)` | Phase 7 |
-| 4ba4:02a3 | TitleStep_Done [TitleStep_WaitActorGone] | `void near(void)` | Phase 8 |
+| 4ba4:0233 | TitleStep_StartWalkoff | `void near(void)` | Phase 6 |
+| 4ba4:027a | TitleStep_WaitWalkoff | `void near(void)` | Phase 7 |
+| 4ba4:02a3 | TitleStep_WaitActorGone | `void near(void)` | Phase 8 |
 | 4ba4:02b1 | Title_SuperSolversPage | `void near(void)` | Phase 10 (§8.4) |
 | 4ba4:042b | Title_ResetPhase | `void near(void)` | Phase 12 |
 | 4ba4:0434 | Title_Run | `void far(void)` | Title loop (§8.1) |
@@ -1346,7 +1346,7 @@ ARCHITECTURE §5.15.
 | 47c7:04a4 | Users_NameExists | `int far(void)` | §9.7 |
 | 47c7:0514 | Users_ReadFile | `void far(void)` | §9.7 |
 | 47c7:055a | Users_WriteFile | `void far(void)` | §9.7 |
-| 47c7:05a9 | SignIn_DrawCaret [SignIn_DrawTypedChar] | `void far(u8 x,u8 y,u8 ch)` | §9.3 |
+| 47c7:05a9 | SignIn_DrawTypedChar | `void far(u8 x,u8 y,u8 ch)` | §9.3 |
 | 47c7:05d4 | SignIn_DrawField | `void far(char on)` | Cursor block and underscores |
 | 47c7:06d4 | SignIn_HighlightRow | `void far(u8 x1,u8 y1,u8 x2,u8 y2,u16 a,u16 b)` | Colour exchange a↔b via 3 |
 | 47c7:071a | SignIn_MoveHighlight | `void far(void)` | Row highlight toggle |
@@ -1408,11 +1408,11 @@ ARCHITECTURE §5.15.
 | Address | Name | Signature | Summary |
 |---|---|---|---|
 | 130f:07a5 | Hud_Redraw | `void far(void)` | Painter 0 (§11.1-11.3) |
-| 130f:0c2e | Hud_DrawHintIcon [Hud_DrawPromptIcon] | `void far(void)` | §11.3 |
+| 130f:0c2e | Hud_DrawPromptIcon | `void far(void)` | §11.3 |
 | 130f:0c73 | Screen_DrawOverlay | `void far(void)` | §2.4 |
 | 130f:0d00 | Hud_DrawNumber | `void far(int x,int y,int ink,int v)` | §11.2 |
-| 130f:0edf | Rank_Update [RankChest_Update] | `void far(void)` | §11.4 |
-| 130f:1261 | Rank_DrawChestCoin | `void far(int x,int y,int frame2)` | §11.4 |
+| 130f:0edf | RankChest_Update | `void far(void)` | §11.4 |
+| 130f:1261 | RankChest_DrawStar | `void far(int x,int y,int frame2)` | §11.4 |
 
 ---
 

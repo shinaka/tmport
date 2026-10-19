@@ -1,6 +1,7 @@
-// Platform layer of the app area: the window icon decoder (RT_GROUP_ICON / RT_ICON from the
-// user's EXE), the fullscreen hot keys (Alt+Enter / F11, taken before the menu bar and the game),
-// and the fullscreen setting. Headless only: nothing opens a window.
+// Platform layer: the window icon decoder (RT_GROUP_ICON / RT_ICON from the user's EXE), the
+// fullscreen hot keys (Alt+Enter / F11, taken before the menu bar and the game), the fullscreen
+// setting, and the edition-neutral host under the Engine (event order, window state, F12, frame
+// dumps). Headless only: nothing opens a window.
 #include <doctest/doctest.h>
 
 #include <SDL3/SDL.h>
@@ -18,6 +19,7 @@
 #include "platform/engine.h"
 #include "platform/engine_setup.h"
 #include "platform/exe_icon.h"
+#include "platform/host.h"
 #include "save/settings.h"
 #include "test_data.h"
 #include "text/font.h"
@@ -349,4 +351,140 @@ TEST_CASE("fullscreen setting: tmport.ini [engine] fullscreen and --fullscreen /
     CHECK(o->windowed);
     std::vector<const char*> a = {"tmport", "--windowed", "--data", "X"};
     CHECK(app::isGameInvocation(static_cast<int>(a.size()), const_cast<char**>(a.data())));
+}
+
+// ------------------------------------------------------------------------------------- host
+
+TEST_CASE("host: event order, window state, hot keys and F12 (headless)") {
+    ManualClock clock;
+    platform::HostConfig cfg;
+    cfg.layout = gfx::PresenterLayout::dos1990();
+    cfg.clock = &clock;
+    cfg.screenshotDir = outDir("host_shots");
+    cfg.screenshotPrefix = "hosttest";
+    platform::Host host(cfg);
+    CHECK_FALSE(host.hasWindow());
+    CHECK(host.layout() == gfx::PresenterLayout::dos1990());
+
+    std::vector<std::string> log;
+    platform::HostHandlers h;
+    h.filter = [&](const SDL_Event& e) {
+        const bool eat = e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_A;
+        if (eat) log.push_back("filter:a");
+        return eat;
+    };
+    h.window = [&](const SDL_Event& e) { log.push_back(std::format("window:{}", static_cast<unsigned>(e.type))); };
+    h.input = [&](const SDL_Event& e) {
+        if (e.type == SDL_EVENT_TEXT_INPUT) log.push_back(std::string("text:") + e.text.text);
+        else if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_KEY_UP)
+            log.push_back(std::format("{}:{}", e.type == SDL_EVENT_KEY_DOWN ? "down" : "up", static_cast<unsigned>(e.key.key)));
+        else log.push_back(std::format("input:{}", static_cast<unsigned>(e.type)));
+    };
+    int activations = 0;
+    h.activation = [&](bool) { ++activations; };
+    host.setHandlers(std::move(h));
+
+    host.postEvent(simple(SDL_EVENT_WINDOW_FOCUS_LOST));
+    host.postEvent(key(true, SDLK_A));
+    host.postEvent(key(true, SDLK_B));
+    {
+        std::string text = "xyz";
+        host.postEvent(textInput(text.c_str()));
+        text = "---";  // the host keeps its own copy
+    }
+    CHECK(host.pendingPostedEvents() == 4);
+    host.dispatchPending();
+    CHECK(host.pendingPostedEvents() == 0);
+    CHECK_FALSE(host.focused());
+    REQUIRE(log.size() == 4);
+    CHECK(log[0] == std::format("window:{}", static_cast<unsigned>(SDL_EVENT_WINDOW_FOCUS_LOST)));
+    CHECK(log[1] == "filter:a");
+    CHECK(log[2] == std::format("down:{}", static_cast<unsigned>(SDLK_B)));
+    CHECK(log[3] == "text:xyz");
+    // Headless nothing freezes, whatever the focus.
+    CHECK_FALSE(host.paused());
+    host.pump();
+    CHECK(activations == 0);
+    host.setAppActive(false);
+    host.setAppActive(false);
+    host.setAppActive(true);
+    CHECK(activations == 2);
+
+    // Alt+Enter toggles fullscreen; the edition sees only the Alt press and its release.
+    log.clear();
+    host.postEvent(key(true, SDLK_LALT, SDL_KMOD_LALT));
+    host.postEvent(key(true, SDLK_RETURN, SDL_KMOD_LALT));
+    host.postEvent(key(false, SDLK_RETURN, SDL_KMOD_LALT));
+    host.postEvent(key(false, SDLK_LALT));
+    host.dispatchPending();
+    CHECK(host.fullscreen());
+    REQUIRE(log.size() == 2);
+    CHECK(log[0] == std::format("down:{}", static_cast<unsigned>(SDLK_LALT)));
+    CHECK(log[1] == std::format("up:{}", static_cast<unsigned>(SDLK_LALT)));
+    press(host, SDLK_F11);
+    host.dispatchPending();
+    CHECK_FALSE(host.fullscreen());
+
+    // F12 writes the game area (320x200) into the screenshot folder; the edition does not see it.
+    log.clear();
+    std::vector<uint32_t> frame(320 * 200, 0xFF5500AAu);
+    host.presenter().presentFrame(frame);
+    press(host, SDLK_F12);
+    host.dispatchPending();
+    CHECK(log.size() == 1);  // only the release
+    int shots = 0;
+    for (const auto& f : std::filesystem::directory_iterator(cfg.screenshotDir))
+        if (pathToUtf8(f.path().filename()).starts_with("hosttest_")) ++shots;
+    CHECK(shots == 1);
+
+    // Close requests: sticky flag, counted, and delivered to the edition.
+    log.clear();
+    host.postEvent(simple(SDL_EVENT_WINDOW_CLOSE_REQUESTED));
+    host.dispatchPending();
+    CHECK(host.quitRequested());
+    CHECK(host.closeRequests() == 1);
+    REQUIRE(log.size() == 1);
+    CHECK(log[0] == std::format("input:{}", static_cast<unsigned>(SDL_EVENT_WINDOW_CLOSE_REQUESTED)));
+    host.clearQuitRequest();
+    CHECK_FALSE(host.quitRequested());
+
+    // The clock: a custom clock drives nowNs.
+    CHECK(host.nowNs() == clock.nowMs() * 1'000'000ull);
+    clock.advance(5);
+    CHECK(host.nowNs() == clock.nowMs() * 1'000'000ull);
+
+    // Frame dump of the canvas: 320x200.
+    const auto dump = cfg.screenshotDir / "dump.png";
+    REQUIRE(host.writeFrameDump(dump));
+    auto data = readWholeFile(dump);
+    REQUIRE(data);
+    REQUIRE(data->size() > 24);
+    CHECK((*data)[19] == 64);   // width 320 = 0x140 (low byte of the big-endian u32 at 16)
+    CHECK((*data)[18] == 1);
+    CHECK((*data)[23] == 200);  // height
+}
+
+TEST_CASE("engine: built on a host with the Windows layout") {
+    TM_REQUIRE_GAME_DATA();
+    ManualClock clock;
+    EngineConfig cfg;
+    cfg.clock = &clock;
+    cfg.windowScale = 0;  // treated as 1, as before
+    Engine e(*g, gfx::ColorMode::Colour256, cfg);
+    CHECK(e.host().layout() == gfx::PresenterLayout::windowsCd());
+    CHECK(&e.presenter() == &e.host().presenter());
+    CHECK(&e.clock() == &clock);
+    CHECK(e.host().config().windowScale == 1);
+    CHECK(e.host().config().screenshotPrefix == "tmport");
+    CHECK(e.presenter().canvas().size() == 640u * 480u * 4u);
+    // Events posted through the engine wait in the host until the next fetch.
+    press(e, SDLK_RETURN);
+    CHECK(e.pendingPostedEvents() == 2);
+    CHECK(e.host().pendingPostedEvents() == 2);
+    CHECK(e.getInputCode() == 0x0D);
+    CHECK(e.pendingPostedEvents() == 0);
+    // The host's close request reaches the input model as 0x1B.
+    e.postEvent(simple(SDL_EVENT_WINDOW_CLOSE_REQUESTED));
+    CHECK(e.getInputCode() == 0x1B);
+    CHECK(e.quitRequested());
 }

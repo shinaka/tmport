@@ -1,0 +1,121 @@
+#pragma once
+// The DOS sound driver as a sample source: the sequencer (491b) advanced by sample count at the
+// PIT rate 1193182 / 5041 Hz, and the device models it writes to (fmt_sound.md §9). Single
+// threaded; DosAudioDevice adds the SDL stream and the command queue around it.
+//
+// Clock: the sequencer ticks at the start of each tick's block of samples; block lengths come from
+// a running fractional accumulator (samples per tick = rate * 5041 / 1193182, about 202.8 at
+// 48 kHz), the same arithmetic as tools/dos/dos_sound.py, so timing never depends on the video
+// frame rate and Raw renders match the oracle sample for sample.
+
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <span>
+#include <vector>
+
+#include "dos/audio/opl_backend.h"
+#include "dos/audio/psg_synth.h"
+#include "dos/audio/sequencer.h"
+#include "dos/audio/sound_data.h"
+#include "dos/audio/speaker_synth.h"
+
+namespace tmport::dos {
+
+struct DosRenderConfig {
+    int sampleRate = 48000;  // 44100 and 49716 (the OPL2's native rate) work as well
+    SynthMode mode = SynthMode::Smooth;
+    NoiseType noise = NoiseType::Ncr8496;  // Raw + Ti15 = tools/dos/dos_sound.py exactly
+    double lowPassHz = 7000.0;             // Smooth mode: 2-pole low-pass (0 = off)
+    double dcBlockHz = 12.0;               // Smooth mode: 1-pole high-pass (0 = off)
+};
+
+class DosSoundRenderer final : private SoundPorts {
+public:
+    // `bank` must outlive the renderer. With the AdLib device and no back end given, the tunes play
+    // on OplFallbackSynth (opl_backend.h).
+    DosSoundRenderer(const SoundBank& bank, DosRenderConfig cfg, std::unique_ptr<OplBackend> opl = nullptr);
+
+    Sequencer& sequencer() { return seq_; }
+    const Sequencer& sequencer() const { return seq_; }
+    const DosRenderConfig& config() const { return cfg_; }
+    double samplesPerTick() const { return samplesPerTick_; }
+
+    // Called right before each PIT tick: the moment commands from the game take effect (between two
+    // interrupts, like the original's calls from the main loop).
+    void setTickHook(std::function<void()> hook) { tickHook_ = std::move(hook); }
+
+    // Writes n mono samples (synth levels: the speaker square is +-0.5, a PSG voice +-0.25; in
+    // Smooth mode after the filters). Ticks happen at block boundaries inside the call.
+    void render(double* out, size_t n);
+    // Runs the next PIT tick and appends exactly its block of samples to out (Raw-mode tools: this
+    // keeps the arithmetic identical to dos_sound.py, which renders one block per tick). Returns
+    // the number of samples appended.
+    size_t renderTick(std::vector<double>& out);
+
+    uint64_t ticks() const { return ticks_; }
+    // Samples left in the current tick's block (0 = the next render starts with a tick).
+    size_t samplesToNextTick() const { return left_; }
+
+    SpeakerSynth& speaker() { return speaker_; }
+    PsgSynth& psg() { return psg_; }
+
+private:
+    void beginTick();
+    void synthesize(double* out, size_t n);
+    void filter(double* out, size_t n);
+
+    // SoundPorts
+    void speakerDivisor(uint16_t divisor) override { speaker_.setDivisor(divisor); }
+    void speakerEnable(bool on) override { speaker_.setEnabled(on); }
+    void psgWrite(uint8_t value) override { psg_.write(value); }
+    void oplInit() override {
+        if (opl_) opl_->init();
+    }
+    void oplPlayTune(int tune, int variant) override {
+        if (opl_) opl_->playTune(tune, variant);
+    }
+    void oplNoteOn(int voice, uint8_t semitone) override {
+        if (opl_) opl_->noteOn(voice, semitone);
+    }
+    void oplNoteOff(int voice) override {
+        if (opl_) opl_->noteOff(voice);
+    }
+
+    DosRenderConfig cfg_;
+    SpeakerSynth speaker_;
+    PsgSynth psg_;
+    std::unique_ptr<OplBackend> opl_;
+    Sequencer seq_;  // after the synths and the OPL back end: its constructor calls oplInit()
+    std::function<void()> tickHook_;
+
+    double samplesPerTick_;
+    double acc_ = 0.0;
+    size_t left_ = 0;
+    uint64_t ticks_ = 0;
+
+    // Smooth-mode filters (RBJ biquad low-pass, one-pole DC blocker).
+    double b0_ = 1, b1_ = 0, b2_ = 0, a1_ = 0, a2_ = 0;
+    double z1_ = 0, z2_ = 0;
+    double dcR_ = 0, dcX_ = 0, dcY_ = 0;
+};
+
+// ---- offline helpers (tools and tests)
+
+struct OfflineRender {
+    std::vector<double> samples;
+    uint64_t ticks = 0;  // PIT ticks until the block stopped
+};
+// One effect (tune = false) or tune on a fresh renderer, from its start until its block stops, one
+// block per PIT tick like tools/dos/dos_sound.py render(); the music loops `loops - 1` times.
+// `afterTick` (optional) runs after each tick. Raw mode then appends dos_sound.py's 50 ms of
+// silence, Smooth mode 200 ms of filter ring-out.
+OfflineRender renderEntry(DosSoundRenderer& r, bool tune, int id, int loops = 1, double maxSeconds = 600.0,
+                          const std::function<void()>& afterTick = {});
+// tools/dos/dos_sound.py write_wav: peak-normalised to 0.9 of full scale, rounded half to even.
+std::vector<int16_t> toPcm16Normalized(std::span<const double> samples);
+// A fixed gain on the synth levels, clipped.
+std::vector<int16_t> toPcm16(std::span<const double> samples, double gain);
+
+}  // namespace tmport::dos

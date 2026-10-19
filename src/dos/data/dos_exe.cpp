@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "dos/data/dgroup_offsets.h"
 #include "util/file_util.h"
 
 namespace tmport::dos {
@@ -12,7 +13,7 @@ namespace tmport::dos {
 namespace {
 
 constexpr std::string_view kTurboC = "Turbo-C - Copyright (c) 1988 Borland Intl.";
-constexpr uint16_t kDsEgaPalette = 0x3C4A;  // 16 attribute registers + overscan (fmt_graphics.md)
+constexpr uint16_t kDsEgaPalette = dg::kPalEga;  // 16 attribute registers + overscan (fmt_graphics.md)
 
 uint16_t rd16(std::span<const uint8_t> b, size_t at) {
     if (at + 2 > b.size()) throw std::runtime_error("SST.EXE is truncated");
@@ -113,6 +114,12 @@ std::string_view DosExe::dsString(uint16_t off) const {
     const auto b = at(kDgroupSeg, off);
     const auto nul = std::find(b.begin(), b.end(), uint8_t{0});
     return {reinterpret_cast<const char*>(b.data()), static_cast<size_t>(nul - b.begin())};
+}
+
+std::span<const uint8_t> DosExe::dsBytes(uint16_t off, size_t n) const {
+    const auto b = at(kDgroupSeg, off);
+    if (b.size() < n) throw std::out_of_range("DS offset out of range");
+    return b.first(n);
 }
 
 DosExe::FarPtr DosExe::readFarPtr(uint16_t dsOff) const {

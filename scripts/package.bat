@@ -3,9 +3,11 @@ rem Builds a personal, ready-to-play copy of TM Port: dist\TMPort\tmport.exe nex
 rem so the game starts with no arguments (double-click tmport.exe). For your own use only: the result
 rem contains your copy of the game. See docs\BUILDING.md, "A ready-to-play copy".
 rem
-rem Usage: scripts\package.bat [game data] [--soundfont <sf2>] [--out <dir>] [--zip]
+rem Usage: scripts\package.bat [game data] [--dos <folder> | --no-dos] [--soundfont <sf2>] [--out <dir>] [--zip]
 rem   game data: the TMTWINCD folder or the CD image (.cue/.iso). Default: TM_DATA, then the
 rem   repository's extracted\wincd\TMTWINCD, then a single .cue/.iso under TM-WIN\.
+rem   --dos: the 1990 DOS edition's folder (with SST.EXE), copied as TM-DOS\. Default: TM_DATA_DOS,
+rem   then SST.EXE in, under or next to the game data, then the repository's TM-DOS\.
 rem Builds in build-package\ (set BUILD_DIR to change it) with the C runtime linked in, so the copy
 rem also runs on PCs without the Visual C++ runtime.
 setlocal

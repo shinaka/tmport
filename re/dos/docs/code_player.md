@@ -2,8 +2,8 @@
 
 Scope (wave 1, "player" topic): every function of segment `18cf` (player.c, 69 functions), `4306`
 (anim.c, 11), `4a03` (search.c, 4), the end-of-game and treasure-room functions of `176a` (cells2.c,
-18 of its 35 functions: `Cell_P64` .. `Shack_ResetDisplay`, 176a:0404-159d), and the rank chest
-screen of `130f` (`Rank_Update`, `Rank_DrawChestCoin`), which is the last step of the end flow.
+18 of its 35 functions: `Cell_P64_EndScreen` .. `Shack_ResetDisplay`, 176a:0404-159d), and the rank chest
+screen of `130f` (`RankChest_Update`, `RankChest_DrawStar`), which is the last step of the end flow.
 Wave-3 engineers implement from this document without reading the decompiled code.
 
 Evidence: Ghidra export `re/dos/ghidra_export/` (`functions/*.c`, `disassembly.asm`), bytes of
@@ -12,8 +12,8 @@ Evidence: Ghidra export `re/dos/ghidra_export/` (`functions/*.c`, `disassembly.a
 `tools/avi_frames.py`). Scratch scripts are in `extracted/scratch/dos_w1_player/`: `dis.py`
 (disassembly with DGROUP names), `dec.py` (decompile with slot/field names), `scripts.py` (script
 table dump), `animsum.py` (per-script summary: steps, ticks, movement, sfx). Capture requests:
-`extracted/scratch/dos_requests/player.md`. Rename suggestions: `re/names/dos/wave1_player.tsv`
-(this document uses the export's names and gives the suggested name where it helps).
+`extracted/scratch/dos_requests/player.md`. Names: the canonical names of
+`re/names/dos/` (merged in wave 2, decision table in `re/names/dos/README.md`).
 
 Notation: **[O]** observed in code, bytes or captures; **[I]** inferred. Addresses `SSSS:OOOO`
 (Ghidra, load segment 0x1000; file offset `(SSSS-0x1000)*16 + OOOO + 0x21F0`). `DS:XXXX` = DGROUP
@@ -76,8 +76,8 @@ byte DS:9100 -= 1; if it reached 0 and g_uiMode == 0: DS:9100 = 0x3c, g_seconds 
 `g_stepDone` is set by `Anim_Tick` when any slot shows a new frame (§3.2) and by `Player_Move` when
 the camera scrolls (§4.3); `Frame_Begin` (130f:025a) clears it at the start of each frame [O]. So at
 most one "step" of logic happens per drawn frame. Frame loop order (ARCHITECTURE §3.3) relevant
-here: `Frame_Begin` (latches, `Sprites_Snapshot(0, g_drawSlotCount)`) ... `Search_Update` ...
-`Playfield_Redraw` ... `Treasures_DrawFound`, `Rank_Update`, `Sprites_DrawSorted(0, n)`,
+here: `Frame_Begin` (latches, `Sprites_Snapshot(0, g_spriteSlotsDrawn)`) ... `Search_Update` ...
+`Playfield_Redraw` ... `ShelfRoom_DrawShelf`, `RankChest_Update`, `Sprites_DrawSorted(0, n)`,
 `Frame_Present`, `Sprites_EraseAll(0, n)` with n = DS:9283 = 13 while `g_uiMode == 0`, else 1
 (only the pointer, slot 0) [O 130f:0097-00c3].
 
@@ -114,13 +114,13 @@ The player object `g_player` (DS:37e2): +0 world x (0..0x7ff within a 16-cell ro
 points at the object being processed; `Player_Update` sets it to the player [O].
 
 Camera `camX`/`camY` (DS:37ea/37ec, camY a multiple of 0x80 except during vertical scrolls). Scroll
-requests `g_scrollDX`/`g_scrollDY` (DS:37ee/37f0) are latched by `Frame_Begin` and executed by
+requests `g_camStepX`/`g_camStepY` (DS:37ee/37f0) are latched by `Frame_Begin` and executed by
 `Scroll_Update` (130f:04e5) [O].
 
 `Cell_GetMask` (1568:1fe4, world agent) calls the player handler of the cell containing
 `g_curObj`, which returns the terrain mask (DS:92c9) and may teleport the object, change
 `g_level`, set `g_transition` (DS:9217: 1 or 2 while a teleport redraw is pending) and set
-`g_redrawRequest` (DS:924f) [O]. `Player_Update` and `Anim_Tick` do nothing while `g_transition`
+`g_fullRedrawReq` (DS:924f) [O]. `Player_Update` and `Anim_Tick` do nothing while `g_transition`
 is non-zero [O 18cf:181a, 4306:0032].
 
 ### 2.4 Sound calls used here
@@ -250,7 +250,7 @@ which copies the level just before). For each slot i in [from, to) [O]:
 * always copy `owner` into the record.
 
 Quirk [O]: because of the skip rule, moving a stopped slot (writing x/y) does not move its sprite.
-Code that drives sprites without scripts sets `prev = 0` (Search_Update, Cell_V49).
+Code that drives sprites without scripts sets `prev = 0` (Search_Update, Cell_V49_Showcase).
 
 ### 3.5 Sprites_DrawSorted (4306:0497) and Sprites_EraseAll (4306:06dd)
 
@@ -299,11 +299,11 @@ load and store it [O 47c7:0c62, 47c7:0e0e]. It has no effect on play.
 | 0 | mouse pointer (`Mouse_Poll` 130f:0d94, scripts 1, 7, 8) |
 | 1 | the player (`g_playerSlotPtr` DS:0b02 = far pointer to DS:8fec) |
 | 2 | player's second sprite: net (2-slot scripts 0x14-0x19), coin and POOF (0x1a/0x1b), the content sprite of a search (§5.1); `g_slot2X` DS:9002 = its x |
-| 3 | treasure-room / clubhouse showcase treasure (`Cell_V49` 1568:1c7b, display scripts 0x5e-0xbe); end sequence |
+| 3 | treasure-room / clubhouse showcase treasure (`Cell_V49_Showcase` 1568:1c7b, display scripts 0x5e-0xbe); end sequence |
 | 4 | end sequence (creature eyes, puffs) |
 | 6, 8, 10 | elves (one per visible elf, slot from the elf's +0x0e; ARCHITECTURE §5.10); castle creature on slots 6/7 (code_world.md §2.2); end sequence; treasure-room partners (8, 10); champion figures (6, 8) |
 | 7, 9, 11 | elf companions (second slot of 2-slot elf scripts) [I]; end sequence |
-| 12 | the visible cells' decoration (`Cell_DrawObject` 1568:1e50 and animated decorations such as `Anim_SetIfIdle(12, 0x53)`, code_world.md §2.2, §6.1); `PlrSt_29/30` play their sound only while it has no script |
+| 12 | the visible cells' decoration (`Cell_DrawObject` 1568:1e50 and animated decorations such as `Anim_SetIfIdle(12, 0x53)`, code_world.md §2.2, §6.1); `PlrSt_29_PassageUp/30` play their sound only while it has no script |
 
 ### 3.7 Porting notes for anim.c
 
@@ -331,12 +331,12 @@ load and store it [O 47c7:0c62, 47c7:0e0e]. It has no effect on play.
 | 926a | `g_playerMask` | terrain mask of the player's cell, from `Cell_GetMask` in `Player_Move` |
 | 9002 | `g_slot2X` | x offset of slot 2 (child of slot 1) |
 | 8fa7 / 8fa9 | `g_playerScrX/Y` | player position relative to the camera (bytes / rows), from `Game_Tick` |
-| 37ee / 37f0 | `g_scrollDX/DY` | scroll request from `Player_Move` |
+| 37ee / 37f0 | `g_camStepX/Y` | scroll request from `Player_Move` |
 | 8fa3 | `g_searchTimer` | search countdown (§5.1) |
 | 8fc6 | `g_searchCell` | cell being searched |
 | 9276 | `g_searchSide` | -1 / 0 / +1: search the left / own / right cell |
 | 9128 | `g_searchPicture` | closed picture (low byte of `g_cellPicture`) of the searched cell |
-| 926c | `g_busy` | 1 while a search or an end scene runs: blocks hints, end messages and menu commands [O 49a6:002f, 49a6:030b, 43cb:0016] |
+| 926c | `g_menuLock` | 1 while a search or an end scene runs: blocks hints, end messages and menu commands [O 49a6:002f, 49a6:030b, 43cb:0016] |
 | 92d0..92da | end sequence counters | §6.3 |
 
 The handler table [O DS:0b8a decoded]: states 0, 3, 4, 5, 9-35, 41-61 and 63-71 have handlers in
@@ -373,21 +373,21 @@ elif g_transition & 2: camY = player.y & 0xff80;  DI = player.y - camY
                        SI = (player.x - camX) SAR 1;  g_playerScrX = SI          (camX kept)
 else:                  camY = player.y - DI;      camX = player.x - 2*SI
 if (unsigned) camX > 0x800: camY -= 0x80; camX += 0x800      (camera wrapped to the previous row)
-g_scrollDX = dx; g_scrollDY = dy
+g_camStepX = dx; g_camStepY = dy
 if dx != 0 or dy != 0:
     if (dx < 0 and SI <= 0x20) or (dx > 0 and SI >= 0x7c):   (signed)
-        if g_slowScroll (DS:3d31) == 1: dx *= 2; g_scrollDX = dx      (camera scrolls, player stays)
-    else: SI += dx; g_scrollDX = 0                                    (player moves on screen)
+        if g_slowScroll (DS:3d31) == 1: dx *= 2; g_camStepX = dx      (camera scrolls, player stays)
+    else: SI += dx; g_camStepX = 0                                    (player moves on screen)
     lim = 0x70 if g_playerMask & 0x400 else 0x40
     if (dy < 0 and DI <= lim) or (dy > 0 and DI >= 0x70):
-        if g_slowScroll == 1: dy *= 2; g_scrollDY = dy
-    else: DI += dy; g_scrollDY = 0
+        if g_slowScroll == 1: dy *= 2; g_camStepY = dy
+    else: DI += dy; g_camStepY = 0
     player.x += 2*dx; player.y += dy
     if not (g_transition & 2):
         Obj_WrapWorldX()                     (on g_curObj = the player)
         camY = player.y - DI; camX = player.x - 2*SI
     if (unsigned) camX > 0x800: camY -= 0x80; camX += 0x800
-g_stepDone |= g_scrollDX | g_scrollDY        (a scroll counts as a step)
+g_stepDone |= g_camStepX | g_camStepY        (a scroll counts as a step)
 g_playerDX = g_playerDY = 0
 slot1.x = SI + 2;  slot1.y = DI + 0x10
 r = player.y & 0x7f
@@ -429,27 +429,27 @@ Notation: `idle` = `slot1.anim == 0`; `Set(a)` = `Anim_Set(1,a)`; `SetIdle(a)` =
 written and the first true branch wins, unless a test is marked *independent*. All tests use the
 masked `g_keys` [O, each handler's disassembly].
 
-**State 0** `PlrSt_00` (18cf:000d; only the BSS start value): if 0x100: state = 15. Then `Set(6)`.
+**State 0** `PlrSt_00_Idle` (18cf:000d; only the BSS start value): if 0x100: state = 15. Then `Set(6)`.
 Then, independent: if `slot1.prev == 6`: state = 10.
 
-**State 3** `PlrSt_03` (18cf:082a): state = 4. (Set by `Users_InitNewPlayer`/`Users_LoadPlayer`.)
+**State 3** `PlrSt_03_Spawn` (18cf:082a): state = 4. (Set by `Users_InitNewPlayer`/`Users_LoadPlayer`.)
 
-**State 4** `PlrSt_04` (18cf:0831), arrival:
+**State 4** `PlrSt_04_Arrive` (18cf:0831), arrival:
 * `(keys & 0x3900) == 0` → `Set(6)` (front pose), state 10;
-* else 0x100 → if `(x & 0x7f) != 0x40`: `x = (x & 0xff80) + 0x40` and `g_redrawRequest += 1`;
+* else 0x100 → if `(x & 0x7f) != 0x40`: `x = (x & 0xff80) + 0x40` and `g_fullRedrawReq += 1`;
   then `Set(0x1e)` (ladder pose), state 15;
 * else 0x800 → `Set(0x1c)`, state 29;
 * else (0x1000 or 0x2000) → `Set(0x3f)`, state 31.
 
-**State 5** `PlrSt_05` (18cf:07f6), searching (frozen): if `(keys & 0xf) != 0` or
+**State 5** `PlrSt_05_Searching` (18cf:07f6), searching (frozen): if `(keys & 0xf) != 0` or
 `g_searchTimer == 1`: if `Search_CanSearch()` returns non-zero, `g_searchTimer = 1`; state = 10.
 A direction key therefore ends the wait at once and makes the search jump to its last step when
 the place is still "in front"; otherwise the search keeps running while the player walks away.
 
-**State 9** `PlrSt_09` (18cf:081b): if `(keys & 0xf) == 0`: state 10 (after a teleport the player
+**State 9** `PlrSt_09_AfterTeleport` (18cf:081b): if `(keys & 0xf) == 0`: state 10 (after a teleport the player
 is frozen until all direction keys are released).
 
-**State 10** `PlrSt_10` (18cf:08cc), standing:
+**State 10** `PlrSt_10_OnPath` (18cf:08cc), standing:
 
 ```
 if (keys & 1) and idle:                       (Up acts only when no script runs)
@@ -482,7 +482,7 @@ the first step comes 9 ticks after the key press). Space alone and the coin key 
 they are ignored until the standing/front script has finished (8 or 12 ticks after stopping);
 Space with a direction works at once.
 
-**State 11** `PlrSt_11` (18cf:0b9e), walking left:
+**State 11** `PlrSt_11_WalkLeft` (18cf:0b9e), walking left:
 
 ```
 (keys & 0x2c) == 0x24 → Set(0xe), state 17          (jump left, Right not held)
@@ -496,23 +496,23 @@ keys & 0x1000         → Set(0x3f), state 31
 slot1.delay >= 0      → Set(2), state 10             (always true, §3.2)
 ```
 
-**State 12** `PlrSt_12` (18cf:0ca0), walking right: the same with `keys & 8` → `SetIdle(5)`;
+**State 12** `PlrSt_12_WalkRight` (18cf:0ca0), walking right: the same with `keys & 8` → `SetIdle(5)`;
 `keys & 1` → `Set(0xb)`, state 10; `keys & 6` → `Set(6)`, state 10; 0x1000 → `Set(0x40)`, state
 32; last → `Set(3)`, state 10. Releasing the key stops the player at once (the walk script is
 replaced mid-step) [O].
 
-**State 13** `PlrSt_13` (18cf:0da2), looking up / walking into the background:
+**State 13** `PlrSt_13_LookUp` (18cf:0da2), looking up / walking into the background:
 * if idle: `keys & 0xe` → `Set(6)`, state 14; else not Up → `SetIdle(0xb)`, state 10; else
   `SetIdle(9)` (two 8-px steps upward per cycle, back view);
 * else (script running): 0x100 → `Set(0xc)`, state 15; else 0x800 → `Set(0x1c)`, state 29.
 
-**State 14** `PlrSt_14` (18cf:0e39), front / walking down:
+**State 14** `PlrSt_14_Front` (18cf:0e39), front / walking down:
 * Up → `Set(0xb)`, state 13;
 * else Down → 0x100: `Set(0xd)`, state 16; otherwise `SetIdle(10)` (two 8-px steps down);
 * else if `keys & 0xc` and `(y & 0x7f) < 0x70` → `SetIdle(10)`;
 * then, independent: if idle → `Set(6)`, state 10.
 
-**State 15** `PlrSt_15` (18cf:0ed8), on a ladder going up:
+**State 15** `PlrSt_15_ClimbUp` (18cf:0ed8), on a ladder going up:
 
 ```
 if not 0x100: Set(0xb), state 10, return
@@ -522,18 +522,18 @@ independent: if 0x2000:
 independent: if 0x1000: Set(0x3f), state 31
 ```
 
-**State 16** `PlrSt_16` (18cf:0fa9), going down: the same with no ladder → `Set(6)`, state 10;
+**State 16** `PlrSt_16_ClimbDown` (18cf:0fa9), going down: the same with no ladder → `Set(6)`, state 10;
 idle: Up → `SetIdle(0xc)`, state 15, else Down → `SetIdle(0xd)`; the 0x2000 and 0x1000 parts are
 identical. Quirk [O]: a ladder jump clears the slow-CPU flag `g_slowCpu` (DS:923c); the castle top
 restores it from `DS:8fa5` (1568:1b93).
 
 **States 17-20**, flips [O]:
-* 17 `PlrSt_17` (18cf:107a), jump left: if idle: if `slot1.prev == 0x10` or
+* 17 `PlrSt_17_JumpLeft` (18cf:107a), jump left: if idle: if `slot1.prev == 0x10` or
   `(keys & 0x24) != 0x24`: Right held → `SetIdle(0x11)`, state 19; else `SetIdle(0x12)`, state 18.
   Else (jump-left still held after the first flip) → `SetIdle(0x10)` (one more flip).
-* 18 `PlrSt_18` (18cf:10df), landing left: if idle: `(keys & 0x24) == 0x24` → `SetIdle(0xe)`,
+* 18 `PlrSt_18_JumpLeftLand` (18cf:10df), landing left: if idle: `(keys & 0x24) == 0x24` → `SetIdle(0xe)`,
   state 17; else `SetIdle(2)`, state 10.
-* 19 `PlrSt_19` (18cf:1120) / 20 `PlrSt_20` (18cf:1185): the mirror with 0x28, scripts
+* 19 `PlrSt_19_JumpRight` (18cf:1120) / 20 `PlrSt_20_JumpRightLand` (18cf:1185): the mirror with 0x28, scripts
   0x11 / 0x13 / 0xf / 3, and Left held → `SetIdle(0x10)`, state 17.
 
 A tap gives flip 0xe (5 moving entries, 40 px, 43 ticks) and landing 0x12 (16 px, 15 ticks);
@@ -557,26 +557,26 @@ moving entry comes D+1 = 7 ticks after the first tick); PgUp held 2 s gives stat
 `slot2.frame = 0xFFFF`; then if `keys & 0x200`: state 10 and `g_shopCoinsOwed` (DS:92a1) -= 1;
 else `Search_Start()`.
 
-**State 29** `PlrSt_29` (18cf:12f6), carried up a passage: if `g_slowCpu == 0` and
+**State 29** `PlrSt_29_PassageUp` (18cf:12f6), carried up a passage: if `g_slowCpu == 0` and
 `slot12.anim == 0`: `Sfx_Play(1)` (every tick, so the effect restarts each tick). If 0x800 is gone:
 `g_area` (DS:910b) = 0, `Sfx_Stop()`, and Left held → state 17, `Set(0x10)`; else state 19,
 `Set(0x11)` (the player comes out flipping). Otherwise `SetIdle(0x1c)`.
 
-**State 30** `PlrSt_30` (18cf:1367), sliding down: same sound rule; 0x800 gone → `g_area = 0`,
+**State 30** `PlrSt_30_SlideDown` (18cf:1367), sliding down: same sound rule; 0x800 gone → `g_area = 0`,
 `Sfx_Stop()`, `Set(6)`, state 10; otherwise `SetIdle(0x1d)`.
 
 **States 31/32**, falling (18cf:13b9 / 140c): if 0x1000 is gone: without 0x100 → state 17 / 19,
 `g_keys &= 0xfff3`, `Set(0x10 / 0x11)` (land with a flip); with 0x100 → `g_keys &= 0xfff3`,
 `Set(0x1e)`, state 16 (catch the ladder). Otherwise `SetIdle(0x3f / 0x40)` (8 px per 5 ticks).
 
-**State 33** `PlrSt_33` (18cf:145f), after a ladder jump: if idle: no ladder → state 32,
+**State 33** `PlrSt_33_LadderJump` (18cf:145f), after a ladder jump: if idle: no ladder → state 32,
 `g_keys &= 0xfff3`, `SetIdle(0x40)`; ladder → state 15, `g_keys &= 0xfff3`.
 
-**State 34** `PlrSt_34` (18cf:1495), down the castle chute: `SetIdle(0x5d)` (8 px per 7.25 ticks
+**State 34** `PlrSt_34_Chute` (18cf:1495), down the castle chute: `SetIdle(0x5d)` (8 px per 7.25 ticks
 downward on average); then, if `slot1.prev != 0x5d`: `Treasure_AddCollected()` (a no-op after its
 first effective call, §5.3, so effectively once).
 
-**State 35** `PlrSt_35` (18cf:14b1), arriving in the treasure room: if 0x1000 is gone: state 1,
+**State 35** `PlrSt_35_TreasureRoomLand` (18cf:14b1), arriving in the treasure room: if 0x1000 is gone: state 1,
 `Set(0x52)` (landing); otherwise `SetIdle(0x5d)` (keep falling).
 
 **States 41-71**: the end sequence, §6.3.
@@ -622,7 +622,7 @@ if Search_CanSearch():
     g_playerState = 5; g_searchTimer = 0x39
     g_searchCell = (player.y >> 7)*16 + (player.x >> 7) + g_searchSide      (unsigned shifts)
     g_searchPicture = low byte of g_cellPicture[g_searchCell]
-    g_busy = 1
+    g_menuLock = 1
 ```
 
 Without a hiding place in front the coin is simply lost (state 10).
@@ -712,7 +712,7 @@ if c == 0x6a: g_keyState = 6;  same
 g_cellContent[g_searchCell] |= 0x80                        (searched)
 mirror copy also marked: cells 0xe3-0xe5 <-> 0xfd-0xff (±0x1a), 0xab-0xad <-> 0xc0-0xc2 (±0x15),
     0x77-0x79 <-> 0x86-0x88 (±0x0f)                         (ranges are exclusive bounds in the code)
-slot2.y = 0;  g_busy = 0;  Anim_Clear(2)
+slot2.y = 0;  g_menuLock = 0;  Anim_Clear(2)
 ```
 
 Notes [O]: a content of exactly 0 would count as a treasure (no 0 check in `Result`), but the layout
@@ -801,13 +801,13 @@ out of the clubhouse stores `g_shownTreasure = -1` (record +0x164); `Users_LoadP
 from it, so the parked treasure is lost [O 47c7:0b47-0b4f, 47c7:0f67]. Capture request 5/6 can
 confirm.
 
-### 5.4 Treasures_DrawFound (4a03:04a8): the prize-room shelves
+### 5.4 ShelfRoom_DrawShelf (4a03:04a8): the prize-room shelves
 
 Called every frame (130f:0007) and after a HUD full redraw (130f:0909). The four **shelf rooms**
 (prize rooms) are reached from the clubhouse door in cell 0x04: rows 3-6, columns 8-11 of the strip,
 door/exit cells of types 50-55, 65, 66 (`Cell_P50_ShelfEnter` ... `Cell_P66_Shelf3to2` in
 code_world.md §5; the older export names call them "tunnel" cells) [O]. Their cell handlers set
-`g_inPrizeRoom[n]` (DS:9201+n), `g_prizeRoom` (DS:9129 = n) and `DS:8fba = 1`; `Frame_Begin`
+`g_inShelfRoom[n]` (DS:9201+n), `g_shelfCamRoom` (DS:9129 = n) and `DS:8fba = 1`; `Frame_Begin`
 latches DS:9201..9204 into DS:8f9f..8fa2; `Scroll_Update` sets DS:8fba = 1 after every
 scroll/redraw [O].
 
@@ -826,7 +826,7 @@ for room in 0..3:
               = none otherwise
         if frame > 0: Sprite_Draw(flag 0x40, x, y) with
             y = 0x28*r + 0x2d - 2*lift
-            x = 0x2c - ((camX - 0x440) >> 1) + 0x14*c + 2*k     if room == g_prizeRoom
+            x = 0x2c - ((camX - 0x440) >> 1) + 0x14*c + 2*k     if room == g_shelfCamRoom
               = ((0x480 - camX) >> 1) + 0x14*c + 2*k + 0x0c      otherwise      (16-bit unsigned shifts)
     1000:18af(1);  DS:7d7c[2*room] = 0;  DS:8fba = 0
 ```
@@ -853,30 +853,30 @@ to the left: the stored treasure, or the showcase treasure when the slot is empt
 ### 6.1 Flow overview [O]
 
 ```
-castle wall: player reaches picture 0x32 moving up   (Cell_P63_V63 1568:1aa4, world agent)
+castle wall: player reaches picture 0x32 moving up   (Cell_P63_V63_CastleTop 1568:1aa4, world agent)
   -> scene 3 (CLOSE.PAN/PAK), player object at (0x400,0x500), slot 1 hidden, state 41,
      total += treasures found, Treasure_PickShowcase
 end sequence, player states 41..61 (or 63..71 + 61 for a total >= 300)      (§6.3)
-Cell_P64 (cells 0xa8-0xaa): end sequence done, or any command -> chute       (§6.4)
+Cell_P64_EndScreen (cells 0xa8-0xaa): end sequence done, or any command -> chute       (§6.4)
   -> (0x6a4,0x1f0), state 34: fall down the chute (cells type 23, rows 3-5 column 13);
      Treasure_AddCollected on the way
-Cell_P20 (cell 0x6d) on the path line: saved game cleared, g_endState = 1    (§6.5)
+Cell_P20_CastleGate (cell 0x6d) on the path line: saved game cleared, g_endState = 1    (§6.5)
   total < 300:  treasure room, scene 4 at (0x4f0,0x4e0), state 35 -> land -> display
-                -> automatically to the rank screen (Cell_P71_V71) (§7)
+                -> automatically to the rank screen (Cell_P71_V71_ToRankScreen) (§7)
   total >= 300: clubhouse, scene 0 at (0x170,0x70), celebration anims 0xa5-0xa7;
-                when the player's anim ends, Cell_P12 sends him to the rank screen (§6.6)
-rank screen (scene 4 at (0x680,0x80), Rank_Update fills the chest; CHAMPION blink at >= 300)
-Cell_P72: Enter/Esc/click/Down -> clubhouse (0xf0,0x70), Game_AdvanceEnd: g_endState 1 -> 2
+                when the player's anim ends, Cell_P12_StartRoom sends him to the rank screen (§6.6)
+rank screen (scene 4 at (0x680,0x80), RankChest_Update fills the chest; CHAMPION blink at >= 300)
+Cell_P72_RankScreen: Enter/Esc/click/Down -> clubhouse (0xf0,0x70), Game_AdvanceEnd: g_endState 1 -> 2
 Scene_Update (1437:0034): Game_End, new layout, end-of-game message (ARCHITECTURE §5.13)
 ```
 
 ### 6.2 Castle-top trigger and EndSeq_Setup
 
-Trigger (part of `Cell_P63_V63` 1568:1aa4, world agent; summarised because it starts this
+Trigger (part of `Cell_P63_V63_CastleTop` 1568:1aa4, world agent; summarised because it starts this
 module's sequence) [O]: when the cell's picture is 0x32, `obj.dy < 0` and `(y & 0x78) < 0x71`:
 `dy = 0`, `g_keyState = 0`, mask 0, `g_level = 3`, `g_area = 0`, `g_slowCpu = g_slowScroll =
-DS:8fa5`, `g_transition = 2`, player = (0x400, 0x500), `camX = 0x400`, `g_redrawRequest = 1`,
-`g_busy = 1`, `g_playerState = 0x29` (41), `Anim_Clear(1)`, `EndSeq_Setup()`, then
+DS:8fa5`, `g_transition = 2`, player = (0x400, 0x500), `camX = 0x400`, `g_fullRedrawReq = 1`,
+`g_menuLock = 1`, `g_playerState = 0x29` (41), `Anim_Clear(1)`, `EndSeq_Setup()`, then
 `Anim_Set(6,0x78)`, `Anim_Set(7,0x7e)`, `Anim_Set(8,0x7c)`, `Anim_Set(10,0x8e)`,
 `Anim_Set(11,0x8f)`, `Anim_Set(4,0x90)`, `*g_totalTreasures += g_treasuresFound` (u16, no
 saturation), `Treasure_PickShowcase()`.
@@ -916,7 +916,7 @@ are PAK frame numbers, descriptions [I] from the previews. Counters: DS:92d0 `g_
 | 58 | 18cf:04ca | slot 6 | if `g_endTreasureCount == 0`: slot 6 = (2, 0x10), slot 6 ← 0x85 (celebration 127-132, 43 ticks), state 61. Else slot 8 ← 0x8d (open chest 69), state 59 |
 | 59 | 18cf:050e | slot 7 (long idle: passes at once) | word DS:48de = `g_showcasePick & 0x7f`; slot 9 = (0x20, 0x6e); `g_endPathIdx = 0`; `Anim_SetIfIdle(9, 0x88)`; 60 |
 | 60 | 18cf:0546 | slot 9 | if `DS:0b3c[g_endPathIdx] < 0`: slot 6 = (2, 0x10), `Anim_Clear(9)`, slot 6 ← 0x85, state 61. Else if `g_endPathIdx < 8`: slot 9.x += 4; slot 9.y = `DS:0b3c[g_endPathIdx++]`; `Anim_SetIfIdle(9, 0x88)` (16 steps of 3 ticks; x moves only on the first 8) |
-| 61 | 18cf:05b2 | slot 6 | `g_endSeqDone = 1`; state 62 (no-op; `Cell_P64` takes over) |
+| 61 | 18cf:05b2 | slot 6 | `g_endSeqDone = 1`; state 62 (no-op; `Cell_P64_EndScreen` takes over) |
 | 63 | 18cf:05c4 | slot 8 | slot 9 = (2, 0x10); slot 9 ← 0x99 (sparkle 76/77, 57 ticks); 64 |
 | 64 | 18cf:05eb | slot 9 | DS:63b8 = 1; `Sfx_Play(7)`; slot 8 ← 0x9a (chest opens 69-71, 22 ticks); slot 9 ← 0x9c (sprite 111, a cloud [I]); 65 |
 | 65 | 18cf:0625 | slot 8 | DS:63b8 = 0; `Sfx_Stop()`; `Anim_Clear(4)`; slot 3 = (2, 0x10); slot 11.y = 0x1c; slot 3 ← 0x9b (arcs 115-117, 118 ticks); slot 11 ← 0x97; slot 10 ← 0x92; 66 |
@@ -941,7 +941,7 @@ that reads the scripts from SST.EXE must keep them writable or special-case scri
 Durations [O from the script lengths, ignoring step gating]: states 41-48 ≈ 62+23+22+22+121+29+8+8
 = 295 ticks; then the scan 48 ticks plus ≈107 ticks per found treasure (26 + 3 + 26·3); chest
 close 29; 21 per rank star; 15 + 64 (or 111 when nothing was found); 50; showcase flight 8 + 48;
-celebration 43. A game with 0 treasures at rank 0 takes ≈584 ticks ≈ 12.3 s before `Cell_P64`
+celebration 43. A game with 0 treasures at rank 0 takes ≈584 ticks ≈ 12.3 s before `Cell_P64_EndScreen`
 continues by itself.
 
 Check [O+O]: `ega_castle_ladder_jump_top.avi` reaches the castle top at AVI frame 559; the first
@@ -955,7 +955,7 @@ Sound note [O fmt_sound §7; I audible result]: state 44 starts effect 2 with th
 45 clears the flag and asks for effect 8, which is refused while effect 2 is still playing its last
 pass (8 > 2); state 65 stops effect 7 explicitly.
 
-### 6.4 Cell_P64 (176a:0404): leaving the castle top
+### 6.4 Cell_P64_EndScreen (176a:0404): leaving the castle top
 
 Player handler of cells 0xa8-0xaa (type 64). Every tick [O]:
 
@@ -966,7 +966,7 @@ if g_endSeqDone != 0 or g_cmd != -1:                 (finished, or any command k
     DS:63b8 = 0; Sfx_Stop()
     g_cellMask = 0x14f0
     obj.dy = 0; obj.x = 0x6a4; obj.y = 0x1f0           (top of the chute, row 3 column 13)
-    g_transition = 2; camX = 0x600; g_redrawRequest = 1
+    g_transition = 2; camX = 0x600; g_fullRedrawReq = 1
     Anim_SetIfIdle(1, 0x5d); g_playerState = 0x22 (34)
 return g_cellMask
 ```
@@ -975,7 +975,7 @@ A key press skips the rest of the sequence at once; the total was already added 
 and the showcase is handed over on the chute, so skipping changes nothing but the pictures [O].
 
 The chute: state 34 lets the player fall with script 0x5d (8 rows per 7.25 ticks) through the
-type-23 cells 0x3d, 0x4d, 0x5d (mask 0x1400: fall + camera mode; `Cell_P23` 1568:0d94 teleports
+type-23 cells 0x3d, 0x4d, 0x5d (mask 0x1400: fall + camera mode; `Cell_P23_FallShaft` 1568:0d94 teleports
 only on level 2; code_world.md §3.3 lists the chute as 5D/6D, the cells that show it) from y 0x1f0
 to y 0x370, 48 steps ≈ 348 ticks ≈ 7.4 s [O arithmetic]. Measured: the fall in
 `ega_r2_end_t2_nokey.avi` runs from AVI frame ≈1212 to 1657 = 7.4 s (answers §2) [O].
@@ -988,18 +988,18 @@ chest closes, chute, dissolve into the treasure room at 1663, rank chest fill fr
 with 2 treasures: both take the champion branch, which confirms that state 52 tests the total, not
 "all found").
 
-### 6.5 Cell_P20 (176a:0485): the castle gate
+### 6.5 Cell_P20_CastleGate (176a:0485): the castle gate
 
 Cell 0x6d (type 20), bottom of the chute [O]:
 
 ```
 if (obj.y & 0x7f) == 0x70:
-    obj.dy = 0; user record byte +9 = 0 (no saved game); g_endState = 1; g_busy = 1
+    obj.dy = 0; user record byte +9 = 0 (no saved game); g_endState = 1; g_menuLock = 1
     if *g_totalTreasures < 300 (unsigned):
         obj = (0x4f0, 0x4e0); g_level = 4; g_playerState = 0x23 (35)
-        g_redrawRequest = 1; g_transition = 1; Anim_InitSlots()
+        g_fullRedrawReq = 1; g_transition = 1; Anim_InitSlots()
     else:                                                                (champion)
-        obj = (0x170, 0x70); g_level = 0; g_redrawRequest = 1; g_transition = 1; Anim_InitSlots()
+        obj = (0x170, 0x70); g_level = 0; g_fullRedrawReq = 1; g_transition = 1; Anim_InitSlots()
         g_playerState = 9; DS:925b = 1 (HUD full redraw request [I])
         Anim_SetIfIdle(1, 0xa5)
         slot 6 = (0x52, 0x84), z 10; Anim_SetIfIdle(6, 0xa6)
@@ -1013,10 +1013,10 @@ else: g_cellMask = 0x14f0
 With a total of 300 or more the player lands in the clubhouse start cell (cell 2, type 12, SPRITES
 bank). Scripts: 0xa5 on slot 1 (player: walk frame 74, slides 211-213, flips 90-93; 20 entries,
 121 ticks), 0xa6 / 0xa7 on slots 6 / 8 (two elf figures, sprites 97 and 112-114, the second
-mirrored; 121 ticks), all absolute positions. The start-cell handler `Cell_P12` (1568:03f6, world
+mirrored; 121 ticks), all absolute positions. The start-cell handler `Cell_P12_StartRoom` (1568:03f6, world
 agent) watches for `slot1.prev == 0xa5` (the player's script ended): then `g_level = 4`,
-`g_busy = 1`, player = (0x4f0, 0x4e0), `g_redrawRequest = 1`, `g_transition = 1`,
-`Anim_Clear(6)`, `Anim_Clear(8)`, `Cell_P71_V71()` (→ rank screen, §7.3), mask 0 [O 1568:0551-05a3].
+`g_menuLock = 1`, player = (0x4f0, 0x4e0), `g_fullRedrawReq = 1`, `g_transition = 1`,
+`Anim_Clear(6)`, `Anim_Clear(8)`, `Cell_P71_V71_ToRankScreen()` (→ rank screen, §7.3), mask 0 [O 1568:0551-05a3].
 The rank screen then blinks CHAMPION (§7.4). Captured in `ega_r2_crown_nokey.avi` (the scene with
 the two figures from AVI frame ≈2703, the rank chest from ≈2853; answers §2, §4) [O]; the capture
 agent describes the room as the treasure room, the code places it in the clubhouse start cell
@@ -1030,15 +1030,15 @@ agent describes the room as the treasure room, the code places it in the clubhou
 
 | Cells (type) | Scene | Use |
 |---|---|---|
-| 0x01 (71) `Cell_P71_V71` | 0 / 4 | clubhouse cell with the chest picture: Up leads to the rank screen |
-| 0x02 (12) `Cell_P12` | 0 | clubhouse start cell; in its right part (x & 0x78 >= 0x5a) walking up to y & 0x7f == 0x60 leads into the treasure room at (0x4f0, 0x4e0): `g_level = 4`, `g_busy = 1`, state 1, `g_redrawRequest = 1`, `Anim_Set(1, 0x51)`, `DS:9282 += 1` (no auto-advance) [O 1568:04e1-054d] |
-| 0x03, 0x9a (49) `Cell_V49` | 0 / 4 | showcase display (visible-cell handler, below) |
-| 0x98, 0x99, 0x9b (70) `Cell_P70` | 4 | treasure room floor |
-| 0x1d (72) `Cell_P72` | 4 | rank chest screen |
+| 0x01 (71) `Cell_P71_V71_ToRankScreen` | 0 / 4 | clubhouse cell with the chest picture: Up leads to the rank screen |
+| 0x02 (12) `Cell_P12_StartRoom` | 0 | clubhouse start cell; in its right part (x & 0x78 >= 0x5a) walking up to y & 0x7f == 0x60 leads into the treasure room at (0x4f0, 0x4e0): `g_level = 4`, `g_menuLock = 1`, state 1, `g_fullRedrawReq = 1`, `Anim_Set(1, 0x51)`, `DS:9282 += 1` (no auto-advance) [O 1568:04e1-054d] |
+| 0x03, 0x9a (49) `Cell_V49_Showcase` | 0 / 4 | showcase display (visible-cell handler, below) |
+| 0x98, 0x99, 0x9b (70) `Cell_P70_TreasureRoom` | 4 | treasure room floor |
+| 0x1d (72) `Cell_P72_RankScreen` | 4 | rank chest screen |
 
-`Cell_V49` (1568:1c7b, world agent; the drawing side of the treasure room) [O]: every tick for a
+`Cell_V49_Showcase` (1568:1c7b, world agent; the drawing side of the treasure room) [O]: every tick for a
 visible type-49 cell (`DS:8fc0`/`8fc2` = the cell's screen x bytes / y): slot 3 = (cellX + `g_shackX`
-DS:9213, cellY + `g_shackY` DS:9211), z 0x50, owner 3; `g_prizeRoom = 0`; if `slot3.anim < 0x5e`
+DS:9213, cellY + `g_shackY` DS:9211), z 0x50, owner 3; `g_shelfCamRoom = 0`; if `slot3.anim < 0x5e`
 and not (`g_shackFlags` & 0x20): `slot3.frame = g_shownTreasure`, `slot3.prev = 0`. If
 `g_shackFlags & 0x40` and partner 1 (DS:00f8, signed word) > 0: slot 8 = (cellX + DS:00fc,
 cellY + 0x44), z 0x46, owner 8, frame = DS:00f8, prev 0. If `g_shackFlags & 0x40`, partner 2
@@ -1061,7 +1061,7 @@ Treasure-room variables (initial values from the data image or `Game_InitVars` 1
 | 9282 | `g_shackStay` | 0 | non-zero: no automatic move to the rank screen |
 | 8faf | `g_shackNoCase` | 0 | set when the shown treasure matched no case; **never cleared** |
 
-### 7.2 Cell_P70 (176a:0596): the treasure room, every tick [O]
+### 7.2 Cell_P70_TreasureRoom (176a:0596): the treasure room, every tick [O]
 
 ```
 g_cellMask = 0x104f
@@ -1077,10 +1077,10 @@ if ((slot1.prev == 0x52 and slot3.prev < 0x5e) or (g_keys & 1) or (g_shackFlags 
     found: run the case (table below); not found: g_shackNoCase = 1
 -- automatic exit to the rank screen --
 if g_shackStay == 0 and (slot3.prev >= 0x5e (signed) or g_shackNoCase == 1):
-    Cell_P71_V71(); g_shackState &= 0x7f
+    Cell_P71_V71_ToRankScreen(); g_shackState &= 0x7f
 -- leaving --
 if ((g_keys & 0x42) or g_cmd != -1) and g_endState == 0:
-    g_cellMask = 0; Shack_ResetDisplay(<no argument pushed>); Shack_Leave()
+    g_cellMask = 0; Shack_ResetDisplay(<no argument pushed>); TreasureRoom_Leave()
 -- carousel start --
 if (g_keys & 8 or g_keys & 4) and obj.y == 0x4e0 and (g_shackFlags & 0xbf) == 0
    and ((signed char) g_collected[0] > 0 or g_collected[1] > 0) and g_shackState == 0
@@ -1107,10 +1107,10 @@ return g_cellMask
 Notes [O]: the collected list works as a ring with one gap (the first 0x80 entry): Right brings the
 entry after the gap onto the pedestal and puts the old pedestal treasure into the gap. The missing
 argument of `Shack_ResetDisplay` on leaving reads the caller's saved DI; any non-zero value only
-sets `slot3.anim`, which `Shack_Leave` clears at once (`Anim_InitSlots`) [O; I harmless]. Because
+sets `slot3.anim`, which `TreasureRoom_Leave` clears at once (`Anim_InitSlots`) [O; I harmless]. Because
 `g_shackNoCase` is never cleared, once a shown value without a case has been displayed (for example
 0xffff of a new player), every later end-of-game visit (where `g_shackStay` is 0) jumps to the rank
-screen on its first tick without the display [O data flow]. `Cell_P70` assumes `g_curObj` is the
+screen on its first tick without the display [O data flow]. `Cell_P70_TreasureRoom` assumes `g_curObj` is the
 player [I].
 
 **The case table** (value = `g_shownTreasure`; "→ s" = `Anim_SetIfIdle(3, s)`, the display script
@@ -1126,21 +1126,21 @@ which also sets `g_shackFlags = 0x40` when true; `R(s)` = `Shack_ResetDisplay(s)
 | 0x38, 0x3a, 0x3c, 0x3e, 0x40, 0x42, 0x44, 0x46, 0x48 | → 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69 |
 | 0x52, 0x54, 0x56 | → 0x6b, 0x6c, 0x6d |
 | 0x5c, 0x5e, 0x60, 0x62, 0x64 | → 0x70, 0x71, 0x72, 0x73, 0x74 |
-| 0x06 | IC(0x5a) false → 0xb4; else P1X > 0x1a → `Shack_AnimD`; else R(0x6f) |
-| 0x5a | IC(0x06) false → 0xbe; else P1X > 0x1a → `Shack_AnimD`; else R(0x6f) |
-| 0x08, 0x8a | IC(0x36) false → 0x60; else if (X > 0x12 or P1X > 0x22) and partner1 != 0x8a → `Shack_AnimA(0)`; elif P1X < 0x50 → `Shack_AnimB(0)`; else R(0), `g_shownTreasure = 0x36`, `slot3.prev = 0x5e` |
-| 0x36, 0x6a | IC(0x08) false → 0xb5; else if (X < 0x22 or P1X > 0x12) and `g_shownTreasure == 8` → `Shack_AnimA(1)` (cannot happen in this case); elif X < 0x50 → `Shack_AnimB(1)`; else R(0), `g_shownTreasure = 8`, `slot3.prev = 0x5e` |
-| 0x0e | IC(0x2c) false → 0xb6; else (X < 0x20 or P1X > 0x12) → `Shack_AnimC(1)`; else R(0xb3) |
-| 0x2c | IC(0x0e) false → 0xba; else (X > 0x12 or P1X > 0x20) → `Shack_AnimC(0)`; else R(0xb3) |
-| 0x18 | IC(0x58) false → 0xb7; else (X > 0x12 or P1X > 0x20) → `Shack_AnimF(0)`; else R(0x75) |
-| 0x58 | IC(0x18) false → 0x6e; else (X < 0x20 or P1X > 0x12) → `Shack_AnimF(1)`; else R(0x75) |
-| 0x1c | IC(0x22) false → 0xb8; else (X > 0x13 or P1X > 0x22) → `Shack_AnimE(0)`; else R(0xa4) |
-| 0x22 | IC(0x1c) false → 0xb9; else (X < 0x22 or P1X > 0x13) → `Shack_AnimE(1)`; else R(0xa4) |
-| 0x4a | IC(0x4c) and IC(0x4e) false → 0xbb and `g_shackFlags &= 0xbf`; else (X > 0xc or P1X > 0x1a or P2X > 0x26) → `Shack_AnimI(0)`; else R(0x77) |
-| 0x4c | IC(0x4a) and IC(0x4e) false → 0xbc, `&= 0xbf`; else (X < 0x1a or P1X > 0xc or P2X > 0x26) → `Shack_AnimI(1)`; else R(0x77) |
-| 0x4e | IC(0x4a) and IC(0x4c) false → 0xbd, `&= 0xbf`; else (X < 0x26 or P1X > 0xc or P2X > 0x1a) → `Shack_AnimI(2)`; else R(0x77) |
-| 0x1e, 0xcc | `Shack_AnimG()` |
-| 0x50, 0x84, 0x86 | `Shack_AnimH()` |
+| 0x06 | IC(0x5a) false → 0xb4; else P1X > 0x1a → `ShackPair_06_5a`; else R(0x6f) |
+| 0x5a | IC(0x06) false → 0xbe; else P1X > 0x1a → `ShackPair_06_5a`; else R(0x6f) |
+| 0x08, 0x8a | IC(0x36) false → 0x60; else if (X > 0x12 or P1X > 0x22) and partner1 != 0x8a → `ShackPair_08_36_Approach(0)`; elif P1X < 0x50 → `ShackPair_08_36_Swap(0)`; else R(0), `g_shownTreasure = 0x36`, `slot3.prev = 0x5e` |
+| 0x36, 0x6a | IC(0x08) false → 0xb5; else if (X < 0x22 or P1X > 0x12) and `g_shownTreasure == 8` → `ShackPair_08_36_Approach(1)` (cannot happen in this case); elif X < 0x50 → `ShackPair_08_36_Swap(1)`; else R(0), `g_shownTreasure = 8`, `slot3.prev = 0x5e` |
+| 0x0e | IC(0x2c) false → 0xb6; else (X < 0x20 or P1X > 0x12) → `ShackPair_0e_2c(1)`; else R(0xb3) |
+| 0x2c | IC(0x0e) false → 0xba; else (X > 0x12 or P1X > 0x20) → `ShackPair_0e_2c(0)`; else R(0xb3) |
+| 0x18 | IC(0x58) false → 0xb7; else (X > 0x12 or P1X > 0x20) → `ShackPair_18_58(0)`; else R(0x75) |
+| 0x58 | IC(0x18) false → 0x6e; else (X < 0x20 or P1X > 0x12) → `ShackPair_18_58(1)`; else R(0x75) |
+| 0x1c | IC(0x22) false → 0xb8; else (X > 0x13 or P1X > 0x22) → `ShackPair_1c_22(0)`; else R(0xa4) |
+| 0x22 | IC(0x1c) false → 0xb9; else (X < 0x22 or P1X > 0x13) → `ShackPair_1c_22(1)`; else R(0xa4) |
+| 0x4a | IC(0x4c) and IC(0x4e) false → 0xbb and `g_shackFlags &= 0xbf`; else (X > 0xc or P1X > 0x1a or P2X > 0x26) → `ShackTrio_4a_4c_4e(0)`; else R(0x77) |
+| 0x4c | IC(0x4a) and IC(0x4e) false → 0xbc, `&= 0xbf`; else (X < 0x1a or P1X > 0xc or P2X > 0x26) → `ShackTrio_4a_4c_4e(1)`; else R(0x77) |
+| 0x4e | IC(0x4a) and IC(0x4c) false → 0xbd, `&= 0xbf`; else (X < 0x26 or P1X > 0xc or P2X > 0x1a) → `ShackTrio_4a_4c_4e(2)`; else R(0x77) |
+| 0x1e, 0xcc | `ShackFly_1e()` |
+| 0x50, 0x84, 0x86 | `ShackFly_50()` |
 
 (The 48 treasure codes 6..0x64 plus 0x6a, 0x84, 0x86, 0x8a, 0xcc = 53 values. The IC tests use
 `&&` short-circuit: for 0x4a the second test runs only if the first was true.)
@@ -1161,23 +1161,23 @@ treasure of the pair, chosen by `g_shownTreasure`):
 
 | Function | Partner choice | dir = 0 | dir = 1 |
 |---|---|---|---|
-| `Shack_AnimA` 176a:1162 (0x08/0x36) | shown == 8 ? 0x36 : 8 | P1X > 0x22 → P1X--; X > 0x12 → X-- | P1X > 0x12 → P1X--; X < 0x22 → X++ |
-| `Shack_AnimC` 176a:1220 (0x0e/0x2c) | shown == 0x0e ? 0x2c : 0x0e | P1X > 0x20 → P1X--; X > 0x12 → X-- | P1X > 0x12 → P1X--; X < 0x20 → X++ |
-| `Shack_AnimD` 176a:1275 (0x06/0x5a) | shown == 6 ? 0x5a : 6 | P1X > 0x1a → P1X-- (argument ignored) | same |
-| `Shack_AnimE` 176a:129d (0x1c/0x22) | shown == 0x1c ? 0x22 : 0x1c | P1X > 0x22 → P1X--; X > 0x13 → X-- | P1X > 0x13 → P1X--; X < 0x22 → X++ |
-| `Shack_AnimF` 176a:12f2 (0x18/0x58) | shown == 0x58 ? 0x18 : 0x58 | P1X > 0x20 → P1X--; X > 0x12 → X-- | P1X > 0x12 → P1X--; X < 0x20 → X++ |
+| `ShackPair_08_36_Approach` 176a:1162 (0x08/0x36) | shown == 8 ? 0x36 : 8 | P1X > 0x22 → P1X--; X > 0x12 → X-- | P1X > 0x12 → P1X--; X < 0x22 → X++ |
+| `ShackPair_0e_2c` 176a:1220 (0x0e/0x2c) | shown == 0x0e ? 0x2c : 0x0e | P1X > 0x20 → P1X--; X > 0x12 → X-- | P1X > 0x12 → P1X--; X < 0x20 → X++ |
+| `ShackPair_06_5a` 176a:1275 (0x06/0x5a) | shown == 6 ? 0x5a : 6 | P1X > 0x1a → P1X-- (argument ignored) | same |
+| `ShackPair_1c_22` 176a:129d (0x1c/0x22) | shown == 0x1c ? 0x22 : 0x1c | P1X > 0x22 → P1X--; X > 0x13 → X-- | P1X > 0x13 → P1X--; X < 0x22 → X++ |
+| `ShackPair_18_58` 176a:12f2 (0x18/0x58) | shown == 0x58 ? 0x18 : 0x58 | P1X > 0x20 → P1X--; X > 0x12 → X-- | P1X > 0x12 → P1X--; X < 0x20 → X++ |
 
-**`Shack_AnimB(dir)`** (176a:11b7): dir 0: if partner1 == 8 → partner1 = 0x8a; if P1X < 0x50:
+**`ShackPair_08_36_Swap(dir)`** (176a:11b7): dir 0: if partner1 == 8 → partner1 = 0x8a; if P1X < 0x50:
 P1X++ and `g_shownTreasure` = 0x36 if P1X is even else 0x6a. dir 1: if shown == 8 → shown = 0x8a;
 if X < 0x50: X++ and partner1 = 0x36 if X is even else 0x6a.
 
-**`Shack_AnimI(which)`** (176a:1463, trio 0x4a/0x4c/0x4e): if partner1 < 0: shown 0x4a →
+**`ShackTrio_4a_4c_4e(which)`** (176a:1463, trio 0x4a/0x4c/0x4e): if partner1 < 0: shown 0x4a →
 (0x4c, 0x4e); 0x4c → (0x4a, 0x4e); else (0x4a, 0x4c) as (partner1, partner2). which 0: X > 0xc →
 X--; P1X > 0x1a → P1X--; if P2X > 0x26 and P1X < 0x36: P2X--. which 1: X < 0x1a → X++; P1X > 0xc →
 P1X--; if P2X > 0x26 and P1X < 0x36: P2X--. which 2: X < 0x26 → X++; P1X > 0xc → P1X--; if P2X >
 0x1a and P1X < 0x36: P2X--. (Other values: nothing.)
 
-**`Shack_AnimG`** (176a:1347, treasure 0x1e) and **`Shack_AnimH`** (176a:13d7, 0x50), "fly"
+**`ShackFly_1e`** (176a:1347, treasure 0x1e) and **`ShackFly_50`** (176a:13d7, 0x50), "fly"
 displays: run only if `not (g_shackFlags & 0x80)` or `g_shackFlags & 0x40` (G also needs
 `not (g_shackFlags & 1)`):
 
@@ -1196,13 +1196,13 @@ else: g_shackY += 1                     (descend)
 **`Treasure_IsCollected(id)`** (176a:1136): for i in 0..47: if `(signed char) g_collected[i] ==
 id`: `g_shackFlags = 0x40` (assignment), return 1. Return 0.
 
-**`Shack_Leave`** (176a:0f47): player = (0x170, 0x70), dy = 0, `g_level = 0`, `g_busy = 0`,
-`g_playerState = 9`, `Anim_InitSlots()`, `Anim_Set(1, 6)`, `g_redrawRequest = 1`,
+**`TreasureRoom_Leave`** (176a:0f47): player = (0x170, 0x70), dy = 0, `g_level = 0`, `g_menuLock = 0`,
+`g_playerState = 9`, `Anim_InitSlots()`, `Anim_Set(1, 6)`, `g_fullRedrawReq = 1`,
 `g_transition = 1`, `g_shackStay = 0`, `g_shackFlags = 0`, `Game_AdvanceEnd()`.
 
 **`Game_AdvanceEnd`** (176a:1119): if `g_endState == 1`: `g_endState = 2`; else `Anim_Set(1, 6)`.
 
-**`Cell_P71_V71`** (176a:0fa6) [O]: as a visible-cell handler (`g_cellCallKind != 2`) it calls
+**`Cell_P71_V71_ToRankScreen`** (176a:0fa6) [O]: as a visible-cell handler (`g_cellCallKind != 2`) it calls
 `Cell_V7` (a decoration). As the player's cell (`g_cellCallKind == 2`):
 
 ```
@@ -1211,25 +1211,25 @@ if (obj.x & 0x78) < 0x44: if obj.dx < 0: obj.dx = 0;  g_cellMask = 0xdb       (l
 if (obj.y & 0x7f) < 0x6c:
     g_cellMask &= 0xf2
     if (obj.y & 0x7f) == 0x60:                                                 (enter the rank screen)
-        obj = (0x680, 0x80); camX = 0x680; g_level = 4; g_rankScreen (DS:925d) = 1; g_busy = 1
-        g_playerState = 1; Anim_Clear(1); Anim_Clear(3); g_redrawRequest = 1; g_transition = 2
+        obj = (0x680, 0x80); camX = 0x680; g_level = 4; g_rankState (DS:925d) = 1; g_menuLock = 1
+        g_playerState = 1; Anim_Clear(1); Anim_Clear(3); g_fullRedrawReq = 1; g_transition = 2
 if (obj.y & 0x78) > 0x6f: if obj.dy > 0: obj.dy = 0;  g_cellMask &= 0xfd
 return g_cellMask
 ```
 
-`Cell_P70` and `Cell_P12` call it directly with the player at (0x4f0, 0x4e0) (`y & 0x7f` = 0x60),
+`Cell_P70_TreasureRoom` and `Cell_P12_StartRoom` call it directly with the player at (0x4f0, 0x4e0) (`y & 0x7f` = 0x60),
 which moves him straight to the rank screen [O].
 
-**`Cell_P72`** (176a:1094), the rank screen cell [O]: `g_cellMask = 0x104f`; if the mouse button
+**`Cell_P72_RankScreen`** (176a:1094), the rank screen cell [O]: `g_cellMask = 0x104f`; if the mouse button
 state changed (`DS:90f4 != DS:9143`, set by `Mouse_Poll`), or `g_cmd` is 8 or 0 (Esc is command
 0, ARCHITECTURE §7.2; 8 is [I] Enter), or
-`g_keys & 0x42`: `g_rankScreen = 0`, player = (0xf0, 0x70), `camX = 0xc0`, `g_level = 0`,
-`g_busy = 0`, `g_playerState = 9`, `g_redrawRequest = 1`, `g_transition = 2`, `g_cellMask = 3`,
+`g_keys & 0x42`: `g_rankState = 0`, player = (0xf0, 0x70), `camX = 0xc0`, `g_level = 0`,
+`g_menuLock = 0`, `g_playerState = 9`, `g_fullRedrawReq = 1`, `g_transition = 2`, `g_cellMask = 3`,
 `Anim_Set(1, 6)`, `Game_AdvanceEnd()`, `g_champFlashTimer = 0`.
 
-### 7.4 The rank chest screen: Rank_Update (130f:0edf) and Rank_DrawChestCoin (130f:1261)
+### 7.4 The rank chest screen: RankChest_Update (130f:0edf) and RankChest_DrawStar (130f:1261)
 
-Called every frame from `main` [O 130f:0092]. DS:8fbd is `g_rankScreen` (DS:925d) latched by
+Called every frame from `main` [O 130f:0092]. DS:8fbd is `g_rankState` (DS:925d) latched by
 `Frame_Begin`. The chest picture is SHACK.PAN block of cell 0x1d.
 
 ```
@@ -1237,26 +1237,26 @@ if latched == 1:                                     (first frame)
     text colour DS:9215 = 0xffff; Text_Draw(0x44, 0x1d, player name)       (43cb:0b63)
     Hud_DrawNumber(0x6c, 0x77, colour 0xffff, *g_totalTreasures)          (130f:0d00)
     i = 0; while DS:0110[i] != -1 and DS:0110[i] < total + 1 (unsigned): i += 2
-    g_rankFillTarget (DS:92a8) = DS:0110[i + 3]     (the "fill" word of the NEXT pair)
-    g_rankTickGroup (DS:92b0) = byte DS:9100 & 0xfc;  g_rankFillRow (DS:92a6) = 0
-    g_rankScreen += 1                                (-> 2)
-elif latched != 0 and (byte DS:9100 & 0xfc) != g_rankTickGroup:      (one step)
-    g_rankTickGroup = byte DS:9100 & 0xfc
-    y = 0x6f - g_rankFillRow
-    Gfx_XorRect(AX 0x7777, BX 0x6666, x bytes 0x1a..0x98, rows y..y+1)    (1000:176c: every pixel
+    g_rankRowsWanted (DS:92a8) = DS:0110[i + 3]     (the "fill" word of the NEXT pair)
+    g_rankTickPhase (DS:92b0) = byte DS:9100 & 0xfc;  g_rankRowsDone (DS:92a6) = 0
+    g_rankState += 1                                (-> 2)
+elif latched != 0 and (byte DS:9100 & 0xfc) != g_rankTickPhase:      (one step)
+    g_rankTickPhase = byte DS:9100 & 0xfc
+    y = 0x6f - g_rankRowsDone
+    Gfx_ReplaceColorRect(AX 0x7777, BX 0x6666, x bytes 0x1a..0x98, rows y..y+1)    (1000:176c: every pixel
                                        of colour 7 in the rectangle becomes colour 6)
-    star rows: when g_rankFillRow == DS:0116 (8): 1 star at x 0x51, y 0x67
+    star rows: when g_rankRowsDone == DS:0116 (8): 1 star at x 0x51, y 0x67
                == DS:011a (16): 2 at 0x4e, 0x54, y 0x5f
                == DS:011e (24): 3 at 0x4b, 0x51, 0x57, y 0x57
                == DS:0122 (32): 4 at 0x48 + 6k, y 0x4f
                == DS:0126 (40): 5 at 0x45 + 6k, y 0x47
                == DS:012a (48): 6 at 0x42 + 6k, y 0x3f
-       each by Rank_DrawChestCoin(x, y, 0xfa) = Sprite_Draw(flag 0x40) of frame 0xfa (SHACK sprite
+       each by RankChest_DrawStar(x, y, 0xfa) = Sprite_Draw(flag 0x40) of frame 0xfa (SHACK sprite
        125, a small star) at (x, y)
-    Sfx_Play(3); g_dirty += 1; g_rankFillRow += 1
-    if g_rankFillRow == g_rankFillTarget:
-        g_rankScreen = 0; latched = 0
-        if g_rankFillRow - 1 >= DS:012e (56, unsigned): g_champFlashTimer (DS:0100) = 800
+    Sfx_Play(3); g_dirty += 1; g_rankRowsDone += 1
+    if g_rankRowsDone == g_rankRowsWanted:
+        g_rankState = 0; latched = 0
+        if g_rankRowsDone - 1 >= DS:012e (56, unsigned): g_champFlashTimer (DS:0100) = 800
 if g_champFlashTimer != 0:                           (runs every frame, any scene)
     if g_champFlashTimer % 160 == 0:  colour 0x6666; Text_Draw(0x40, 0x2e, "CHAMPION" DS:013a)
     elif g_champFlashTimer % 160 == 80: colour 0xffff; Text_Draw(0x40, 0x2e, DS:013a)
@@ -1276,7 +1276,7 @@ frames/s in DOSBox-X, so the 800 frames last ≈0.88 s (640 frames took 0.70 s) 
 slow CPU the timer drops by 4 per frame.
 
 Observation (answers §2) [O]: after a game that brought the total to 6, the rank chest showed one
-star row (16 rows filled) while a rank label in the band still read "Trainee". `Rank_Update` draws
+star row (16 rows filled) while a rank label in the band still read "Trainee". `RankChest_Update` draws
 only the name and the total; the label is drawn elsewhere (UI agent, open point §11).
 
 ---
@@ -1286,9 +1286,9 @@ only the name and the total; the label is drawn elsewhere (UI agent, open point 
 | Per tick (47.34 Hz, inside `Game_Tick`) | Per frame (free-running loop) |
 |---|---|
 | `Anim_Tick` (all script timing, script movement, sfx ops, the -6 strike counter) | `Sprites_Snapshot` (in `Frame_Begin`), `Sprites_DrawSorted`, `Sprites_EraseAll` |
-| `Player_Update`: state handlers 0-71, `Player_Move`, the cell handlers called from it (`Cell_P64`, `Cell_P20`, `Cell_P70`, `Cell_P71_V71`, `Cell_P72`, the treasure-room steppers) | `Search_Update` (37 frames per search) |
-| treasure-room carousel and pair motion (one step per tick) | `Treasures_DrawFound` (prize-room shelves) |
-| DS:9100 counter that times the rank-chest fill | `Rank_Update` (fill steps polled per frame, CHAMPION blink counted in frames) |
+| `Player_Update`: state handlers 0-71, `Player_Move`, the cell handlers called from it (`Cell_P64_EndScreen`, `Cell_P20_CastleGate`, `Cell_P70_TreasureRoom`, `Cell_P71_V71_ToRankScreen`, `Cell_P72_RankScreen`, the treasure-room steppers) | `Search_Update` (37 frames per search) |
+| treasure-room carousel and pair motion (one step per tick) | `ShelfRoom_DrawShelf` (prize-room shelves) |
+| DS:9100 counter that times the rank-chest fill | `RankChest_Update` (fill steps polled per frame, CHAMPION blink counted in frames) |
 
 Step gating (§2.1): when a tick finds `g_stepDone` set (no frame drawn since the last step), only
 `Anim_Tick` (holding every due advance) and `Input_Tick` run.
@@ -1314,15 +1314,15 @@ measured from the AVIs (108 ms per step) equals the ungated value [O+O].
 | Id | Where | When |
 |---|---|---|
 | 0 | coin script 0x1a/0x1b, entry 4 | the POOF cloud |
-| 1 | `PlrSt_29`, `PlrSt_30` | every tick while carried up / sliding (not on a slow CPU) |
-| 2 | `PlrSt_44` (looping), `Cell_P70` trigger (if no effect is playing) | magic sparkle; treasure-room display start |
-| 3 | `Rank_Update` | each chest-fill step |
+| 1 | `PlrSt_29_PassageUp`, `PlrSt_30_SlideDown` | every tick while carried up / sliding (not on a slow CPU) |
+| 2 | `PlrSt_44_EndSparkle` (looping), `Cell_P70_TreasureRoom` trigger (if no effect is playing) | magic sparkle; treasure-room display start |
+| 3 | `RankChest_Update` | each chest-fill step |
 | 5 | coin script entry 3 | the throw |
-| 6 | `Search_Update` (key found), `PlrSt_69` | key; champion crowned |
-| 7 | `Search_Update` (treasure found), `PlrSt_64` (looping), carousel swap | treasure; champion chest; carousel |
-| 8 | `PlrSt_42`, `PlrSt_45` | horn blow; chest opens (likely masked by effect 2, §6.3) |
-| 9 | `PlrSt_66` | creature screams |
-| music 1 | `PlrSt_48` | treasures fly into the chest (music was stopped by `EndSeq_Setup`) |
+| 6 | `Search_Update` (key found), `PlrSt_69_ChampCrowned` | key; champion crowned |
+| 7 | `Search_Update` (treasure found), `PlrSt_64_ChampChest` (looping), carousel swap | treasure; champion chest; carousel |
+| 8 | `PlrSt_42_EndHorn`, `PlrSt_45_EndChestOpen` | horn blow; chest opens (likely masked by effect 2, §6.3) |
+| 9 | `PlrSt_66_ChampScream` | creature screams |
+| music 1 | `PlrSt_48_EndFlightInit` | treasures fly into the chest (music was stopped by `EndSeq_Setup`) |
 
 Elf scripts and other modules start their own effects (fmt_sound §7).
 
@@ -1337,7 +1337,7 @@ Elf scripts and other modules start their own effects (fmt_sound §7).
 | 3d36-4f59 | the scripts (§3.1) | script 6 = `10, 1, 164, -10` |
 | 0b02 | far pointer to slot 1 | 3d94:8fec |
 | 0110 | i16 pairs (threshold, value), -1 terminated: end-sequence rank stars and rank-screen fill rows | (5,1), (25,8), (70,16) ... (9999,86), -1 |
-| 0116, 011a, 011e, 0122, 0126, 012a, 012e | words inside DS:0110 used as row counts by `Rank_Update` | 8, 16, 24, 32, 40, 48, 56 |
+| 0116, 011a, 011e, 0122, 0126, 012a, 012e | words inside DS:0110 used as row counts by `RankChest_Update` | 8, 16, 24, 32, 40, 48, 56 |
 | 013a | "CHAMPION" (NUL-terminated) | – |
 | 0b06 | i16 y positions, -1 terminated (treasure flight) | 64, 66, 68, ... 110, -1 (26 values) |
 | 0b3c | i16 y positions, -1 terminated (showcase flight) | 108, 106, 102, ... 134, -1 (16 values) |
@@ -1374,8 +1374,8 @@ champion), 7 (jumps), 9 (loop rates), 10 (typematic). Still open:
 6. The capture agent counted 38 loop frames for a search, the code gives 37 calls with the timer
    ≥ 1; the extra frame is presumably the frame that started the search or the timer-0 frame
    (counting convention) [I].
-7. Interfaces with the world agent: the cell handlers named here (`Cell_P63_V63`, `Cell_P12`,
-   `Cell_P11`, `Cell_V49`, shelf-room cells 50-55/65/66, type 23) are summarised only where they
+7. Interfaces with the world agent: the cell handlers named here (`Cell_P63_V63_CastleTop`, `Cell_P12_StartRoom`,
+   `Cell_P11_ClubDoor`, `Cell_V49_Showcase`, shelf-room cells 50-55/65/66, type 23) are summarised only where they
    drive this module; their full specs are in `code_world.md`.
 
 ---
@@ -1394,11 +1394,11 @@ Suggested files in `src/dos/game/` (SCOPING §5.3):
 * `search.h/.cpp`: `Search_Update` as a per-frame function, showcase pick/hand-over, shelf
   drawing.
 * `endseq.h/.cpp`: states 41-71 (they live in the player state table but form one script);
-  `Cell_P64`, `Cell_P20`, the treasure room (`Cell_P70` + helpers) and the rank screen. The 53-case
+  `Cell_P64_EndScreen`, `Cell_P20_CastleGate`, the treasure room (`Cell_P70_TreasureRoom` + helpers) and the rank screen. The 53-case
   switch is code: implement it as a lookup table of {value, action} built from §7.2 (the values
   are game logic, not assets; the scripts and pictures still come from the user's files).
 * Shared state: one `GameState` struct holding the DS variables named in this document (and in
-  `wave1_player.tsv`), so that save/restore (USERS.DAT fields +0x164 shown treasure, +0x08A
+  `re/names/dos/dgroup.tsv`), so that save/restore (USERS.DAT fields +0x164 shown treasure, +0x08A
   collected list, +0x133 shelf bits, header byte 1 = low byte of `g_saveHeapHigh`) maps 1:1.
 
 Pitfalls:
@@ -1435,14 +1435,13 @@ Pitfalls:
 
 | Module | Functions | Specified here |
 |---|---|---|
-| 18cf player.c | `PlrSt_00` 000d, `EndSeq_Setup` 0038, `PlrSt_41`-`PlrSt_61` 00a9-05b2 (21), `PlrSt_63`-`PlrSt_71` 05c4-07ea (9), `PlrSt_05` 07f6, `PlrSt_09` 081b, `PlrSt_03` 082a, `PlrSt_04` 0831, `PlrSt_10` 08cc, `Player_NetLeft` 0b36, `Player_NetRight` 0b6a, `PlrSt_11`-`PlrSt_35` 0b9e-14b1 (25), `Search_Start` 14e0, `Search_CanSearch` 1532, `Player_Move` 15f0, `Obj_WrapWorldX` 17c9, `Player_Update` 181a | 69 / 69 |
+| 18cf player.c | `PlrSt_00_Idle` 000d, `EndSeq_Setup` 0038, `PlrSt_41_EndIntro`-`PlrSt_61_EndDone` 00a9-05b2 (21), `PlrSt_63_ChampSparkle`-`PlrSt_71_ChampSparkleWait` 05c4-07ea (9), `PlrSt_05_Searching` 07f6, `PlrSt_09_AfterTeleport` 081b, `PlrSt_03_Spawn` 082a, `PlrSt_04_Arrive` 0831, `PlrSt_10_OnPath` 08cc, `Player_NetLeft` 0b36, `Player_NetRight` 0b6a, `PlrSt_11_WalkLeft`-`PlrSt_35_TreasureRoomLand` 0b9e-14b1 (25), `Search_Start` 14e0, `Search_CanSearch` 1532, `Player_Move` 15f0, `Obj_WrapWorldX` 17c9, `Player_Update` 181a | 69 / 69 |
 | 4306 anim.c | `Anim_Tick`, `Anim_InitSlots`, `Sprites_Snapshot`, `Sprites_DrawSorted`, `Sprites_EraseAll`, `Anim_SetIfIdle`, `Anim_Queue`, `Anim_Set`, `Anim_Stop`, `Anim_Start`, `Anim_Clear` | 11 / 11 |
-| 4a03 search.c | `Search_Update`, `Treasure_PickShowcase`, `Treasures_DrawFound`, `Treasure_AddCollected` | 4 / 4 |
-| 176a cells2.c (end screens) | `Cell_P64`, `Cell_P20`, `Cell_P70`, `Shack_Leave`, `Cell_P71_V71`, `Cell_P72`, `Game_AdvanceEnd`, `Treasure_IsCollected`, `Shack_AnimA`-`Shack_AnimI` (9), `Shack_ResetDisplay` | 18 / 18 (of the 35 in 176a; the path links, `Cell_P42` and `Castle_CreatureSpawn` belong to the world topic) |
-| 130f main.c (rank screen) | `Rank_Update`, `Rank_DrawChestCoin` | 2 / 2 (of 14 in 130f) |
-| outside, summarised | `Cell_P63_V63` trigger part (1568:1aa4), `Cell_V49` (1568:1c7b), `Cell_P12` treasure-room/champion parts (1568:03f6), `Game_Tick` order (130f:00fe), `Playfield_Redraw` search band (130f:0326), `Gfx_XorRect` (1000:176c), 1000:18af | interface only |
+| 4a03 search.c | `Search_Update`, `Treasure_PickShowcase`, `ShelfRoom_DrawShelf`, `Treasure_AddCollected` | 4 / 4 |
+| 176a cells2.c (end screens) | `Cell_P64_EndScreen`, `Cell_P20_CastleGate`, `Cell_P70_TreasureRoom`, `TreasureRoom_Leave`, `Cell_P71_V71_ToRankScreen`, `Cell_P72_RankScreen`, `Game_AdvanceEnd`, `Treasure_IsCollected`, `ShackPair_08_36_Approach`-`ShackTrio_4a_4c_4e` (9), `Shack_ResetDisplay` | 18 / 18 (of the 35 in 176a; the path links, `Cell_P42_GateL2` and `Castle_CreatureSpawn` belong to the world topic) |
+| 130f main.c (rank screen) | `RankChest_Update`, `RankChest_DrawStar` | 2 / 2 (of 14 in 130f) |
+| outside, summarised | `Cell_P63_V63_CastleTop` trigger part (1568:1aa4), `Cell_V49_Showcase` (1568:1c7b), `Cell_P12_StartRoom` treasure-room/champion parts (1568:03f6), `Game_Tick` order (130f:00fe), `Playfield_Redraw` search band (130f:0326), `Gfx_ReplaceColorRect` (1000:176c), 1000:18af | interface only |
 
 Suggested descriptive names for all these functions (e.g. `PlrSt_10_OnPath`, `PlrSt_49_EndFlightNext`,
-`Cell_P70_TreasureRoom`, `ShackPair_06_5a`, `RankScreen_Update`, `PrizeRoom_DrawShelf`) and for 50
-DGROUP variables named in this document are in `re/names/dos/wave1_player.tsv`; the existing TSVs
-were not edited.
+`Cell_P70_TreasureRoom`, `ShackPair_06_5a`, `RankChest_Update`, `ShelfRoom_DrawShelf`) and for 50
+DGROUP variables named in this document are now canonical in `re/names/dos/` (wave 2 merge).

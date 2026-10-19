@@ -201,3 +201,51 @@ TEST_CASE("ini (REVIEW_1 H-1): tmport.ini is replaced atomically and the previou
     CHECK_FALSE(b.save(path));
     CHECK_FALSE(IniFile::load(path)->get("engine", "window_scale"));
 }
+
+TEST_CASE("settings: [engine] edition and the [dos] section") {
+    const EngineSettings d = EngineSettings::fromIni(IniFile{});
+    CHECK_FALSE(d.edition);
+    CHECK(d.dosDataPath.empty());
+    CHECK(d.dos == dos::DosSettings{});
+    CHECK(d.dos.look == dos::Look::Ega);
+    CHECK(d.dos.sound == dos::SoundDevice::Tandy);
+    CHECK_FALSE(d.dos.slowCpu);
+    CHECK(d.dos.frameSpeed == dos::FrameSpeed::Reference);
+    CHECK_FALSE(d.dos.squarePixels);
+    CHECK(d.dos.windowScale == 3);
+
+    const EngineSettings s = EngineSettings::fromIni(IniFile::parse(
+        "[engine]\nedition = DOS\n"
+        "[dos]\ndata = D:\\TM-DOS\nlook = Tandy\nsound = speaker\nslow_cpu = yes\nframe_speed = period\n"
+        "square_pixels = true\nwindow_scale = 5\n"));
+    CHECK(s.edition == Edition::Dos1990);
+    CHECK(s.dosDataPath == "D:\\TM-DOS");
+    CHECK(s.dos.look == dos::Look::Tandy);
+    CHECK(s.dos.sound == dos::SoundDevice::Speaker);
+    CHECK(s.dos.slowCpu);
+    CHECK(s.dos.frameSpeed == dos::FrameSpeed::Period);
+    CHECK(s.dos.squarePixels);
+    CHECK(s.dos.windowScale == 5);
+    // The Windows keys are not touched by the new ones.
+    CHECK(s.windowScale == 2);
+    CHECK(EngineSettings::fromIni(IniFile::parse("[engine]\nedition = win\n")).edition == Edition::WinCd);
+    CHECK_FALSE(EngineSettings::fromIni(IniFile::parse("[engine]\nedition = auto\n")).edition);
+
+    // Round trip.
+    IniFile ini;
+    s.toIni(ini);
+    CHECK(EngineSettings::fromIni(IniFile::parse(ini.text())) == s);
+    EngineSettings autoEd = s;
+    autoEd.edition.reset();
+    IniFile ini2;
+    autoEd.toIni(ini2);
+    CHECK(ini2.get("engine", "edition") == "auto");
+    CHECK(EngineSettings::fromIni(IniFile::parse(ini2.text())) == autoEd);
+
+    // Bad values keep their defaults.
+    const EngineSettings bad = EngineSettings::fromIni(IniFile::parse(
+        "[engine]\nedition = amiga\n[dos]\nlook = svga\nsound = gus\nslow_cpu = sometimes\nframe_speed = turbo\n"
+        "window_scale = 0\n"));
+    CHECK_FALSE(bad.edition);
+    CHECK(bad.dos == dos::DosSettings{});
+}

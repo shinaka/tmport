@@ -14,7 +14,8 @@ TM Port is not affiliated with or endorsed by The Learning Company or any later 
 
 Contents: [Features](#features) · [Requirements](#requirements) ·
 [Getting started](#getting-started) · [Controls](#controls) · [Menus](#menus) ·
-[Saved players](#saved-players) · [Options](#options) · [Modding](#modding) ·
+[Saved players](#saved-players) · [Options](#options) ·
+[DOS edition (in progress)](#dos-edition-in-progress) · [Modding](#modding) ·
 [Building](#building) · [Command-line tools](#command-line-tools) ·
 [Project layout](#project-layout) · [Status and known differences](#status-and-known-differences) ·
 [Credits and licences](#credits-and-licences)
@@ -46,7 +47,8 @@ Contents: [Features](#features) · [Requirements](#requirements) ·
 
 * **Your copy of *Super Solvers Treasure Mountain!*, Windows CD edition** (the CD carries a
   `TMTWINCD` folder with `TMTWINCD.EXE`, `TMT.DLL`, `TMT256.DLL`, `TMT16.DLL`, `TM0SOUND.DLL` to
-  `TM8SOUND.DLL` and a `SOUNDS` folder). The DOS version and other editions are not supported.
+  `TM8SOUND.DLL` and a `SOUNDS` folder). The 1990 DOS edition is in progress (a preview, see
+  [DOS edition (in progress)](#dos-edition-in-progress)); other editions are not supported.
 * **A computer** with Windows 10 or 11 (64-bit), Linux (X11 or Wayland) or macOS. Windows is the
   main platform. On Linux the engine is built and tested with GCC (under WSL 2); macOS builds
   and plays with Xcode's Clang.
@@ -168,6 +170,7 @@ window_scale = 2            ; initial window size: 640x480 times this
 integer_scale = false       ; scale the picture by whole numbers only
 fullscreen = false          ; start in fullscreen (Alt+Enter / F11 switch at run time)
 pause_on_focus_loss = true
+edition = auto              ; win or dos: the edition to play when the data holds both
 
 [input]
 mode = lossless             ; or first-event: keep only the first input event per message
@@ -191,6 +194,15 @@ paths = mods                ; mod folders, ';'-separated (see docs/MODDING.md)
 [debug]
 show_treasure = false       ; true: box the hiding places that hold a treasure (gold) or the key (cyan)
 keys = false                ; true: F9 switches the treasure boxes on and off (show_treasure implies it)
+
+[dos]                       ; the 1990 DOS edition (in development)
+data = D:\TM-DOS            ; its folder (the one with SST.EXE)
+look = ega                  ; ega, tandy, mcga or cga: the picture of that video adapter
+sound = tandy               ; tandy, speaker, adlib or off
+slow_cpu = false            ; the original's slow-machine mode (-X)
+frame_speed = reference     ; or period: frame-counted effects at one step per frame
+square_pixels = false       ; true: 320x200 with square pixels instead of 4:3
+window_scale = 3            ; initial window: 320x240 times this
 ```
 
 The most useful command-line options (`tmport --help` lists them all):
@@ -212,12 +224,50 @@ The most useful command-line options (`tmport --help` lists them all):
 | `--show-treasure` | debug: box the hiding places that hold a treasure (gold) or the key (cyan); F9 switches the boxes off and on |
 | `--debug` | debug keys only: F9 switches the treasure boxes on and off |
 | `--verbose` | detailed log |
+| `--edition win\|dos` | the edition to play when the data holds both the Windows CD and the 1990 DOS edition |
+| `--look`, `--sound`, `--slow-cpu`, `--frame-speed`, `--dos-args "<switches>"`, `--square-pixels` | options of the 1990 DOS edition (`docs/BUILDING.md` lists their values) |
 
 **Music.** `auto` uses the Windows MIDI synthesizer on Windows. On Linux and macOS there is no
 system synthesizer: configure a General MIDI SoundFont (`.sf2`, not `.sf3`), for example
 FluidR3_GM (`fluid-soundfont-gm` on Debian/Ubuntu) or GeneralUser GS; without one the game runs
 without music. The engine does not include or download a SoundFont. `docs/BUILDING.md` ("Music")
 has the details.
+
+## DOS edition (in progress)
+
+The engine is learning to play the original 1990 DOS edition too (`SST.EXE` version 1.0, the
+16-colour EGA/Tandy game), from its own folder (`TM-DOS`, the one with `SST.EXE`, `SPRITES.PAK`
+and `ALL_PUZS`). Its game logic is not written yet: for now the DOS edition starts a **preview**
+that shows what already works.
+
+* **Screens**, rebuilt from your files with the original's drawing rules: the title, the Club
+  Sign-In (with your DOS players), the clubhouse at the start of a game, an elf question, the
+  mountain path of level 1 and the castle's ladder shaft. The game screens use the hiding places
+  and castle layout of your second saved player, if any. Compared with recordings of the original
+  in DOSBox-X (title and sign-in in all four looks, the others in EGA, the clubhouse also on
+  Tandy), every screen matches pixel for pixel when it shows the same players.
+* **Sound**: the original's three tunes and twelve effects on the PC speaker, the Tandy 3-voice
+  chip, or AdLib (for now with a simple stand-in for the AdLib music), with the music played and
+  paused where the original does it.
+* **Keys**: Enter or Space (or a click) shows the next screen; `0`-`9`, `-` and `=` play effects 0
+  to 11; Ctrl+S switches music and sound off and on (as in the original: on the title and the game
+  screens); Esc quits. Alt+Enter / F11 (fullscreen), F12 (screenshot) and the pause in the
+  background work as in the Windows edition.
+
+Start it with `tmport --data D:\TM-DOS` (or set `TM_DATA_DOS`, or `data =` in the `[dos]`
+section of `tmport.ini`); when a folder holds both editions, add `--edition dos`. The picture is
+320x200 shown at 4:3, as on a monitor of the time. DOS options (also in the `[dos]` section):
+
+| Option | Effect |
+|---|---|
+| `--look ega\|tandy\|mcga\|cga` | the picture of that video adapter (EGA and Tandy look the same; MCGA has softer colours; CGA is dithered to 4 colours) |
+| `--sound tandy\|speaker\|adlib\|off` | the sound device (default `tandy`) |
+| `--slow-cpu`, `--frame-speed reference\|period` | the original's slow-machine mode; the speed of frame-counted effects (for the game itself; in the preview a slow Tandy or CGA machine only turns the music off after the title, as the original does) |
+| `--dos-args "<switches>"` | the original's own switches, e.g. `"-T -St"` |
+| `--square-pixels`, `--integer-scale` | 320x200 with square pixels; whole-number scaling (5x6 per pixel) |
+
+The DOS players are kept in `dos_users.dat` in the preference folder, imported from the DOS
+folder's `USERS.DAT` on the first start (the DOS file is never changed).
 
 ## Modding
 
@@ -270,7 +320,10 @@ comparing the engine with the original. The tools open no window (except the pic
   hints, cut-scenes, celebration, rank screen, castle wall) and the room loop (`--room-run`),
   all with scripted input on a simulated clock;
 * audio: `--dump-ssnd`, `--midi-dump`, `--midi-render` (a tune through a SoundFont into a WAV);
-* mods: `--export-mod-kit`, `--check-mods`.
+* mods: `--export-mod-kit`, `--check-mods`;
+* the DOS edition: `--dos-pan`, `--dos-pak`, `--dos-screen` (scenery, sprites and the preview's
+  screens to PNG) and `--dos-sound` (tunes and effects to WAV); `tmport --help dos-gfx` and
+  `tmport --help dos-sound` list their options.
 
 The game itself can also run headless with scripted input (`--headless --keys "..."`).
 `tmport --help` gives an overview and `tmport --help <topic>` the options of each group;
@@ -281,7 +334,7 @@ The game itself can also run headless with scripted input (`--headless --keys ".
 | Path | Contents |
 |---|---|
 | `src/` | the engine: `util`, `vfs` (folders and CD images), `ne` (Windows NE executables), `data` (tables of `TMTWINCD.EXE`), `res` (resources), `gfx`, `text`, `anim`, `input`, `timing`, `audio`, `ui` (dialogs, menu bar), `save`, `game` (the game itself), `mods`, `rtl`, `platform` (SDL), `app` (start-up), `cli` (tools); `docs/DESIGN.md` describes them |
-| `tests/` | unit tests (doctest); tests that need the game read it from `TM_DATA` and skip themselves without it |
+| `tests/` | unit tests (doctest); tests that need the game read it from `TM_DATA` (`TM_DATA_DOS` for the DOS edition) and skip themselves without it |
 | `docs/` | `BUILDING.md` (building, running, tools), `DESIGN.md` (engine conventions), `MODDING.md` |
 | `re/` | the specifications written from the study of the original: `re/docs/ARCHITECTURE.md` first, then `PORTING_NOTES.md` and the topic documents; reviews in `re/reviews/` |
 | `tools/` | Python tools used for the study (resource extraction and reference decoders) |

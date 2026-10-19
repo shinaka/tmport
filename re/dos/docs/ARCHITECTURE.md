@@ -5,7 +5,11 @@ shipped as `SST.EXE` plus data files) and compares its gameplay with the Windows
 described in `re/docs/ARCHITECTURE.md`. The data formats are in the companion docs
 `fmt_graphics.md` (PAN/PAK pictures, palettes, video modes, font, the block grid),
 `fmt_sound.md` (TUNES/SFX and the sound driver) and `fmt_data.md` (ALL_PUZS, PRG_DICT, HELP.DAT,
-USERS.DAT, the DGROUP map); this document covers the program and the game rules.
+USERS.DAT, the DGROUP map); this document covers the program and the game rules. It is the
+overview: the wave 1 topic docs specify every routine and win where they are more detailed —
+`code_world.md` (cells, grid, camera), `code_player.md` (player, animation scripts, search, end
+sequence, treasure room), `code_elves_layout_hints.md`, `code_ui.md` (menus, boxes, help, title,
+sign-in, quiz, HUD), `code_runtime.md` (timer, main loop, start-up, input) and `PORTING_NOTES.md`.
 
 Conventions (same as the Windows docs):
 
@@ -15,9 +19,11 @@ Conventions (same as the Windows docs):
   `SST_unpacked.EXE`, the EXEPACK-free image; load segment 0x1000). File offset of `SSSS:OOOO` in
   `extracted/SST_unpacked.EXE` = `(SSSS − 0x1000)·16 + OOOO + 0x21F0`.
 * `DS:XXXX` = DGROUP (segment `4d94`), file offset `0x3D940 + XXXX + 0x21F0 = 0x3FB30 + XXXX`.
-  DS:0000–8F9F is initialised, DS:8FA0–CCFF is BSS (zero at start).
-* Names follow `re/names/dos/*.tsv` (one name per address; the export `re/dos/ghidra_export/`
-  carries them). Numbers are hex where the code uses hex.
+  DS:0000–8F9F is initialised, DS:8FA0–CC1F is BSS (zero at start); the stack segment follows.
+* Names follow `re/names/dos/*.tsv` (one canonical name per address, decision table in
+  `re/names/dos/README.md`; the export `re/dos/ghidra_export/` carries them, and
+  `src/dos/data/dgroup_offsets.h` uses the same names for the DGROUP tables). Numbers are hex where
+  the code uses hex.
 * "World units" are pixels of the 320×200 logical screen; x positions inside the play-field are
   often kept in *bytes* (2 pixels per byte, 4 bpp back buffer).
 * Game text is referred to by DGROUP offset with at most a few identifying words.
@@ -54,7 +60,7 @@ name, disk number) [O `File_OpenByIndex` 1460:06c8]:
 the directory of `argv[0]` (`Path_InitDrives` 1460:08cc) and prompts for disk 1/2 on floppy
 drives (`Disk_PromptForDisk` 150a:00f5, message boxes 0x10/0x11/0x15). `TLCINFO.DAT` (DS:0898) is
 the disk check file read by `Disk_CheckInfoFile` 150a:0002 [I]. `ssrnet.dat`/`ssrquiet.dat`
-drive a school-network refusal (DS:070b "cannot be used on a network") that can never fire:
+drive a school-network refusal (the network message at DS:070b) that can never fire:
 `Net_IsNetworkDrive` 1460:05a3 always returns 0 [O].
 
 ### 1.1 Module map and size
@@ -111,9 +117,11 @@ The first export had 353 functions (60 KB of ~90 KB of code). This pass [O, scri
   (`DGROUP`, `DGROUP_BSS`, `FARDATA_1ae7/2005/2897/32d7/415f/41ca`);
 * applied `re/names/dos/` (628 functions, 114 DGROUP variables).
 
-Six cell handlers still fail to decompile (far pointers built on the stack: 1568:1090, 1556,
-15bc, 1c7b, 1d96, 1e50); read their disassembly. About 2 KB of data and padding in code segments
-stay uncovered.
+Wave 1 repaired the six cell handlers that did not decompile (far pointers built on the stack:
+1568:1090, 1556, 15bc, 1c7b, 1d96, 1e50) by clearing the DS assumption over their bodies
+(`code_world.md` §12.3); since then all 628 functions decompile. Wave 2 merged the five wave 1
+name proposals into one canonical name per address (628 functions, 429 DGROUP labels). About 2 KB
+of data and padding in code segments stay uncovered.
 
 ---
 
@@ -125,7 +133,7 @@ stay uncovered.
  c0_startup 1000:0000 -> main 130f:0007
    Game_Init 1460:0003  (fails -> exit 1)
      sprite bank 0x1C908 bytes (farmalloc), harderr, Hw_Detect, ParseCommandLine,
-     "needs a graphics adapter" (DS:0693) -> exit, disk paths, Mouse_Detect,
+     the no-graphics-adapter message (DS:0693) -> exit, disk paths, Mouse_Detect,
      buffers, Video_Init, Pal_Apply, Mouse_Setup, Sound_LoadData, Help_LoadFile,
      Quiz_LoadDictionary, Sprites_LoadBegin (BEGIN.PAK), Game_InitVars
    Kbd_Install 43a0:0002, Timer_Install 1000:03c5
@@ -147,11 +155,11 @@ stay uncovered.
                   0,1,2 mountain levels  -> 3 castle top close-up -> 4 treasure room
  E  END         castle top cell (1568:1aa4): total += treasures found, scene 3,
                 end sequence (player states 41..71): treasures fly into the chest, chest fill
-                to the rank; any key (176a:0404) -> showcase treasure added (PlrSt_34);
+                to the rank; any key (176a:0404) -> showcase treasure added (PlrSt_34_Chute);
                 castle gate cell (176a:0485): saved game cleared; total < 300 -> treasure
                 room (scene 4), else crown sequence
  N  NEXT GAME   g_endState DS:9234 1 -> 2 (Game_AdvanceEnd 176a:1119); Scene_Update:
-                Game_End 47c7:09a2 (save), Castle_ResetCells, Layout_ClearSlots,
+                Game_End 47c7:09a2 (save), Cells_ResetVariable, Layout_ClearSlots,
                 Game_Start (a new layout at once), end-of-game message (DS:911c = 2);
                 the player walks out of the treasure room (176a:1094) into scene 0
  X  EXIT        File menu "Exit and Save" (43cb:032c) -> g_quit -> Game_Shutdown 130f:00db
@@ -204,8 +212,8 @@ then sets up a new or saved game (§2.4) and starts the music of the area.
 ### 2.4 Game set-up
 
 New game (`Game_NewSetup` 47c7:0bd6): treasures found = 0, key state = 8, all 9 question slots
-empty (0xFFFF), answer masks 7, clue words 0, per-level found masks 0, all 48 hiding places
-cleared, castle cells reset, then `Layout_Generate` (§5.3). The player starts at world
+empty (0xFFFF), answer masks 7, clue words 0, per-level found masks 0, all 48 hiding-place
+cells cleared, the 9 variable cells reset (`Cells_ResetVariable`), then `Layout_Generate` (§5.3). The player starts at world
 (0x140, 0x70) with the camera at (0xC0, 0) (start area), area id 5 (`DS:910b`) [O 47c7:0b19,
 47c7:08b5]. A new player record gets 5 coins and 10 nets (`Users_InitNewPlayer` 47c7:0a8b); later
 games start with the coins and nets banked at the end of the previous game (record +0x15C/+0x15A,
@@ -251,7 +259,7 @@ if no full redraw is pending: `SignIn_Update`, `Gameover_UpdateMessages`, `Hints
 `Menu_Update`; then `Scene_Update`, `Scroll_Update` (draw newly exposed tile columns/rows),
 `Search_Update`, `Quiz_Update`, `Sound_SyncState`, `Game_HandleHotkeys`, `Screen_DrawOverlay`
 (HUD / quiz / sign-in painter `DS:0104[g_screen]`), `Playfield_Redraw` (full redraw when requested),
-`Treasures_DrawFound`, `Rank_Update`; `Sprites_DrawSorted` (back to front by y, saving the
+`ShelfRoom_DrawShelf`, `RankChest_Update`; `Sprites_DrawSorted` (back to front by y, saving the
 background under each), `Frame_Present` (dirty spans or full screen), `Sprites_EraseAll`.
 
 Consequence: per-frame features (the hiding-place search animation, HUD count-up, rank/chest
@@ -287,10 +295,12 @@ Handlers per cell type [O]:
 
 * `g_cellPlayerHandlers` DS:08a6[75] — called by `Cell_GetMask` (1568:1fe4) for the cell containing
   the object being moved (`g_curObj` DS:8fab: the player or an elf). It returns a **terrain mask**
-  (DS:92c9) and may teleport the object, change the scene or play a sound. Mask bits seen: low
-  byte = allowed moves/keys (bit 0 up, 1 down, …), 0x100 ladder, 0x200 coin drop pays (shop) /
-  hiding place, 0x400 camera mode, 0x800 slide, 0x1000/0x2000 ladder-jump [O masks, meaning of
-  some bits I]. `Player_Update` ANDs the high byte of the held-key word with it.
+  (DS:92c9) and may teleport the object, change the scene or play a sound. Mask bits: low
+  byte = allowed keys (1 up, 2 down, 4 left, 8 right, 0x10 net, 0x20 jump, 0x40 coin), 0x100 ladder,
+  0x200 a dropped coin pays the net shop instead of searching, 0x400 camera mode (scroll up earlier),
+  0x800 slide/lift, 0x1000 fall, 0x2000 ladder jump [O; table in `code_world.md` §4.4]. The mask
+  of the previous tick is applied to the held-key word (`Player_Update`: low byte ANDed, high byte
+  copied).
 * `g_cellVisibleHandlers` DS:09d2[74] — called every tick for the 4 cells across the view
   (`Cells_UpdateVisible` 1568:1f0b): static decorations (`Cell_DrawObject` 1568:1e50), the net-shop
   sign, the castle creature.
@@ -304,18 +314,18 @@ visible handler).
 `g_level` (DS:928f) selects the scene; `Scene_Update` (1437:0034) loads `MOUNTAIN.PAN`,
 `MOUNT2N3.PAN`, `MOUNT3.PAN` (levels 0/1/2, with SPRITES.PAK), `CLOSE.PAN` + CLOSE.PAK (3, castle
 top) or `SHACK.PAN` + SHACK.PAK (4, treasure room) and forces a full redraw [O]. Each scene uses a
-part of the 16×16 strip. From the coordinates in the cell handlers and the hiding-place list
-(`g_hidingCells` DS:11aa) [I from O data]:
+part of the 16×16 strip; the block numbers of a region are only meaningful in its scene's PAN. The
+regions, traced from every teleport target and confirmed by the capture matching (full table and an
+ASCII map of the cell types in `code_world.md` §3.3) [O]:
 
-| Rows of the strip | Part of the world |
-|---|---|
-| 0–2 | clubhouse rooms and start area (row 0 shows the clubhouse with MOUNTAIN.PAN, `fmt_graphics.md` §4.1); new games start at (0x140,0x70) in cell 2 |
-| 3–6 (cols 0–7) | castle wall (cells 0x32..0x72 get the ladder layout) |
-| 7–8 | level 2 path (hiding-place cells 0x77–0x87) |
-| 9 (cols 8–11) | treasure room (scene 4) |
-| 10 (cols 8–10) | castle-top close-up / end screen (scene 3) |
-| 10–12 | level 1 path (hiding-place cells 0xAB–0xC1) |
-| 13–15 | level 0 path, the foot of the mountain (hiding-place cells 0xE3–0xFC) |
+| Scene / PAN | Cells (hex) | Part of the world |
+|---|---|---|
+| 0 MOUNTAIN | 00–05; 08–0B, 20–27; 38–6B (cols 8–B, rows 3–6) | clubhouse (new games start in 02 at (0x140,0x70)); level-0 cave and its upper room (bonus spot 26); the four treasure shelf rooms |
+| 0 | E3–FF (rows 14–15); DF, CF | **level 0 path**; the trunk ladder up to level 1 |
+| 1 MOUNT2N3 | AB–C2 (rows 10–12); 28–2A; 8E, 9E, AE | **level 1 path**; mine tunnel; geyser column above the level-1 gate AE |
+| 2 MOUNT3 | 77–88 (rows 7–8); 70–76; 30–67 (cols 0–7, rows 3–6); 2D–2F | **level 2 path**; castle hall; castle wall; ice cave |
+| 3 CLOSE | A8–AA; 5D, 6D | castle-top end screen; the chute down to the castle gate 6D |
+| 4 SHACK | 98–9B; 1D–1F | treasure room; rank chest screen |
 
 Three cell pairs show the same hiding place from two scenes; `Layout_MirrorSharedCells` (1a54:06dc)
 copies 0xE3–E5 → 0xFD–FF, 0xAB–AD → 0xC0–C2, 0x77–79 → 0x86–88 and `Search_Update` marks both
@@ -335,39 +345,49 @@ CPU the scroll steps are doubled (DS:3d31) [O `Player_Move` 18cf:15f0].
 * **Path line**: an object stands when `y & 0x7F == 0x70`; cell handlers stop downward motion there
   (`Cell_GroundCheckObj`/`Cell_GroundCheckPlayer` 1568:0134/0203).
 * **Ladders and up-passages between paths**: in these cells the mask allows Up/Down only in the
-  ladder's x range (e.g. x & 0x78 within 0x26..0x5A) and Up climbs (`PlrSt_15`); once the player is more than 8 px
+  ladder's x range (e.g. x & 0x78 within 0x26..0x5A) and Up climbs (`PlrSt_15_ClimbUp`); once the player is more than 8 px
   above the path line (`y & 0x7F < 0x68`, `Cell_GroundCheckPlayer` returns 1) he is moved to the
-  ladder's destination on another path row and the scene/music may change: `Cell_P5` 1568:0008 →
-  (0x460,0x70), `Cell_P9` 1568:01b4 → (0x5b0,0x70), `Cell_P11` 1568:0386 → (0x140,0x70), `Cell_P17`
-  1568:0b38 → (0x440,0x170), `Cell_P18` 1568:0bfb → (0x540,0x170), `Cell_P34` 1568:0303 →
-  (0xc0,0x170), `Cell_P35` 1568:0341 → (0x4c0,0x70), `Cell_P60` 1568:1953 → (0x6c0,0x170). Other
-  ladder cells keep the player in the same column (`Cell_P30_V30` 1568:0a6c, `Cell_P40_V40`
-  1568:1286, `Cell_P7/P8` 1568:05cb/0638, `Cell_P48` 1568:16ed); at a ladder-jump spot (mask
+  ladder's destination on another path row and the scene/music may change: `Cell_P5_CaveDoorW` 1568:0008 →
+  (0x460,0x70), `Cell_P9_CaveDoorE` 1568:01b4 → (0x5b0,0x70), `Cell_P11_ClubDoor` 1568:0386 → (0x140,0x70), `Cell_P17_MineDoorW`
+  1568:0b38 → (0x440,0x170), `Cell_P18_MineDoorE` 1568:0bfb → (0x540,0x170), `Cell_P34_CaveUp` 1568:0303 →
+  (0xc0,0x170), `Cell_P35_UpperRoomDown` 1568:0341 → (0x4c0,0x70), `Cell_P60_IceDoor` 1568:1953 → (0x6c0,0x170). Other
+  ladder cells keep the player in the same column (`Cell_P30_V30_TrunkTop` 1568:0a6c, `Cell_P40_V40_Geyser`
+  1568:1286, `Cell_P7_WallLeft/P8` 1568:05cb/0638, `Cell_P48_Landing` 1568:16ed); at a ladder-jump spot (mask
   0x2000) Left/Right jumps to another ladder (state 0x21, hint text 12) [O].
-* **Gaps / slide-down tunnels**: in `Cell_P41_V41` (1568:141c), a player walking on the path line
-  through the middle of the cell (x & 0x78 within 0x15..0x57) who is not jumping (states 17–20)
-  drops in: slide animation 0x1D, state 0x1E, mask 0x800 (`PlrSt_29/30` 18cf:12f6/1367, sfx 1); the
-  tunnel cells (`Cell_P50..P55`, `P65`, `P66` 1568:06a5..09e8) carry him down to the tunnel exit
-  (e.g. (0x460,0x1f0), (0x200,0x70)) and mark the tunnel as seen (DS:7d7c.., DS:9201..). Jumping
-  over the gap avoids it. Message 11 "Whoops! You slid down a tunnel" (DS:70c1) and the 4-star
-  message "Watch out for gaps in the path!" describe this; no code arms hint 11 (§5.14) [O, link
-  between the texts and the cells I].
+* **Geyser hole**: cell type 41 is only cell 7E, the top of the geyser on level 2
+  (`Cell_P41_V41_GeyserTop` 1568:141c). A player walking through its middle (x & 0x78 within
+  0x18..0x50) who is not jumping (states 17–20) drops in: slide animation 0x1D, state 0x1E, mask 0x800
+  (`PlrSt_30_SlideDown` 18cf:1367, sfx 1), down 7E → 8E → 9E to the level-1 gate cell AE (`g_level`
+  1). Jumping over it avoids it. Message 11, the slid-down-a-tunnel hint (DS:70c1), has no code
+  that arms it (§5.14) [O, `code_world.md` §6.5].
+* **Rope bridges** (type 45, cells 84 on level 2 and B7 on level 1, `Cell_P45_V45_Bridge` 1568:15bc):
+  at tier ≥ 2 a bridge breaks under a walking player in its middle (picture 0x2F → 0x30, sfx 9) and
+  he falls to the level below (B4 / E7); jumping over avoids it. This is the tier-dependent gap of the
+  4-star message that warns about gaps in the path. On a slow CPU the bridges are plain path
+  (`Cells_AdjustForCpu`) [O, `code_world.md` §6.6].
+* **Treasure shelf rooms** (cells 38–6B, from the clubhouse door cell 04): the cells
+  `Cell_P50_ShelfEnter`..`Cell_P66_Shelf3to2` (1568:06a5..09e8) move the player between the clubhouse
+  and the four rooms where the collected treasures stand on shelves (DS:9201.., DS:7d7c..,
+  `ShelfRoom_DrawShelf` 4a03:04a8) [O, `code_world.md` §6.3]. (The first synthesis took them for
+  slide-down tunnels.)
 * **Path links**: some cells convey a walking object into another part of the strip
   (`Cell_ConveyLeft/Right` 176a:0019/0110, offsets like (−0x500,−0x80)); elves near the player are
   moved along (`Elves_ShiftNearby` 4521:12df).
-* **Exits/doors**: cells that teleport when walking out (e.g. `Cell_P6` 1568:00ce → (0x5b0,0x770),
-  `Cell_P10` 1568:029d) and the start-area door (`Cell_P12` 1568:03f6: Up enters level 0 at
+* **Exits/doors**: cells that teleport when walking out (e.g. `Cell_P6_CaveExitW` 1568:00ce → (0x5b0,0x770),
+  `Cell_P10_CaveExitE` 1568:029d) and the start-area door (`Cell_P12_StartRoom` 1568:03f6: Up enters level 0 at
   (0x1c0,0x7f0)).
-* **Level gates (locks)**: `Cell_P31` (1568:0f17) level 0 → 1, `Cell_P39_V39` (1568:1329) level 1 → 2,
-  `Cell_P42` (176a:02dc) level 2 → castle. Each opens only with the level's key (`g_keyState`
+* **Level gates (locks)**: `Cell_P31_GateL0` (1568:0f17) level 0 → 1, `Cell_P39_V39_GateL1` (1568:1329) level 1 → 2,
+  `Cell_P42_GateL2` (176a:02dc) level 2 → castle. Each opens only with the level's key (`g_keyState`
   DS:9120 == 2/4/6); otherwise Up arms hint 8 "You must have the key" [O].
 * **Level boundaries**: `Cell_LevelBoundary01/12` (1568:0e6d/12b4) switch `g_level` when the
   player crosses between scenes, in either direction, and set the key icon state for the level
   entered (10/12 = that level's key still hidden, 2/4 = already found) [O].
-* **Bonus coins**: cell type 73 (cell 38, start area; `Cell_BonusCoins` 1568:1ed8): once per
-  session, an object at `x & 0x7F == 0x48` gives the player **+5 coins** (sfx 4) and changes the cell
-  picture (0x4B → 0x49) [O]. The handler does not check that the object is the player, so an elf
-  passing the spot would also pay out [O]; the picture is not saved [O §6].
+* **Bonus coins**: cell type 73 (cell 26, the upper room of the level-0 cave; `Cell_BonusCoins`
+  1568:1ed8): once per game, an object at `x & 0x7F == 0x48` gives the player **+5 coins** (sfx 4)
+  and changes the cell picture (0x4B → 0x49) [O]. The handler does not check that the object is the
+  player, so an elf passing the spot would also pay out [O]. The picture is entry 0 of the 9
+  variable cells (DS:120a): it is saved with the game and reset for every new game
+  (`Cells_ResetVariable`) [O, `code_world.md` §3.5].
 * **Net shop**: §5.9. **Castle wall**: §5.12.
 
 ---
@@ -384,14 +404,15 @@ CPU the scroll steps are doubled (DS:3d31) [O `Player_Move` 18cf:15f0].
 | Rank label (DS:625c by DS:629d) | Trainee | 1 star | 2 stars | 3 stars | 4 stars | 5 stars | 6 stars | Champion |
 | Tier `g_tier` DS:9130 | 0 | 0 | 1 | 1 | 2 | 2 | 3 | 3 |
 
-The tier is recomputed at every new layout from the total (< 25 → 0, 25–114 → 1, 115–229 → 2,
-≥ 230 → 3; `Layout_PlaceTreasures` 1a54:029a) and saved (record +0x140) [O].
+The tier is raised at every new layout to the total's tier (25–114 → 1, 115–229 → 2, ≥ 230 → 3;
+`Layout_PlaceTreasures` 1a54:029a; a total below 25 leaves the loaded tier) and saved (record
++0x140) [O, `code_elves_layout_hints.md` §5.7].
 
 | Effect of the tier | 0 | 1 | 2 | 3 | Source |
 |---|---|---|---|---|---|
 | Treasures hidden per level | 2 | 3 | 4 | 5 | 1a54:029a |
 | HUD treasure slots per level | 2 | 3 | 4 | 5 | `Hud_Redraw` 130f:07a5 (tier+2) |
-| Elves (A walkers / D coin / B throwers / C walkers) | 3/3/0/3 = 9 | 3/3/2/3 = 11 | 3/3/4/3 = 13 | 3/3/6/3 = 15 | `Elves_Spawn` 4521:182e, DS:5d34 |
+| Elves (A walkers / D coin creatures / B throwers / C walkers, spawn order) | 3/3/0/3 = 9 | 3/3/2/3 = 11 | 3/3/4/3 = 13 | 3/3/6/3 = 15 | `Elves_Spawn` 4521:182e, DS:5d34 (columns A, B, C, D) |
 | Castle ladder layout | 0 | R(2) | R(3) | R(4) | `Castle_PickLayout` 1a54:0892 |
 | Castle creature chance per aligned tick | never | 1/512 | 1/256 | 1/64 | `Castle_CreatureSpawn` 176a:159e, DS:0afa |
 | "Found all" in a game | 6 | 9 | 12 | 15 | `Gameover_UpdateMessages` 49a6:026f |
@@ -403,7 +424,7 @@ held-key word `g_keys` (DS:9105) masked by the cell mask, then `Player_Move` (18
 Key bits (set by `Kbd_ISR` 43a0:0071 and `Input_MouseWalk` 4a85:0208): 1 up, 2 down, 4 left,
 8 right, 0x10 net, 0x20 jump, 0x40 drop a coin [O].
 
-State 10 (`PlrSt_10` 18cf:08cc, standing on the path) [O]:
+State 10 (`PlrSt_10_OnPath` 18cf:08cc, standing on the path) [O]:
 
 | Input | Effect |
 |---|---|
@@ -418,9 +439,11 @@ With no coins nothing is dropped; hint 7 is armed, and hint 6 as well when nets 
 
 ### 5.3 Hiding places and the layout
 
-Each of the 48 hiding-place cells (`g_hidingCells` DS:11aa) can hold one hiding place: a picture
-(`g_cellPicture`) and a content (`g_cellContent`). Per level the picture set and the number of
-places come from `DS:121c+18` [O]:
+`g_hidingCells` (DS:11aa) lists **44 hiding places plus 4 mirror cells** (slots 11, 12, 27, 28:
+cells 86, 87, C0, C1, which only receive copies, §4.2). Each place holds a picture
+(`g_cellPicture`) and a content (`g_cellContent`), and **every place is filled in every game**
+(`code_elves_layout_hints.md` §5.3). Per level the picture set and the number of places come from
+`g_levelPicData` (DS:122e) [O]:
 
 | Level | Pictures | Places = slots in DS:11aa | Key | Treasures (match 2) | Decoys (match 1) | Others (match 0) |
 |---|---|---|---|---|---|---|
@@ -429,7 +452,9 @@ places come from `DS:121c+18` [O]:
 | 2 | 31 | 11 (0–10) | 1 | t | t + 1 (t when total > 380) | 9 − 2t (or 10 − 2t) |
 
 (t = treasures per level by tier, §5.1; the "places" value of the table, 18/13/10, excludes the
-key.)
+key.) Details that change the result: a square counts as a rectangle, sizes match by value (the
+key's lowest non-zero size field), and the same picture can appear in several places of a level
+(`code_elves_layout_hints.md` §5.3, §5.7).
 
 `Layout_Generate` (1a54:0003) [O]:
 
@@ -447,7 +472,7 @@ key.)
    in the player's collected list, not shown, not already placed; all other places get 0x80 (empty).
 5. Castle: layout R(tier+1) written into the castle cells (`Castle_ApplyLayout` 1a54:08dc).
 
-So **one key per level** (matches all 3 clue words), **treasures match exactly 2 of the 3**, decoys
+So **one key per level** (the key fits all 3 clue words), **treasures match exactly 2 of the 3**, decoys
 1, the rest none. The Windows layout records have the same structure and the same treasure and
 decoy counts as DOS level 0, with one empty spot fewer (Windows 18 spots, tier 0: 10 empty /
 5 decoy / 2 treasure / 1 key; DOS level 0, 19 places: 11 / 5 / 2 / 1) [O both]. Levels 1 and 2 have
@@ -455,7 +480,7 @@ fewer places in DOS (14, 11) but 18 spots in Windows.
 
 ### 5.4 Searching (dropping a coin)
 
-When the drop animation ends (`PlrSt_27/28` 18cf:1282/12bc) [O]:
+When the drop animation ends (`PlrSt_27_CoinLeftDone/28` 18cf:1282/12bc) [O]:
 
 * in the net shop (mask 0x200): the coin pays the shop (§5.9);
 * else `Search_Start` (18cf:14e0): `Search_CanSearch` (18cf:1532) picks the cell in front (the
@@ -470,7 +495,7 @@ on the last step [O]:
 
 | Content | Result |
 |---|---|
-| < 0x66 (treasure 6+2k, not yet searched) | `g_treasuresFound` (DS:9113) += 1, next free bit of the level's found mask (record +0x130), sfx 7, hint 4 ("matches 2 of the 3 clue words") |
+| < 0x66 (treasure 6+2k, not yet searched) | `g_treasuresFound` (DS:9113) += 1, next free bit of the level's found mask (record +0x130), sfx 7, hint 4 (the two-of-three-clues hint) |
 | 0x66 / 0x68 / 0x6A (key of level 0/1/2) | `g_keyState` = 2/4/6, sfx 6, hint 9 ("You found the key!") |
 | 0x80 (empty, decoy) | nothing |
 
@@ -500,15 +525,15 @@ gate.
 
 * Found treasures count in `g_treasuresFound` (shown on the HUD) and the level's found mask; they
   stay in their hiding places (content | 0x80) until the end [O].
-* At the castle top (`Cell_P63_V63` 1568:1aa4, picture 0x32): **total treasures += treasures found
+* At the castle top (`Cell_P63_V63_CastleTop` 1568:1aa4, picture 0x32): **total treasures += treasures found
   this game** (u16, no saturation) and the end sequence starts (§5.13) [O].
 * Collection: each finished game adds one treasure to the player's collection: the "showcase"
   treasure is chosen among those found this game, preferring one not yet collected
-  (`Treasure_PickShowcase` 4a03:038c), added to the 48-entry collected list and the treasure-room
-  shelves (`Treasure_AddCollected` 4a03:078c, record +0x8A/+0x133/+0x164) [O mechanics, purpose I].
+  (`Treasure_PickShowcase` 4a03:038c), added to the 48-entry collected list and the shelves
+  of the treasure shelf rooms (`Treasure_AddCollected` 4a03:078c, record +0x8A/+0x133/+0x164) [O mechanics, purpose I].
 * Champion: total ≥ 300. Arriving at the castle gate with a total of 300 or more plays the crown
   sequence instead of the treasure room (176a:0485); the end messages for a total of 300–314 are the
-  crown texts (messages 36/35 "won back the crown") [O].
+  crown texts (messages 35, then 36, "won back the crown") [O].
 
 ### 5.8 Coins
 
@@ -518,18 +543,20 @@ gate.
 | Carried over | yes, banked at the end of each game (`Game_End` 47c7:09a2) |
 | Spent | dropping a coin (search or shop payment), −1 |
 | Lost | elf dust hit −1 (`ElfSt_53/57` 4521:0855/0aac), castle creature −1 (`Castle_CreatureHitCheck` 1568:18f1) |
-| Gained | each net catch +1 (`Elf_NetCatch` 4521:147c); correct answer **+2/+1/0** by earlier wrong tries (`Quiz_Correct` 46ce:05bb, DS:5f93); coin elf +2 (`ElfSt_72` 4521:0cfe); bonus cell +5 once (1568:1ed8) |
+| Gained | each net catch +1 (`Elf_NetCatch` 4521:147c); correct answer **+2/+1/0** by earlier wrong tries (`Quiz_Correct` 46ce:05bb, DS:5f93); coin creature +2 (`ElfSt_72` 4521:0cfe); bonus cell +5 once per game (1568:1ed8) |
 
 The HUD counts the coin display up one by one with sfx 4 (`Hud_Redraw`) [O].
 
 ### 5.9 Nets and the net shop
 
 * `g_nets` (DS:910f): 10 for a new player, carried over between games [O].
-* A net swing costs nothing by itself. **The first elf caught in a swing uses up one net**
-  (`Elf_NetCatch` 4521:147c: `if no catch yet this swing → nets −1`) [O].
+* A net swing costs nothing by itself. **Each catch uses up one net**; catches resolved in the
+  same tick share one (`Elf_NetCatch` 4521:147c, `g_netCatchesThisTick`, reset at the end of every
+  `Elves_Update`), so two elves pulled in by one swing usually cost one net and elves caught on
+  different ticks one each [O, `code_elves_layout_hints.md` §4.8].
 * With 0 nets the swing uses the torn-net animation (0x15/0x18 instead of 0x14/0x17) and elves
-  escape (`Player_NetLeft/Right`, `Elf_NetCatch`); hint 5 "Your net has worn out!" [O].
-* **Net shop** (cell type 36, `Cell_P36_V36` 1568:1090; cells 188 and 234 [O table], i.e. on levels
+  escape (`Player_NetLeft/Right`, `Elf_NetCatch`); hint 5, the worn-out-net hint [O].
+* **Net shop** (cell type 36, `Cell_P36_V36_NetShop` 1568:1090; cells 188 and 234 [O table], i.e. on levels
   1 and 0 [I]): the price counter DS:92a1 (record +0x158) starts at 4; each coin dropped at the shop
   pays one (mask 0x200 → `DS:92a1 −= 1`); the sign shows the coins still owed (frames 0x188+2·(n−1),
   0x194 when paid); when paid, climbing into the cave gives **+5 nets** (DS:92a1 = −1), leaving resets
@@ -544,22 +571,24 @@ DS:a212), respawned at every scene change with `Elves_Spawn(hidden clue words of
 | Type | Base states | Count | Behaviour |
 |---|---|---|---|
 | A walker / clue carrier | 1, 5 | 3 | walks; the first *n* carry question slots 1..n, where n = clue words of the level still hidden; carriers use a different sprite set (anim offset 0x22) |
-| D coin elf | 25 | 3 | shows itself only when coins < 4 and nets < 5; touching it (±5 bytes) gives **+2 coins** and it reappears elsewhere (`ElfSt_25/70/71/72`, `CoinElf_Check` 4521:0d93) |
-| B thrower | 9, 13 | 0/2/4/6 by tier | when the player is ahead may throw **elf dust** (anim 0x25/0x26); the dust flies out 80 bytes (160 px) and back, one byte per tick; a hit (within ±10 bytes, player on the path line, not jumping, not netting, coins > 0) costs a coin (`ElfSt_52..59`) |
+| D coin creature | 25 | 3 | a gold coin lying on the path that grows legs: it appears only at a view edge and only when coins < 4 and nets < 5; touching it (±5 bytes) gives **+2 coins** after its sparkle and it respawns at a random x of the level; netting it makes it run away for good (`ElfSt_25/70/71/72`, `CoinElf_Check` 4521:0d93) |
+| B thrower | 9, 13 | 0/2/4/6 by tier | when the player is ahead may throw **elf dust** (anim 0x25/0x26); the dust moves 2 px per tick and vanishes after 160 px if it hits nothing; a hit (within ±10 bytes, player on the path line, not jumping, coins > 0) costs a coin and only then does the dust fly back with it; netting does not protect, and dust thrown to the right is only avoided by jumping left (`ElfSt_52..59`, `code_elves_layout_hints.md` §4.5) |
 | C walker | 17, 21 | 3 | walks only |
 
 Placement: random x inside the level's range (DS:5d54: base, row, mask; `Elves_Spawn`), facing by
 type. Movement is driven by the animation scripts; a walking type-A elf pauses with chance 1/16 per
-step (`Elf_WalkCommon` 4521:04e6) and then picks a random direction (`ElfSt_47` 4521:0545); elves
+walk cycle (`Elf_WalkCommon` 4521:04e6) and then picks a random direction (`ElfSt_47` 4521:0545);
+after a dodge a walker resumes away from the player; elves
 turn at some terrain cells (`Elf_Turn` 4521:181a, called from cell handlers such as 1568:141c); at
 most 3 elves have sprites at a time (slots 6/8/10, `Elf_Think` 4521:1062) [O].
 
 **Net catch** [O `Elf_Think`, `Elf_CheckNet` 4521:1648, `Elf_NetCatch`]: only while the player is in
-net state 21 (left) or 24 (right). With p = player x (bytes), facing right: elf x in [p+9, p+42]
-→ class 4 (edge), [p+15, p+36] → 5, [p+23, p+28] → 6 (mirrored to the left). Class 4: the elf hops
+net state 21 (left) or 24 (right). Three nested zones in front of the player, mirror images about
+P − 1 byte for the two directions (exact bounds in `code_elves_layout_hints.md` §4.3): edge → class
+4, net → 5, centre → 6. Class 4: the elf hops
 aside (anim 0x33/0x34, state 64) and walks on, or with chance 1/64 leaves the screen (states 73/74;
 the visuals are [I]). Classes 5/6: caught; after the animation
-`Elf_NetCatch` needs nets > 0, uses one net for the first catch of the swing, **+1 coin**, and a
+`Elf_NetCatch` needs nets > 0, uses one net (shared by the catches of one tick), **+1 coin**, and a
 carrier opens its question (`g_caughtSlot` DS:921e = its slot, `g_uiMode |= 2`). After a correct
 answer the elf loses its question; after a wrong answer or Esc it keeps it (`ElfSt_03`
 4521:15ab) [O].
@@ -594,7 +623,7 @@ answer the elf loses its question; after a wrong answer or Esc it keeps it (`Elf
 ### 5.12 Castle wall
 
 The castle wall (rows 3–6) is part of the scrolling world: ladder cells (pictures 0x25, 0x27, 0x2D,
-0x31) with masks for climbing and ladder jumps (`Cell_P56_V56` 1568:1734, `Cell_P57_V57` 1568:182b),
+0x31) with masks for climbing and ladder jumps (`Cell_P56_V56_CastleHall` 1568:1734, `Cell_P57_V57_CastleWall` 1568:182b),
 the layout chosen per game (§5.1). The **Master of Mischief** appears in a window next to the
 climber when a window cell is exactly 32 bytes (64 px) left or right of the player sprite and
 `rand() & mask(tier)` hits (`Castle_CreatureSpawn` 176a:159e: never at tier 0, 1/512, 1/256, 1/64);
@@ -607,20 +636,23 @@ op −6) at the player's height costs a coin (sfx 5) and pushes the player sidew
 1. Castle top (1568:1aa4): total += treasures found; scene 3; player state 41 (`EndSeq_Setup`
    18cf:0038) [O].
 2. End sequence (player states 41–71, 18cf:00a9..07ea): every treasure found this game flies into
-   the treasure chest (`PlrSt_49` 18cf:0205, paths DS:0b06/0b3c); "all found" (tier·3+6) gets a
-   special animation (`PlrSt_55`); the chest fills to the level of the rank (`PlrSt_52`, `PlrSt_70`,
+   the treasure chest (`PlrSt_49_EndFlightNext` 18cf:0205, paths DS:0b06/0b3c); "all found" (tier·3+6) gets a
+   special animation (`PlrSt_55_EndCrown`); the chest fills to the level of the rank (`PlrSt_52_EndRank`, `PlrSt_70_ChampSparkle`,
    table DS:0110: 5→1, 25→8, 70→16, 115→24, 170→32, 230→40, 300→48, 400→56) [O].
-3. Any key or click (`Cell_P64` 176a:0404) → the showcase treasure is handed over (`PlrSt_34`,
+3. Any key or click (`Cell_P64_EndScreen` 176a:0404) → the showcase treasure is handed over (`PlrSt_34_Chute`,
    `Treasure_AddCollected`) [O].
-4. Castle gate (`Cell_P20` 176a:0485): the saved game is cleared (record +9 = 0),
+4. Castle gate (`Cell_P20_CastleGate` 176a:0485): the saved game is cleared (record +9 = 0),
    `g_endState` = 1; total < 300 → treasure room (scene 4), else the crown sequence [O].
-5. Treasure room (`Cell_P70` 176a:0596, `Treasures_DrawFound` 4a03:04a8): shelves of collected
-   treasures and per-treasure animations; any key/click (`Cell_P72` 176a:1094) walks out to scene 0
-   [O mechanics, I purpose]. The room can also be visited from the start area: the right-hand part
-   of the start cell (`Cell_P12` 1568:03f6) and `Cell_P71_V71` (176a:0fa6) lead into it [O].
+5. Treasure room (`Cell_P70_TreasureRoom` 176a:0596, scene 4): the showcase treasure on its pedestal
+   with a display per treasure (a 53-case switch), then, unless the player stays, the rank chest
+   screen (`Cell_P71_V71_ToRankScreen` 176a:0fa6, `RankChest_Update` 130f:0edf); any key or click
+   there (`Cell_P72_RankScreen` 176a:1094) leads back to the clubhouse (scene 0), as does
+   `TreasureRoom_Leave` (176a:0f47) [O, `code_player.md` §7]. Both rooms can also be visited from the
+   clubhouse: the right-hand part of the start cell (`Cell_P12_StartRoom` 1568:03f6) leads into the
+   treasure room, the chest picture (cell 01) into the rank screen [O].
 6. `Scene_Update` with `g_endState` == 2: `Game_End` (games played +1, banked coins and nets, save),
    immediately a new layout (`Game_Start`), and the end-of-game message: 0 treasures → 31, 1 → 32,
-   all → 34, else 33 with the number; total 300–314 → crown messages 36/35 (`Gameover_UpdateMessages`
+   all → 34, else 33 with the number; total 300–314 → crown messages 35, then 36 (`Gameover_UpdateMessages`
    49a6:026f). The next game's start message (`DS:911c` = 1) is the rank message 23–30 with "N more
    treasures" filled in, or the Flutter introduction (message 0) for a first game [O].
 
@@ -629,14 +661,15 @@ op −6) at the player's height costs a coin (sfx 5) and pushes the player sidew
 15 one-shot hint flags `g_hintFlags` DS:923e (0 pending, 0x80 shown, 1 idle);
 `Hints_Update` (49a6:000f) shows the highest pending one with `Flutter_Show` (49a6:0565, text
 `DS:7ca3[i]`) while no dialog is open; Enter/Esc/click closes. Hints are on when the total is below 5
-at sign-in or via Options. Triggers [O]:
+at sign-in or via Options; they never switch themselves off during play
+(`code_elves_layout_hints.md` §6.6). Triggers [O]:
 
 | # | Trigger | Code | Message |
 |---|---|---|---|
 | 1 | no Left/Right for 3 "seconds" in the start area (area 5) | 49a6:0121 | how to walk |
 | 2 | no net swing for 31 "seconds" in area 0 | 49a6:0121 | how to use the net |
 | 3 | 2 clue words known and no coin dropped for 5 "seconds" | 49a6:0121 | how to drop a coin |
-| 4 | first treasure found | 4a03:0003 | "matches 2 of the 3 clue words" |
+| 4 | first treasure found | 4a03:0003 | the two-of-three-clues hint |
 | 5 | a net swing (anim 0x16/0x19) with 0 nets | 49a6:0121 | net worn out |
 | 6 | coin key with no coins and no nets | 18cf:08cc | need coins to fix the net |
 | 7 | coin key with no coins | 18cf:08cc | catch an elf to get a coin |
@@ -678,11 +711,11 @@ DS:6132 = 3 + 360·i) [O]. Header byte 1 is saved from/to DS:929f [O]. Record la
 | 0x081 | 9 | clue words, 3 per level (bit 7 hidden) |
 | 0x08A | 48 | collected treasure ids (0x80 none) |
 | 0x0BA | 1 | (unused) |
-| 0x0BB | 57 | pictures of the 48 hiding places + 9 castle cells |
+| 0x0BB | 57 | pictures of the 48 hiding-place cells + the 9 variable cells (bonus spot, gates, bridges, net shop) |
 | 0x0F4 | 48 | contents of the 48 hiding places |
 | 0x124 | 12 | per-level picture data (6 words of DS:121c+18 via DS:62ab) |
 | 0x130 | 3 | found-treasure masks per level |
-| 0x133 | 12 | treasure-room shelf bits |
+| 0x133 | 12 | shelf bits of the treasure shelf rooms |
 | 0x13F | 1 | quiz tier (0..3, 5 = all) |
 | 0x140 | 2 | tier |
 | 0x142 | 2 | level (scene) |
@@ -700,7 +733,7 @@ DS:6132 = 3 + 360·i) [O]. Header byte 1 is saved from/to DS:929f [O]. Record la
 | 0x164 | 2 | showcase treasure |
 | 0x166 | 2 | castle layout |
 
-Not saved: elf positions (respawned), the RNG seed, the bonus-coin cell, hint flags (re-armed at
+Not saved: elf positions (respawned), the RNG seed, hint flags (re-armed at
 sign-in).
 
 When it is written [O]: new player (`Users_AddPlayer` 47c7:07b9), remove player
@@ -791,14 +824,14 @@ game plays, **C** = cosmetic or technical only. Windows facts are from `re/docs/
 | Searching | different | **G** | DOS: ↓ drops a coin on the hiding place in front (the neighbouring cell near a cell edge); no place there, or a place already searched, means the coin is lost, and searched places look unchanged; search length is frame-rate dependent; Win: Enter tosses at the spot in the player's third, 13 ticks, every targeted spot blinks |
 | Starting coins | different | **G** | DOS 5, Win 10 |
 | Coins and nets carried between games | same | – | |
-| Net cost | different | **G** | DOS: a swing is free; the first elf caught per swing uses a net; 0 nets = torn net, catches nothing; Win: every swing costs a net |
+| Net cost | different | **G** | DOS: a swing is free; each catch uses a net (catches of the same tick share one); 0 nets = torn net, catches nothing; Win: every swing costs a net |
 | Net shop | different | **G** | DOS: one shop type (2 entrances), 4 coins → **+5 nets**; Win: 3 shops, 4 coins → +10 nets |
-| Coin sources | different | **G** | DOS: elf +1, quiz +2/+1/0, **coin elf +2** (appears when coins < 4 and nets < 5), **bonus spot +5**; Win: elf +1, quiz +2/+1/0, **rescue coin pile +10** when broke |
+| Coin sources | different | **G** | DOS: elf +1, quiz +2/+1/0, **coin creature +2** (a coin with legs, appears when coins < 4 and nets < 5), **bonus spot +5** once per game; Win: elf +1, quiz +2/+1/0, **rescue coin pile +10** when broke |
 | Coin losses | same idea | – | elf dust (thrower) −1, castle creature −1 |
 | Elves | different | **G** | DOS 9/11/13/15 by tier (7 on slow CPUs), 4 types incl. coin elf; Win 6/8/10/12; both have 3 clue carriers and 0/2/4/6 throwers by tier |
 | Clue carriers | different | **G** | DOS: as many carriers as clue words still hidden on the level; Win: carriers for slots that still have questions |
 | Net catch geometry | different | **G** | DOS: catch zone 30–72 px in front with a dodge edge (escape chance 1/64); Win: `\|x − netX\| ≤ 30` during steps 2–7 |
-| Elf dust | similar | **G** | DOS: hit = within ±10 bytes (20 px) on the path line, not jumping/netting; Win: overlap test, not jumping |
+| Elf dust | similar | **G** | DOS: hit = within ±10 bytes (20 px) on the path line, not jumping (netting does not protect); the dust returns only with a coin; Win: overlap test, not jumping |
 | Quiz tiers | almost same | **G** (small) | DOS 0–62, 63–179, 180–302, 303–359, then 123–359 (360 questions); Win 0–62, 63–178, 179–301, 302–358, then all (359) |
 | Quiz promotion | different | **G** | DOS at ≥ 70 % right first time; Win ≥ 80 % |
 | Quiz deal | similar | – | 9 questions by status in both |
@@ -809,7 +842,7 @@ game plays, **C** = cosmetic or technical only. Windows facts are from `re/docs/
 | Castle climb | different | **G** | DOS: castle wall is part of the scrolling world; Win: separate 3-screen ladder scene |
 | Champion at 300 | same | – | crown sequence in both |
 | Jumping | same idea | **G** | DOS has jumps over gaps (Home/PgUp/diagonals); Win jumps exist (elf dust test) |
-| Ladders, gaps, slide-down tunnels on the paths | DOS only | **G** | Win has ladders only in the castle climb |
+| Ladders, the geyser hole, breaking rope bridges (tier ≥ 2), cave and tunnel doors on the paths | DOS only | **G** | Win has ladders only in the castle climb |
 | Gates need the level's key | same | – | |
 | New Player Hints | different | C/G | DOS: 10 armed hints (Flutter, no voice), on while total < 5; Win: 33 events, spoken |
 | Help topics | different | C | |
@@ -830,7 +863,7 @@ game plays, **C** = cosmetic or technical only. Windows facts are from `re/docs/
 **Verdict.** The DOS mountain plays noticeably differently, not just at another resolution: the
 world is a long scrolling path with ladders, gaps and tunnels instead of rooms; hiding places are
 spread along it (at most one per 128-px cell, fewer on the upper levels); nets wear out per catch rather than per swing; coins come from coin
-elves and a bonus spot; the shop gives half as many nets; per-level progress persists and the
+creatures and a bonus spot; the shop gives half as many nets; per-level progress persists and the
 player can go back down; the quiz promotes earlier. The scoring frame (ranks, treasures per level,
 clue logic, quiz rewards, castle layout choice) is the same, which shows the Windows design was
 derived from this game.
@@ -872,17 +905,16 @@ sequence and all asset/engine back ends are new work.
 
 ## 10. Open questions
 
-1. Meaning of some terrain-mask bits (0x400, 0x1000) and of the six cell handlers that do not
-   decompile (1568:1090 is understood from its disassembly; 1556, 15bc, 1c7b, 1d96, 1e50 are
-   decoration/animation helpers [I]).
+1. ~~Terrain-mask bits 0x400, 0x1000 and the six handlers that did not decompile~~ — answered:
+   0x400 = camera mode, 0x1000 = fall (§4.1, `code_world.md` §4.4); the six handlers decompile since
+   wave 1 (§1.2) and are specified in `code_world.md` §6.
 2. Hints 10, 11, 12 (on your way, tunnel, ladders) have texts but no code arms them; check in a run
    whether they ever appear.
-3. "Watch out for gaps in the path!" (4-star message): the gaps are the slide-down holes of cell type
-   41 (§4.4), which exist at every tier; no tier-dependent gap code was found, so the message is a
-   reminder [I].
-4. The row assignment of §4.2 beyond row 0 (clubhouse, confirmed with MOUNTAIN.PAN in
-   `fmt_graphics.md` §4.1) and how scenes 1–4 use the shared 16×16 grid are not traced yet.
-5. The treasure-room animations (`Cell_P70` 176a:0596, 53-case switch on the showcase treasure) and
-   the purpose of the collected-list special cases (treasures 0x2C, 0x36, 0x58, 0x5A).
+3. ~~The gap warning (4-star message)~~ — answered: the tier-dependent gaps are the
+   rope bridges of type 45, which break at tier ≥ 2 (§4.4; type 41 is the geyser hole, at every tier).
+4. ~~The row assignment of §4.2~~ — answered by `code_world.md` §3.3 (every region traced from the
+   teleport targets, confirmed by the capture matching).
+5. ~~The treasure-room animations~~ — specified in `code_player.md` §7.2–7.3 (the 53-case switch
+   of `Cell_P70_TreasureRoom` 176a:0596, the pair, trio and fly displays).
 6. Behaviour that depends on frame rate (search length, HUD count-up) should be measured on period
    hardware speeds before porting.

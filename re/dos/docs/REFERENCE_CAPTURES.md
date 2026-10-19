@@ -131,7 +131,7 @@ fast-grab loop (see §7), and those have no separate raw copy where none existed
 
 | Files | Shows |
 |---|---|
-| 001-003 | Title page; story page 1; the walk-off (title redrawn without "Press Enter" while the Super Solver walks up the path) |
+| 001-003 | Title page; story page **2** (the file is named `002_story1.png`, but it shows the second page with the S key line, `code_ui.md` §16); the walk-off (title redrawn without "Press Enter" while the Super Solver walks up the path) |
 | 004-007 | Club Sign-In list (shipped "Rascal" + New Player); Enter New Player Name dialog (empty, then "Ada" with a block cursor); first in-game frame: clubhouse with Flutter's first New Player Hint |
 | 008-009 | Clubhouse interior (rank button = chest picture, prize button = arrows picture, door, bench); hint about the arrow keys |
 | 010-020 | Help menu (F1); About the Game pages 1-6; Using the Keyboard pages 1-4 |
@@ -151,7 +151,7 @@ fast-grab loop (see §7), and those have no separate raw copy where none existed
 | 082-088 | Level 3: shovels and sleds, snowmen and a rope bridge over a gap, the bridge, the stone arch with a blue portcullis and keyhole (the castle lock), an ice doorway, snowballs, a level 3 quiz |
 | 089-093 | Walking onto the geyser top on level 3 drops the player back to level 2; inside the ice cave (a slide-down tunnel); falling down a rock shaft; landing on level 2 at the mine-tunnel exit; the open level 2 gate with the geyser |
 | 094-096 | Level 3 clue words; key found (key icon turns green); arch opened |
-| 097-101 | Castle hall; ladder; ladder shaft with several ladders; jumping between ladders; **treasure room at the top** (Master of Mischief with the crown in a window, treasure chest, chute, urn, sparkles) |
+| 097-101 | Castle hall; ladder; ladder shaft with several ladders; jumping between ladders; **castle-top end screen** (scene 3, CLOSE.PAN, cells A8–AA: Master of Mischief with the crown in a window, treasure chest, chute, urn, sparkles; not the treasure room of scene 4) |
 | 102-104 | Rank chest screen shown after the castle (no menu bar); back in the clubhouse with the reached-the-top message; File-menu hint |
 
 ### 4.2 `tandy\` (22 frames)
@@ -218,8 +218,9 @@ after_castle`. Tandy: `signin level2_resumed level2_caught outside`. Each `.sav`
   stays up for **1826 frames ≈ 30.5 s** (measured in `tandy_attract_full_cycle.avi`; the EGA
   title also lasted about 31 s). Small sparkles animate on the mountain the whole time.
 - Enter skips to the next page (CGA test: title → story 1 → story 2). Enter on story page 2 starts
-  the walk-off and then the sign-in. On EGA the walk-off also followed an Enter press while
-  story 1 was showing. **Open:** this may have been a page change just before the key arrived.
+  the walk-off and then the sign-in. (Round 1 thought the EGA walk-off followed an Enter on
+  story 1; the frame taken as story 1, `ega/002`, is story page 2, and the code advances one page
+  per Enter, `code_ui.md` §8.3.)
   `S` on story page 2 is offered for the series information page.
 - The sign-in list shows name, rank and score. ↑/↓ move the highlight and Enter selects. "New
   Player" opens a name box with 8 character cells (shown as underscores), a block cursor, and Esc
@@ -513,6 +514,9 @@ sessions (`speaker_clubhouse`, `slowcpu_clubhouse`), the sound-test states (`snd
   R2.2).
 * §8 "listening to the audio (muted by design)": solved without unmuting (R2.3).
 * §5.6 "No treasure was found", §8 not-captured list: now captured (R2.2) except the items below.
+* §4.1 `ega/002` shows story page 2, not page 1, and `ega/101` is the castle-top end screen (scene 3),
+  not the treasure room (scene 4); §5.1 open point answered (wave 2 synthesis, from `code_ui.md`
+  §8.3 and §16).
 
 ### R2.7 Still not captured
 

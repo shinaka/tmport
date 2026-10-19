@@ -9,6 +9,10 @@
 #   [--data] <path>     TMTWINCD folder (or a folder containing it), or a CD image (.cue/.iso).
 #                       Default: TM_DATA, then the repository's extracted/wincd/TMTWINCD, TMTWINCD,
 #                       then a single .cue/.iso under TM-WIN/.
+#   --dos <dir>         Folder of the 1990 DOS edition (the one holding SST.EXE) to include as
+#                       TM-DOS/. Default: TM_DATA_DOS, then SST.EXE in the game data folder, in one
+#                       of its subfolders or next to it, then the repository's TM-DOS/.
+#   --no-dos            Do not include the DOS edition.
 #   --soundfont <sf2>   General MIDI SoundFont to include (music on Linux/macOS; ignored on Windows
 #                       unless the MIDI output is set to soundfont).
 #   --out <dir>         Output folder (default: <repo>/dist).
@@ -16,7 +20,9 @@
 #
 # Result: <out>/TMPort/ with tmport[.exe] and TMTWINCD/ (or the CD image) on Windows and Linux;
 # <out>/TMPort.app with the data in Contents/Resources on macOS (SDL_GetBasePath() returns that
-# folder for an app bundle, and the engine's data auto-detection starts there).
+# folder for an app bundle, and the engine's data auto-detection starts there). A DOS folder goes
+# to TM-DOS/ beside it; with both editions the copy starts the Windows CD edition (the DOS edition
+# with --edition dos) until the DOS edition is playable. Either edition alone is fine.
 #
 # The result contains the user's copy of the game: it is for personal use and must not be shared.
 
@@ -30,6 +36,8 @@ file(REAL_PATH "${TM_BUILD_DIR}" TM_BUILD_DIR)
 
 # --- arguments ------------------------------------------------------------------------------------
 set(data "")
+set(dos "")
+set(no_dos OFF)
 set(soundfont "")
 set(out "${TM_REPO}/dist")
 set(zip OFF)
@@ -44,7 +52,7 @@ while(i LESS CMAKE_ARGC)
         endif()
         continue()
     endif()
-    if(a STREQUAL "--data" OR a STREQUAL "--soundfont" OR a STREQUAL "--out")
+    if(a STREQUAL "--data" OR a STREQUAL "--soundfont" OR a STREQUAL "--out" OR a STREQUAL "--dos")
         if(NOT i LESS CMAKE_ARGC)
             message(FATAL_ERROR "${a} needs a value")
         endif()
@@ -54,8 +62,10 @@ while(i LESS CMAKE_ARGC)
         set(${name} "${v}")
     elseif(a STREQUAL "--zip")
         set(zip ON)
+    elseif(a STREQUAL "--no-dos")
+        set(no_dos ON)
     elseif(a STREQUAL "--help" OR a STREQUAL "-h")
-        message("Usage: package [--data] <TMTWINCD folder | .cue | .iso> [--soundfont <sf2>] [--out <dir>] [--zip]")
+        message("Usage: package [--data] <TMTWINCD folder | .cue | .iso> [--dos <DOS folder> | --no-dos] [--soundfont <sf2>] [--out <dir>] [--zip]")
         return()
     elseif(a MATCHES "^-")
         message(FATAL_ERROR "unknown option ${a} (try --help)")
@@ -102,6 +112,31 @@ function(game_folder path out_var)
     endif()
 endfunction()
 
+# Sets out_var to the first folder holding SST.EXE (the 1990 DOS edition): <path> itself, then its
+# subfolders by name.
+function(dos_folder path out_var)
+    set(${out_var} "" PARENT_SCOPE)
+    if(NOT IS_DIRECTORY "${path}")
+        return()
+    endif()
+    find_entry("${path}" "SST.EXE" exe)
+    if(exe AND NOT IS_DIRECTORY "${exe}")
+        set(${out_var} "${path}" PARENT_SCOPE)
+        return()
+    endif()
+    file(GLOB subs LIST_DIRECTORIES true "${path}/*")
+    list(SORT subs)
+    foreach(s IN LISTS subs)
+        if(IS_DIRECTORY "${s}")
+            find_entry("${s}" "SST.EXE" exe)
+            if(exe AND NOT IS_DIRECTORY "${exe}")
+                set(${out_var} "${s}" PARENT_SCOPE)
+                return()
+            endif()
+        endif()
+    endforeach()
+endfunction()
+
 # --- game data ------------------------------------------------------------------------------------
 if(data STREQUAL "" AND DEFINED ENV{TM_DATA} AND NOT "$ENV{TM_DATA}" STREQUAL "")
     set(data "$ENV{TM_DATA}")
@@ -125,18 +160,70 @@ if(data STREQUAL "")
         message(FATAL_ERROR "Several CD images under TM-WIN/; pass the one to use:\n  ${images}")
     endif()
 endif()
-if(data STREQUAL "")
+# The 1990 DOS edition: --dos, TM_DATA_DOS, SST.EXE in / under / next to the game data, the
+# repository's TM-DOS. A --data folder that is the DOS edition itself counts as --dos.
+if(NOT no_dos)
+    if(dos STREQUAL "" AND NOT data STREQUAL "" AND IS_DIRECTORY "${data}")
+        game_folder("${data}" win_here)
+        dos_folder("${data}" dos_here)
+        if(dos_here AND NOT win_here)
+            set(dos "${dos_here}")
+            set(data "")
+            message(STATUS "game data: ${dos} is the DOS edition")
+        endif()
+    endif()
+    if(dos STREQUAL "" AND DEFINED ENV{TM_DATA_DOS} AND NOT "$ENV{TM_DATA_DOS}" STREQUAL "")
+        set(dos "$ENV{TM_DATA_DOS}")
+        message(STATUS "DOS edition from TM_DATA_DOS")
+    endif()
+    if(dos STREQUAL "" AND NOT data STREQUAL "" AND EXISTS "${data}")
+        if(IS_DIRECTORY "${data}")
+            dos_folder("${data}" found)
+        else()
+            set(found "")
+        endif()
+        if(NOT found)
+            get_filename_component(data_parent "${data}" DIRECTORY)
+            dos_folder("${data_parent}" found)
+        endif()
+        if(found)
+            set(dos "${found}")
+        endif()
+    endif()
+    if(dos STREQUAL "")
+        dos_folder("${TM_REPO}/TM-DOS" found)
+        if(found)
+            set(dos "${found}")
+        endif()
+    endif()
+    if(NOT dos STREQUAL "")
+        dos_folder("${dos}" dos_dir)
+        if(NOT dos_dir)
+            message(FATAL_ERROR "${dos} is not the DOS edition's folder: it has no SST.EXE (nor a subfolder with one).")
+        endif()
+        file(REAL_PATH "${dos_dir}" dos_dir)
+        message(STATUS "DOS edition: folder ${dos_dir}")
+    endif()
+endif()
+
+if(data STREQUAL "" AND NOT dos_dir)
     message(FATAL_ERROR
         "No game data found. Pass the Treasure Mountain! Windows CD data: the TMTWINCD folder, "
-        "or the CD image (.cue/.bin or .iso), e.g.\n  scripts/package.sh ~/Games/TMTWINCD")
+        "or the CD image (.cue/.bin or .iso), e.g.\n  scripts/package.sh ~/Games/TMTWINCD\n"
+        "(or the folder of the 1990 DOS edition with --dos <folder>)")
 endif()
-if(NOT EXISTS "${data}")
+if(NOT data STREQUAL "" AND NOT EXISTS "${data}")
     message(FATAL_ERROR "Game data not found: ${data}")
 endif()
-file(REAL_PATH "${data}" data)
+if(NOT data STREQUAL "")
+    file(REAL_PATH "${data}" data)
+endif()
 
 set(image_files "")
-if(IS_DIRECTORY "${data}")
+set(game_dir "")
+if(data STREQUAL "")
+    message(STATUS "no Windows CD data: the copy holds the DOS edition only")
+elseif(IS_DIRECTORY "${data}")
     game_folder("${data}" game_dir)
     if(NOT game_dir)
         message(FATAL_ERROR "${data} is not the game folder: it has no TMTWINCD.EXE (nor a TMTWINCD folder with one).")
@@ -227,9 +314,14 @@ file(COPY "${exe}" DESTINATION "${bin_dir}")
 
 if(image_files)
     file(COPY ${image_files} DESTINATION "${data_dir}")
-else()
+elseif(game_dir)
     # Copy the folder's contents under the name the engine looks for.
     file(COPY "${game_dir}/" DESTINATION "${data_dir}/TMTWINCD")
+endif()
+if(dos_dir)
+    # The engine finds a subfolder with SST.EXE next to the executable (--edition dos while the
+    # Windows edition is there too).
+    file(COPY "${dos_dir}/" DESTINATION "${data_dir}/TM-DOS")
 endif()
 if(NOT soundfont STREQUAL "")
     file(COPY "${soundfont}" DESTINATION "${data_dir}")
@@ -268,6 +360,8 @@ file(WRITE "${out}/TMPort-README.txt"
 "TM Port - personal ready-to-play copy (${platform})
 
 Start ${exe_name} (TMPort.app on macOS) with no arguments: the game data is next to it.
+If the copy holds both editions, the Windows CD edition starts; add --edition dos for the 1990 DOS
+edition (still in development).
 Saves and settings live in your user profile, not here, so rebuilding this copy keeps them.
 
 This copy contains your own copy of Super Solvers Treasure Mountain! (c) The Learning Company.

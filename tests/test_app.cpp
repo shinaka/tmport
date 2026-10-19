@@ -390,6 +390,54 @@ TEST_CASE("launch options: game vs tool invocation, parsing") {
     CHECK_FALSE(app::parseLaunchArgs(static_cast<int>(missing.size()), const_cast<char**>(missing.data()), err));
 }
 
+TEST_CASE("launch options: editions and the DOS edition's options") {
+    auto parse = [](std::vector<const char*> a, std::string& err) {
+        a.insert(a.begin(), "tmport");
+        return app::parseLaunchArgs(static_cast<int>(a.size()), const_cast<char**>(a.data()), err);
+    };
+    auto inv = [](std::vector<const char*> a) {
+        a.insert(a.begin(), "tmport");
+        return app::isGameInvocation(static_cast<int>(a.size()), const_cast<char**>(a.data()));
+    };
+    CHECK(inv({"--edition", "dos", "--headless", "--frame-dump", "x.png"}));
+    CHECK(inv({"--look", "tandy", "--sound", "adlib", "--slow-cpu", "--frame-speed", "period", "--dos-args", "-T -St",
+               "--square-pixels"}));
+    CHECK_FALSE(inv({"--edition", "dos", "--info"}));
+
+    std::string err;
+    auto o = parse({"--edition", "dos", "--look", "mcga", "--sound", "speaker", "--slow-cpu", "--frame-speed", "period",
+                    "--dos-args", "-T -St", "--square-pixels"},
+                   err);
+    REQUIRE(o);
+    CHECK(o->edition == "dos");
+    CHECK(o->dosLook == "mcga");
+    CHECK(o->dosSound == "speaker");
+    CHECK(o->dosSlowCpu);
+    CHECK(o->frameSpeed == "period");
+    CHECK(o->dosArgs == "-T -St");
+    CHECK(o->squarePixels);
+    o = parse({"--edition", "auto"}, err);
+    REQUIRE(o);
+    CHECK(o->edition == "auto");
+    o = parse({}, err);
+    REQUIRE(o);
+    CHECK(o->edition.empty());
+    CHECK_FALSE(o->dosSlowCpu);
+    CHECK_FALSE(o->squarePixels);
+
+    CHECK_FALSE(parse({"--edition", "mac"}, err));
+    CHECK(err.find("--edition") != std::string::npos);
+    CHECK_FALSE(parse({"--look", "svga"}, err));
+    CHECK(err.find("--look") != std::string::npos);
+    CHECK_FALSE(parse({"--sound", "gus"}, err));
+    CHECK(err.find("--sound") != std::string::npos);
+    CHECK_FALSE(parse({"--frame-speed", "fast"}, err));
+    CHECK(err.find("--frame-speed") != std::string::npos);
+    CHECK_FALSE(parse({"--dos-args"}, err));
+    CHECK(app::launchUsage().find("--edition") != std::string::npos);
+    CHECK(app::launchUsage().find("--dos-args") != std::string::npos);
+}
+
 TEST_CASE("script input: parsing") {
     std::string err;
     auto s = app::parseScript("enter, alt+o ,wait:250,shot:C:/x/y.png,click:100:7,ctrl+s,q,shift+a,quit", err);

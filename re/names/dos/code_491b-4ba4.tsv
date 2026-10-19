@@ -32,10 +32,10 @@
 49a6:022b	Hints_PickNext	int far Hints_PickNext(void)	Highest pending hint of DS:923e[15] (0 = pending, 0x80 = done); disables hints when all done
 49a6:026f	Gameover_UpdateMessages	void far Gameover_UpdateMessages(void)	Start-of-game rank message (DS:911c==1, thresholds DS:7d37) and end-of-game message (==2): treasures this game, "found all", crown messages at total 300..314
 49a6:0565	Flutter_Show	void far Flutter_Show(int msg)	Draws Flutter (the butterfly guide) and message msg (far text table DS:7ca3)
-4a03:0003	Search_Update	void far Search_Update(void)	Hiding-place search (timer DS:8fa3): the picture opens, the content shows; at the end: treasure (< 0x66) -> treasures found DS:9113++, sfx 7, found-mask bit; key 0x66/0x68/0x6a -> key state 2/4/6, sfx 6; marks the place searched (0x80, also its mirror cell)
-4a03:038c	Treasure_PickShowcase	void far Treasure_PickShowcase(void)	Picks the treasure shown at the end (DS:9219) among those found this game, preferring one not yet collected
-4a03:04a8	Treasures_DrawFound	void far Treasures_DrawFound(void)	Draws the collected treasures of the treasure-room shelves (bits DS:8fb6)
-4a03:078c	Treasure_AddCollected	void far Treasure_AddCollected(void)	Adds the showcase treasure to the collected list (record +0x8a) and its shelf bit
+4a03:0003	Search_Update	void far Search_Update(void)	Per frame: search blink/open/content sprite schedule over 37 frames; result at timer 1
+4a03:038c	Treasure_PickShowcase	void far Treasure_PickShowcase(void)	Picks the showcase treasure among those found (compares only with collected[0] and the shown one)
+4a03:04a8	ShelfRoom_DrawShelf	void far ShelfRoom_DrawShelf(void)	Draws the 12 collected treasures of the treasure shelf room being shown (DS:9201..9204 latched in DS:8f9f), doubles raised
+4a03:078c	Treasure_AddCollected	void far Treasure_AddCollected(void)	Old showcase to the first free shelf slot, new showcase to the pedestal, duplicates removed (shelf bit)
 4a85:000e	Input_Poll	void far Input_Poll(void)	bioskey(1/0) through the context key table (DS:80f3/810b) or mouse zones (DS:80db) -> command code DS:9226
 4a85:00cd	Mouse_ChangedMask	unsigned far Mouse_ChangedMask(void)	
 4a85:0107	Input_LookupKey	int far Input_LookupKey(int key,int far *table)	
@@ -82,9 +82,9 @@
 4ba4:0156	Title_DrawSprite	void far Title_DrawSprite(int x,int y,int frame,int f)	
 4ba4:017f	TitleStep_Story1	void near TitleStep_Story1(void)	Story page 1 (DS:8a5a)
 4ba4:01cc	TitleStep_Story2	void near TitleStep_Story2(void)	Story page 2 (DS:8b54)
-4ba4:0233	TitleStep_Finish	void near TitleStep_Finish(void)	
-4ba4:027a	TitleStep_Clear	void near TitleStep_Clear(void)	
-4ba4:02a3	TitleStep_Done	void near TitleStep_Done(void)	
+4ba4:0233	TitleStep_StartWalkoff	void near TitleStep_StartWalkoff(void)	phase 6, redraws OPENING.PAN, erases slot 1, Anim_Set(1,0x5a) walk-off
+4ba4:027a	TitleStep_WaitWalkoff	void near TitleStep_WaitWalkoff(void)	phase 7, waits for the end of slot-1 script (DS:8ff6 == 0) or Enter, then clears slot 1
+4ba4:02a3	TitleStep_WaitActorGone	void near TitleStep_WaitActorGone(void)	phase 8, waits until actor frame DS:9159 == -1, then phase 9 (end of the title)
 4ba4:02b1	Title_SuperSolversPage	void near Title_SuperSolversPage(void)	"Look for these other Super Solvers adventures" page
 4ba4:042b	Title_ResetPhase	void near Title_ResetPhase(void)	
 4ba4:0434	Title_Run	void far Title_Run(void)	Loads OPENING.PAN, runs the title phases DS:8d83 until a zero entry, then the sign-in

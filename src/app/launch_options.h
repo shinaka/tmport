@@ -36,6 +36,15 @@ struct LaunchOptions {
     // Mods (area mods, docs/MODDING.md):
     std::vector<std::string> modDirs;  // --mods <dir> (repeatable): extra mod folders, after tmport.ini's
     bool noMods = false;               // --no-mods: load no mods at all
+    // Editions (edition/edition.h) and the 1990 DOS edition (edition/dos_options.h); the values are
+    // checked by the parser, empty = not given:
+    std::string edition;        // --edition win|dos|auto: which edition to play when the data holds both
+    std::string dosLook;        // --look ega|tandy|mcga|cga (hercules = cga)
+    std::string dosSound;       // --sound tandy|speaker|adlib|off
+    bool dosSlowCpu = false;    // --slow-cpu (the original's -X)
+    std::string frameSpeed;     // --frame-speed reference|period
+    std::string dosArgs;        // --dos-args "<switches>": the original's switches (-E -C -T -H -M, -X, -Si/-St/-Sa)
+    bool squarePixels = false;  // --square-pixels: show the DOS picture with square pixels (16:10)
 };
 
 // True when argv should start the game: no arguments, --play, or only options of LaunchOptions.

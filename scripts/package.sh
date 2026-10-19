@@ -4,9 +4,11 @@
 # own use only: the result contains your copy of the game. See docs/BUILDING.md,
 # "A ready-to-play copy".
 #
-# Usage: scripts/package.sh [game data] [--soundfont <sf2>] [--out <dir>] [--zip]
+# Usage: scripts/package.sh [game data] [--dos <folder> | --no-dos] [--soundfont <sf2>] [--out <dir>] [--zip]
 #   game data: the TMTWINCD folder or the CD image (.cue/.iso). Default: TM_DATA, then the
 #   repository's extracted/wincd/TMTWINCD, then a single .cue/.iso under TM-WIN/.
+#   --dos: the 1990 DOS edition's folder (with SST.EXE), copied as TM-DOS/. Default: TM_DATA_DOS,
+#   then SST.EXE in, under or next to the game data, then the repository's TM-DOS/.
 #   --soundfont: a General MIDI .sf2 to include, for music on Linux and macOS.
 # Builds in build-package/ (set BUILD_DIR to change it), with Ninja when it is installed.
 set -e

@@ -11,6 +11,9 @@
 #include "app/menu_commands.h"
 #include "app/script_input.h"
 #include "audio/audio_system.h"
+#include "dos/app/dos_entry.h"
+#include "dos/app/script_input.h"
+#include "dos/data/dos_files.h"
 #include "game/game_main.h"
 #include "game/game_state.h"
 #include "game/game_tables.h"
@@ -32,6 +35,16 @@ namespace tmport::app {
 namespace {
 
 constexpr const char* kAppTitle = "Treasure Mountain! (TM Port)";
+constexpr const char* kDosTitle = "Treasure Mountain! 1990 DOS edition (TM Port)";
+
+// --frame-dump for the DOS edition: an existing folder or a name without an extension is a folder
+// for one PNG per screen (DosOptions::frameDumpDir); anything else is the canvas file at the end.
+bool isFrameDumpFolder(const std::string& frameDump) {
+    if (frameDump.empty()) return false;
+    const std::filesystem::path p = pathFromUtf8(frameDump);
+    std::error_code ec;
+    return std::filesystem::is_directory(p, ec) || !p.has_extension();
+}
 
 std::filesystem::path exeDirectory() {
     const char* base = SDL_GetBasePath();  // owned by SDL
@@ -64,8 +77,26 @@ std::string howToPointAtData(const save::Paths& paths) {
         ".cue/.bin/.iso):\n"
         "  - start it with  --data <folder or image>,\n"
         "  - or set the environment variable TM_DATA,\n"
-        "  - or write  data = <folder or image>  in the [engine] section of\n    {}",
+        "  - or write  data = <folder or image>  in the [engine] section of\n    {}\n"
+        "(The 1990 DOS edition plays from its folder with SST.EXE: --data, TM_DATA_DOS, or  data =  in "
+        "the [dos] section.)",
         paths.iniPath.empty() ? std::string("tmport.ini") : pathToUtf8(paths.iniPath));
+}
+
+std::string howToPointAtDos() {
+    return "Point the game at the folder of the 1990 DOS edition (the one with SST.EXE, SPRITES.PAK and "
+           "ALL_PUZS):\n"
+           "  - start it with  --data <folder>,\n"
+           "  - or set the environment variable TM_DATA_DOS,\n"
+           "  - or write  data = <folder>  in the [dos] section of tmport.ini.";
+}
+
+// The DOS edition's folder when no --data was given: TM_DATA_DOS, [dos] data, auto-detection.
+std::string resolveDosDataPath(const std::string& iniDosData, const std::filesystem::path& exeDir) {
+    if (auto env = getEnv("TM_DATA_DOS"); env && !env->empty()) return *env;
+    if (!iniDosData.empty()) return iniDosData;
+    if (auto p = autoDetectDosPath(exeDir)) return pathToUtf8(*p);
+    return {};
 }
 
 }  // namespace
@@ -86,11 +117,82 @@ std::string resolveDataPath(const LaunchOptions& o, const std::string& iniDataPa
     return {};
 }
 
+EditionChoice selectEdition(const LaunchOptions& o, const save::EngineSettings& settings, const std::filesystem::path& exeDir) {
+    std::optional<Edition> preferred = settings.edition;
+    if (!o.edition.empty()) preferred = o.edition == "auto" ? std::nullopt : parseEditionKey(o.edition);
+
+    std::string path;
+    if (!o.dataPath.empty()) {
+        path = o.dataPath;
+    } else if (preferred == Edition::Dos1990) {
+        path = resolveDosDataPath(settings.dosDataPath, exeDir);
+    } else {
+        path = resolveDataPath(o, settings.dataPath);
+        if (path.empty() && !preferred) path = resolveDosDataPath(settings.dosDataPath, exeDir);
+    }
+    if (path.empty()) {
+        if (preferred == Edition::Dos1990)
+            throw StartupError("The 1990 DOS edition of Treasure Mountain! was not found.\n\n" + howToPointAtDos(),
+                               std::string(kDosExeName));
+        return {Edition::WinCd, {}};  // the Windows start-up reports it as before
+    }
+    try {
+        const EditionCandidate c = detectEdition(pathFromUtf8(path), preferred);
+        if (c.edition == Edition::Dos1990) return {Edition::Dos1990, pathToUtf8(c.path)};
+        // Auto: exactly the path as given (the Windows start-up of before); --edition win: the
+        // Windows part of a folder holding both.
+        return {Edition::WinCd, preferred == Edition::WinCd ? pathToUtf8(c.path) : path};
+    } catch (const EditionError& e) {
+        // A DOS folder that cannot be played names its file; the two-editions message stands alone.
+        if (e.file().empty()) throw StartupError(e.what());
+        throw StartupError(std::format("{}\n\n{}", e.what(), howToPointAtDos()), e.file());
+    }
+}
+
+dos::DosOptions resolveDosOptions(const LaunchOptions& o, const save::EngineSettings& settings,
+                                  const std::filesystem::path& prefDir) {
+    dos::DosOptions d = dos::dosOptionsFrom(settings.dos);
+    if (!o.dosArgs.empty())
+        for (const std::string& a : dos::applyDosSwitches(d, o.dosArgs)) log::warn("--dos-args: '{}' has no effect", a);
+    if (auto v = dos::parseLookOption(o.dosLook)) d.look = *v;
+    if (auto v = dos::parseSoundDevice(o.dosSound)) d.sound = *v;
+    if (o.dosSlowCpu) d.slowCpu = true;
+    if (auto v = dos::parseFrameSpeed(o.frameSpeed)) d.frameSpeed = *v;
+    if (o.squarePixels) d.squarePixels = true;
+    if (o.noAudio) d.sound = dos::SoundDevice::Off;
+    d.headless = o.headless;
+    d.keys = o.keys;
+    d.prefDir = prefDir;
+    d.verbose = o.verbose;
+    if (isFrameDumpFolder(o.frameDump)) d.frameDumpDir = pathFromUtf8(o.frameDump);
+    return d;
+}
+
+platform::HostConfig dosHostConfig(const LaunchOptions& o, const save::EngineSettings& settings,
+                                   const std::filesystem::path& screenshotDir) {
+    platform::HostConfig h;
+    h.layout = gfx::PresenterLayout::dos1990(settings.dos.squarePixels || o.squarePixels);
+    h.title = kDosTitle;
+    h.windowScale = settings.dos.windowScale;
+    h.integerScale = settings.integerScale || o.integerScale;
+    h.fullscreen = (settings.fullscreen || o.fullscreen) && !o.windowed;
+    h.pauseOnFocusLoss = settings.pauseOnFocusLoss && !o.noPause;
+    h.screenshotDir = !o.screenshotDir.empty() ? pathFromUtf8(o.screenshotDir) : screenshotDir;
+    h.screenshotPrefix = "tmport_dos";
+    return h;
+}
+
 // ------------------------------------------------------------------------------------------- App
 
 struct App::Parts {
     save::Paths paths;
     save::EngineSettings settings;
+    Edition edition = Edition::WinCd;
+    // The 1990 DOS edition:
+    std::filesystem::path dosFolder;
+    dos::DosOptions dosOptions;
+    std::unique_ptr<platform::Host> host;
+    // The Windows CD edition:
     GameFiles files;
     std::unique_ptr<Engine> engine;
     std::unique_ptr<audio::AudioSystem> audio;
@@ -105,6 +207,10 @@ struct App::Parts {
 };
 
 App::App(LaunchOptions options) : options_(std::move(options)), p_(std::make_unique<Parts>()) {}
+
+bool App::initialised() const { return ctx_ != nullptr || (p_ && p_->host != nullptr); }
+
+Edition App::edition() const { return p_->edition; }
 
 App::~App() {
     if (p_) {
@@ -131,8 +237,15 @@ void App::init() {
     p.settings = save::loadSettingsAndImport(p.paths, &import);
     if (import == save::ImportResult::Imported) log::info("imported the original users.dat into {}", pathToUtf8(p.paths.usersDat));
 
-    // 2. Game files. The original swallowed DLL load failures; the port refuses to start.
-    const std::string dataPath = resolveDataPath(o, p.settings.dataPath);
+    // 2. Edition and data path (edition/edition.h). The DOS edition has its own runtime.
+    const EditionChoice choice = selectEdition(o, p.settings, exeDirectory());
+    if (choice.edition == Edition::Dos1990) {
+        initDos(pathFromUtf8(choice.dataPath));
+        return;
+    }
+
+    // 2a. Game files. The original swallowed DLL load failures; the port refuses to start.
+    const std::string& dataPath = choice.dataPath;
     if (dataPath.empty())
         throw StartupError("The Treasure Mountain! game files were not found.\n\n" + howToPointAtData(p.paths));
     ResourceManager::Options ro;
@@ -253,9 +366,52 @@ void App::init() {
     mirrorAudioOptions(*ctx_);
 }
 
-int App::run(const GameMainFn& entry) {
-    if (!ctx_) throw Error("App::run before init");
+void App::initDos(const std::filesystem::path& folder) {
     Parts& p = *p_;
+    const LaunchOptions& o = options_;
+    p.edition = Edition::Dos1990;
+    p.dosFolder = folder;
+    p.dosOptions = resolveDosOptions(o, p.settings, p.paths.prefDir);
+    // The DOS --keys script (game ticks, dos/app/script_input.h) and every file of the folder
+    // (dos/data/dos_files.h) are checked before a window opens; the runtime opens the files again.
+    if (!p.dosOptions.keys.empty()) {
+        std::string error;
+        if (!dos::ScriptedInput::parse(p.dosOptions.keys, error)) throw StartupError("--keys: " + error);
+    }
+    try {
+        (void)dos::DosFiles::open(folder);
+    } catch (const MissingFileError& e) {
+        throw StartupError(std::format("A file of the 1990 DOS edition is missing: {}\n\n({})\n\nDOS game folder: {}\n\n{}",
+                                       e.file(), e.what(), pathToUtf8(folder), howToPointAtDos()),
+                           e.file());
+    } catch (const std::exception& e) {
+        throw StartupError(std::format("The files of the 1990 DOS edition could not be used.\n\n{}\n\nDOS game folder: {}",
+                                       e.what(), pathToUtf8(folder)));
+    }
+    p.host = std::make_unique<platform::Host>(dosHostConfig(o, p.settings, p.paths.screenshotDir));
+    log::info("game data: {} ({})", pathToUtf8(folder), editionName(Edition::Dos1990));
+    if (!o.headless && !p.host->openWindow())
+        throw StartupError("The game window could not be opened (see the log for the SDL error).");
+}
+
+int App::run(const GameMainFn& entry) {
+    Parts& p = *p_;
+    if (p.edition == Edition::Dos1990) {
+        if (!p.host) throw Error("App::run before init");
+        struct DosDump {
+            App& app;
+            ~DosDump() {
+                // A frame-dump folder is filled by the DOS runtime itself.
+                if (app.options_.frameDump.empty() || !app.p_->dosOptions.frameDumpDir.empty()) return;
+                if (app.p_->host->writeFrameDump(pathFromUtf8(app.options_.frameDump)))
+                    log::info("canvas -> {}", app.options_.frameDump);
+                else
+                    log::error("cannot write {}", app.options_.frameDump);
+            }
+        } dump{*this};
+        return dos::runDosEdition(*p.host, p.dosOptions, p.dosFolder);
+    }
+    if (!ctx_) throw Error("App::run before init");
     std::unique_ptr<ScriptInput> script;
     if (!options_.keys.empty() || options_.headless) {
         std::string error;
@@ -326,8 +482,14 @@ int runGame(int argc, char** argv, const GameMainFn& entry, const ErrorSink& sin
         return 2;
     }
     if (!o->keys.empty()) {
-        if (!parseScript(o->keys, error)) {
-            std::fprintf(stderr, "tmport: %s\n", error.c_str());
+        // The editions script in their own units: Windows steps per input fetch (app/script_input.h),
+        // DOS key events in game ticks (dos/app/script_input.h). Before the edition is known (auto),
+        // a script either one accepts passes; the start-up checks it again for the chosen edition.
+        std::string dosError;
+        const bool winOk = o->edition != "dos" && parseScript(o->keys, error).has_value();
+        const bool dosOk = o->edition != "win" && !winOk && dos::ScriptedInput::parse(o->keys, dosError).has_value();
+        if (!winOk && !dosOk) {
+            std::fprintf(stderr, "tmport: %s\n", (o->edition == "dos" ? dosError : error).c_str());
             return 2;
         }
     }

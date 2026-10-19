@@ -32,8 +32,8 @@
 1000:158f	Present_FullCGA	void far Present_FullCGA(void)	Whole back buffer -> B800
 1000:15dd	Present_FullEGA	void far Present_FullEGA(void)	Whole back buffer -> A000 (EGA/MCGA; Tandy at 1617)
 1000:169b	Gfx_FillRect	void far Gfx_FillRect(int x1,int y1,int x2,int y2)	Fills a back-buffer rectangle with the current pattern colour (register arguments SI,DI,CX,DX; x in bytes)
-1000:176c	Gfx_XorRect	void far Gfx_XorRect(int x1,int y1,int x2,int y2)	Inverts/highlights a back-buffer rectangle (menu highlight)
-1000:18af	Gfx_SetColor	void far Gfx_SetColor(char c)	AL -> DS:37ae
+1000:176c	Gfx_ReplaceColorRect	void far Gfx_ReplaceColorRect(void)	AX/BX colour words, SI..CX x bytes, DI..DX rows: pixels of colour AX become BX
+1000:18af	Gfx_SetDirtyTracking	void far Gfx_SetDirtyTracking(char on)	AL -> DS:37ae, bit 0 tested by the fill/blit tails [I: dirty-span recording]
 1000:18b3	Scroll_PlayfieldLeft	void far Scroll_PlayfieldLeft(void)	Shifts the play-field contents by one tile column (camera moved right)
 1000:1934	Scroll_Setup	void near Scroll_Setup(void)	Common set-up of the scroll routines (play-field 2..0x9e x 16..143)
 1000:196d	Scroll_PlayfieldRight	void far Scroll_PlayfieldRight(void)	Shifts the play-field by one tile column (camera moved left)
