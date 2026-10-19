@@ -45,6 +45,12 @@ struct LaunchOptions {
     std::string frameSpeed;     // --frame-speed reference|period
     std::string dosArgs;        // --dos-args "<switches>": the original's switches (-E -C -T -H -M, -X, -Si/-St/-Sa)
     bool squarePixels = false;  // --square-pixels: show the DOS picture with square pixels (16:10)
+    // DOS game diagnostics (dos/game/trace.h):
+    std::string dosTrace;                    // --dos-trace <csv>: per game tick trace
+    std::vector<std::string> dosDumpStates;  // --dos-dump-state <tick>:<file> (repeatable): DGROUP image
+    std::string dosTicks;                    // --dos-ticks <n>: a headless run lasts at least n game ticks
+    bool dosPreview = false;                 // --dos-preview (not in the help): the wave-2 screen preview
+    std::string dosLayoutSeed;               // --dos-layout-seed <n>: srand value of new games instead of time()
 };
 
 // True when argv should start the game: no arguments, --play, or only options of LaunchOptions.

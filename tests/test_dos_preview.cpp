@@ -239,7 +239,7 @@ TEST_CASE("DOS preview: headless start-up with a frame-dump folder and a DOS --k
     const fs::path dump = dir / "frames";
     const std::string data = pathToUtf8(*testdata::dosDataPath());
     const std::string pref = pathToUtf8(dir), ini = pathToUtf8(dir / "tmport.ini"), out = pathToUtf8(dump);
-    std::vector<const char*> argv = {"tmport", "--edition", "dos", "--data", data.c_str(), "--headless", "--pref-dir", pref.c_str(),
+    std::vector<const char*> argv = {"tmport", "--edition", "dos", "--dos-preview", "--data", data.c_str(), "--headless", "--pref-dir", pref.c_str(),
                                      "--config", ini.c_str(), "--look", "tandy", "--frame-dump", out.c_str(),
                                      "--keys", "10:tap:enter, 20:tap:enter, 30:tap:3"};
     std::vector<std::string> errors;

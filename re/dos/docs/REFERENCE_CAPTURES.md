@@ -357,7 +357,10 @@ structures (clubhouse, net caves, locks, doorways) looked the same.
 - **EGA and Tandy frames are pixel-identical.** Compared 320x200 frames: the clubhouse with its
   first hint (`ega\007` vs `tandy\020`), the clubhouse (`008` vs `021`) and the controls hint
   (`009` vs `022`) differ by **0 pixels**. The title differs only in 43 pixels of a sparkle
-  animation. The help dialog and the status panel are identical where the scene behind them is
+  animation: the sparkle frame differs (wave 2: EGA spot 0 showing BEGIN frame 40, Tandy spot 0
+  frame 38). The mouse pointer (BEGIN frame 2) is in every title capture, at the mouse driver's
+  initial position: EGA and Tandy (159, 101), MCGA (158, 82), CGA (159, 146) (x in bytes, y in
+  rows). The help dialog and the status panel are identical where the scene behind them is
   the same. Same 16 colours, same layout, same tick timing.
 - Differences are outside the image: DOSBox-X captures EGA at 640x400 and Tandy at 320x200, and
   the sound hardware differs (type 1 Tandy versus type 2 AdLib; nothing was listened to).
@@ -483,6 +486,10 @@ elves agent's crafted roster after a new game of tierb / tierc and Exit and Save
 
 Every AVI of Round 1 and Round 2 also carries the emulated audio (EGA runs: AdLib music + speaker
 effects; Tandy runs: PSG); `extracted/scratch/dos_w1_runtime/avi_audio.py` extracts it.
+
+Note (wave 2): the `snd_*` save states the sound tests started from have DS:63BA (the music loop
+flag) = 1, so the recorded tunes loop; an engine render of the same schedule must set the loop flag
+as well (in the game it is set by `Title_Run` and by every scene load, `Scene_Update`).
 
 ### R2.4 Timing measured (summary; details in `code_runtime.md` §1.3, §9, §10)
 

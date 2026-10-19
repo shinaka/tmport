@@ -1,5 +1,7 @@
 #include "app/launch_options.h"
 
+#include <charconv>
+#include <cstdint>
 #include <format>
 #include <string_view>
 
@@ -25,6 +27,8 @@ constexpr Flag kFlags[] = {
     {"--debug", 0},        {"--show-treasure", 0},
     {"--edition", 1},      {"--look", 1},        {"--sound", 1},       {"--slow-cpu", 0},
     {"--frame-speed", 1},  {"--dos-args", 1},    {"--square-pixels", 0},
+    {"--dos-trace", 1},    {"--dos-dump-state", 1}, {"--dos-ticks", 1}, {"--dos-preview", 0},
+    {"--dos-layout-seed", 1},
 };
 
 const Flag* findFlag(std::string_view a) {
@@ -128,6 +132,38 @@ std::optional<LaunchOptions> parseLaunchArgs(int argc, char** argv, std::string&
             o.dosArgs = v;
         } else if (a == "--square-pixels") {
             o.squarePixels = true;
+        } else if (a == "--dos-trace") {
+            o.dosTrace = v;
+        } else if (a == "--dos-dump-state") {
+            const size_t colon = v.find(':');
+            uint64_t tick = 0;
+            const auto [p, ec] = std::from_chars(v.data(), v.data() + (colon == std::string::npos ? 0 : colon), tick);
+            if (colon == std::string::npos || colon == 0 || colon + 1 >= v.size() || ec != std::errc() || p != v.data() + colon) {
+                error = std::format("--dos-dump-state: '{}' is not <tick>:<file>", v);
+                return std::nullopt;
+            }
+            o.dosDumpStates.push_back(v);
+        } else if (a == "--dos-ticks") {
+            uint64_t n = 0;
+            const auto [p, ec] = std::from_chars(v.data(), v.data() + v.size(), n);
+            if (v.empty() || ec != std::errc() || p != v.data() + v.size()) {
+                error = std::format("--dos-ticks: '{}' is not a number", v);
+                return std::nullopt;
+            }
+            o.dosTicks = v;
+        } else if (a == "--dos-preview") {
+            o.dosPreview = true;
+        } else if (a == "--dos-layout-seed") {
+            // decimal or 0x-prefixed hex, 0..65535 (the srand argument is an unsigned int)
+            const bool hex = v.size() > 2 && v[0] == '0' && (v[1] == 'x' || v[1] == 'X');
+            const char* first = v.data() + (hex ? 2 : 0);
+            uint32_t n = 0;
+            const auto [p, ec] = std::from_chars(first, v.data() + v.size(), n, hex ? 16 : 10);
+            if (v.empty() || ec != std::errc() || p != v.data() + v.size() || n > 0xFFFF) {
+                error = std::format("--dos-layout-seed: '{}' is not a number from 0 to 65535", v);
+                return std::nullopt;
+            }
+            o.dosLayoutSeed = v;
         }
     }
     return o;
@@ -189,7 +225,13 @@ std::string launchUsage() {
            "                       recordings (default) or one step per frame like a period PC\n"
            "  --dos-args \"<sw>\"    the original's switches, e.g. \"-T -St\" (-E -C -T -H -M look, -X\n"
            "                       slow CPU, -Si -St -Sa sound); --look, --sound, --slow-cpu win\n"
-           "  --square-pixels      square pixels (320x200 at 16:10) instead of the 4:3 picture\n";
+           "  --square-pixels      square pixels (320x200 at 16:10) instead of the 4:3 picture\n"
+           "  --dos-trace <csv>    write one CSV row per game tick (player, camera, keys, events)\n"
+           "  --dos-dump-state <tick>:<file>   write the game state in the original's memory layout\n"
+           "                       after that game tick (repeatable; plus <file>.fields.tsv, <file>.png)\n"
+           "  --dos-ticks <n>      with --headless: run at least n game ticks (47.34 per second)\n"
+           "  --dos-layout-seed <n>  a new game's layout from this srand value (0..65535, or 0x..)\n"
+           "                       instead of the clock, for reproducible runs\n";
 }
 
 }  // namespace tmport::app

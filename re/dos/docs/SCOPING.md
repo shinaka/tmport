@@ -45,7 +45,7 @@ Tags: **[O]** observed (bytes, code, decoded output, pixel comparisons), **[I]**
 | AdLib music path (24 instruments, 4 random arrangements per tune) | **partial**: tables and note mapping known, register order inferred, not rendered | fmt_sound §5.5 | `dos_sound.py adlib` (tables only) |
 | ALL_PUZS + PRG_DICT, level ranges, deal and history | **decoded** (360 questions; 326 identical to Windows, 33 edited, 1 dropped) | fmt_data §2 | `puzzles.py` |
 | HELP.DAT | **decoded** (pages); page picture tables listed | fmt_data §3 | `dos_text.py help` |
-| USERS.DAT | **decoded**; a few fields (+0x08A, +0x124, +0x130, +0x133, header byte 1) described by use, not meaning | fmt_data §4, ARCHITECTURE §6 | `users_dos.py` |
+| USERS.DAT | **decoded**; a few fields (+0x08A, +0x124, +0x130, +0x133, header bytes 1-2) described by use, not meaning (all explained since wave 1/2: fmt_data §4) | fmt_data §4, ARCHITECTURE §6 | `users_dos.py` |
 | DGROUP (hints, menus, dialogs, word lists, ranks, tables) | **mapped** region by region; some code-pointer and word tables only labelled | fmt_data §7 | `dos_text.py exe` |
 | School-network and disk files (`ssrnet.dat`, `ssrquiet.dat`, `TLCINFO.DAT`) | **understood**: inert in your install; a port ignores them | fmt_data §5 | – |
 
@@ -64,8 +64,8 @@ Scripts: `extracted/scratch/dos_scoping/` (`world.py`, `screens.py`, `render_che
 | New game, clubhouse (`ega/008_shack`) | frame and menu bar, MOUNTAIN.PAN at camera (0xC0,0), status bar, player (as the graphics pass) | **0** [O] |
 | Elf question (`ega/030_quiz_question`) | scenery and HUD at the catch position, SPRITES 57/94/103, question 61 of ALL_PUZS expanded with PRG_DICT, answer order from DS:5E9C, `Quiz_Draw*` 46ce:0271-052d | **0** [O] |
 | Same sign-in, Tandy palette (`tandy/06_signin`) and MCGA palette (`mcga/04_signin`) | as above | **0** each [O] (MCGA needs rounded 6-to-8-bit colour expansion, see §8) |
-| Title (`ega/001_title`) | OPENING.PAN + BEGIN frame 3 | 479: the "Press Enter" line and sparkles, not drawn [O] |
-| 10 path and castle screens (levels 1-3, castle hall, ladder shaft) | scenery at the camera found by tile matching, hiding places and castle layout restored from the saved USERS.DAT, HUD | 1 401-2 242 each, all on actors (player, elves), clue words, or the locked-gate overlay drawn by a cell handler [O] |
+| Title (`ega/001_title`) | OPENING.PAN + BEGIN frame 3 | 479: the "Press Enter" line and sparkles, not drawn [O]. Wave 2: the rest was a BEGIN.PAK sparkle (slot 2, script 0x5C; a z tie goes to the higher record) plus the mouse pointer (slot 0, BEGIN frame 2); with them every title capture is **0 px** |
+| 10 path and castle screens (levels 1-3, castle hall, ladder shaft) | scenery at the camera found by tile matching, hiding places and castle layout restored from the saved USERS.DAT, HUD | 1 401-2 242 each, all on actors (player, elves) and clue words [O]. (The "locked-gate overlay drawn by a cell handler" of this pass does not exist: `ega/042` was taken before the trunk was unlocked, i.e. with `picture[0xEF]` = block 0x40, wave 2.) The composed screens of wave 2 (`dos_screens.h`) are 0 px |
 | Castle top (`ega/101_castle_top_treasure_room`) | CLOSE.PAN at the matched camera, HUD | 7 229: the chest, the creature and the player are actors, and the menu bar is drawn differently in that scene [O] |
 
 Capture matching places the screens in the 16×16 cell grid where ARCHITECTURE §4.2 predicts [O]:
@@ -96,10 +96,10 @@ resolution:
   per level from layout records.
 * **Progress per level is kept for the whole game**; you can fall back a level and climb again.
   Windows resets clues and key at each level and is one-way.
-* **Nets:** a swing is free; only the first elf caught in a swing uses a net. Net shop: 4 coins
-  for **5** nets (Windows 10).
-* **Coins:** start with **5** (Windows 10); a coin elf (+2) and a one-time bonus spot (+5); no
-  rescue coin pile.
+* **Nets:** a swing is free; each catch uses a net, but catches resolved in the same tick share
+  one (`code_elves_layout_hints.md` §4.8). Net shop: 4 coins for **5** nets (Windows 10).
+* **Coins:** start with **5** (Windows 10); a coin creature (+2: a coin with legs that appears at a
+  view edge when coins < 4 and nets < 5) and a one-time bonus spot (+5); no rescue coin pile.
 * **Elves:** 9/11/13/15 by rank tier (Windows 6/8/10/12), four kinds, different catch zone.
 * **Quiz:** promotion at **70 %** right first time (Windows 80 %); missed questions come first on
   the next level.
@@ -119,8 +119,9 @@ from the specs, original addresses in comments, no game data in the repo.
 
 ### 5.1 Edition detection
 
-* New `src/edition/edition.h/.cpp`: `enum class Edition { WinCd, Dos1990 }` and
-  `detectEdition(const vfs::DataSource&)`.
+* New `src/edition/edition.h/.cpp`: `enum class Edition { WinCd, Dos1990 }`,
+  `detectEdition(path, optional preferred edition)`, `scanEditions(path)` and
+  `checkDosFolder(dir)` (as implemented in wave 2; detection works on a path, not a data source).
 * **Dos1990** when the folder holds `SST.EXE`, `SPRITES.PAK` and `ALL_PUZS`. Validate before using
   fixed offsets: MZ, EXEPACK signature, unpacked image of 288 992 bytes, Turbo C copyright at
   DS:0004, EGA palette sanity check (as `tools/dos/dos_gfx_common.py`). Anything else is reported as
@@ -155,7 +156,7 @@ from the specs, original addresses in comments, no game data in the repo.
 | `dos/audio/` | `sequencer` (491b, run at 236.696 Hz by sample count), `speaker_synth`, `psg_synth` (SN76496), later `opl2_driver` (4ac9) on a pinned BSD-licensed OPL2 core (ymfm) |
 | `dos/input/` | `keyboard` (held-key bits like `Kbd_ISR` 43a0:0071, diagonal = jump, Tandy codes, BIOS-style buffer for menus and names), `mouse_zones` (4a85) |
 | `dos/save/` | `users_dat` (3 + 9 × 360 bytes, byte exact, import from the DOS folder's `USERS.DAT`) |
-| `dos/game/` | `main_loop` (130f: `Frame_Begin`, `Game_Tick`, step gating, HUD), `scene` (1437), `init` (1460, switches as options), `cells` + `cells2` (1568, 176a), `player` (18cf), `layout` (1a54), `anim` (4306), `ui` (43cb: menu bar, boxes, help pager), `elves` (4521), `quiz` (46ce, adapted from `game/quiz.cpp`), `signin` (47c7, adapted), `hints` (49a6), `search` (4a03), `title` (4ba4), `game_state.h` |
+| `dos/game/` | `main_loop` (130f: `Frame_Begin`, `Game_Tick`, step gating, HUD), `scene` (1437), `init` (1460, switches as options), `cells` + `cells2` (1568, 176a), `player` (18cf), `layout` (1a54), `anim` (4306), `ui` (43cb: menu bar, boxes, help pager), `elves` (4521), `quiz` (46ce, adapted from `game/quiz.cpp`), `signin` (47c7, adapted), `hints` (49a6), `search` (4a03), `title` (4ba4), `game_state.h` (as built in wave 3: file, function and owner map in `ENGINE_MAP.md`) |
 | `dos/app/` | `dos_runtime` (virtual PIT: ticks from the clock, game tick every 5th, at most one logic step per presented frame), `dos_bootstrap`, `dos_cli` (`--dos-pan`, `--dos-pak`, `--dos-screen`, `--dos-sound`) |
 
 The DOS runtime is simpler than the Windows one: a flat frame loop with modal states as bits of
@@ -202,8 +203,9 @@ the frame-rate-dependent timing, and the content not yet captured.
    drawn frame, and some features count frames (search animation, HUD count-up, rank chest). The
    port must pick a reference frame rate (the DOSBox-X one) and measure those counts from the AVIs;
    frame-by-frame comparison is harder than with the Windows 10 Hz ticks.
-2. **Code that does not decompile:** six cell handlers (1568:1090, 1556, 15bc, 1c7b, 1d96, 1e50)
-   and the 53-case treasure-room switch (176a:0596) need reading from disassembly.
+2. ~~**Code that does not decompile:**~~ resolved in wave 1: the six cell handlers (1568:1090,
+   1556, 15bc, 1c7b, 1d96, 1e50) decompile after the DS repair (`code_world.md` §12.3) and the
+   53-case treasure-room switch (176a:0596) is specified in `code_player.md` §7.2.
 3. **Not yet captured:** treasure found, chest filling, star rank-up, crown ending, prize rooms,
    gap jumps, elf dust taking a coin, any audio. Wave 1 agent E must capture them (crafted
    USERS.DAT, save states) or their fidelity cannot be checked.
@@ -215,12 +217,14 @@ the frame-rate-dependent timing, and the content not yet captured.
    one owner in wave 2.
 6. **Other DOS releases** (other disk sets, later versions) may move DGROUP offsets. Only your
    V 1.0 is verified; others are refused with a clear message.
-7. **Small open points:** terrain-mask bits 0x400/0x1000; hint texts 10-12 that no code arms;
-   PAK header words; some USERS.DAT fields. None blocks the engine.
+7. **Small open points:** ~~terrain-mask bits 0x400/0x1000~~ (resolved: camera mode and fall,
+   `code_world.md` §4.4); hint texts 10-12 that no code arms; PAK header words; ~~some USERS.DAT
+   fields~~ (resolved, `fmt_data.md` §4). None blocks the engine.
 8. **Findings of this pass:** `tools/dos/dos_gfx_common.py` expands MCGA 6-bit colours with
    `v*255//63`, which is 1 lower than DOSBox-X in some channels (e.g. 0x9D vs 0x9E); rounding
-   (`(v*255+31)//63`) matches the capture exactly. The locked tree-trunk gate on level 1 is painted
-   by its cell handler over the PAN block, so scenery alone is not the full picture for gate cells.
+   (`(v*255+31)//63`) matches the capture exactly. ~~The locked tree-trunk gate on level 1 is
+   painted by its cell handler over the PAN block~~ — wrong (wave 2): no handler paints it; the
+   capture predates the unlocking (`picture[0xEF]` = block 0x40), so scenery alone is the picture.
    DOSBox-X logs "Packed file is corrupt" at every start (an EXEPACK loader warning); the game runs
    normally and the port unpacks the EXE itself, so it does not matter.
 

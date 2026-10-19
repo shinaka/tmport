@@ -9,7 +9,7 @@ target_sources(tmcore PRIVATE
     src/dos/input/input_poll.cpp
     src/dos/app/script_input.cpp
     src/dos/app/dos_runtime.cpp
-    # Wave 2 preview (dos::runDosEdition): replaced by the game modules in wave 3.
+    # dos::runDosEdition (the game; the wave-2 screen preview behind --dos-preview).
     src/dos/app/dos_preview.cpp
     src/dos/app/dos_entry.cpp
 )

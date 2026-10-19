@@ -1029,3 +1029,59 @@ including the dissolve's 700 calls and the AdLib choice.
 * O4. The meaning of size fields 2–3 (superlative words) is inferred from the word list order.
 * O5. The escape (states 73/74) visuals: the child sprite moves down; whether this reads as a jump
   out of the net or a fall was not captured.
+
+---
+
+## Wave 3 corrections
+
+Found while porting (`src/dos/game/elves.cpp`, `layout.cpp`, `hints.cpp`) against the disassembly;
+the port follows the code where this document was silent or loose [O unless marked].
+
+1. **`Elves_Spawn` moves `g_curObj`** (4521:182e): the clearing loop points it at each of the 15
+   records, then it is set to record 0 and advanced after every spawned elf, so it ends **one record
+   past the last spawned elf** (DS:39DA, past the table, with 15 spawned at tier 3). The next tick's
+   `Player_Update` / `Elves_Update` overwrite it before a reader sees it; the engine keeps record 14
+   in the 15-elf case (it cannot point past the table).
+2. **`Elves_Update` sets `g_curObj` for every active record in both loops** (also base-0 ones), so
+   after it `g_curObj` is record `g_elfActiveCount − 1` (the stale object of the visible cell calls,
+   `code_world.md` §4.3). In step 3 the second computation of a visible elf **overwrites the globals**
+   `g_elfRelX` (now in pixels, not shifted) and `g_elfRelY`.
+3. **`g_elfAnimSel` is written by many handlers**, not only by `Elf_CheckNet` and `ElfSt_63/66`:
+   `ElfSt_01/05` (walk id 0x1F/0x20, carrier 0x41/0x42), `ElfSt_02/04` (0 or 0x22), `ElfSt_45/46`
+   (the walk id, passed to `Elf_WalkCommon`, whose `Elf_CheckNet` then sets 0 / 0x16), `ElfSt_47` (0x21
+   / 0x43 after the rand() calls), `ElfSt_62/65` (0x31/0x47, 0x32/0x48, only when the pull ends). The
+   stale value `ElfSt_03` reads (§4.8) can therefore be any of these.
+4. **Relative state steps**: `ElfSt_52/56` (state + 1 when the wind-up ends), `ElfSt_53/57` (hit:
+   state + 1), `ElfSt_54/58`, `ElfSt_62/65`, `ElfSt_73` increment the current state instead of storing
+   a constant. In `ElfSt_53/57` `Elf_CheckNet` runs first and may already have changed the state (dodge
+   64, pull 62/65, freeze 68, escape 73); the hit test still runs on the same tick, so a netted thrower
+   whose dust hits moves one state further (e.g. 64 -> 65), and a vanishing dust overrides the state
+   with 49 / 50. Kept as in the original.
+5. `Elf_CheckNet`'s net centre register is uninitialised when the player is in neither net-down state;
+   classes 4..6 only arise in those states, so it is never used then (the engine uses 0).
+6. **Hint 3 count past the clue words**: `Hints_CheckTriggers` reads the clue-word bytes at
+   `g_level * 3 + i` through the record pointer; in levels 3 and 4 these are record bytes +0x8A..+0x8E
+   (the collected list), which count as revealed when they hold a treasure id (< 0x80).
+7. `Layout_PlaceKey` writes every candidate k into `g_levelPicData[level][1]` while it draws (the
+   final value is the accepted key, as §5.3 says); `Clue_BuildWords` reads the attribute tables at
+   the fixed addresses DS:0184 / 0250 / 02EC, not through `g_pictureAttrTables`.
+8. `Castle_PickLayout` returns AX = rand() / divisor (no caller uses it).
+9. **Turbo C's DST rule** (`__isDST` 4d63:01e5, §5.5): the 1987 US rule, DST from the first Sunday of
+   April 2:00 to the last Sunday of October 2:00 local time (before 1987 from the last Sunday of
+   April). In 2026 that is 5 April to 25 October, not the modern March-November rule; the engine's
+   seed follows Turbo C's rule (`turboCTime`, `turboCIsDst`).
+10. **Crafted higher-tier layouts confirmed (O1, R1)**: `USERS_crafted_tierb_layout.DAT` record 2
+    (total 120, 40 collected, shown 0x5A) is seed **0x426E** (scheme 0, 671 rand() calls, tier 2) and
+    `USERS_crafted_tierc_layout.DAT` record 3 (total 390, 10 collected, shown 0x2E) is seed
+    **0x42D3** (scheme 1, 637 calls, tier 3), each the only seed of 65 536. The three tier-0 layouts
+    of §5.6 take 734 (0xA954), 732 (0x1EE2) and 739 (0x2B40) calls. The engine reproduces all five
+    byte for byte and the deal of §5.6 from the handed-over rand() position (`tests/test_dos_layout.cpp`).
+11. **Elf behaviour confirmed against DOSBox-X (R2, R3)**: loading the DGROUP of
+    `savestates/r2/fl_tierc_outside` into the engine and standing still for 2617 ticks takes the
+    coins on exactly the ticks of the `fl_tierc_dust1` log (losses during ticks 1591, 1883, 1962,
+    2206 after the state) and ends with the same rand() seed (0x2BC5650F) and elf table as
+    `fl_tierc_dust1`; from `fl_tierc_coincreature` with the logged keys of `fl_coin_after` the coin
+    creature gives +2 during tick 1421 and dust takes one during tick 1504, again ending with
+    DOSBox-X's seed, player x and elf table (`tests/test_dos_elves.cpp`, run with
+    `TM_DOS_ELF_REPLAY` pointing at DGROUP dumps written with `savmem.py`). So the per-tick model
+    (lockstep, rand() order of spawn / think / handlers, scripts, dust) is exact in these runs.

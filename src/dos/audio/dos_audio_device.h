@@ -62,6 +62,7 @@ public:
     void setMusicOn(bool on);   // DS:63b6 g_musicOn
     void setMusicPaused(bool paused);  // DS:37ce (0 while g_uiMode != 0, Sound_SyncState 43cb:046e)
     void setMusicLoop(bool on);        // DS:63ba
+    void setSfxLoop(bool on);          // DS:63b8 (the end sequence loops effect 2, player states 44/45/64/65)
 
     // ---- engine-side controls (no effect on the driver state)
     void setVolume(float v) { volume_.store(v); }
@@ -91,7 +92,8 @@ public:
 
 private:
     struct Command {
-        enum class Kind : uint8_t { SfxPlay, SfxStop, MusicPlay, MusicStop, SilenceAll, SoundOn, MusicOn, MusicPaused, MusicLoop };
+        enum class Kind : uint8_t { SfxPlay, SfxStop, MusicPlay, MusicStop, SilenceAll, SoundOn, MusicOn, MusicPaused, MusicLoop,
+                                    SfxLoop };
         Kind kind;
         int a = 0;
         int b = 0;

@@ -697,7 +697,7 @@ A "second" here is 1.27 s (`g_seconds`).
 
 USERS.DAT is **3 bytes header + 9 records of 360 (0x168) bytes = 3243 bytes**, read and written as
 one block into DS:ba14 (`Users_ReadFile`/`Users_WriteFile` 47c7:0514/055a; record offsets
-DS:6132 = 3 + 360·i) [O]. Header byte 1 is saved from/to DS:929f [O]. Record layout
+DS:6132 = 3 + 360·i) [O]. Header bytes 1-2 are the u16 DS:929f (word moves 47c7:0de0 / 0f80) [O]. Record layout
 (`Users_Pack` 47c7:0e0e, `Game_Restore` 47c7:0c62, `Users_SelectRecord` 47c7:09dd) [O]:
 
 | Off | Size | Field |
@@ -713,7 +713,7 @@ DS:6132 = 3 + 360·i) [O]. Header byte 1 is saved from/to DS:929f [O]. Record la
 | 0x0BA | 1 | (unused) |
 | 0x0BB | 57 | pictures of the 48 hiding-place cells + the 9 variable cells (bonus spot, gates, bridges, net shop) |
 | 0x0F4 | 48 | contents of the 48 hiding places |
-| 0x124 | 12 | per-level picture data (6 words of DS:121c+18 via DS:62ab) |
+| 0x124 | 12 | per-level picture data: `g_levelPicData` DS:122e elements {1,2,5,6,9,10} (DS:62ab/62b1) |
 | 0x130 | 3 | found-treasure masks per level |
 | 0x133 | 12 | shelf bits of the treasure shelf rooms |
 | 0x13F | 1 | quiz tier (0..3, 5 = all) |
@@ -727,7 +727,7 @@ DS:6132 = 3 + 360·i) [O]. Header byte 1 is saved from/to DS:929f [O]. Record la
 | 0x152 / 0x154 | 2 / 2 | camera x / y |
 | 0x156 | 2 | area id (music) |
 | 0x158 | 2 | net-shop coins owed |
-| 0x15A / 0x15C | 2 / 2 | banked nets / coins for the next game |
+| 0x15A / 0x15C | 2 / 2 | banked nets / coins for the next game (written only by `Game_End` and `Users_InitNewPlayer`, read only by `Users_LoadPlayer`) |
 | 0x15E / 0x160 | 2 / 2 | music on / sound on |
 | 0x162 | 2 | games played |
 | 0x164 | 2 | showcase treasure |

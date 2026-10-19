@@ -15,7 +15,7 @@ TM Port is not affiliated with or endorsed by The Learning Company or any later 
 Contents: [Features](#features) · [Requirements](#requirements) ·
 [Getting started](#getting-started) · [Controls](#controls) · [Menus](#menus) ·
 [Saved players](#saved-players) · [Options](#options) ·
-[DOS edition (in progress)](#dos-edition-in-progress) · [Modding](#modding) ·
+[DOS edition](#dos-edition) · [Modding](#modding) ·
 [Building](#building) · [Command-line tools](#command-line-tools) ·
 [Project layout](#project-layout) · [Status and known differences](#status-and-known-differences) ·
 [Credits and licences](#credits-and-licences)
@@ -47,8 +47,8 @@ Contents: [Features](#features) · [Requirements](#requirements) ·
 
 * **Your copy of *Super Solvers Treasure Mountain!*, Windows CD edition** (the CD carries a
   `TMTWINCD` folder with `TMTWINCD.EXE`, `TMT.DLL`, `TMT256.DLL`, `TMT16.DLL`, `TM0SOUND.DLL` to
-  `TM8SOUND.DLL` and a `SOUNDS` folder). The 1990 DOS edition is in progress (a preview, see
-  [DOS edition (in progress)](#dos-edition-in-progress)); other editions are not supported.
+  `TM8SOUND.DLL` and a `SOUNDS` folder), **or the 1990 DOS edition** (`SST.EXE` version 1.0, see
+  [DOS edition](#dos-edition)); other editions are not supported.
 * **A computer** with Windows 10 or 11 (64-bit), Linux (X11 or Wayland) or macOS. Windows is the
   main platform. On Linux the engine is built and tested with GCC (under WSL 2); macOS builds
   and plays with Xcode's Clang.
@@ -195,7 +195,7 @@ paths = mods                ; mod folders, ';'-separated (see docs/MODDING.md)
 show_treasure = false       ; true: box the hiding places that hold a treasure (gold) or the key (cyan)
 keys = false                ; true: F9 switches the treasure boxes on and off (show_treasure implies it)
 
-[dos]                       ; the 1990 DOS edition (in development)
+[dos]                       ; the 1990 DOS edition
 data = D:\TM-DOS            ; its folder (the one with SST.EXE)
 look = ega                  ; ega, tandy, mcga or cga: the picture of that video adapter
 sound = tandy               ; tandy, speaker, adlib or off
@@ -233,41 +233,62 @@ FluidR3_GM (`fluid-soundfont-gm` on Debian/Ubuntu) or GeneralUser GS; without on
 without music. The engine does not include or download a SoundFont. `docs/BUILDING.md` ("Music")
 has the details.
 
-## DOS edition (in progress)
+## DOS edition
 
-The engine is learning to play the original 1990 DOS edition too (`SST.EXE` version 1.0, the
-16-colour EGA/Tandy game), from its own folder (`TM-DOS`, the one with `SST.EXE`, `SPRITES.PAK`
-and `ALL_PUZS`). Its game logic is not written yet: for now the DOS edition starts a **preview**
-that shows what already works.
+The engine also plays the original 1990 DOS edition (`SST.EXE` version 1.0, the 16-colour
+EGA/Tandy game) from its own folder (the one with `SST.EXE`, `SPRITES.PAK` and `ALL_PUZS`). Its game
+logic is a port of the DOS program, so it plays as the DOS game did, not as the Windows CD edition:
 
-* **Screens**, rebuilt from your files with the original's drawing rules: the title, the Club
-  Sign-In (with your DOS players), the clubhouse at the start of a game, an elf question, the
-  mountain path of level 1 and the castle's ladder shaft. The game screens use the hiding places
-  and castle layout of your second saved player, if any. Compared with recordings of the original
-  in DOSBox-X (title and sign-in in all four looks, the others in EGA, the clubhouse also on
-  Tandy), every screen matches pixel for pixel when it shows the same players.
-* **Sound**: the original's three tunes and twelve effects on the PC speaker, the Tandy 3-voice
-  chip, or AdLib (for now with a simple stand-in for the AdLib music), with the music played and
-  paused where the original does it.
-* **Keys**: Enter or Space (or a click) shows the next screen; `0`-`9`, `-` and `=` play effects 0
-  to 11; Ctrl+S switches music and sound off and on (as in the original: on the title and the game
-  screens); Esc quits. Alt+Enter / F11 (fullscreen), F12 (screenshot) and the pause in the
-  background work as in the Windows edition.
+* **The whole game**: the title and attract pages, the Club Sign-In, the clubhouse (rank chest and
+  prize shelves), the three levels of the mountain with their hiding places, elves, elf questions,
+  clue words, keys and locks, net shops, caves, mine tunnels, bridges and the geyser, the castle
+  wall, the end sequence, the treasure room and the rank screen, Flutter's New Player Hints and the
+  game messages, the menus (Help, File, Options) and the help pages.
+* **Faithful to the original**: the game advances in the original's 47.3 Hz timer ticks with the
+  original's order of events, the same random number generator (the same layouts and question deals
+  for the same seed), the original's movement timings (checked tick for tick against recordings of
+  the original in DOSBox-X), and the original's screens (compared with captures pixel for pixel).
+* **Saves** at the original's moments (new player, remove player, Start Over, Start New Player,
+  Exit and Save, the end of each game) in `dos_users.dat` in the preference folder, in the DOS
+  `USERS.DAT` format byte for byte. On the first start the DOS folder's `USERS.DAT` is imported (the
+  DOS file is never changed); copy `dos_users.dat` back as `USERS.DAT` to continue in DOS.
+* **Sound**: the original's tunes and effects on the PC speaker, the Tandy 3-voice chip, or AdLib
+  (for now with a simple stand-in for the AdLib music).
 
-Start it with `tmport --data D:\TM-DOS` (or set `TM_DATA_DOS`, or `data =` in the `[dos]`
-section of `tmport.ini`); when a folder holds both editions, add `--edition dos`. The picture is
-320x200 shown at 4:3, as on a monitor of the time. DOS options (also in the `[dos]` section):
+**Keys** (the original's): Left / Right walk; Up goes through a door or cave, opens a lock with the
+level's key, or climbs; Up+Left / Up+Right (or Home / PgUp) jump; Down drops a coin at the hiding
+place in front of you (or climbs down); Space swings the net; F1 / F2 / F3 open the Help, File and
+Options menus, Up / Down / Enter choose; Esc in play asks to Exit and Save; Ctrl+S switches music
+and sound off and on. The mouse works as in the original: hold the button over the play field to
+walk, click the status bar to drop a coin, click buttons, answers and players. Alt+Enter / F11
+(fullscreen), F12 (screenshot) and the pause in the background work as in the Windows edition.
+
+Start it with `tmport --data D:\TM-DOS` (or set `TM_DATA_DOS`, or `data =` in the `[dos]` section
+of `tmport.ini`); when a folder holds both editions, add `--edition dos`. The picture is 320x200
+shown at 4:3, as on a monitor of the time. DOS options (also in the `[dos]` section):
 
 | Option | Effect |
 |---|---|
 | `--look ega\|tandy\|mcga\|cga` | the picture of that video adapter (EGA and Tandy look the same; MCGA has softer colours; CGA is dithered to 4 colours) |
 | `--sound tandy\|speaker\|adlib\|off` | the sound device (default `tandy`) |
-| `--slow-cpu`, `--frame-speed reference\|period` | the original's slow-machine mode; the speed of frame-counted effects (for the game itself; in the preview a slow Tandy or CGA machine only turns the music off after the title, as the original does) |
+| `--slow-cpu` | the original's slow-machine mode (`-X`: fewer elves, coarser scrolling, shorter search) |
+| `--frame-speed reference\|period` | the speed of the effects the original counted in frames (search, coin count-up, CHAMPION flash, dissolve): as in the reference recordings (default) or one step per frame like a period PC |
 | `--dos-args "<switches>"` | the original's own switches, e.g. `"-T -St"` |
 | `--square-pixels`, `--integer-scale` | 320x200 with square pixels; whole-number scaling (5x6 per pixel) |
 
-The DOS players are kept in `dos_users.dat` in the preference folder, imported from the DOS
-folder's `USERS.DAT` on the first start (the DOS file is never changed).
+For testing and comparisons: `--headless --keys "<script>"` plays a script in game ticks
+(`60:tap:enter, 400:down:left, +20:up:left`), `--dos-trace <csv>` writes one row per game tick,
+`--dos-dump-state <tick>:<file>` the game's memory in the original's layout (and the picture shown),
+`--frame-dump <folder>` the last frame of each screen, and `--dos-layout-seed <n>` makes new games
+use a fixed layout instead of one from the clock. `tmport --data <folder> --dos-preview` shows the
+earlier static preview of six screens.
+
+**Known differences** (`re/dos/docs/ENGINE_MAP.md` §8): the game runs one original frame per timer
+tick, so the few frames the original needed several ticks for (full redraws, about 40-130 ms in the
+recordings) are shorter (one visible case: the player is not yet drawn under the start-of-game
+message); files load instantly; the mouse pointer starts one row higher than in DOSBox-X; the slow-CPU
+mode's box save does not model the original's save heap; the AdLib music is a stand-in; there are no
+mods for the DOS edition yet.
 
 ## Modding
 
@@ -323,7 +344,9 @@ comparing the engine with the original. The tools open no window (except the pic
 * mods: `--export-mod-kit`, `--check-mods`;
 * the DOS edition: `--dos-pan`, `--dos-pak`, `--dos-screen` (scenery, sprites and the preview's
   screens to PNG) and `--dos-sound` (tunes and effects to WAV); `tmport --help dos-gfx` and
-  `tmport --help dos-sound` list their options.
+  `tmport --help dos-sound` list their options. The DOS game itself runs headless with
+  `--headless --keys`, `--dos-trace`, `--dos-dump-state` and `--dos-layout-seed` (see
+  [DOS edition](#dos-edition)).
 
 The game itself can also run headless with scripted input (`--headless --keys "..."`).
 `tmport --help` gives an overview and `tmport --help <topic>` the options of each group;

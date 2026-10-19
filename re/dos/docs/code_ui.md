@@ -129,12 +129,13 @@ went down), +7 (held) or +8 (released) [O 4a85:0130].
 `Input_Tick` (4a85:03ac) [O]: `Input_Poll()`; then, if `g_cmd` ≠ −1 and `g_uiMode` = 0:
 * if DS:926c (menu lock, set by cells during end sequences and searches) ≠ 0: commands 1..3 and
   ≥ 12 are discarded (`g_cmd = −1`);
-* else command 0 (Esc): slow CPU (`g_slowCpu` = 1): `g_uiMode |= 0x20`, dialog id DS:9323 = 10
-  (the Exit-and-Save box, §5.4); otherwise `g_uiMode |= 0x40`, `g_cmd = 8`, DS:90fc = 1 (File),
+* else command 0 (Esc): slow CPU (`g_slowCpu` = 1): `g_uiMode = 0x20` (an assignment; equal to an
+  OR here because `g_uiMode` is 0), dialog id DS:9323 = 10
+  (the Exit-and-Save box, §5.4); otherwise `g_uiMode = 0x40`, `g_cmd = 8`, DS:90fc = 1 (File),
   DS:9111 = 2 (third item): the next `Menu_Update` takes this as Enter on "Exit and Save", so Esc
   in play opens the Exit-and-Save box directly without drawing the menu [O, matches capture
   `tandy/13`];
-* commands 1..3 (F1..F3 or a click on a title): `g_uiMode |= 0x40`, DS:90fc = −1, DS:9111 = 0
+* commands 1..3 (F1..F3 or a click on a title): `g_uiMode = 0x40`, DS:90fc = −1, DS:9111 = 0
   (`Menu_Update` then opens menu `cmd−1`).
 
 ### 2.4 Redraw protocol and screen painters
@@ -162,7 +163,7 @@ went down), +7 (held) or +8 (released) [O 4a85:0130].
 |---|---|---|
 | `Gfx_FillRect` 1000:169b | SI x1, DI y1, CX x2, DX y2 (bytes, inclusive), AL fill byte | every byte of the rectangle = AL; CGA translates through 2005:7E00; adds a dirty rectangle when DS:37ae bit 0 |
 | `Gfx_ReplaceColorRect` 1000:176c | SI, DI, CX, DX as above, AX "from" colour word, BX "to" colour word | per pixel: if the pixel equals the "from" colour it becomes the "to" colour. Not an XOR. Highlights call it three times to exchange two colours through a temporary (colour 3) |
-| `Font_DrawChar` 1000:2180 | AX colour word (1 = measure only), BX x bytes, CX y, DX glyph code | draws the glyph's 1-bpp rows (whole bytes of 8 pixels from x·2) with set bits in the colour and clear bits leaving the background; returns `width >> 1` (advance in bytes, glyph width from the font, `fmt_graphics.md` §6) |
+| `Font_DrawChar` 1000:2180 | AX colour word (1 = measure only), BX x bytes, CX y, DX glyph code | draws the glyph's 1-bpp rows (whole bytes of 8 pixels from x·2) with set bits in the colour and clear bits leaving the background; returns `width >> 1` (advance in bytes, glyph width from the font, `fmt_graphics.md` §6). Exact [O wave 2]: the buffer is addressed linearly, so a glyph running past byte 159 continues at the start of the next row; within each 4-pixel word, pixels 0/1 (the first byte) take the colour word's **low-byte** nibbles (high, low) and pixels 2/3 its **high-byte** nibbles |
 | `Sprite_GetHeader` 1000:2159 / `Sprite_Draw` 1000:1b8d | AX = frame·2; BX x bytes, CX y, AL flags (0 opaque with hotspot, 0x40 masked colour 0 transparent, 0x20 mirror, 0x80 no hotspot) | `fmt_graphics.md` §5.3. Status-bar, panel and title frames have absolute positions in their hotspot and are drawn at (0,0) |
 | `Tile_DrawColumn` 1000:19cf | BX map pointer, SI x bytes, DI y top, DX y bottom | one 8-px tile column of the loaded PAN picture; `Screen_DrawBackdrop` (47c7:042d) and the title call it 40 times (x 0..0x9C step 4, map pointer += 0x32) to draw OPENING.PAN full screen |
 
@@ -248,8 +249,10 @@ w = Text_Width(title) + 0x18                   # DS:931e, box width in bytes
 for each line of text (split at NUL, CR or LF):
     lw = sum of advances of every byte of the line (control bytes included) + 0x0F
     w = max(w, lw)
+    # lines are counted by their terminators (CR, LF and the final NUL): "a" CR LF is 3 lines,
+    # "a" is 1, an empty text 0 [O wave 2]
 w = max(w, 0x5C if type == 3 else 0x4B)
-h = lines*12 + 0x0F
+h = lines*12 + 0x0F                            # lines as counted above
 if title: h += 0x0E
 if type in (1, 3): h += 0x0C
 if type != 7: h += 0x13
@@ -567,7 +570,10 @@ if slowCpu and video type is Tandy (3) or CGA (2): g_musicOn = 0; Music_Stop(); 
 restore DS:5b3c; g_quit = 1, then 0; g_uiMode = 0; DS:63ba = 0; Anim_InitSlots()
 ```
 
-(The title music keeps playing into the sign-in but no longer loops.) `Game_Tick` keeps running
+The title music does **not** continue into the sign-in: `g_lastUiMode` DS:9300 is BSS (0) and is
+never written during the title, so on the first main-loop frame (`g_uiMode` = 8) `Sound_SyncState`
+sees a change and pauses the music (DS:37ce = 0, `Sfx_Stop`, `Sound_SilenceAll`); the audio of
+`avi/ega_signin_idle.avi` is all zero [O wave 2]. `Game_Tick` keeps running
 in the background; with `g_uiMode` = 0x80 it also runs the player/elf/cell updates (130f:0173),
 which the walk-off animation uses [O; behaviour of those updates: player spec].
 
@@ -816,7 +822,7 @@ every game (`Game_End`). No write at level changes or on the title [O, matches R
 | +0x162 | `g_gamesPlayed` | same |
 | +0x164 | `g_shownTreasure` | same |
 | +0x166 | u16 = sign-extended `g_castleLayout` (DS:8f9e) | low byte only |
-| header byte 1 (DS:ba15) | = DS:929f | DS:929f = header byte 1 |
+| header bytes 1-2 (u16 DS:ba15) | = DS:929f (word move 47c7:0f80) | DS:929f = header word (47c7:0de0) |
 
 Fields used in place through the pointers of 9.7 (no copy): name, +0x09, +0x0A, +0x0C history,
 +0x66 slots, +0x78 masks, +0x81 clue words, +0x8A collected, +0x130, +0x133, +0x13F. `Game_Restore`
@@ -1167,8 +1173,10 @@ in scene 4, so this screen has no HUD or menu titles.
 
 ## 12. Sound triggers (whole program)
 
-Effects (`Sfx_Play(id)` 491b:06d7; lower id has priority, a playing effect is only replaced by an
-equal or lower id) and their triggers [O, call sites from `sndcalls.py`, script opcodes −5 from
+Effects (`Sfx_Play(id)` 491b:06d7; on the speaker and AdLib a lower id has priority, a playing
+effect is only replaced by an equal or lower id; **on the Tandy and the PS/1 there is no
+priority**: `Sfx_Play` first calls `Sfx_Stop`, which resets the current id to 0xFFFF, so any effect
+replaces any other [O wave 2]) and their triggers [O, call sites from `sndcalls.py`, script opcodes −5 from
 `animsfx.py`]:
 
 | Effect | Triggers |
@@ -1513,3 +1521,81 @@ use the virtual PIT of the DOS runtime.
    by the end-sequence cells, so probably not) [I].
 4. What DS:913f (set by `Game_Start` and the hints option, read by `Hints_Update` 49a6:004f)
    controls exactly: hints spec.
+
+---
+
+## Wave 3 corrections
+
+Found while porting this document's modules (`src/dos/game/ui.cpp`, `title.cpp`, `signin.cpp`,
+`quiz.cpp`, `hud.cpp`) and checking them against the captures:
+
+* **§8.2 phase 0 zeroes slot 1's x, y and z**, not "x/y/frame": DS:8FEC, 8FEE, 8FF0 are slot 1
+  (DS:8FD6 + 22) +0, +2, +4; its frame word is DS:8FF2 (the one `TitleStep_WaitWalkoff` sets to
+  −1) [O 4ba4:0045, slot layout `code_player.md` §3.1].
+* **§4.5 types 4, 5 and 7 leave the zone count alone**: `Box_SetupInput` rewrites zone 0 (and its
+  release command) and nothing else for them, so the count of the context stays what it was [O
+  43cb:12cf]. Type 0 takes its count from DS:5C83[`g_menuOpen`], so `g_menuOpen` must be set
+  before `MsgBox_Draw` (Menu_Update does).
+* **§4.5 key entries past a smaller count keep their bytes**: a help page sets the dialog key count
+  to 9 and leaves entries 10 and 11 (lower-case y, n) in memory; the next Yes/No box sets the count
+  back to 11 and they work again. Nothing rewrites entries 10 and 11 [O 43cb:12cf; engine: entries
+  that come back are read from the EXE].
+* **§11.1-11.2 the treasure markers are drawn only for `g_level` 0..2 and `g_tier` 0..3** (two
+  nested loops that look for the matching level and tier), and `g_dirty` is incremented only when
+  `g_level` <= 2, markers or not; the marker bit starts at 1 for the matching level [O
+  130f:09f7..0ad8]. On the castle top and in the treasure room (levels 3, 4) the counters draw no
+  markers.
+* **§4.4 / §5.3 the confirm handler runs at the end of the flash on the sign-in boxes too**
+  (dialogs 14..16 through `SignIn_HandleInput`): `Dialog_HandleButtons` -> `Button_Flash` -> handler,
+  then `SignIn_HandleInput`'s game start and `SignIn_Update`'s `g_cmd = -1` [O 47c7:1454, 0f8b].
+  Engine model (ENGINE_MAP §3.4): the four toggles at +0, +18, +36, +54 PIT ticks of the Enter,
+  each presented at once, the handler at +72 (ideal deadlines: the original's busy waits return
+  exactly at them); `ui.h` `uiFlashPending` / `uiFlashContinue`. For Yes/No boxes `Dialog_Update`
+  has already cleared the dialog bit and set DS:922E = 1 before the flash, so during it the game
+  ticks run with `g_uiMode` = 0 (the player can move) while the box stays on screen: the frame loop
+  must not run a frame then (no `Frame_Begin`, no painter).
+* **§9.8 a restore followed by a pack is not the identity for mirror hiding places**: four of the
+  48 hiding places are mirror cells (0x86, 0x87, 0xC0, 0xC1: slots 11, 12, 27, 28 of DS:11AA), and
+  `Game_Restore` runs `Layout_MirrorSharedCells`, which overwrites them with their source cells'
+  picture and content. Every other byte of the reference records round-trips (`USERS_*.DAT`, all
+  named records) [O engine test].
+* **§9.7-9.9 the writes are reproduced byte for byte** [O engine tests `test_dos_signin.cpp`]:
+  - a new player typed as in the EGA run (`a`, `d`, `a`) from the shipped `USERS.DAT` gives
+    `USERS_after_signin_Ada.DAT` (header bytes 1-2, DS:929F, taken from the reference run: the sprite
+    heap of the frames before);
+  - Exit and Save (Yes) from the state `r2/tierb_exitbox` gives `USERS_crafted_tierb_layout.DAT`
+    exactly; from `ega/after_castle` it gives `USERS_after_exit_post_castle_Ada.DAT` except bytes 1
+    (DS:929F) and 695 (record 1 +0x14C, the prompt icon), which changed between the state (the end
+    message still open) and the player's Esc;
+  - `Game_End` from the rank-chest state `r2/end_t6_rankchest` gives the file of the next state
+    `r2/end_t6_clubhouse` except 7 bytes, all in record 1's level (+0x142) and player / camera
+    (+0x14E..+0x154) words: leaving the rank screen moves the player to the clubhouse before the
+    end-of-game hook writes (the header word, the banked coins and nets, the dropped saved game and
+    the games played are equal).
+* **The shifted-A drop is not in the game's code**: the context-4 key list maps 0x1E41 to command
+  65 (DS:7E16 entry 18), `SignIn_HandleInput` and `SignInCmd_NewName` accept 0x41 like any capital
+  (no compare against it, 47c7:1244..129a), and `Kbd_ISR` has no entry for scan 0x1E or 0x2A. The
+  drop seen in the Round 2 keyboard check must come from outside the game (the emulator's key
+  injection) [O code; open]. The engine has no special case; the captures typed with other shifted
+  letters (`r2_kbd_shift_test_*`) are reproduced exactly.
+* **§10.1-10.3 the deal is reproduced against the reference records** [O engine test
+  `test_dos_quiz.cpp`]: `Users_LoadPlayer` + `Game_Start` with the srand value of each layout
+  (found by the elves agent, `test_dos_layout.cpp`) deals Rascal's 9 questions of the shipped file
+  in slot order, and Ada's of her first and second games as sets (her slots were reordered at level
+  changes); the second game plans with the statuses of the first game's history (statuses 1, 2, 3).
+* **Deviations kept as guards** (§10.3, §10.8, §17): `Quiz_PlanStatuses` falls back to the first
+  status with questions left after more fallbacks than the longest chain (3 -> 2 -> 0 -> 1), where
+  the original loops forever; `Quiz_ReorderSlots` fills list entries a 4th missed slot leaves unset
+  with the slots left out; `Quiz_TierHasWork` returns "promote" for an empty range instead of
+  dividing by zero; text and answer copies are bounded by their buffers. None is reachable with
+  V 1.0's data.
+* **Round 2 mouse-help captures** (REFERENCE_CAPTURES R2.2): `r2_ui_help_mouse_p1` is page 0, `_p2`
+  and `_after_pgdn` page 1 (PgDn on page 0), `_next` page 2, `_next2` page 3, `_next3` the Help
+  drop-down reopened after Done, and `_p2_after_pgup` page 0 again (PgUp on page 1) [O 0 px each].
+* **Verification with the engine's modules**: 64 renders driven through the module functions
+  (title and story pages, the series page, the sign-in in every sub-state and box of Round 1 and 2,
+  the drop-downs, the Yes/No boxes incl. Start Over, New Player Hints and Sound, all help pages of
+  the four topics, the quiz question and right answer, the HUD clue box and status bar) equal the
+  captures in every pixel (`extracted/scratch/dos_w3_ui/verify.py`; the test stores their hashes).
+  The boxes of the Round 2 captures open with hints No, music Yes, sound Yes (the player's
+  settings that `Game_Start` copied into DS:5A32/5A42/5A52).

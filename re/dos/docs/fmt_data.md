@@ -144,9 +144,11 @@ Windows at 80 %. Note: `fmt_othr_puzzles.md` numbers the Windows history states
 DS:ba14 (`47c7:0514`), written whole (`47c7:055a`, retried until no critical error). The
 current player's record pointer is DS:9228; `47c7:09dd` derives the field pointers below.
 
-**Header**: byte 0 and byte 2 are never referenced individually; byte 1 (DS:ba15) is copied
-to DS:929f at load (`47c7:0c62`) and back at save (`47c7:0e0e`). DS:929f is raised in the
-animation code `4306:0022` [inf: a high-water mark]. The shipped file has `00 A1 05`.
+**Header**: byte 0 is never referenced; **bytes 1-2 are one u16**, the word `g_saveHeapHigh`
+DS:929f: `Game_Restore` loads it with a word move (47c7:0de0 `MOV AX,[ba15]; MOV [929f],AX`) and
+`Users_Pack` stores it back (47c7:0f80 `MOV AX,[929f]; MOV [ba15],AX`) [O]. DS:929f is the
+sprite save-heap end kept by `Sprites_DrawSorted` (4306:0664, `code_player.md` §3.5). The shipped
+file has `00 A1 05` (DS:929f = 0x05A1).
 
 **Record** (field names marked * are inferred from use):
 
@@ -163,7 +165,7 @@ animation code `4306:0022` [inf: a high-water mark]. The shipped file has `00 A1
 | 0x0BA | 1 | unused | – | |
 | 0x0BB | 57 | spot table A*: bytes ↔ u16 array DS:0caa via index tables DS:11aa (48) and DS:120a (9) | DS:0caa[] | `47c7:0c62` / `47c7:0e0e` |
 | 0x0F4 | 48 | spot table B*: bytes ↔ u16 array DS:0faa via DS:11aa | DS:0faa[] | same |
-| 0x124 | 12 | 6 × u16 into the u16 array at DS:1225, elements {1,2,5,6,9,10} (DS:62ab/62b1) | – | same |
+| 0x124 | 12 | 6 × u16 = `g_levelPicData` DS:122e (u16[3][4]) elements {1,2,5,6,9,10} (index lists DS:62ab/62b1): per level the key picture and the unused word | DS:122e[] | same |
 | 0x130 | 3 | zeroed for a new game | ptr DS:9209 | `47c7:0bd6` |
 | 0x133 | 12 | zeroed for a new player | ptr DS:8fb6 | `47c7:0a8b` |
 | 0x13F | 1 | puzzle level (0..3, then 5) | ptr DS:9101 | §2.3 |
@@ -177,8 +179,8 @@ animation code `4306:0022` [inf: a high-water mark]. The shipped file has `00 A1
 | 0x14E..0x155 | 4 × 2 | → DS:37e2, 37e4, 37ea, 37ec (new player 0x140, 0x70, 0xC0, 0)* screen/scroll positions | | `47c7:0a8b` |
 | 0x156 | 2 | → DS:910b, room/scene number | | music choice `43cb:03cb` |
 | 0x158 | 2 | → DS:92a1 (new game 4) | | |
-| 0x15A | 2 | → DS:910f, also written at game end (new player 10) | | `47c7:09a2` |
-| 0x15C | 2 | → DS:9134, also written at game end (new player 5) | | `47c7:09a2` |
+| 0x15A | 2 | banked nets for the next game: written only by `Game_End` (= `g_nets`) and `Users_InitNewPlayer` (10), read only by `Users_LoadPlayer` (→ DS:910f); `Users_Pack`/`Game_Restore` do not touch it | | `47c7:09c2`, `0aad`, `0b3b` |
+| 0x15C | 2 | banked coins: written only by `Game_End` (= `g_coins`) and `Users_InitNewPlayer` (5), read only by `Users_LoadPlayer` (→ DS:9134) | | `47c7:09ce`, `0a9e`, `0b2f` |
 | 0x15E | 2 | music on (DS:63b6) | | loaded by `47c7:0c62`; `47c7:0b19` takes it only while DS:63b6 ≠ 0 |
 | 0x160 | 2 | sound on (DS:63b4) | | as 0x15E |
 | 0x162 | 2 | games played (DS:926e), +1 at game end | | `47c7:09a2` |

@@ -165,6 +165,19 @@ dos::DosOptions resolveDosOptions(const LaunchOptions& o, const save::EngineSett
     d.prefDir = prefDir;
     d.verbose = o.verbose;
     if (isFrameDumpFolder(o.frameDump)) d.frameDumpDir = pathFromUtf8(o.frameDump);
+    // DOS game diagnostics (checked by the parser).
+    if (!o.dosTrace.empty()) d.tracePath = pathFromUtf8(o.dosTrace);
+    for (const std::string& s : o.dosDumpStates) {
+        const size_t colon = s.find(':');
+        d.stateDumps.push_back({std::stoull(s.substr(0, colon)), pathFromUtf8(s.substr(colon + 1))});
+    }
+    if (!o.dosTicks.empty()) d.runTicks = std::stoull(o.dosTicks);
+    d.preview = o.dosPreview;
+    if (!o.dosLayoutSeed.empty()) {
+        const std::string& s = o.dosLayoutSeed;  // checked by the parser
+        const bool hex = s.size() > 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X');
+        d.layoutSeed = static_cast<uint16_t>(std::stoul(hex ? s.substr(2) : s, nullptr, hex ? 16 : 10));
+    }
     return d;
 }
 

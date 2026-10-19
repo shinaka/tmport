@@ -1,4 +1,4 @@
-// Wave 2 preview: replaced by the title/sign-in/game modules in wave 3.
+// Wave 2 preview, kept behind the hidden option --dos-preview (dos_entry.cpp).
 #include "dos/app/dos_preview.h"
 
 #include <optional>

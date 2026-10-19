@@ -48,8 +48,9 @@ USERS.DAT of the wrong size is ignored with a warning (it is only imported).
 
 ### 2.1 What the original does [O]
 
-* PIT channel 0 at 1193181.67 / 5041 = **236.6974 Hz**. Every interrupt: tick counter, sound
-  sequencer. Every 13th: BIOS clock. Every **5th: the game tick, 47.3395 Hz**, run inside the
+* PIT channel 0 at 1193181.67 / 5041 = **236.69543 Hz** (exactly 3579545 / 3 / 5041 Hz). Every
+  interrupt: tick counter, sound sequencer. Every 13th: BIOS clock (18.20734 Hz). Every **5th: the
+  game tick, 47.339086 Hz**, run inside the
   interrupt with a re-entrancy guard (`Timer_ISR` 1000:0428).
 * The main loop runs as fast as the CPU allows. One iteration = one "frame": latch tick-side state
   (`Frame_Begin` 130f:025A, clears the step flag DS:910D), UI updaters, scene load, scroll, search,
@@ -74,7 +75,7 @@ swing 80 ticks, rank chest one row per 4 ticks, attract page 7200 PIT ticks.
 ### 2.3 Engine model [R]
 
 ```
-host clock (ns) --> virtual PIT accumulator (236.6974 Hz)
+host clock (ns) --> virtual PIT accumulator (236.69543 Hz = 3579545 / 3 / 5041)
                      |-- every PIT tick: sound sequencer (or run it in the audio callback by
                      |                   sample count, fmt_sound.md §9)
                      '-- every 5th PIT tick: one ORIGINAL FRAME STEP:
@@ -100,7 +101,7 @@ presentation: at each display refresh, show the newest completed back buffer (32
   | search blink and reveal, 37 frames | 0.78 s (0.79 s) | keep per frame |
   | HUD coin count-up, 1 coin per frame + effect 4 | 21 ms per coin (13.1 ms) | default: 76 coins/s from an "original frame clock"; option: 1 per frame |
   | CHAMPION flash, 800 frames, toggle every 80 | 16.9 s (0.7-0.9 s) | default: ~914 flash frames/s (≈ 87 ms per phase); option: 1 per frame |
-  | dissolve, 350 cells in one frame | instant | spread over 127 ms (6 display frames at 47 Hz, ~58 cells each); keep its 700 rand() calls |
+  | dissolve, 350 cells in one frame | instant | spread over 127 ms (about 6 frames at 47 Hz, ~58 cells each; 127 ms = 6.01 game ticks, so at the exact rates the last cell lands in a **7th** lockstep frame, wave 2); keep its 700 rand() calls |
   | title sparkle attempts, chance 1/128 per frame | 0.37/s | see `code_ui.md` (DOSBox-X: ~1690 attempts/s on idle pages) |
   | UI updaters | per frame | per frame (invisible) |
 
@@ -125,6 +126,9 @@ returns bits 16..30 of seed = seed * 0x015A4E35 + 1): `srand` is only called by 
 for a new game, so everything before it (title sparkles, a dissolve, the elves of a resumed game)
 runs on the unseeded sequence (`src/rtl/borland_rand` is the same LCG). The seed can be read out of
 any DOSBox-X save state (`savmem.py peek STATE 8f48 4`) to check the engine's sequence.
+On the AdLib device every `Music_Play` with the music on draws one `rand()` (4ac9:0002: the
+orchestration `4·tune + (rand() & 3)`), so the sound device changes the random sequence;
+`DosAudioDevice::musicPlay` draws it from the game's generator (wave 2).
 
 ---
 
@@ -133,7 +137,7 @@ any DOSBox-X save state (`savmem.py peek STATE 8f48 4`) to check the engine's se
 | Option (engine) | Original | Values | Default [R] |
 |---|---|---|---|
 | `look` | `-E` / `-C` / `-T` / `-M` / `-H` | `ega` (also Tandy: identical pixels), `cga` (4-colour dither), `tandy`, `mcga` (softer palette), `hercules` = CGA path | `ega` |
-| `sound` | `-Si` / `-St` / `-Sa` (`-Ss` = AdLib) | `speaker` (SFX.IBM + TUNES.IBM), `tandy` (SFX.TAN + TUNES.TAN on SN76496), `adlib` (TUNES.TAN on OPL2, effects SFX.IBM on the speaker) | `tandy` or `speaker` until an OPL2 core exists; the DOSBox-X reference machine was AdLib |
+| `sound` | `-Si` / `-St` / `-Sa` (`-Ss` = AdLib) | `speaker` (SFX.IBM + TUNES.IBM), `tandy` (SFX.TAN + TUNES.TAN on SN76496), `adlib` (TUNES.TAN on OPL2, effects SFX.IBM on the speaker; every `Music_Play` with music on draws one `rand()`, §2.4), `off` (engine only) | `tandy` (implemented in wave 2) until an OPL2 core exists; the DOSBox-X reference machine was AdLib |
 | `slow_cpu` | `-X` (toggles the 8086 detection) | off / on: 7 elves processed, scroll and the player's scroll step doubled with rows 112..143 not scrolled, search shortened by 32 frames, CHAMPION timer −4 per frame, Esc opens the Exit box directly | off |
 | `music`, `sound effects` | per player (USERS.DAT +0x15E/+0x160), Ctrl+S toggles both | | from the save |
 | `frame_speed` | — (CPU speed) | `reference` (DOSBox-X per-frame rates, §2.3) / `period` (one step per original frame) | `reference` |
@@ -141,6 +145,12 @@ any DOSBox-X save state (`savmem.py peek STATE 8f48 4`) to check the engine's se
 The PS/1 audio card (device 3) is a Tandy PSG on another port: no separate option. Only the second
 character of a switch counts and switches are separate arguments; the engine may accept them on its
 command line for familiarity (`--dos-args "-T -St"`).
+
+As implemented in wave 2 (`edition/dos_options.h`): defaults look `ega`, sound **`tandy`**, slow CPU
+off, frame speed `reference`; precedence defaults < `tmport.ini` [dos] < `--dos-args` (the switches
+in order) < `--look` / `--sound` / `--slow-cpu` / `--frame-speed`. `-H` (Hercules) gives the CGA look;
+`-X` toggles the value it finds (the ini value), while `--slow-cpu` forces slow-CPU mode on after
+`--dos-args`.
 
 ---
 
@@ -152,8 +162,10 @@ command line for familiarity (`--dos-args "-T -St"`).
   Tandy arrow codes only on a Tandy), and a **BIOS-style queue** of 16-bit key codes
   (scan << 8 | ASCII) fed by key down and by **typematic repeats** for menus, dialogs, quiz and name
   entry. `Input_Poll` consumes one code per game tick.
-* Synthesise typematic repeats in the engine (DOSBox-X: first repeat after ~500 ms, then ~30/s; only
-  the last key pressed repeats). They matter for play too: the terrain clears held bits it forbids
+* Synthesise typematic repeats in the engine (DOSBox-X: first repeat **500 ms** after the press,
+  then exactly every **33 ms** (30.3/s, one per 1.562 game ticks); only the last key pressed
+  repeats). These two values reproduce the key bits of every r2 per-tick log with 0 mismatches
+  (wave 2, `dos/input/keyboard.h` KeyboardOptions). They matter for play too: the terrain clears held bits it forbids
   every tick and only a repeat sets them again (holding Left against a wall, walking off a ladder).
   "Up then Right" does not jump; "Right then Up" does.
 * Mouse: logical coordinates x 0..159 (2-px units), y 0..199; zones per input context (DS:80DB);
@@ -173,8 +185,8 @@ command line for familiarity (`--dos-args "-T -St"`).
   Nothing is written at level changes or while playing.
 * Not saved (rebuilt on resume): elf positions, the RNG state, the bonus-coin picture, hint flags.
   A resumed game continues on the unseeded rand sequence of the new session (§2.4).
-* Header byte 1 (DS:929F) is raised by the animation code [I high-water mark]; keep the value round
-  trip.
+* Header bytes 1-2 are the u16 DS:929F (`g_saveHeapHigh`, the sprite save-heap end of
+  `Sprites_DrawSorted`; word moves 47c7:0de0 / 0f80) [O]; keep the value round trip.
 
 ---
 
@@ -190,8 +202,11 @@ Keep (they change what the player sees or how the game plays):
   one row per 4 ticks; search length in frames;
 * the dissolve's 700 rand() calls (they shift the random sequence of everything after a transition);
 * hint "seconds" of 60 ticks (1.27 s), paused and phase-shifted by UI modes;
-* music frozen while an effect plays (speaker/Tandy), effect priority by id (`fmt_sound.md`);
-* Esc in play opens the Exit-and-Save box; the shifted-A drop in name entry (`code_ui.md`).
+* music frozen while an effect plays (speaker/Tandy), effect priority by id on the speaker and
+  AdLib (`fmt_sound.md`); on the Tandy/PS/1 there is no priority (`Sfx_Play` 491b:06d7 calls
+  `Sfx_Stop` first, which resets the id to 0xFFFF, so any effect replaces any other);
+* Esc in play opens the Exit-and-Save box. (The shifted-A drop seen in name entry is not in the
+  game's code, so the engine has none: `code_ui.md`, Wave 3 corrections.)
 
 Make optional:
 * slow-CPU mode (`-X`) with its scroll tear;
@@ -229,5 +244,6 @@ Drop:
 * Which per-frame speed users prefer (`reference` vs `period`) — decide after seeing both in the
   engine.
 * The title sparkle rate under lockstep (owner: `code_ui.md`).
-* Exact DOSBox-X keyboard repeat parameters (measured 500 ms / ~31 ms; a host keyboard's own repeat
+* ~~Exact DOSBox-X keyboard repeat parameters~~ — answered in wave 2: 500 ms delay, then exactly
+  33 ms per repeat reproduce the r2 logs with 0 mismatches (§4). (A host keyboard's own repeat
   rate must not leak into the game).

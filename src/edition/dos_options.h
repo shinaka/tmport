@@ -63,6 +63,17 @@ struct DosOptions {
     // runtime writes a PNG of each screen it shows there (and, headless, the sound as a WAV) instead
     // of the start-up writing one canvas at the end.
     std::filesystem::path frameDumpDir;
+    // Diagnostics of the game (dos/game/trace.h; owner: wave 3 mainloop):
+    std::filesystem::path tracePath;  // --dos-trace <csv>: one row per game tick
+    struct StateDump {
+        uint64_t tick = 0;            // after this game tick and its frame
+        std::filesystem::path file;   // DGROUP image (+ ".fields.tsv")
+        bool operator==(const StateDump&) const = default;
+    };
+    std::vector<StateDump> stateDumps;  // --dos-dump-state <tick>:<file> (repeatable)
+    uint64_t runTicks = 0;              // --dos-ticks <n>: a headless run lasts at least n game ticks
+    bool preview = false;               // --dos-preview (hidden): the wave-2 screen preview instead of the game
+    std::optional<uint16_t> layoutSeed; // --dos-layout-seed <n>: Layout_Generate's srand value instead of time()
 
     bool operator==(const DosOptions&) const = default;
 };

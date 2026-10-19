@@ -94,7 +94,7 @@ public:
     bool soundOn() const { return soundOn_; }
     bool musicOn() const { return musicOn_; }
     void setMusicLoop(bool on) { musicLoop_ = on; }  // DS:63ba (set by the title and the scene loader)
-    void setSfxLoop(bool on) { sfxLoop_ = on; }      // DS:63b8 (never set by the game)
+    void setSfxLoop(bool on) { sfxLoop_ = on; }      // DS:63b8 (set by the end sequence, player states 44/45/64/65)
     // DS:37ce: 0xFFFF while g_uiMode == 0, 0 while a menu or box is open (Sound_SyncState 43cb:046e).
     void setMusicGate(uint16_t mask) { musicGate_ = mask; }
     void setMusicPaused(bool paused) { musicGate_ = paused ? 0 : 0xFFFF; }

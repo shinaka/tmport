@@ -8,11 +8,14 @@
 // quit), runs its frame loop (host.pump() per frame, host.presenter().presentFrame(rgba) per
 // finished 320x200 frame, the 32-bit RGBA convention of gfx/presenter.h) and returns the process
 // exit code (0 = normal end). With options.headless there is no window: the run ends when the
-// --keys script is used up. The start-up writes --frame-dump from the host's canvas afterwards
-// (a frame-dump folder, DosOptions::frameDumpDir, is filled by the runtime instead).
+// --keys script is used up (and --dos-ticks have run), or when the game quits. The start-up writes
+// --frame-dump from the host's canvas afterwards (a frame-dump folder, DosOptions::frameDumpDir, is
+// filled by the runtime instead: the last frame of each screen and the final one).
 //
-// Implemented in dos_entry.cpp. Wave 2 preview: the composed screens with their music and effects
-// (dos_preview.h); replaced by the title/sign-in/game modules in wave 3.
+// Implemented in dos_entry.cpp: the game (dos/game/game.h; main_loop.h mainStart), the saves in the
+// preference folder (dos_users.dat), the sound driver, the per-tick trace and DGROUP dumps
+// (dos/game/trace.h). DosOptions::preview (the hidden --dos-preview) runs the wave-2 screen preview
+// (dos_preview.h) instead.
 
 #include <filesystem>
 

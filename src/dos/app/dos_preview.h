@@ -1,5 +1,6 @@
 #pragma once
-// Wave 2 preview: replaced by the title/sign-in/game modules in wave 3.
+// Wave 2 preview, kept behind the hidden option --dos-preview (dos_entry.cpp); the game itself is
+// dos/game/ (wave 3).
 //
 // What the 1990 DOS edition shows until its game logic exists: the screens that the composer of
 // dos/gfx/dos_screens.h rebuilds pixel for pixel from the user's files, one after the other, with

@@ -85,9 +85,8 @@ Without `--data` the engine uses the environment variable `TM_DATA`. Without tha
 the current directory and the executable's directory (and their parents) for a `TMTWINCD`
 folder, or a single `.cue`/`.iso` file. File names are matched case-insensitively.
 
-**The 1990 DOS edition** (`SST.EXE` V 1.0, still being built: for now the engine checks every
-file and starts a preview of the screens and sound that work, see the README's "DOS edition (in
-progress)") is played from its own folder, the one
+**The 1990 DOS edition** (`SST.EXE` V 1.0, see the README's "DOS edition") is played from its own
+folder, the one
 holding `SST.EXE`, `SPRITES.PAK`, `ALL_PUZS` and the other `.PAK`/`.PAN` files. `--data` may point
 at that folder, at `SST.EXE`, or at a folder that contains it. The edition is detected from the
 files: `TMTWINCD.EXE` or a CD image means the Windows CD edition, `SST.EXE` the DOS edition (an
@@ -98,7 +97,7 @@ the engine stops with a message that names both.
 
 | Edition chosen | Where the data path comes from, in order |
 |---|---|
-| none (detect) | `--data`, `TM_DATA`, `[engine] data`, the Windows auto-detection above; then `TM_DATA_DOS`, `[dos] data`, a folder with `SST.EXE` next to the executable or the current directory (or one of their parents, or a subfolder of one of them). While the DOS edition is in development the Windows edition wins when both are found this way |
+| none (detect) | `--data`, `TM_DATA`, `[engine] data`, the Windows auto-detection above; then `TM_DATA_DOS`, `[dos] data`, a folder with `SST.EXE` next to the executable or the current directory (or one of their parents, or a subfolder of one of them). When both are found this way the Windows edition wins |
 | `--edition win` | `--data`, `TM_DATA`, `[engine] data`, the Windows auto-detection |
 | `--edition dos` | `--data`, `TM_DATA_DOS`, `[dos] data`, the DOS auto-detection |
 
@@ -196,6 +195,10 @@ Game options (any other argument selects the command-line tools below; `tmport -
 | `--headless` | no window, no message boxes, no sound (automation); errors go to stderr; the run ends when the `--keys` script is used up |
 | `--keys <script>` | scripted input: comma-separated steps `enter`, `esc`, `space`, arrows, `f1`..`f12`, `alt`, letters/digits, `alt+o`/`ctrl+s`/`shift+a`, `click:<x>:<y>`, `move:<x>:<y>` (canvas coordinates), `wait:<ms>`, `shot:<file.png>` (writes the 640x480 canvas), `quit`. The DOS edition counts in game ticks (47.34 per second): items `TICK:down:KEY`, `TICK:up:KEY`, `TICK:tap:KEY[:N]`, `TICK:move:X:Y`, `TICK:click:X:Y`, `TICK:buttons:MASK` (`+N` = N ticks after the previous item; keys `enter`, `esc`, `space`, `up`, `kp8`, `lctrl`, `a`, `5`, `minus`, ...), e.g. `--keys "50:tap:enter, +50:tap:enter, +10:tap:3"` |
 | `--frame-dump <png>` | writes the 640x480 canvas when the game ends (the DOS edition: its 320x200 canvas). DOS edition: a folder (an existing one, or a name without an extension) receives a PNG of every screen shown, `NN_<screen>_<look>.png`, and with `--headless` the sound of the run as `sound.wav` |
+| `--dos-trace <csv>` | DOS edition: one CSV row per game tick (player, camera, state, keys, coins, nets, level, scene, UI mode, area and the events of the tick) |
+| `--dos-dump-state <tick>:<file>` | DOS edition, repeatable: after that game tick, the game state in the original's memory layout (DGROUP, 52 256 bytes), `<file>.fields.tsv` naming its fields, and `<file>.png`, the picture shown |
+| `--dos-ticks <n>` | DOS edition with `--headless`: run at least n game ticks (otherwise the run ends when the `--keys` script is used up and a flash or dissolve it started has ended) |
+| `--dos-layout-seed <n>` | DOS edition: new games take their layout from this srand value (0..65535, decimal or `0x` hex) instead of the clock, so scripted runs repeat exactly |
 | `--mods <dir>`, `--no-mods` | also load this mod folder (repeatable, after the `[mods]` folders of `tmport.ini`) / load no mods at all (`docs/MODDING.md`) |
 | `--play` | accepted and ignored (`tmport --play` = `tmport`) |
 | `--edition win\|dos\|auto` | which edition to play when the data holds both (default: `edition =` in `[engine]` of `tmport.ini`, else detected; see "Pointing the engine at the game data") |
@@ -415,7 +418,7 @@ build\tmtests.exe
   is not set; the data-free tests (PNG writer, CRC/Adler, RUND codec, frame buffer primitives,
   palette, Borland RNG, id routing, icon decoder, ...) always run. This is what CI runs.
 * The tests of the 1990 DOS edition (file checks, decoders, screens, sound, input, saves, the
-  runtime and the preview) read the DOS folder from `TM_DATA_DOS` (the folder with `SST.EXE`) and
+  runtime, the preview, the game logic and two end-to-end playthroughs) read the DOS folder from `TM_DATA_DOS` (the folder with `SST.EXE`) and
   skip themselves without it. They too store only sizes, counts and hashes.
 * No test opens a window or plays sound. The app-area tests write their PNGs (the decoded window
   icon, scripted-run screenshots) to a temporary folder; set `TM_APP_SHOTS=<folder>` to keep them.

@@ -133,6 +133,7 @@ void DosAudioDevice::applyPending() {
             case Command::Kind::MusicOn: s.setMusicOn(c.a != 0); break;
             case Command::Kind::MusicPaused: s.setMusicPaused(c.a != 0); break;
             case Command::Kind::MusicLoop: s.setMusicLoop(c.a != 0); break;
+            case Command::Kind::SfxLoop: s.setSfxLoop(c.a != 0); break;
         }
     }
 }
@@ -144,6 +145,7 @@ void DosAudioDevice::silenceAll() { push({Command::Kind::SilenceAll}); }
 void DosAudioDevice::setSoundOn(bool on) { push({Command::Kind::SoundOn, on ? 1 : 0}); }
 void DosAudioDevice::setMusicPaused(bool paused) { push({Command::Kind::MusicPaused, paused ? 1 : 0}); }
 void DosAudioDevice::setMusicLoop(bool on) { push({Command::Kind::MusicLoop, on ? 1 : 0}); }
+void DosAudioDevice::setSfxLoop(bool on) { push({Command::Kind::SfxLoop, on ? 1 : 0}); }
 
 void DosAudioDevice::setMusicOn(bool on) {
     musicOnMirror_ = on;

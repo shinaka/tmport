@@ -1235,9 +1235,12 @@ Returns if `g_uiMode != 0` or DS:922E != 0 [O]. Horizontal part, when `37F2 != 9
 5. `Tile_DrawColumn(SI = x, DI = 0x10, DX = b, BX = off, CX = map)`.
 6. If `g_slowScroll == 1`: second column: `off += 0x20`; if `off >= 0x200` (u):
    `map = map of cell c+1`, `off = 0` (the row offset is dropped — harmless because the slow CPU
-   only scrolls horizontally with `camY` cell-aligned [I]); `x += 4`; `Tile_DrawColumn` again.
+   only scrolls horizontally with `camY` cell-aligned [I]); `x += 4`; `Tile_DrawColumn(SI = x,
+   DI = 0x10, DX = b)` again — with the **first piece's bottom b** [O wave 2].
 7. If `r != 0` (lower part from the next cell row): `Tile_DrawColumn(SI = x, DI = b + 1,
-   DX = 0x8F, BX = off - 920F, CX = map of cell c + 0x10)`.
+   DX = 0x8F, BX = off - 920F, CX = map of cell c + 0x10)`. x is the current x, i.e. **x + 4**
+   when step 6 drew a second column (`g_slowScroll` = 1 with `g_slowCpu` = 0, e.g. after a ladder
+   jump cleared `g_slowCpu`) [O wave 2].
 8. `9297 = 37F2`, `9299 = 920D`, `9270 = 9124`; `g_dirty++`.
 
 Vertical part, when `37F4 != 929B` and `37F8 != 0` and (`920F != 929D` or `9126 != 9272`):
@@ -1297,15 +1300,17 @@ set, calls `Dirty_AddRect(AX = DS:3082, BX = DS:3084, CX = DS:3080, DX = DS:307E
 
 | Routine | In | Does |
 |---|---|---|
-| `Dirty_AddRect` 1000:1181 | AX x (bytes), BX y, CX height, DX width (bytes) | marks the rectangle dirty (row pairs, even byte bounds; gfx doc) |
+| `Dirty_AddRect` 1000:1181 | AX x (bytes), BX y, CX height, DX width (bytes) | marks the rectangle dirty, exactly [O wave 2]: `y &= ~1`; row pairs = `h/2 + ((h \| y) & 1)` (y before the rounding); an odd x adds 1 to the width, the width is rounded up to even, and the span is `[x & 0xFE, (x & 0xFE) + width)` |
 | `Scroll_Setup` 1000:1934 (near) | DI top, DX bottom | DS:3082 = 2, DS:307E = 0x9C, DS:3084 = DI, DS:3080 = AX = DX − DI + 1; CL = video type, CH = `g_slowScroll`; ES = DS = back buffer; BX = DX = row address of DI |
 | `Scroll_PlayfieldLeft` 1000:18b3 | DI, DX | content moves left (camera right): each row, bytes 6..0x9D → 2..0x99 (slow: 0x0A..0x9D → 2..0x95); CGA 3..0x4E → 1..0x4C (slow 5.. → 1..) |
 | `Scroll_PlayfieldRight` 1000:196d | DI, DX | content moves right: bytes 2..0x99 → 6..0x9D, copied backwards (slow: 0x4C words from 0x94 down, i.e. bytes −2..0x95 → 6..0x9D; the extra word at 6..7 comes from the row above and is overwritten by the second new column) |
 | `Scroll_PlayfieldUp` 1000:1a86 | DI, DX | content moves up 8 rows (slow 16): rows DI+8..DX → DI.., bytes 2..0x9D (CGA 1..0x4E) |
-| `Scroll_PlayfieldDown` 1000:1aef | DI, DX | content moves down 8 rows (slow 16), copied from the bottom up |
+| `Scroll_PlayfieldDown` 1000:1aef | DI, DX | content moves down 8 rows (slow 16), copied from the bottom up; its dirty rectangle is x 0, width 0xA0 (the other three scrolls use x 2, width 0x9C) [O wave 2] |
 | `Tile_DrawColumn` 1000:19cf | SI x, DI top, DX bottom, BX map byte offset, CX map paragraph | from map word `CX:BX` downwards, copy each 8 × 8 tile (32 bytes at paragraph `tileseg + word`) row by row (4 bytes per row) into x, rows DI..DX; stops after DX − DI + 1 rows, even inside a tile |
 
-The scroll routines leave the uncovered strip unchanged; `Scroll_Update` fills it.
+The scroll routines leave the uncovered strip unchanged; `Scroll_Update` fills it. A zero or
+negative row/byte count in `Gfx_FillRect`, `Tile_DrawColumn` and the scroll routines would loop
+65536 times (16-bit counters); no caller passes one [O wave 2].
 
 ---
 
@@ -1595,3 +1600,66 @@ Scroll_Setup, 196d Scroll_PlayfieldRight, 19cf Tile_DrawColumn, 1a86 Scroll_Play
 Scroll_PlayfieldDown.
 
 **18cf (camera parts):** 15f0 Player_Move (camera), 17c9 Obj_WrapWorldX.
+
+---
+
+## Wave 3 corrections
+
+Found while porting `cells.c`, `cells2.c` (world part), `scene.c` and the camera glue to
+`src/dos/game/` (cells, cells2, scene, camera) and checking them against the disassembly and the
+DOSBox-X save states [O unless marked]:
+
+1. **`Cell_P63_V63_CastleTop` calls `Castle_CreatureHitCheck` only for the exit picture 0x32.** The
+   branches of pictures 0x31 (1568:1ac7), 0x2D (1568:1b0b), 0x25 (1568:1b37) and every other picture
+   (1568:1b47) jump to the column test at 1568:1c4c, past the call at 1568:1c48. §6.8 step 3 ("all
+   pictures") is wrong; a strike pending while the player climbs a top-row ladder stays pending until
+   he is in a cell that tests it (type 56, 57, or 63 with picture 0x32). `Cell_P57_V57_CastleWall`
+   does call it for every picture.
+2. **`Cells_UpdateVisible` advances `g_cellScreenX` after the first three calls only** (1568:1f79,
+   1f8d, 1fa1); after the loop it is the first cell's x + 0xC0, not + 0x100.
+3. **`Playfield_Redraw`'s column loop is a do-while** (130f:03ea..0456): the first tile column of each
+   row is drawn before `x < x1` (u) is tested. Tile columns address the back buffer linearly (row y
+   at `0x10 + y·0xA0`), so an x past 0x9F would land in the next row. Neither matters for the
+   cameras of the game (the partial redraw keeps x0 below 0x9E); the engine reproduces both.
+4. **The chute in the `castle_top` save state shows rows 5–6** (camera (0x600, 0x2B0)), i.e. CLOSE's
+   own blocks 3/4 under 5D/6D; the stale MOUNT3 blocks 0x2A/0x43 of 3D/4D are on screen only while
+   the camera is above y 0x280 (the first frames of the fall, e.g. AVI frame 1221 at (0x600, 0x188)).
+   Both are the same stone shaft, so a capture cannot tell the two apart by appearance; the engine's
+   buffer model (loaded PAN where it wrote, the previous PAN elsewhere) renders frame 1221 with 583 of
+   624 tiles equal, exactly the §6.10 result (the rest under the falling player), and draws cell 3D
+   under CLOSE.PAN byte for byte as MOUNT3 does.
+5. **`Castle_CreatureSpawn` with `g_tier == 0`** (176a:15b3) jumps to the `g_creatureCell ==
+   g_castleCellIdx` branch instead of returning; that branch cannot match there (`g_creatureCell` is
+   0), so §6.8's "return" is equivalent.
+6. **The visible handlers of types 7 and 8 are `Cell_V7` / `Cell_V8` themselves** (DS:09D2 entries 7
+   and 8); the "visible call → `Cell_V7`/`Cell_V8`" branches of `Cell_P7_WallLeft` / `Cell_P8_WallRight`
+   are never reached through the dispatchers (`Cell_GetMask` always sets kind 2).
+7. **Door columns** (§12.4, P34): `Cell_GroundCheckPlayer` fires for any x once the player has risen
+   below 0x68; the column 0x26..0x5A only removes Up/Down on the path line, which is what keeps the
+   look-up rise from starting outside the door (the r1 observation "Up at x 0x560 did nothing").
+8. **The geyser-hole slide ends at (0x740, 0x560)** because `PlrSt_30_SlideDown` gets a non-zero dy
+   only on the ticks the slide script advances: on the ticks in between `Cell_GetMask` re-evaluates
+   the mask at the new y, and at `y & 0x7F == 0x60` in AE (`Cell_P39_V39_GateL1`, key state 4 set by
+   the 1/2 boundary in 8E) the mask loses 0x800 before the next 8-row step. Checked with a
+   per-tick stand-in of the slide against the r2 capture numbers (state 30 at x 0x750, snap to
+   0x740 on the next tick, end (0x740, 0x560) on level 1) [I for the player-side part].
+9. **Save-state back buffers as references.** Between frames the back buffer (segment 2005, at the
+   same relocation as DGROUP) holds only the background; 107 of the save states of
+   `extracted/captures/dos/savestates` in play redraw byte for byte from their DGROUP (camera latched
+   in DS:37F2/37F4, `g_cellPicture`, the loaded scene). Exceptions found: states saved between
+   `Sprites_DrawSorted` and `Sprites_EraseAll` (draw records with bit 15 of the owner word set:
+   sprites in the buffer), the shelf rooms (collected treasures drawn into the background by
+   `ShelfRoom_DrawShelf`) and the rank room (name, rank band and total drawn by `RankChest_Update`);
+   with those areas masked the scenery matches in every state, slow-CPU states in rows 0x10..0x6F.
+10. **Log replays.** Four r2 frame-log runs replay through the engine's modules from the save
+    states they started at, tick for tick in x, y, camera and player state (engine record e = log
+    record e + 1): the level-3 bridge (`fl_l3_at_tree_tier2` → `fl_bridge_l3`, 1395 ticks), the
+    level-2 bridge (`fl_l2_at_nests_tier2` → `fl_bridge_l2`), the geyser hole (`fl_level3_start` →
+    `fl_geyser_slide`) and the mine-tunnel doorway (`fl_l2door` → `fl_l2door_after`). Two timing facts
+    follow: (a) at a level boundary the logs lose 4 or 5 ticks (log gaps of 9–10 ticks instead of 5
+    between two fall steps): the original loads the new PAN from disk with `g_quit` set, which skips
+    whole game ticks; the engine loads instantly and stays that many ticks ahead afterwards (the
+    "Game_Tick overrun" of PORTING_NOTES §6); (b) after the doorway teleport `Player_Update` resumes 8
+    ticks after the teleport tick, i.e. the dissolve occupies the 7 lockstep frames after the frame
+    that latched it — the engine's spread (2755.9 cells/s, the frame clock's dissolve remainder dropped
+    while no dissolve runs) gives exactly that.

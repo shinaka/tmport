@@ -220,10 +220,12 @@ layout (4 voices, u16 each unless noted):
 | 63f6 | active[4] (0 or 2) | 643e | tie state[4] |
 
 Other driver variables: 63a4/63a6 sfx buffer, 63a8/63aa music buffer, 63b4 sound on, 63b6
-music on, 63b8 sfx loop flag (never set), 63ba music loop flag (set to 1 at `1437:0204`,
+music on, 63b8 sfx loop flag (set only by the end sequence: player states 44/45/64/65, `code_player.md` §6.3), 63ba music loop flag (set to 1 at `1437:0204`,
 `4ba4:0469`), 63bc device, 63be voice count, 63c0 1 = processing music, 63c2 block pointer,
 63c6[4] voice-owned-by-effect mask (cleared every tick), 63ac[4] AdLib pitch, 6538/6550
-period tables, 6568 table pointers, 656c port, 656e envelope pointers.
+period tables, 6568 table pointers, 656c port, 656e envelope pointers. DS:6446..6447 lie between
+the 0x78-byte work copy (DS:63ce..6445) and the effect block DS:6448; no use of them was found
+(unexplained, noted in wave 2).
 
 ### 5.2 One tick (`491b:0004`) [obs]
 
@@ -482,7 +484,7 @@ tunes on the speaker and on the Tandy: **30 of 30 WAV files identical, 0 differi
 The engine runs the recording schedule (Music_Stop +100 ticks, effects 0..11 every 600 ticks,
 tunes 0, 1, 2 at +700, +12 900, +17 300, Music_Stop +6 000, music loop flag DS:63ba = 1 as in
 the recorded states) and logs the speaker/PSG state per tick; the recording is aligned by one
-offset (recording sample = A + tick × 48000 / 236.6974).
+offset (recording sample = A + tick × 48000 / 236.69543).
 
 | Check | Speaker | Tandy |
 |---|---|---|

@@ -349,7 +349,7 @@
 4d94:9299	g_drawnTileColOff	u16	Tile column offset of the last drawn play-field
 4d94:929b	g_drawnCamY	u16	Camera y of the last drawn play-field
 4d94:929d	g_drawnTileRowOff	u16	Tile row offset of the last drawn play-field
-4d94:929f	g_saveHeapHigh	u16	High-water mark of the sprite save heap offset; low byte saved as USERS.DAT header byte 1
+4d94:929f	g_saveHeapHigh	u16	Sprite save-heap end offset of Sprites_DrawSorted (4306:0664: set unconditionally while the heap segment DS:37ca != 0, a maximum only with segment 0); the whole word is USERS.DAT header bytes 1-2 (47c7:0de0 / 0f80)
 4d94:92a1	g_shopCoinsOwed	i16	Net-shop price still to pay (4..0, -1 = net taken; record +0x158)
 4d94:92a6	g_rankRowsDone	u16	Rank chest rows drawn so far
 4d94:92a8	g_rankRowsWanted	u16	Rank chest rows to draw (fill value of the next rank pair)

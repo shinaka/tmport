@@ -25,7 +25,7 @@ addresses (file offset `(SSSS-0x1000)*16 + OOOO + 0x21F0` of `SST_unpacked.EXE`)
 DGROUP (segment `4d94`, file offset `0x3FB30 + XXXX`). In DOSBox-X the program is loaded so that
 Ghidra segment S runs at S − 0x7DC (DGROUP at 0x45B8) [O, RAM]; a port never needs this.
 Coordinates: x in **bytes** (2 pixels) where the code uses bytes, y in pixel rows; world
-coordinates in pixels. "Tick" = PIT interrupt (236.70 Hz) unless "game tick" (47.34 Hz) is said.
+coordinates in pixels. "Tick" = PIT interrupt (236.695 Hz) unless "game tick" (47.339 Hz) is said.
 "Frame" = one iteration of the main loop (`main` 130f:0037..00d1), whether or not it presents.
 
 ---
@@ -35,11 +35,11 @@ coordinates in pixels. "Tick" = PIT interrupt (236.70 Hz) unless "game tick" (47
 ### 1.1 Two clocks [O]
 
 ```
- PIT channel 0, divisor 0x13B1 = 5041      1193181.67 / 5041 = 236.6974 Hz   (4.2248 ms)
+ PIT channel 0, divisor 0x13B1 = 5041      1193181.67 / 5041 = 236.69543 Hz  (4.22484 ms)
    every interrupt:        g_ticks DS:3D2B (u32) += 1
                            Sound_Tick 491b:0004 if (music.status & DS:37CE) | sfx.status != 0
-   every 13th interrupt:   chain to the BIOS INT 8 handler (18.2075 Hz, keeps the DOS clock)
-   every 5th interrupt:    Game_Tick 130f:00FE, re-entrancy guarded    47.3395 Hz (21.124 ms)
+   every 13th interrupt:   chain to the BIOS INT 8 handler (18.20734 Hz, keeps the DOS clock)
+   every 5th interrupt:    Game_Tick 130f:00FE, re-entrancy guarded    47.339086 Hz (21.1242 ms)
 
  main loop (main 130f:0007): as fast as the CPU allows, no vertical-retrace wait, no limiter
    except a 1000-iteration busy loop in frames that drew nothing (Frame_Present 130f:01C2)
@@ -412,14 +412,15 @@ if pointer visible (DS:92AC == 1):
         if prevX > x: Anim_Set(0, 7)                       (pointer animation facing left)
         if prevX < x: Anim_Set(0, 8)                       (facing right)
         if prevX == x and DS:8FE2 == 1: Anim_Set(0, 7)
-        if prevX == x: Anim_SetIfIdle(0, DS:8FE2)
+        if prevX == x: Anim_SetIfIdle(0, DS:8FE2)          (DS:8FE2 read now, after the Anim_Set above)
     else: Anim_Set(0, 1)                                   (arrow pointer)
     if x, y and buttons all unchanged: DS:92AE += 1; at 600 (0x258): DS:92AC = 0, Anim_Clear(0)
     else DS:92AE = 0
 else (hidden): any change of x, y or buttons: DS:92AE = 0, DS:92AC = 1
 ```
 The pointer hides after **600 executed game ticks (12.7 s)** without mouse activity and reappears
-on the next movement or button change. `Anim_Set/SetIfIdle/Clear` are 4306:07FA/0784/092F
+on the next movement or button change. `g_mousePtrVisible` DS:92AC is BSS, so the pointer starts
+hidden and appears with the first mouse activity [O, wave 2]. `Anim_Set/SetIfIdle/Clear` are 4306:07FA/0784/092F
 (`code_player.md`). DS:8FE2 is slot 0's current script [I].
 
 ### 3.13 `RankChest_Update` 130f:0EDF (per frame) [O]
@@ -686,8 +687,9 @@ Facts that matter for a port:
   again (only the last key pressed repeats).
 * `Player_Update` writes the held-key bits masked by the terrain back into `g_keys`, so a key the
   terrain forbids is dropped at the next tick and only comes back with a new make code (a
-  typematic repeat). DOSBox-X's emulated keyboard repeats after **500 ms** (24 ticks measured) at
-  about **30 per second** (every 1.5 ticks) [O, `r2/fl_typematic`, `r2/fl_shack_left`]. Hence
+  typematic repeat). DOSBox-X's emulated keyboard repeats after **500 ms** (24 ticks measured),
+  then exactly every **33 ms** (30.3 per second, one per 1.562 game ticks) [O, `r2/fl_typematic`,
+  `r2/fl_shack_left`; wave 2: these two values reproduce the r2 logs with 0 mismatches]. Hence
   "Up, then Right" does not jump (Up was dropped before Right arrived) while "Right, then Up" does
   [O, `r2/fl_jumps`].
 * Shift is passed to the BIOS like any key; shifted letters reach the game as capital ASCII (the
@@ -726,7 +728,8 @@ file): zones DS:80DB[ctx], key list DS:80F3[ctx], command list DS:810B[ctx]. Con
   #9 the play-field (x 0-159, y 16-143): press 9, held 9, release 10; #10 the status bar (y 146-199):
   press 11, held 11, release 10; #0, #4-#8 empty (x2 < x1 placeholders). Contexts 1-4 hold
   rectangles that the menu, dialog and name-entry code fill in at run time (records with x1 =
-  200 are placeholders) [O static data; dynamic contents `code_ui.md`]. Context 5 (DS:80CA): two
+  200 are placeholders) [O static data; dynamic contents `code_ui.md`]. Room per zone table (up to
+  the next table in DGROUP): **11, 17, 11, 12, 19, 2** records for contexts 0..5 [O, wave 2]. Context 5 (DS:80CA): two
   zones covering the screen: y 0-189 release -> 8 (Enter), y 189-199 release -> 13.
 
 ### 6.2 `Input_Poll` 4a85:000E (from Input_Tick, and from 153e:0000) [O]
@@ -778,7 +781,8 @@ if g_uiMode != 0: return
 if DS:926C == 0:                                       (normal play; 926C = 1 during scripted moves)
     if (DS:926A & 3) == 0:                             (terrain mask: no Up/Down here)
         DS:90F8 = 4                                    (prompt "Press Down to drop coin")
-        if g_keys & 2: g_keys = (g_keys & 0xFC) | 0x40 (Down becomes "drop a coin"; clears Up/Down)
+        if g_keys & 2: g_keys = (g_keys & 0x00FC) | 0x40   (16-bit AND AX,0x00FC: Down becomes
+                                                           "drop a coin"; clears Up/Down and the high byte)
         else:          g_keys &= 0x00BF               (clears 0x40 and the whole high byte)
     else:
         if g_cmd == 11: g_cmd = -1                     (status-bar click ignored where Down climbs)
@@ -817,9 +821,10 @@ if DS:926C != 0:                                       (scripted move in progres
     if 1 <= g_cmd <= 3 or g_cmd > 11: g_cmd = -1      (no menus; 0 = Esc and 4..11 kept)
     return
 switch g_cmd (0..3):
-  0 (Esc): if g_slowCpu == 1: g_uiMode |= 0x20; DS:9323 = 10       (dialog 10 = Exit and Save box)
-           else: g_uiMode |= 0x40; g_cmd = 8; DS:90FC = 1; DS:9111 = 2   (menu bar with a queued Enter)
-  1, 2, 3 (F1/F2/F3 or a click on a title): g_uiMode |= 0x40; DS:90FC = -1; DS:9111 = 0
+  0 (Esc): if g_slowCpu == 1: g_uiMode = 0x20; DS:9323 = 10        (dialog 10 = Exit and Save box)
+           else: g_uiMode = 0x40; g_cmd = 8; DS:90FC = 1; DS:9111 = 2    (menu bar with a queued Enter)
+  1, 2, 3 (F1/F2/F3 or a click on a title): g_uiMode = 0x40; DS:90FC = -1; DS:9111 = 0
+  (assignments in the code; g_uiMode is 0 here, so they equal the OR) [O, wave 2]
 ```
 Esc in play showed the Exit-and-Save box directly in the captures (fast CPU), i.e. the queued
 command 8 selects it at once through the menu code (`code_ui.md`) [O capture, I path].
@@ -915,7 +920,7 @@ is `g_playerState` DS:913C.
 
 | What | Driven by | Measured | Source |
 |---|---|---|---|
-| game tick | PIT / 5 | 47.3395 Hz = 21.124 ms | ISR, every log |
+| game tick | PIT / 5 | 47.339086 Hz = 21.1242 ms | ISR, every log |
 | walk step (8 px) | player script | **41 ticks per 8 steps**: seven of 5 ticks, one of 6 (5.125 ticks = 108.3 ms); state 11/12 one tick after the key bit, first step 9 ticks later | `r2/fl_walk2` |
 | horizontal scroll step (8 px) | the walk step | one per walk step once the player is past the edge (screen x <= 0x20 bytes moving left, >= 0x7C moving right); AVI 6-7 frames (6.54 mean) | `ega_r2_jumps_path`, `fl_walk.avi` |
 | climb step (8 rows) | player script | **29 ticks per 4 steps** (7, 7, 7, 8) = 7.25 ticks = 153 ms; AVI 9.2 frames | `r2/fl_climb` |
@@ -936,7 +941,7 @@ is `g_playerState` DS:913C.
 | attract page | `TitleStep_Wait` | 0x1C20 = 7200 PIT ticks = 30.42 s (AVI 1826 frames) | REFERENCE_CAPTURES §5.1 |
 | hint "second" | game tick | 60 ticks = 1.2675 s, paused while `g_uiMode` != 0 | §3.3 |
 | mouse pointer hide | game tick | 600 executed ticks = 12.7 s | §3.12 |
-| keyboard repeat | DOSBox-X keyboard | delay ~500 ms (24 ticks), then ~30/s | `r2/fl_typematic` |
+| keyboard repeat | DOSBox-X keyboard | delay 500 ms (24 ticks), then every 33 ms (30.3/s, 1.562 ticks; 0 mismatches against the r2 logs) | `r2/fl_typematic`, `r2/fl_shack_left` |
 
 ---
 
@@ -981,8 +986,9 @@ unnamed globals are canonical in `re/names/dos/dgroup.tsv` since the wave 2 merg
 Engine structure (`src/dos/app/dos_runtime`, `src/dos/game/main_loop`, `src/dos/input/`,
 `src/dos/game/init`; see also `PORTING_NOTES.md`):
 
-* **Virtual PIT.** Accumulate host time and convert it to PIT ticks at 1193181.67 / 5041 Hz
-  (`ticks = floor(elapsed_us * 1193182 / 5041 / 1e6)`, keep the remainder). Every PIT tick: the
+* **Virtual PIT.** Accumulate host time and convert it to PIT ticks at 1193181.67 / 5041 Hz =
+  236.69543 Hz, exactly the rational 3579545 / 3 / 5041 Hz (`ticks = floor(t_ns * 3579545 /
+  (15123 * 10^9))`, keep the remainder; `dos/app/dos_runtime.h` PitClock). Every PIT tick: the
   sound sequencer (better: run it in the audio callback by sample count, `fmt_sound.md` §9);
   every 5th: one game tick. No BIOS chain.
 * **Frame loop in lockstep.** DOSBox-X ran 50-1700 loop frames per second and practically never
@@ -1011,7 +1017,7 @@ Engine structure (`src/dos/app/dos_runtime`, `src/dos/game/main_loop`, `src/dos/
   world position each frame).
 * **Keyboard.** Keep two inputs: held bits (`g_keys`) from key down/up events with the Kbd_ISR
   table (Home/PgUp, Tandy codes, diagonal -> jump, the jump bit dropped at the next key event), and
-  a BIOS-style queue of 16-bit key codes fed by key down **and typematic repeats** (500 ms, ~30/s,
+  a BIOS-style queue of 16-bit key codes fed by key down **and typematic repeats** (500 ms, then 33 ms,
   only the last key pressed repeats; synthesise repeats in the engine rather than using the host's
   repeat rate). `Input_Poll` takes one code per game tick. The terrain clears forbidden held bits,
   so a repeat is needed to bring them back; "Up then Right" therefore does not jump.
@@ -1045,3 +1051,46 @@ Engine structure (`src/dos/app/dos_runtime`, `src/dos/game/main_loop`, `src/dos/
   code only.
 * Context 5's two zones (DS:80CA) and DS:0102/37CA (full-screen picture request): users not traced
   here (`code_ui.md`).
+
+---
+
+## Wave 3 corrections
+
+Found while porting the main loop (`src/dos/game/main_loop.cpp`, `init.cpp`, `game.cpp`):
+
+* **The dissolve frame does not gate the ticks** (§3.4, §1.3; also `ENGINE_MAP.md` §3.4). The frame
+  log `r2/fl_l2door_after` has the 30-PIT-tick dissolve frame at g_ticks 9032..9062: six game ticks
+  ran inside it (STEP records 9034 .. 9059, the player state 9 counting down) and its BLOCKED ring is
+  empty [O]. Reason: `Anim_Tick` returns at once while `g_transition` is set, so no script marks
+  DS:910D, and the camera does not move during the door's state 9. A port that spreads the 350 cells
+  over frames must therefore treat those frames as one long frame without re-marking the gate: no
+  `Frame_Begin`, no updaters, the sprites of the frame stay in the back buffer until the last cell
+  (then `Sprites_EraseAll`), and g_stepDone keeps whatever the ticks of the long frame set (the engine
+  carries it from frame to frame, `DosGame::dissolveGate`) [O log, engine choice].
+* **`Video_Init` 1000:0361 ends with `Gfx_SetDirtyTracking(0xFF)`** (§4.1 step 14): DS:37AE is 0 in the
+  file and 0xFF from then on (`Video_SetModeByType` 1000:0738 writes 0xFF as well); every DOSBox-X
+  state shows 0xFF [O]. Without it no primitive adds dirty rectangles and `Present_Dirty` copies
+  nothing.
+* **`g_machineId` on the reference machine** (§2.4): 0xFC in the EGA states (an AT's model byte), 0x21
+  in the Tandy states (`ega/signin`, `tandy/signin`) [O RAM].
+* **The mouse at start-up** (§3.12, `dos/input/mouse.h` [I]): every DOSBox-X state of a run in which
+  the mouse was never touched has x 0x9F, y **0x65** (101), not 100; the pointer appeared at the first
+  `Mouse_Poll` (BSS 0,0 -> 0x9F,0x65 is a change) and was hidden again after 600 idle ticks (DS:92AC 0,
+  DS:92AE 0x258 in `ega/signin`, `tandy/signin`, `ega/outside1`, ...) [O RAM].
+* **`Game_Init` step 15 has visible state**: `Help_LoadFile` sets `g_helpLoaded` DS:5BEB = 1 and
+  `Quiz_LoadDictionary` DS:A21A = the low word of PRG_DICT's length (0x0D00 in `ega/signin`) [O RAM].
+* **The time-out of the attract pages** (§9): `TitleStep_Wait` sets its timer on its first call, the
+  frame after the page was drawn, so a page lasts 7205 PIT ticks = 1441 game ticks plus the drawing
+  frame; the engine's headless run shows the page changes at game ticks 1443, 2886, 4329, 5772
+  (7215 PIT ticks apart, 30.48 s; AVI 1826 frames = 30.47 s) [O engine trace, consistent with §9].
+* **State at the sign-in vs the original**: an engine run (Enter on each title page, AdLib device)
+  dumped after game tick 380 equals `ega/signin.sav` in 264 of the 276 registry fields; the 12 that
+  differ are timing (g_ticks, g_randSeed, DS:90FE, DS:9100, the mouse idle count and so the pointer's
+  visibility and draw record, the save-heap high water DS:929F), the mouse y above, and DS:5FDC (the
+  engine computes `Quiz_FindTierEnd`'s words 5 and 6 at start-up, the original at the first game
+  start) [O, `extracted/scratch/dos_w3_mainloop/dgdiff.py`]. The sign-in frame differs from
+  `ega/004_signin.png` in 8 pixels: the engine's pointer at (159, 100), hidden in the capture.
+* **Tick order vs the reference logs**: with the lockstep order (sound ticks, `Frame_Begin`,
+  `Game_Tick`, frame body) the engine reproduces `r2/fl_walk2` tick for tick (544 STEP records: x, y,
+  camera, state, keys, coins) after a new player left the clubhouse through the door (Up at
+  `Cell_P12_StartRoom`, dissolve, cell F3) [O engine test `test_dos_mainloop.cpp`].
