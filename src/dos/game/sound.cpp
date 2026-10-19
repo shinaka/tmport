@@ -11,28 +11,33 @@ namespace tmport::dos {
 
 // ---- RecordingSound -------------------------------------------------------------------------
 
+void RecordingSound::record(Op op, int arg) {
+    calls_.push_back({op, arg});
+    if (delay_) delays_.push_back(delay_());
+}
+
 void RecordingSound::sfxPlay(int id) {
-    calls_.push_back({Op::SfxPlay, id});
+    record(Op::SfxPlay, id);
     sfxActive_ = true;
 }
 void RecordingSound::sfxStop() {
-    calls_.push_back({Op::SfxStop, 0});
+    record(Op::SfxStop, 0);
     sfxActive_ = false;
 }
-void RecordingSound::musicPlay(int tune) { calls_.push_back({Op::MusicPlay, tune}); }
-void RecordingSound::musicStop() { calls_.push_back({Op::MusicStop, 0}); }
+void RecordingSound::musicPlay(int tune) { record(Op::MusicPlay, tune); }
+void RecordingSound::musicStop() { record(Op::MusicStop, 0); }
 void RecordingSound::silenceAll() {
-    calls_.push_back({Op::SilenceAll, 0});
+    record(Op::SilenceAll, 0);
     sfxActive_ = false;
 }
-void RecordingSound::setSoundOn(bool on) { calls_.push_back({Op::SoundOn, on ? 1 : 0}); }
-void RecordingSound::setMusicOn(bool on) { calls_.push_back({Op::MusicOn, on ? 1 : 0}); }
-void RecordingSound::setSfxLoop(bool on) { calls_.push_back({Op::SfxLoop, on ? 1 : 0}); }
-void RecordingSound::setMusicLoop(bool on) { calls_.push_back({Op::MusicLoop, on ? 1 : 0}); }
-void RecordingSound::setMusicGate(uint16_t m) { calls_.push_back({Op::MusicGate, m}); }
+void RecordingSound::setSoundOn(bool on) { record(Op::SoundOn, on ? 1 : 0); }
+void RecordingSound::setMusicOn(bool on) { record(Op::MusicOn, on ? 1 : 0); }
+void RecordingSound::setSfxLoop(bool on) { record(Op::SfxLoop, on ? 1 : 0); }
+void RecordingSound::setMusicLoop(bool on) { record(Op::MusicLoop, on ? 1 : 0); }
+void RecordingSound::setMusicGate(uint16_t m) { record(Op::MusicGate, m); }
 void RecordingSound::restoreDriver(std::span<const uint8_t> sfxBlock, std::span<const uint8_t> musicBlock, int /*voices*/) {
     const auto word = [](std::span<const uint8_t> b, size_t i) { return b.size() > 2 * i + 1 ? b[2 * i] | (b[2 * i + 1] << 8) : 0; };
-    calls_.push_back({Op::Restore, word(musicBlock, 0) != 0 ? word(musicBlock, 1) : 0xFFFF});
+    record(Op::Restore, word(musicBlock, 0) != 0 ? word(musicBlock, 1) : 0xFFFF);
     sfxActive_ = word(sfxBlock, 0) != 0;
 }
 
@@ -52,31 +57,33 @@ std::string RecordingSound::describe() const {
 DosAudioSound::DosAudioSound(DosAudioDevice& device, bool offline) : device_(device), offline_(offline) {}
 
 // Sfx_Play and Sfx_Stop set the status DS:6448 at once; the device shows a request after the tick
-// that applies it (the next one it renders, offline or on the audio thread), so until then the
-// facade answers for it.
+// that applies it (the next one it renders, offline or on the audio thread, or the one its delay
+// names), so until then the facade answers for it.
 void DosAudioSound::sfxPlay(int id) {
-    device_.sfxPlay(id);
+    const uint32_t d = delay();
+    device_.sfxPlay(id, d);
     if (!soundOn_) return;  // 491b:06d7 returns at once with g_soundOn 0
     pending_ = Pending::Play;
-    pendingTicks_ = device_.status().ticks;
+    pendingTicks_ = device_.status().ticks + d;
 }
 void DosAudioSound::sfxStop() {
-    device_.sfxStop();
+    const uint32_t d = delay();
+    device_.sfxStop(d);
     pending_ = Pending::Stop;
-    pendingTicks_ = device_.status().ticks;
+    pendingTicks_ = device_.status().ticks + d;
 }
-void DosAudioSound::musicPlay(int tune) { device_.musicPlay(tune); }
-void DosAudioSound::musicStop() { device_.musicStop(); }
-void DosAudioSound::silenceAll() { device_.silenceAll(); }  // voices off; the effect's status stays
+void DosAudioSound::musicPlay(int tune) { device_.musicPlay(tune, delay()); }
+void DosAudioSound::musicStop() { device_.musicStop(delay()); }
+void DosAudioSound::silenceAll() { device_.silenceAll(delay()); }  // voices off; the effect's status stays
 void DosAudioSound::setSoundOn(bool on) {
     soundOn_ = on;
-    device_.setSoundOn(on);
+    device_.setSoundOn(on, delay());
 }
-void DosAudioSound::setMusicOn(bool on) { device_.setMusicOn(on); }
+void DosAudioSound::setMusicOn(bool on) { device_.setMusicOn(on, delay()); }
 // DS:63B8: the end sequence's looping effect 2 (player states 44/45/64/65, Cell_P64_EndScreen).
-void DosAudioSound::setSfxLoop(bool on) { device_.setSfxLoop(on); }
-void DosAudioSound::setMusicLoop(bool on) { device_.setMusicLoop(on); }
-void DosAudioSound::setMusicGate(uint16_t m) { device_.setMusicPaused(m == 0); }
+void DosAudioSound::setSfxLoop(bool on) { device_.setSfxLoop(on, delay()); }
+void DosAudioSound::setMusicLoop(bool on) { device_.setMusicLoop(on, delay()); }
+void DosAudioSound::setMusicGate(uint16_t m) { device_.setMusicPaused(m == 0, delay()); }
 
 bool DosAudioSound::sfxActive() const {
     const DosAudioDevice::Status st = device_.status();
@@ -89,6 +96,13 @@ void DosAudioSound::restoreDriver(std::span<const uint8_t> sfxBlock, std::span<c
     const bool active = sfxBlock.size() >= 2 && (sfxBlock[0] | sfxBlock[1]) != 0;
     pending_ = active ? Pending::Play : Pending::Stop;  // the status shows it after the next tick
     pendingTicks_ = device_.status().ticks;
+}
+
+void DosAudioSound::restoreOplDriver(std::span<const uint8_t> dgroup) { device_.restoreOplDriver(dgroup); }
+
+void DosAudioSound::keepSamples(bool keep) {
+    keepSamples_ = keep;
+    if (offline_) device_.setOplSynthesis(keep);
 }
 
 void DosAudioSound::pitTick() {
@@ -145,6 +159,7 @@ void syncSoundFlags(DosGame& g) {
 void soundRestoreDriver(DosGame& g, std::span<const uint8_t> dgroup) {
     constexpr size_t kSfxBlock = 0x6448, kMusicBlock = 0x64C0, kVoices = 0x63BE, kBlockBytes = 0x78;
     if (dgroup.size() < kMusicBlock + kBlockBytes) return;
+    g.sound.restoreOplDriver(dgroup);  // the AdLib driver first: the blocks then send no notes again
     g.sound.restoreDriver(dgroup.subspan(kSfxBlock, kBlockBytes), dgroup.subspan(kMusicBlock, kBlockBytes),
                           dgroup[kVoices] | (dgroup[kVoices + 1] << 8));
 }

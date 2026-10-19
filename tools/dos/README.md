@@ -55,6 +55,11 @@ engine's loader both read that from the `CPU` entry.
 * `audiocmp.py`: the engine's sound (`--frame-dump DIR` writes `DIR/sound.wav`) against the PCM track
   of a DOSBox-X AVI or a WAV: alignment by pitch features, the alignment tracked over time, sound
   on/off edges per PIT tick (wave 4, `re/dos/docs/fmt_sound.md` §11.6).
+* `oplcmp.py ENGINE_LOG REF.dro`: the AdLib driver's OPL register writes (`tmport --dos-sound adlib
+  soundtest OUT --from-state STATE --script ... --opl-log LOG`) against a DOSBox-X raw OPL capture
+  (`tools/tmctl.py audio opl`), write for write after DOSBox-X's filter of unchanged registers, with the
+  registers where the capture continues and each write's time against its PIT tick (wave 5,
+  `fmt_sound.md` §11.7).
 * `avifit.py`: an engine run against a DOSBox-X AVI. The run dumps the picture of every game tick of a
   range; every AVI frame of a range is looked up among them by exact picture, and the AVI's time base
   (tick = a + frame * k) is fitted; it reports the frames off it. EGA AVIs run at 60.29 frames per
@@ -92,7 +97,10 @@ another moment (a capture taken before its state was saved, another route) and i
 the summary. Scenario files hold only numbers, file names and key scripts. The pictures are what the
 engine shows after the tick: the picture of a frame longer than a game tick (a bubble, a scene load,
 a title page) appears when that frame ends, as on the reference machine, so a checkpoint right after
-such a change sits a few ticks later than the logic event.
+such a change sits a few ticks later than the logic event. Wave 5 (frame order): the frame that does a
+tick's work runs after it, so a short frame's picture shows from that tick; checkpoints that moved for
+it carry a `moved` note with their evidence, AVI fits whose limits changed a `wave5` note (the runner
+ignores both keys).
 
 The seed scenarios:
 

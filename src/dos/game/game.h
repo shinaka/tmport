@@ -80,9 +80,11 @@ public:
     bool dissolveGate = false;     // g_stepDone at the end of the last frame of that long frame
     bool flashGate = false;        // g_stepDone at the end of the last frame of a Button_Flash wait (ui.h)
     bool searchRunning = false;    // a search ran in the last frame (main_loop.cpp times its frames)
-    uint32_t searchClock = 0;      // where the next search frame begins, in FrameTiming units after the tick
+    uint64_t searchAt = 0;         // where the next search frame begins (FrameTiming units of the runtime's PIT count)
+    uint32_t dissolveTail = 0;     // the reference time from the dissolve's last frame's tick to its end (FrameTiming units)
     bool latchedLoad = false;      // this frame's Frame_Begin latched a scene load (frameBeginTiming)
     bool latchedRedraw = false;    // ... or a full play-field redraw (no transition, no search band)
+    bool redrawCostDue = false;    // that redraw's cost is still to be reported (before Playfield_Redraw)
     bool dissolveAfterHud = false; // this frame redrew the HUD (and with it the play field) before its present
     uint32_t musicPlays = 0;       // tunes started so far (Music_Play with the music on, sound.cpp)
     uint32_t musicPlaysAtBegin = 0;      // musicPlays at this frame's start and at the one before (a tick

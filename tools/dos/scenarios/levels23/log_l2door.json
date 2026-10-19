@@ -52,9 +52,9 @@
    "to": {
     "event": "dissolve=off"
    },
-   "expect_ticks": 6,
+   "expect_ticks": 7,
    "tolerance": 0,
-   "source": "r2/fl_l2door_after: the dissolve frame lasted 30 PIT ticks (127 ms); avi/ega_doorway_dissolve.avi frames 74-81"
+   "source": "r2/fl_l2door_after: the dissolve frame lasted 30 PIT ticks (127 ms); avi/ega_doorway_dissolve.avi frames 74-81; wave 5: the dissolve=on event is in the frame that runs right after the teleporting tick (its other work and the tune first), whose first cells show in the next tick: 7 rows from on to off for the 6 ticks of the 127 ms dissolve"
   }
  ]
 }

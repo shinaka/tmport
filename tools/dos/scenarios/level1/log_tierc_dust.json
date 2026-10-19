@@ -8,27 +8,31 @@
  "checkpoints": [
   {
    "id": "before_hit",
-   "tick": 1588,
+   "tick": 1587,
    "capture": "ega/r2_elf_dust_01_before_hit.png",
-   "max_px": 0
+   "max_px": 0,
+   "moved": "wave 5: the frame after a game tick now runs after that tick (Game_Tick, Frame_Begin, the body), so a short frame's picture (sprites that moved in the tick) shows from that tick, one tick earlier than before (the r2 log end states hold draw records equal to the live slots: DOSBox-X's last frame began after the last tick); tick 1588 -> 1587: the per-tick scan: 0 px at 1587 (before at 1588)"
   },
   {
    "id": "hit_coin_lost",
-   "tick": 1593,
+   "tick": 1592,
    "capture": "ega/r2_elf_dust_02_hit_coin_lost.png",
-   "max_px": 0
+   "max_px": 0,
+   "moved": "wave 5: the frame after a game tick now runs after that tick (Game_Tick, Frame_Begin, the body), so a short frame's picture (sprites that moved in the tick) shows from that tick, one tick earlier than before (the r2 log end states hold draw records equal to the live slots: DOSBox-X's last frame began after the last tick); tick 1593 -> 1592: the per-tick scan: 0 px at 1592 (before at 1593)"
   },
   {
    "id": "coin_flies_back",
-   "tick": 1608,
+   "tick": 1607,
    "capture": "ega/r2_elf_dust_03_coin_flies_back.png",
-   "max_px": 0
+   "max_px": 0,
+   "moved": "wave 5: the frame after a game tick now runs after that tick (Game_Tick, Frame_Begin, the body), so a short frame's picture (sprites that moved in the tick) shows from that tick, one tick earlier than before (the r2 log end states hold draw records equal to the live slots: DOSBox-X's last frame began after the last tick); tick 1608 -> 1607: the per-tick scan: 0 px at 1607 (before at 1608)"
   },
   {
    "id": "log_end",
-   "at_log_end": "savestates/r2/fl_tierc_dust1.sav",
+   "tick": 2616,
    "capture_state": "savestates/r2/fl_tierc_dust1.sav",
-   "max_px": 0
+   "max_px": 0,
+   "moved": "wave 5: the frame after a game tick now runs after that tick (Game_Tick, Frame_Begin, the body), so a short frame's picture (sprites that moved in the tick) shows from that tick, one tick earlier than before (the r2 log end states hold draw records equal to the live slots: DOSBox-X's last frame began after the last tick); the state r2/fl_tierc_dust1 was saved inside Sprites_DrawSorted (4306:0497) of the frame after its last game tick (2617), before that frame presented: its screen shows the frame of tick 2616"
   }
  ],
  "logs": [

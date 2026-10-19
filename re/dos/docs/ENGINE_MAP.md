@@ -21,6 +21,18 @@ disk I/O, presentation at a frame's end: §3.9) and starts from any DOSBox-X sta
 every checkpoint of the fidelity scenarios that shows the moment of its capture matches at 0 pixels
 except two (129 pixels each, §8), in every look; the AVI time bases fit; the result table is §11.
 
+**Wave 5 (frame order):** the frame that does a tick's work runs after that tick (Game_Tick, then
+Frame_Begin and the body), and a frame that begins when a longer one ended runs before the next tick
+(§3.1, §3.9): the 21 logs still match tick for tick, the hint after a search blocks DOSBox-X's ticks,
+the elf under it and the castle-top key icon match the reference runs; 438 of 439 checkpoints at 0
+pixels (§11).
+
+**Status after wave 5 (options and hardening, §12):** the original's AdLib driver on an emulated OPL2
+(register streams equal DOSBox-X's captures write for write), mods for the DOS edition
+(`src/dos/mods/`), the DOS autoplay soak test (`src/dos/autoplay/`), the frame order above, and sound
+calls inside long frames at their place in the frame (§3.8). Whole suite green on Windows and Linux
+(GCC 15); fidelity 0 regressions.
+
 ---
 
 ## 1. Shape of the game layer
@@ -113,7 +125,7 @@ DGROUP dumps): `trace.h/.cpp` (mainloop).
 | 491b | the sound driver (27 functions) | `Sequencer`, `DosAudioDevice` (`dos/audio/`); the game calls `sound.h` |
 | 49a6:0001 | `SoundPort_Out` | part of the sound driver |
 | 4a85 | `Input_Poll`, `Input_LookupKey`, `Input_HitZone`, `Mouse_ChangedMask`, `Input_MouseWalk`, `Input_Tick` | `InputPoll`, `inputLookupKey`, `inputHitZone` (`dos/input/input_poll.h`); game wrappers `inputTick` / `inputMouseWalk` (main_loop.h) |
-| 4ac9 | the AdLib driver (34 functions) | `opl_backend` (wave 5); `DosAudioDevice` draws the orchestration rand() |
+| 4ac9 | the AdLib driver (34 functions) | `AdLibDriver` (`dos/audio/adlib_driver.h`, wave 5) on `OplChip` (ymfm's YM3812), joined by `AdLibOpl` (`opl_backend.h`); `DosAudioDevice` draws the orchestration rand(); a state's driver: `SoundFacade::restoreOplDriver` |
 | 4ba4:057d.. | Turbo C `_rtl_creat`, `_rtl_trunc`, `open` | host file API |
 | 4c15-4d90 | Turbo C RTL (stdio, string, heap, time, int86, rand) | C++ library; `rand`/`srand` = `BorlandRand`; `time()` = `layoutTimeSeed` |
 
@@ -124,8 +136,11 @@ DGROUP dumps): `trace.h/.cpp` (mainloop).
 ### 3.1 Lockstep frames
 
 `DosRuntime` runs one *original frame* per game tick (PORTING_NOTES §2.3): for game tick n it
-applies the --keys events of tick n and every keyboard byte due (Kbd_ISR, BIOS), clears the step
-gate, starts the original frame clock, then calls
+applies the --keys events of tick n and every keyboard byte due (Kbd_ISR, BIOS), runs the tick
+(2 below), then clears the step gate, starts the original frame clock and runs the frame (1, 3):
+wave 5, the frame that does a tick's work begins right after it on the reference machine. (Before a
+tick it runs 1 and 3 only for the frame that began when a longer frame ended, §3.9; period mode and
+the slow-machine mode run 1, 2, 3 in that order.)
 
 1. `DosGame::frameBegin()` — `Frame_Begin` 130f:025a (camera.h) in the main loop; skipped while the
    title runs (`g_uiMode & 0x80`: the title loop has no Frame_Begin, and the runtime already reset
@@ -215,6 +230,22 @@ reaches the facade and the DGROUP copy (`core.soundOn`, `musicOn`, `sfxLoop`, `m
 `musicGate`) changes where the original writes it. `RecordingSound` records calls for tests;
 `DosAudioSound` drives `DosAudioDevice`. `sfxBlockActive(g)` is DS:6448 != 0.
 
+Wave 5 (integration): a call reaches the driver where the original made it. The original's entry
+points write the driver's blocks at once and the next timer interrupt plays them, so a call made
+partway through a long frame (Game_Start's tune after Quiz_LoadQuestions, Sound_SyncState's gate after
+a level's PAN or after a message bubble's drawing, a search frame's effect) sounds that far into the
+frame. The game reports a frame's costs where the work happens (§3.9: the I/O routines report
+themselves, `reportPanLoad` / `reportBankLoad` / `reportUsersWrite` / `reportQuizLoad`, main_loop.h;
+the bubble after the updaters, a HUD redraw after its painter, the latched play-field redraw before
+Playfield_Redraw, each search frame at its start), so the cost reported so far is where the frame
+stands; `DosRuntime::soundDelay()` turns that place (`FrameTiming::callTime`: the frame's start plus
+the cost so far, or the time a part with its own clock names, the coin count-up) into PIT ticks after
+the next interrupt, `DosAudioSound` asks it for each call (`setDelaySource`) and `DosAudioDevice`
+keeps a delayed command in its queue until then (commands take effect in the order of their PIT tick).
+A game tick's calls (in its interrupt) and the period speed have no delay. Nothing the game reads
+changes: the effect status shows a delayed Sfx_Play at once, as DS:6448 does (the 164 fidelity traces
+are byte-identical with and without the delays).
+
 ### 3.9 Long frames and disk I/O (wave 4: the reference frame timing)
 
 At `frame_speed = reference` (the default) a frame lasts as long as on the reference machine
@@ -222,10 +253,13 @@ At `frame_speed = reference` (the default) a frame lasts as long as on the refer
 (`FrameTiming`, dos_runtime.h: `quitSection(units)` for I/O with g_quit = 1, `spend(units)` for
 drawing, `fromPreviousTick()` when the work was asked for before the frame's tick; units are
 thousandths of a PIT tick). `frameBeginTiming(g)` (main_loop.h, called by `DosGame::frameBegin`)
-reports what Frame_Begin's latches start: a scene the ticks asked for (`DosGame::latchedLoad`) and a
-full play-field redraw (`latchedRedraw`); `mainFrameBody` reports the rest from what the frame did
-(`FrameCosts`: USERS.DAT writes, Game_Start's Quiz_LoadQuestions, PAN loads, a full HUD redraw, a
-message or hint bubble opening). The runtime then runs the game ticks that fall inside the frame
+notes what Frame_Begin's latches start: a scene the ticks asked for (`DosGame::latchedLoad`) and a
+full play-field redraw (`latchedRedraw`); the frame reports its costs where the work happens (wave-5
+integration, §3.8): the I/O routines themselves (Users_WriteFile, Game_Start's Quiz_LoadQuestions,
+Scene_LoadPan, the scene's sprite bank: `reportUsersWrite` ... in main_loop.h, only while the frame
+timing is open, `FrameTiming::isOpen`) and `mainFrameBody` the drawing (`FrameCosts`: a message or hint
+bubble after the updaters, a full HUD redraw after its painter, the latched play-field redraw before
+Playfield_Redraw). The runtime then runs the game ticks that fall inside the frame
 without Frame_Begin or a frame body (so `g_stepDone` gates a tick after one that advanced a script or
 moved the camera) and skips Game_Tick, its counters and the trace row of a tick inside the I/O. The
 dissolve and a Button_Flash are long frames `DosGame` spreads over its frames itself
@@ -248,6 +282,18 @@ presents at the end of a frame: `runDosEdition` (and the frame and state dumps) 
 the last game tick before `DosRuntime::frameEndUnits()`, or before `DosGame::screenShownAt` for the
 title loop's page draws, which keep their own clock; until then the previous picture stays.
 
+
+Wave 5 (frame order): the game tick comes first and the frame that does its work after it (its
+Frame_Begin latches what the tick asked for, so a frame's cost counts from its own tick:
+`FrameTiming::setStart`, `beganAfterTick`); a frame that ran past a tick has the ticks inside it run
+without a frame, and when it ended between two ticks the runtime runs the next frame before the next
+tick (`DosRuntime::gameStepReference`): the frame after a scroll frame, after the search's result
+frame (hint 4), after a dissolve (`DosGame::dissolveTail` reports its end) or a Button_Flash wait (its
+rest counted from the wait's end, `FrameTiming::backdateStart`). A dissolve or a flash wait goes on with
+`FrameTiming::continueFrame` (no gate clear, no Frame_Begin). The search frames carry an absolute clock
+(`DosGame::searchAt`) and an engine frame lasts until its last search frame ends. `fromPreviousTick()`
+stays as information only. The frame dumps follow: a short frame's picture shows from the tick that
+changed it (one tick earlier than in wave 4), a long frame's from the last tick before its end.
 ---
 
 ## 4. Shared-state conventions
@@ -425,7 +471,11 @@ with its own scenario set-up.
 
 ---
 
-## 8. Known gaps and deviations (after wave 4)
+## 8. Known gaps and deviations (after wave 5)
+
+Done in wave 5 (§12): the frame order (§3.1, §3.9), the original's AdLib driver on an emulated OPL2,
+sound calls inside long frames at their place (§3.8), mods for the DOS edition, the autoplay soak
+test; the struck-through items below.
 
 Fixed in the wave-3 integration: the effect loop flag DS:63B8 reaches the driver
 (`DosAudioDevice::setSfxLoop`); the Button_Flash wait is wired into the frame loop (§3.4);
@@ -446,29 +496,42 @@ Done in wave 4 (fidelity, §3.9, §10, §11):
   Sprites_DrawSorted.
 
 Still open (each with its evidence in §11):
-* **The order of a frame against its tick.** The engine runs Frame_Begin, the tick, the frame body;
-  on the reference machine a tick usually lands in the drawing part of a frame, so the next
-  Frame_Begin is the first to see it (the engine's order is the original's rarer case). Visible only
-  where a picture freezes: the walking elf's feet under the hint bubble after a search (129 pixels in
-  `level1/treasure5_found` and `treasure_found_avi`: the bubble's HUD redraw draws the actors from a
-  snapshot taken before the elf's last step); the castle-top tick always removes the HUD key icon,
-  which 4 of 5 reference runs keep (masked in the castle_end scenarios). Changing the order means
-  re-deriving the long-frame model (which frames count from the previous tick) and moving the
-  scenario ticks; left for a later wave.
-* The hint bubble that opens right after a search begins after the search's last frame on the
-  reference machine: r2/fl_search_t blocks 4 ticks behind it, the engine gates 3 (the end state
-  matches).
-* Sound calls inside a long frame take effect at the frame's start (`tandy_r3_session.avi`: the
-  resumed game's tune 23 PIT ticks early, the tune after Flutter's first hint 10 early); a per-command
-  delay in `DosAudioDevice` with costs reported as the frame goes would fix it (`fmt_sound.md` §11.6).
+* ~~The order of a frame against its tick~~ (wave 5, §3.9): the frame after a tick runs after it;
+  `level1/treasure5_found` 0 pixels (the elf under hint 4), hint 4 after `r2/fl_search_t`'s search
+  blocks DOSBox-X's 331535..331550. The castle-top key icon stays as in 4 of the 5 reference runs; in
+  the fifth (`ega_r2_end_t2_nokey`, masked in `castle_end/log_end_t2`) the tick fell between a frame's
+  Frame_Begin and its Screen_DrawOverlay inside an idle frame, a sub-tick race not modelled.
+  `level1/treasure_found_avi` hint 4 keeps 129 pixels: the AVI's elf is one step further (its hint came
+  8 ticks later, the AVI's slower search, below). The two search end states differ in slot 2's depth
+  (the hidden content sprite, `code_runtime.md` wave 5).
+* ~~Sound calls inside a long frame take effect at the frame's start~~ (wave-5 integration, §3.8): a
+  call reaches the driver at its place in the frame. `tandy_r3_session.avi`: the resumed game's tune
+  starts 3 PIT ticks after the recording's (23 before), at the scenario's time base. The tune after
+  Flutter's first hint still resumes 9 PIT ticks early (10 before): the start-of-game message's pause
+  now comes after the bubble's drawing as in the original, but the Tandy draws the resume frame's and
+  the bubble's full HUD redraws in about 10 PIT ticks each where the engine takes the EGA's 16 (the
+  bubble is complete at AVI frame 1192, 13 PIT ticks before the engine's; the tune ran 31 PIT ticks
+  before the pause in the original, 42 in the engine). Per-look drawing costs: below. `fmt_sound.md`
+  §11.8.
 * Not measured, so not modelled: the cost of menus, Yes/No and OK boxes, the quiz screen, the sign-in
-  and the rank screen (no log gated a tick behind them); the occasional long Game_Tick (r2/fl_climb,
-  4 PIT ticks at the level boundary); diagonal and slow-CPU scroll frames.
+  and the rank screen (no log gated a tick behind them, no FRAME ring holds them); the occasional long
+  Game_Tick (r2/fl_climb, 4 PIT ticks at the level boundary); diagonal and slow-CPU scroll frames.
+  Measured in wave 5, not modelled: the end sequence's animation frames show about 6 PIT ticks after
+  their tick (`ega_r2_end_t2_nokey.avi` against r2/fl_end_t2_wait; the castle AVI fits keep the frames
+  off their time base that this leaves); the Tandy's full HUD redraw shows 4-6 PIT ticks after its key
+  (16 on EGA) and a Tandy menu opens within a game tick (`tandy_r3_session.avi`); in the same AVI the
+  resumed game's HUD redraw and the start message's bubble (its HUD redraw, then the cloud) together
+  take about 12 PIT ticks less than the EGA model (the audio of the music's pause and the bubble's
+  frame, above): about 10 PIT ticks per Tandy HUD redraw. PORTING_NOTES §2.5 lists the logs needed.
 * The search frames in the three EGA AVIs of a search last 4.9-5.5 PIT ticks, in every logged run
   4.25 / 4.65 (the model): `level1/treasure_found_avi`'s timing (AVI 113 ticks from the throw to the
   hint, engine 105) is kept as off; the logged runs of the same search agree with the engine.
-* The AdLib music is a square-wave stand-in until the OPL2 core (wave 5); effect timing was compared
-  on the Tandy only.
+* ~~The AdLib music is a square-wave stand-in~~ (wave 5): the original's AdLib driver on ymfm's OPL2;
+  its register stream equals DOSBox-X's .dro captures write for write at the original's ticks for every
+  tune and orchestration (`fmt_sound.md` §11.7). Effect timing was compared on the Tandy only. A traced
+  run (`--dos-trace`) restores a state's AdLib driver too (`TraceSound` forwards `restoreOplDriver`,
+  wave-5 integration). AdLib is not the default device (`tandy` stays): the default's rand() sequence is
+  the one the boot scenarios were checked with.
 * Not carried over from a DOSBox-X state: the frame clock's fractions, an engine-side wait in progress
   (a Button_Flash or a dissolve), the rest of a Game_Tick the state was saved inside (5 of the 124
   states: the engine starts with the next tick), the slow-CPU box save.
@@ -959,6 +1022,23 @@ their own. `Title_Run` is split into three.
   exits with 1 on a regression against `tools/dos/scenarios/baseline.json` (`--update-baseline`
   stores the current numbers). 164 scenarios in five groups; the whole run takes about half a minute
   with `--jobs 10`. The result after wave 4: §11.
+* **Mods** (wave 5, `src/dos/mods/`): `DosFiles::open` applies the installed `DosOverrides`
+  (`dos/mods/dos_mods.h`: PAK/PAN pictures, sound and text files, the strings and colour tables of
+  `SST.EXE` written into its DGROUP image) to the checked originals, so the game reads modded bytes as
+  originals; `installDosMods` runs at the DOS start-up (`app/bootstrap.cpp`: `[mods] dos_paths`, the
+  default `dos_mods` folders, `--mods`; nothing with `--no-mods`). `docs/MODDING.md`, "The 1990 DOS
+  edition".
+* **The autoplayer** (wave 5, `src/dos/autoplay/`): `tmport --edition dos --autoplay [--seeds A-B]
+  [--climbs N] [--soak] ...` plays the game headless as a bot (`dos_autoplay_bot.h`: keyboard only;
+  it reads the hiding places' contents from the state and sees elves on the screen, by the pictures
+  of the draw records, `dos_autoplay_vision.h`) and checks the rules after every tick
+  (`dos_autoplay_checks.h`: every change of the coins and nets explained, the layout by tier, key
+  states, clue words, the elves spawned by tier, USERS.DAT after every save, a resumed game against
+  the record it was saved as). `--soak` varies the look, the sound driver, slow CPU, the frame speed,
+  crafted players up to the champion and the exercises (clubhouse rooms, menus, Start New Player,
+  Start Over, Exit and Save with a resumed program run, tunnels, falls through the geyser hole and
+  the bridges); a run is deterministic for its seed. `--autoplay-vision-check` compares what the bot
+  sees with the elf table.
 
 ---
 
@@ -980,6 +1060,23 @@ log counts as matching when both alignments have 0 mismatches over all its recor
 | castle_end | 27 | 81 / 81 | 0 | 3 / 3 (4943 ticks) | 4 / 4 | 8 / 8 |
 | looks | 13 | 98 / 98 | 10 | - | - | - |
 | all | 164 | 439 / 441 | 45 | 21 / 21 (21634 ticks) | 12 / 13 | 8 / 8 |
+
+After wave 5 (frame order; `python -P tools/dos/fidelity.py --jobs 4`, 0 regressions against the
+updated `baseline.json`):
+
+| Group | Scenarios | Checkpoints at 0 px | Informational | Logs tick for tick | Timings | AVI fits |
+|---|---|---|---|---|---|---|
+| ui | 24 | 73 / 73 | 0 | - | 4 / 4 | - |
+| level1 | 53 | 76 / 77 | 35 | 11 / 11 | 1 / 2 | - |
+| levels23 | 47 | 110 / 110 | 2 | 7 / 7 | 3 / 3 | - |
+| castle_end | 27 | 81 / 81 (no key-icon masks but in the one run that lost it) | 0 | 3 / 3 | 4 / 4 | 8 / 8 |
+| looks | 13 | 98 / 98 | 10 | - | - | - |
+| all | 164 | 438 / 439 | 47 | 21 / 21 | 12 / 13 | 8 / 8 |
+
+The checkpoints of moving pictures moved one tick earlier (each with a `moved` note in its scenario);
+two state scenarios' first frames became informational (`frame1_own_screen`: the engine's first frame
+runs after tick 1); the castle AVI fits keep more frames off their time base (`wave5` notes: the end
+sequence's long sprite frames, §8). Wave 4's numbers follow.
 
 Captures (best checkpoint per capture): EGA Round 1 (106 frames with 070a-c): 65 at 0 pixels, 18 at
 0 pixels with masks (the player or the elves where the Round-1 key times between two states are
@@ -1017,3 +1114,49 @@ bases of the castle, end-sequence, crown, castle-creature and treasure-room runs
 
 Windows edition: the whole test suite passes and the headless frame dumps of the wave-2 platform
 scenarios (`extracted/scratch/dos_w2_platform/run_scenarios.sh`) are byte-identical to their baseline.
+
+---
+
+## 12. Wave 5: options and hardening
+
+Four build areas and an integration (SCOPING.md §6, wave 5):
+
+* **AdLib** (`src/dos/audio/adlib_driver.h`, `opl_chip.h`, `opl_backend.h`): a port of SST.EXE's AdLib
+  driver (segment 4ac9, its functions renamed in `re/names/dos/README.md`) on ymfm's YM3812 (pinned
+  commit, BSD-3-Clause). Its register writes equal DOSBox-X's OPL captures write for write at the same
+  PIT ticks for every tune in all 12 orchestrations; a state's driver is restored
+  (`SoundFacade::restoreOplDriver`, also through the trace); `tmport --dos-sound adlib ... --opl-log`
+  and `tools/dos/oplcmp.py` compare streams (`fmt_sound.md` §5.5, §11.7). The default device stays
+  `tandy`.
+* **Mods** (`src/dos/mods/`, §10): the DOS mod kit and checker (`--export-mod-kit` / `--check-mods`
+  with `--edition dos`), load-time overrides through `DosFiles::open`, exact packers for PAK and PAN
+  (`docs/MODDING.md`, "The 1990 DOS edition").
+* **Autoplay** (`src/dos/autoplay/`, §10): a keyboard bot that plays the whole game headless and
+  checks the rules after every tick (`tmport --edition dos --autoplay`, `docs/BUILDING.md`). Original
+  behaviours its checks model (each confirmed in the code): a castle creature strike that lands while
+  the player is in the hall door cell 73 is kept in DS:9264 and costs a coin at the next castle cell
+  (Castle_CreatureHitCheck 1568:18f1); a slow-CPU game saved in the castle resumes with the fast CPU's
+  bridge pictures (Game_Start 47c7:08b5 runs Cells_AdjustForCpu after Game_Restore, with g_slowCpu 0 in
+  area 0x0D; no effect on play); Start New Player or Exit and Save before the start-of-game message
+  has been shown keeps no saved game (g_gameInProgress is still 0); Quiz_ReorderSlots 46ce:0df2
+  reverses the answered question slots at every scene load; the geyser-hole slide leaves the player
+  16 pixels above the path line until a key is pressed.
+* **Frame order** (§3.1, §3.9, §11): Game_Tick before the frame that does its work; the frame after a
+  long one before the next tick; scenario checkpoints moved with `moved` notes, castle AVI fits with
+  `wave5` notes.
+* **Integration**: the requests of the four areas (the trace's AdLib restore, the test patch of the
+  frame order, the Linux path tests, a GCC `-Wcomment`, unused helpers, the help texts, the 4ac9 names);
+  sound calls inside long frames at their place (§3.8, `fmt_sound.md` §11.8).
+
+Results of the integrated tree (build `build_w5_integration`, fresh configure):
+
+| Check | Result |
+|---|---|
+| `tmtests` on Windows (MSVC) | 631 of 631 test cases |
+| `tmtests` on Linux (WSL 2, GCC 15) | 631 of 631; no warning in project code; Clang diagnostics sweep (`-Wall -Wextra`) clean |
+| `tools/dos/fidelity.py` (164 scenarios) | 0 regressions; the §11 wave-5 table (438 of 439 checkpoints at 0 pixels, 21 of 21 logs, 12 of 13 timings, 8 of 8 AVI fits); the 164 traces byte-identical with and without the sound delays |
+| DOS autoplay soak (`--soak --seeds 1-200 --climbs 3`) | 200 of 200 seeds clean, 600 climbs (40 to the crown), 8 559 530 game ticks with the rules checked after each, 1 344 saves checked; 50 seeds per look (EGA, Tandy, MCGA, CGA) and per sound device (Tandy, speaker, AdLib, off), slow CPU and both frame speeds; the Linux build gives the same game ticks for all 200 seeds |
+| AdLib register streams (`oplcmp.py`) | w5 variants capture: 85 767 of 85 767 logged writes identical in order, 120 of 120 registers where the capture continues; R2 sound test: 21 324 of 21 324, 120 of 120, timer writes −0.13 .. +0.19 PIT ticks |
+| AdLib in the game | `--sound adlib` headless: the title tune in the frame dump's `sound.wav` (OPL2 synthesis); a traced run from an EGA (AdLib) state gives the same sound as an untraced one |
+| DOS mod kit round trip | 777 files; 524 of 524 sprite frames and 6 of 6 PAN files reproduced byte for byte; the kit applied as a mod gives 18 files byte-exact (the data files and SST.EXE's DGROUP) |
+| Windows edition | the wave-2 platform scenarios' frame dumps equal their baselines (the sign-in frames' caret phase differs between the two stored baselines) |

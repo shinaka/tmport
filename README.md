@@ -190,6 +190,7 @@ import_from = C:\TLCWIN\TMTWINCD\users.dat
 [mods]
 enabled = true
 paths = mods                ; mod folders, ';'-separated (see docs/MODDING.md)
+dos_paths = dos_mods        ; the same for the 1990 DOS edition
 
 [debug]
 show_treasure = false       ; true: box the hiding places that hold a treasure (gold) or the key (cyan)
@@ -249,13 +250,19 @@ logic is a port of the DOS program, so it plays as the DOS game did, not as the 
   for the same seed), the original's movement timings and the reference machine's slow frames (21
   per-tick recordings of the original in DOSBox-X replayed from the same moment match on every tick),
   and the original's screens: every EGA, Tandy, MCGA and CGA capture reachable from a recorded moment
-  of the original matches pixel for pixel, apart from two (`re/dos/docs/ENGINE_MAP.md` §11).
+  of the original matches pixel for pixel, apart from one (`re/dos/docs/ENGINE_MAP.md` §11).
 * **Saves** at the original's moments (new player, remove player, Start Over, Start New Player,
   Exit and Save, the end of each game) in `dos_users.dat` in the preference folder, in the DOS
   `USERS.DAT` format byte for byte. On the first start the DOS folder's `USERS.DAT` is imported (the
   DOS file is never changed); copy `dos_users.dat` back as `USERS.DAT` to continue in DOS.
 * **Sound**: the original's tunes and effects on the PC speaker, the Tandy 3-voice chip, or AdLib
-  (for now with a simple stand-in for the AdLib music).
+  (the original's AdLib driver on an emulated OPL2 chip, with its four orchestrations of each tune;
+  the effects play on the PC speaker as in the original). Sounds start when the original started
+  them, also those it started partway through a slow frame (after a level loads, under a message).
+* **Mods** of its own (pictures, music, questions, help and the program's texts; see
+  [Modding](#modding)) and a **soak test**: `tmport --edition dos --autoplay --soak` plays the game
+  headless as a bot over many seeds, looks and options and checks the game's rules on every tick
+  ([`docs/BUILDING.md`](docs/BUILDING.md), "The DOS edition's tools").
 
 **Keys** (the original's): Left / Right walk; Up goes through a door or cave, opens a lock with the
 level's key, or climbs; Up+Left / Up+Right (or Home / PgUp) jump; Down drops a coin at the hiding
@@ -289,15 +296,18 @@ reference captures, recordings and logs of the original (`docs/BUILDING.md`).
 `tmport --data <folder> --dos-preview` shows the earlier static preview of six screens.
 
 **Known differences** (`re/dos/docs/ENGINE_MAP.md` §8): the slow frames of the original (scene loads,
-full redraws, message bubbles, scrolling) last as long as in the reference recordings and their
-pictures appear when they end, but only the measured kinds are modelled (menus, dialog boxes and the
-quiz screen draw within one timer tick); the engine latches a frame's sprites before its timer tick
-where the original usually latches them after it, which shows only under a bubble that freezes the
-picture right after a tick (an elf's feet under the hint after a treasure search) and in whether the
-castle top's tick removes the key icon from the status bar at once; sounds that the original starts
-in the middle of a slow frame start at its beginning; the slow-CPU mode's box save does not model
-the original's save heap; the AdLib music is a stand-in; there are no mods for the DOS edition
-yet.
+full redraws, message bubbles, scrolling, the search) last as long as in the reference recordings,
+their pictures appear when they end, and the sounds started inside them come where the original
+started them; but only the measured kinds are modelled: menus, dialog boxes and the quiz screen draw
+within one timer tick, the end sequence's large animation frames take no time, and the Tandy, MCGA
+and CGA looks take the EGA's drawing times (the Tandy redraws the whole status bar faster, so there a
+message after a level loads opens a few ticks late). Whether the castle top's tick removes the key
+icon from the status bar at once is a race in the original (it did in one of five recordings; the
+engine keeps the icon). The slow-CPU mode's box save does not model the original's save heap; the
+AdLib music is synthesised by ymfm, whose OPL2 differs from the reference recordings' emulated chip
+only at sample level (the same register writes at the same timer ticks, the same pitches and
+onsets; `re/dos/docs/fmt_sound.md` §11.7) and plays with `--sound adlib` (the default stays the
+Tandy chip).
 
 ## Modding
 
@@ -315,6 +325,13 @@ The kit made by `--export-mod-kit` is a copy of your game's data: keep it to you
 [`docs/MODDING.md`](docs/MODDING.md) for the folder layout, the formats, the rules a mod must keep
 and the tools.
 
+The 1990 DOS edition has mods of its own: sprite frames and scenery as 16-colour PNGs (one picture
+changes the EGA, Tandy, MCGA and CGA looks alike), music and effects as note text, the questions and
+help pages as text, and the messages, boxes, menus, hints and title pages of `SST.EXE` as JSON. Add
+`--edition dos` to the two commands above (or point `--data` at the DOS folder); DOS mod folders go in
+`dos_mods` (or `[mods] dos_paths` in `tmport.ini`) and `--mods` works for both editions
+([`docs/MODDING.md`, "The 1990 DOS edition"](docs/MODDING.md#the-1990-dos-edition)).
+
 ## Building
 
 Windows (Visual Studio 2026 with its CMake and Ninja):
@@ -330,7 +347,7 @@ cmake --preset release
 cmake --build --preset release
 ```
 
-The first configure downloads SDL, TinySoundFont and doctest (pinned versions, checked by
+The first configure downloads SDL, TinySoundFont, ymfm and doctest (pinned versions, checked by
 SHA-256). [`docs/BUILDING.md`](docs/BUILDING.md) lists the requirements (on Linux, the development
 packages SDL needs), the build outputs (`tmport`, and on Windows also the console program
 `tmport-cli` for scripts), the tests and continuous integration.
@@ -356,6 +373,8 @@ comparing the engine with the original. The tools open no window (except the pic
   `tmport --help dos-sound` list their options. The DOS game itself runs headless with
   `--headless --keys`, `--dos-trace`, `--dos-dump-state` and `--dos-layout-seed` (see
   [DOS edition](#dos-edition)).
+* soak test of the DOS edition: `--edition dos --autoplay` plays the game headless as a bot and
+  checks its rules while it plays (`--soak` over many seeds, looks and options).
 
 The game itself can also run headless with scripted input (`--headless --keys "..."`).
 `tmport --help` gives an overview and `tmport --help <topic>` the options of each group;
@@ -426,12 +445,14 @@ built into the programs:
 |---|---|---|---|
 | [SDL](https://libsdl.org) | 3.4.18 | zlib | window, input, audio, timing (linked statically) |
 | [TinySoundFont](https://github.com/schellingb/TinySoundFont) (`tsf.h`, Bernhard Schelling) | commit `853a0a1` | MIT | the SoundFont MIDI synthesizer |
+| [ymfm](https://github.com/aaronsgiles/ymfm) (Aaron Giles) | commit `81aec25` | BSD-3-Clause | the OPL2 (YM3812) of the DOS edition's AdLib music |
 | [doctest](https://github.com/doctest/doctest) | 2.4.12 | MIT | the unit tests only (`tmtests`) |
 
-If you pass on builds of `tmport`, include the MIT licence text of TinySoundFont (SDL's zlib
-licence does not require a notice in binaries). Everything else (the PNG and zlib codecs, the
-MIDI sequencer, the CD-image reader, the NE parser) is the project's own code. The
-reverse-engineering work used Ghidra and Python, which are not part of the engine.
+If you pass on builds of `tmport`, include the MIT licence text of TinySoundFont and the
+BSD-3-Clause licence text of ymfm (SDL's zlib licence does not require a notice in binaries).
+Everything else (the PNG and zlib codecs, the MIDI sequencer, the CD-image reader, the NE parser)
+is the project's own code. The reverse-engineering work used Ghidra and Python, which are not
+part of the engine.
 
 The project's own code and documentation are released under the [MIT licence](LICENSE). The licence
 covers this project only: it grants no rights to *Treasure Mountain!* itself, whose files you

@@ -1,9 +1,9 @@
 {
- "description": "level 1, the run of r2/fl_search_t from ega/r2_treasure_spot: Down at 114 (pinned by the hidden elves, which move until the hint opens: their x in the end state), the treasure search, hint 4 opening at g_ticks 331520 as in the FRAME ring. The host mouse moved the pointer to the status bar during the reference run (DS:911E 98 -> 199; placed at tick 60)",
+ "description": "level 1, the run of r2/fl_search_t from ega/r2_treasure_spot: the treasure search, hint 4. Down at 115: the search starts in tick 186 (g_ticks 331355; the FRAME ring has idle frames up to 331354 and the first search frame mark at 331356), the hidden elves move until the hint opens (their x in the end state equal the state's), the result frame ends after tick 219 (g_ticks 331520, its mark) and the hint frame begins when it ends, before tick 220, latching tick 219 (the bubble's HUD redraw draws the actors of that tick). The host mouse moved the pointer to the status bar during the reference run (DS:911E 98 -> 199): placed at tick 61, which gives the pointer animation of the reference run: the ticks blocked behind the hint frame are DOSBox-X's 331535..331550. End state: g_randSeed, elves and sprite slots equal except slot 2's depth (the hidden content sprite: no tick with g_searchTimer 0 ran before the hint in the engine, see re/dos/docs/ENGINE_MAP.md section 8); the pointer's idle count DS:92AE 225 vs 226",
  "start": {
   "state": "savestates/ega/r2_treasure_spot.sav"
  },
- "keys": "60:move:318:199, 114:down:down, 116:up:down",
+ "keys": "61:move:318:199, 115:down:down, 117:up:down",
  "ticks": 290,
  "checkpoints": [
   {
@@ -24,7 +24,7 @@
    },
    "expect_ticks": 105,
    "tolerance": 0,
-   "source": "r2/fl_search_t FRAME ring: the hint frame began after g_ticks 331520 (tick 219); Down at tick 114"
+   "source": "r2/fl_search_t FRAME ring: the result frame's mark at g_ticks 331520 (tick 219), the hint frame 331520 -> 331543: the hint frame began between ticks 219 and 220, after the frame of tick 219 (its events are in the row of tick 220); Down at tick 115"
   }
  ]
 }

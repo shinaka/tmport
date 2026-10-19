@@ -103,3 +103,22 @@ an all-zero record, DS:4f5a `far[194]`, DS:5fd2 `u16[7]`, DS:62b7 `far[19]`, DS:
 DS:8d83 `near[14]`). The same names, as `k<Name>` constants (`g_cellPicture` → `kCellPicture`,
 `s_btnDone` → `kStrBtnDone`), are in `src/dos/data/dgroup_offsets.h`; add a row here before adding a
 constant there.
+
+## Wave 5: the AdLib driver (segment 4ac9)
+
+The wave-5 port of the AdLib driver (`src/dos/audio/adlib_driver.h`) found that many wave-0 names of
+segment 4ac9 did not describe the functions: they are the AdLib sample driver's routines (`SetMode`,
+`SetVoiceTimbre`, `SndSetAllPrm`, ...), and the register each writes is in the disassembly
+(`re/dos/docs/fmt_sound.md` §5.5). Renamed (old → canonical): 4ac9:0103 `AdLib_KeyOffAll` →
+`AdLib_SetMode`, 4ac9:010d `AdLib_ResetRegs` → `AdLib_SetWaveSel`, 4ac9:0150 `AdLib_InitTables` →
+`AdLib_SetPitchRange`, 4ac9:0179 `AdLib_Silence` → `AdLib_SetGlobalParams`, 4ac9:019a `AdLib_LoadTune`
+→ `AdLib_SetVoiceTimbre`, 4ac9:054a `AdLib_SetTempo` → `AdLib_InitSlotVolume`, 4ac9:055c
+`AdLib_CalcFreq` → `AdLib_CalcFNum`, 4ac9:0601 `AdLib_CalcBlock` → `AdLib_SetFNumRow`, 4ac9:067e
+`AdLib_BuildFreqTable` → `AdLib_InitFNums`, 4ac9:081a `AdLib_SetInstrument` → `AdLib_SetSlotParam`,
+4ac9:0847 `AdLib_SetVoiceInstr` → `AdLib_SetSlotParams`, 4ac9:08db `AdLib_WriteOperator` →
+`AdLib_WriteParam`, 4ac9:095e `AdLib_WriteOperator2` → `AdLib_WriteAllParams`, 4ac9:099c
+`AdLib_SetFeedback` → `AdLib_WriteKslLevel` (0x40), 4ac9:0a0e `AdLib_SetAM` → `AdLib_WriteNoteSel`
+(0x08), 4ac9:0a29 `AdLib_SetLevel` → `AdLib_WriteFeedbackFm` (0xC0), 4ac9:0b26 `AdLib_SetMult` →
+`AdLib_WriteAmVibEgKsrMulti` (0x20), 4ac9:0bd6 `AdLib_SetRhythm` → `AdLib_WriteAmVibRhythm` (0xBD).
+The driver's variables (BSS DS:C6E4..CB7C and the slot tables DS:8148, DS:815A) were added to
+`dgroup.tsv` as `g_opl*`, at the offsets of `AdLibDriver::kDs*`.

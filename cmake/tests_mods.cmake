@@ -3,4 +3,5 @@
 target_sources(tmtests PRIVATE
     tests/test_mods_formats.cpp
     tests/test_mods_game.cpp
+    tests/test_dos_mods.cpp
 )

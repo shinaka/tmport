@@ -13,7 +13,9 @@
 //     where the terrain allows no vertical move, while g_menuLock is 0;
 //   * Frame_Begin's latches (camera.h): g_sceneWanted, g_rankState, then Sprites_Snapshot;
 //   * Frame_Present's transition (main_loop/camera): g_transition is cleared at the end of the
-//     `dissolveFrames`-th frame after the one that latched it (the dissolve, ENGINE_MAP §3.4);
+//     `dissolveFrames`-th frame after the one that latched it (the dissolve, ENGINE_MAP §3.4), counted
+//     from the tick after the teleporting one: the frame that latches it runs right after that tick
+//     (wave 5), one more frame then;
 //   * the cell handlers: a few cell types (paths, the club door, the trunk ladder, the chute), and the
 //     player module's own 176a handlers through the dispatch.
 
@@ -203,10 +205,13 @@ public:
         g.world.sceneWanted = g.core.level;  // Frame_Begin 130f:025a latches
         g.world.frameRankState = g.player.rankState;
         spritesSnapshot(g, 0, kSpriteSlots);
-        if (g.world.transition != 0 && dissolveLeft_ == 0) dissolveLeft_ = dissolveFrames;
+        // The frame after the teleporting tick latches it; one set before that tick (a scene set up
+        // with it) counts from this frame.
+        if (g.world.transition != 0 && dissolveLeft_ == 0) dissolveLeft_ = dissolveFrames + (transitionBeforeTick_ == 0 ? 1 : 0);
     }
     void gameTick(const TickInfo& info) override {
         DosGame& g = *game_;
+        transitionBeforeTick_ = g.world.transition;
         Rec r;
         r.x = g.player.obj.x;
         r.y = g.player.obj.y;
@@ -260,6 +265,7 @@ private:
     std::unique_ptr<DosGame> game_;
     std::vector<Rec> recs_;
     int dissolveLeft_ = 0;
+    uint16_t transitionBeforeTick_ = 0;  // g_transition when the last game tick began
 };
 
 // The log value at record t (the last change point at or before t).

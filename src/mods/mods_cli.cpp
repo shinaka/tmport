@@ -8,6 +8,8 @@
 #include <string_view>
 #include <vector>
 
+#include "dos/mods/dos_mods_cli.h"
+#include "edition/edition.h"
 #include "mods/mod_kit.h"
 #include "mods/mods.h"
 #include "res/game_files.h"
@@ -42,6 +44,15 @@ std::optional<std::filesystem::path> dataPathFrom(const std::string& arg, const 
     return vfs::autoDetectDataPath(exeDirectory());
 }
 
+// --edition dos, or (no --edition) a --data path that holds only the DOS edition. Without either,
+// the commands work on the Windows edition exactly as before.
+bool isDosEdition(const std::string& edition, const std::string& dataArg) {
+    if (!edition.empty() && edition != "auto") return parseEditionKey(edition) == Edition::Dos1990;
+    if (dataArg.empty()) return false;
+    const EditionScan scan = scanEditions(pathFromUtf8(dataArg));
+    return scan.dos && !scan.win;
+}
+
 }  // namespace
 
 std::string modsUsage() {
@@ -57,12 +68,14 @@ std::string modsUsage() {
            "  --mods <dir>                     also load this mod folder; may be repeated (later ones win).\n"
            "                                   Works with the game and every tool that reads the game\n"
            "                                   files except --info, --export-mod-kit and the audio\n"
-           "                                   tools; with --check-mods it names a folder to check\n";
+           "                                   tools; with --check-mods it names a folder to check\n"
+           "  --edition dos                    the 1990 DOS edition's kit and mod folders (also chosen when\n"
+           "                                   --data names its folder; default data: TM_DATA_DOS, [dos] data)\n";
 }
 
 std::optional<int> runModsCommand(int argc, char** argv) {
     enum class Cmd { None, Export, Check } cmd = Cmd::None;
-    std::string outDir, dataPath, configPath;
+    std::string outDir, dataPath, configPath, edition;
     std::vector<std::string> dirs;
     bool force = false, verify = true, verbose = false, colour16 = false, compare = false;
     for (int i = 1; i < argc; ++i) {
@@ -104,6 +117,9 @@ std::optional<int> runModsCommand(int argc, char** argv) {
             colour16 = true;
         } else if (a == "--compare") {
             compare = true;
+        } else if (a == "--edition") {
+            if (!need()) return 2;
+            edition = argv[++i];
         } else {
             std::fprintf(stderr, "tmport: unknown argument '%s' for the mods tools\n%s", argv[i], modsUsage().c_str());
             return 2;
@@ -112,6 +128,27 @@ std::optional<int> runModsCommand(int argc, char** argv) {
     log::setVerbose(verbose);
     save::Paths paths = save::Paths::detect();
     if (!configPath.empty()) paths.iniPath = pathFromUtf8(configPath);
+    // The 1990 DOS edition (dos/mods/dos_mods_cli.h): --edition dos, or --data naming a DOS folder.
+    if (!edition.empty() && edition != "auto" && !parseEditionKey(edition)) {
+        std::fprintf(stderr, "tmport: --edition takes win, dos or auto, not '%s'\n", edition.c_str());
+        return 2;
+    }
+    if (isDosEdition(edition, dataPath)) {
+        if (colour16) {
+            std::fprintf(stderr, "tmport: --16 is an option of the Windows edition\n");
+            return 2;
+        }
+        dos::DosModsCommand dc;
+        dc.exportKit = cmd == Cmd::Export;
+        dc.outDir = outDir;
+        dc.dataArg = dataPath;
+        for (const auto& d : dirs) dc.modDirs.push_back(pathFromUtf8(d));
+        dc.force = force;
+        dc.verify = verify;
+        dc.compare = compare;
+        dc.paths = paths;
+        return dos::runDosModsCommand(dc);
+    }
     const auto data = dataPathFrom(dataPath, paths);
     if (!data) {
         std::fprintf(stderr, "tmport: the game data was not found. Pass --data <TMTWINCD folder or CD image> or set TM_DATA.\n");

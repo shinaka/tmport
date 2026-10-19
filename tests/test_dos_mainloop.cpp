@@ -165,13 +165,14 @@ TEST_CASE("dos mainloop: the options decide what Hw_Detect and the switches gave
     CHECK(f2.g().core.soundDevice == 2);
 }
 
-TEST_CASE("dos mainloop: each game tick is sound ticks, Frame_Begin, Game_Tick, frame body") {
+TEST_CASE("dos mainloop: each game tick is sound ticks, Game_Tick, Frame_Begin, frame body") {
     TM_REQUIRE_DOS_GAME_FILES();
     dosgame::GameFixture f(*gameFiles);
     OrderClient order(f.g());
     f.runtime().setClient(&order);
     f.runtime().stepGameTicks(3);
-    CHECK(order.log == "SSSSSBTFSSSSSBTFSSSSSBTF");
+    // At the reference speed the frame that does a tick's work begins right after it (wave 5).
+    CHECK(order.log == "SSSSSTBFSSSSSTBFSSSSSTBF");
     // Slow-machine mode: one frame per two ticks, the second tick without a Frame_Begin.
     RuntimeOptions ro;
     ro.frameMode = FrameMode::SlowMachine;
@@ -414,12 +415,15 @@ TEST_CASE("dos mainloop: a dissolve is one long frame: no Frame_Begin, then the 
     g.frameClock().beginFrame(kPitTicksPerGameTick);  // what the runtime does at each frame start
     framePresent(g);
     CHECK(g.dissolveRunning);
+    g.rt.frameTiming().continueFrame();  // as mainFrameBody reports it after this present
     int frames = 1;
     while (g.dissolveRunning && frames < 50) {
-        // The runtime's frame: no Frame_Begin latch (the latched camera stays), the gate kept.
+        // The runtime's frame: no Frame_Begin latch (the latched camera stays), the gate kept (the body
+        // reported FrameTiming::continueFrame, so the runtime does not clear g_stepDone).
+        CHECK(f.runtime().frameTiming().continuesFrame());
+        f.runtime().frameTiming().clear();
         g.world.cameraX = static_cast<uint16_t>(g.world.cameraX + 8);
         const uint16_t latched = g.world.frameCamX;
-        g.stepGate().clear();  // the runtime clears g_stepDone before each frame
         g.frameClock().beginFrame(kPitTicksPerGameTick);
         const bool carried = g.dissolveGate;
         g.frameBegin();
@@ -834,6 +838,80 @@ TEST_CASE("dos mainloop: the driver facade shows an effect's status at once and 
     CHECK_FALSE(s.sfxActive());
     s.pitTick();
     CHECK_FALSE(s.sfxActive());
+}
+
+TEST_CASE("dos mainloop: a delayed call (inside a long frame) reaches the driver that many PIT ticks later, in time order") {
+    TM_REQUIRE_DOS_FILES();
+    auto device = makeDosAudioDevice(*dosFiles, SoundDevice::Tandy);
+    REQUIRE(device);
+    DosAudioSound s(*device, true);
+    uint32_t delay = 3;
+    s.setDelaySource([&delay] { return delay; });
+    s.sfxPlay(4);  // made 3 PIT ticks into a frame: the 4th interrupt from now plays it
+    delay = 0;
+    CHECK(s.sfxActive());  // Sfx_Play set DS:6448 when it was made
+    for (int t = 0; t < 3; ++t) {
+        s.pitTick();
+        CHECK(device->status().sfxStatus == 0);
+        CHECK(s.sfxActive());
+    }
+    s.pitTick();
+    CHECK(device->status().sfxStatus != 0);
+    CHECK(s.sfxActive());
+    // A stop made later but due earlier (a game tick's call while the frame's play waits) comes first.
+    s.sfxStop();
+    s.pitTick();
+    CHECK(device->status().sfxStatus == 0);
+    delay = 2;
+    s.sfxPlay(4);
+    delay = 0;
+    s.sfxStop();
+    s.pitTick();
+    CHECK(device->status().sfxStatus == 0);
+    s.pitTick();
+    s.pitTick();
+    CHECK(device->status().sfxStatus != 0);  // the play, due at the third interrupt, came after the stop
+}
+
+TEST_CASE("dos mainloop: a resumed game's tune and the start message's pause sound where the original's frames made them (wave 5)") {
+    // tandy/signin: Ada, Enter, Yes on the saved-game prompt (looks/state_tandy_signin). The frame after
+    // the flash: Game_Start's Quiz_LoadQuestions (7 PIT ticks), its Music_Play, Scene_Update's
+    // MOUNT2N3 (20.3) and SPRITES.PAK (2.2), Sound_SyncState's gate and Music_Play; the next frames:
+    // the HUD redraw (16), then the start message's bubble (27.5) before its Sound_SyncState pauses
+    // the music (avi/tandy_r3_session.avi: the tune starts 23 PIT ticks after the flash's end, not at it).
+    TM_REQUIRE_DOS_GAME_FILES();
+    TM_REQUIRE_DOS_CAPTURES();
+    dosgame::GameFixture f(*gameFiles);
+    DosGame& g = f.g();
+    (void)loadDosboxState(g, DosboxState::load(*captures / "savestates" / "tandy" / "signin.sav"));
+    f.sound().clear();
+    f.sound().setDelaySource([&f] { return f.runtime().soundDelay(); });
+    REQUIRE(f.setScript("20:tap:up, 30:tap:enter, 60:tap:enter"));
+    f.step(120);
+    const auto& calls = f.sound().calls();
+    const auto& delays = f.sound().delays();
+    REQUIRE(calls.size() == delays.size());
+    std::string seen;
+    for (size_t i = 0; i < calls.size(); ++i) seen += std::format("{}:{}@{} ", static_cast<int>(calls[i].op), calls[i].arg, delays[i]);
+    CAPTURE(seen);
+    std::vector<uint32_t> tunes, gates;
+    for (size_t i = 0; i < calls.size(); ++i) {
+        if (calls[i].op == Op::MusicPlay) tunes.push_back(delays[i]);
+        if (calls[i].op == Op::MusicGate) gates.push_back(delays[i]);
+    }
+    REQUIRE(tunes.size() == 2);
+    // Game_Start's after its question load (7 PIT ticks from the flash's end, which lies 0..4 PIT ticks
+    // before the runtime's tick), Sound_SyncState's after MOUNT2N3 and SPRITES.PAK as well (22.5 more).
+    CHECK(tunes[1] - tunes[0] == 22);
+    CHECK(tunes[0] >= 3);
+    CHECK(tunes[0] <= 7);
+    // The gate opens with the second (same frame); the bubble's pause comes 27.5 PIT ticks into its
+    // frame, which began when the HUD redraw's frame ended, between two game ticks (before the
+    // runtime's current one: 2 to 3 PIT ticks less from there).
+    REQUIRE(gates.size() >= 2);
+    CHECK(gates[gates.size() - 2] == tunes[1]);
+    CHECK(gates.back() >= 24);
+    CHECK(gates.back() <= 28);
 }
 
 TEST_CASE("dos mainloop: without keys the attract pages change on their 7200-PIT-tick time-outs") {

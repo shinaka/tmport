@@ -105,6 +105,14 @@ right after `GameFiles::open` (the game in `app/bootstrap.cpp`, the tools throug
 `cli/tool_mods.h`). The user documentation (folder layout, formats, constraints, tools) is
 [`MODDING.md`](MODDING.md).
 
+The 1990 DOS edition's mod layer is `src/dos/mods/` (namespace `tmport::dos`): `DosFiles::open`
+applies the installed `DosOverrides` (`dos/data/dos_files.h`) to the checked original files, so the
+game code reads modded bytes like originals; `dos::installDosMods` installs the folders at the DOS
+start-up (`app/bootstrap.cpp`). PAK/PAN pictures go through PNG with the original packers' encodings,
+sound files through a note text, `ALL_PUZS`/`PRG_DICT`/`HELP.DAT` through text, and the strings and
+colour tables of `SST.EXE` are written into its DGROUP image (`DosExe::writeDs`) before any table is
+read (MODDING.md, "The 1990 DOS edition").
+
 ## Testing
 
 * `tmtests`: decoders vs the Python reference tools in `tools/assets/` (byte-exact RUND

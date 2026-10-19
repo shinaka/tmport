@@ -10,7 +10,7 @@ namespace {
 
 std::unique_ptr<OplBackend> defaultOpl(const SoundBank& bank, const DosRenderConfig& cfg, std::unique_ptr<OplBackend> given) {
     if (given || bank.device != SoundCard::AdLib) return given;
-    return std::make_unique<OplFallbackSynth>(cfg.sampleRate);
+    return std::make_unique<AdLibOpl>(*bank.tables, cfg.sampleRate);
 }
 
 }  // namespace
@@ -51,11 +51,18 @@ void DosSoundRenderer::beginTick() {
 void DosSoundRenderer::synthesize(double* out, size_t n) {
     speaker_.render(out, n);
     psg_.render(out, n);
-    if (opl_) opl_->render(out, n);
+}
+
+void DosSoundRenderer::synthesizeOpl(double* out, size_t n) {
+    if (oplSynthesis_)
+        opl_->render(out, n);
+    else
+        opl_->skip(n);
 }
 
 void DosSoundRenderer::render(double* out, size_t n) {
     std::fill(out, out + n, 0.0);
+    if (opl_) oplBuf_.assign(n, 0.0);
     size_t done = 0;
     while (done < n) {
         if (left_ == 0) {
@@ -64,10 +71,13 @@ void DosSoundRenderer::render(double* out, size_t n) {
         }
         const size_t k = std::min(left_, n - done);
         synthesize(out + done, k);
+        if (opl_) synthesizeOpl(oplBuf_.data() + done, k);
         left_ -= k;
         done += k;
     }
     filter(out, n);
+    if (opl_)
+        for (size_t i = 0; i < n; ++i) out[i] = (out[i] + oplBuf_[i]) * kAdLibMixLevel;
 }
 
 size_t DosSoundRenderer::renderTick(std::vector<double>& out) {
@@ -75,8 +85,14 @@ size_t DosSoundRenderer::renderTick(std::vector<double>& out) {
     const size_t at = out.size(), k = left_;
     out.resize(at + k, 0.0);
     synthesize(out.data() + at, k);
+    if (opl_) {
+        oplBuf_.assign(k, 0.0);
+        synthesizeOpl(oplBuf_.data(), k);
+    }
     left_ = 0;
     filter(out.data() + at, k);
+    if (opl_)
+        for (size_t i = 0; i < k; ++i) out[at + i] = (out[at + i] + oplBuf_[i]) * kAdLibMixLevel;
     return k;
 }
 
@@ -104,10 +120,10 @@ void DosSoundRenderer::filter(double* out, size_t n) {
 // ------------------------------------------------------------------------- offline helpers
 
 OfflineRender renderEntry(DosSoundRenderer& r, bool tune, int id, int loops, double maxSeconds,
-                          const std::function<void()>& afterTick) {
+                          const std::function<void()>& afterTick, int variant) {
     Sequencer& s = r.sequencer();
     if (tune)
-        s.musicPlay(id, 0);
+        s.musicPlay(id, variant);
     else
         s.sfxPlay(id);
     OfflineRender res;

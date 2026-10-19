@@ -9,7 +9,7 @@
    "id": "frame1_own_screen",
    "tick": 1,
    "capture_state": "savestates/r2/fl_bridge_l2.sav",
-   "max_px": 0
+   "info": "the first engine frame runs after game tick 1 (wave 5: Game_Tick, Frame_Begin, the body), whose moving sprites (falling leaves, the slide) changed; the state's own screen shows the frame before that tick"
   }
  ]
 }

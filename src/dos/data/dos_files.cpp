@@ -90,6 +90,30 @@ void checkDosDataFile(FileIndex index, std::string_view name, std::span<const ui
     }
 }
 
+void checkPuzzleWindows(const DosExe& exe, std::span<const uint8_t> allPuzs) {
+    // The quiz reads every tier's texts with one 0x7B00-byte read (Quiz_LoadQuestions 46ce:09ab).
+    const auto puzzles = PuzzleFile::parse(allPuzs);
+    const auto tiers = QuizTiers::read(exe, puzzles);
+    for (const int tier : {0, 1, 2, 3, 5}) {
+        const auto [first, end] = tiers.range(tier);
+        for (int q = first; q < end; ++q)
+            if (!puzzles.fitsWindow(first, q)) bad("ALL_PUZS", "question " + std::to_string(q) + " outside its tier's read");
+    }
+}
+
+namespace {
+
+std::shared_ptr<const DosOverrides>& overridesSlot() {
+    static std::shared_ptr<const DosOverrides> slot;
+    return slot;
+}
+
+}  // namespace
+
+void setDosOverrides(std::shared_ptr<const DosOverrides> overrides) { overridesSlot() = std::move(overrides); }
+
+const std::shared_ptr<const DosOverrides>& dosOverrides() { return overridesSlot(); }
+
 DosFiles::DosFiles(std::filesystem::path folder, DosExe exe, FileTable table, std::vector<uint8_t> exeFile)
     : folder_(std::move(folder)), exe_(std::move(exe)), table_(std::move(table)), exeFile_(std::move(exeFile)) {}
 
@@ -98,7 +122,9 @@ bool DosFiles::looksLikeDosFolder(const std::filesystem::path& folder) {
     return dir.resolve(kExeName, false) && dir.resolve("SPRITES.PAK", false) && dir.resolve("ALL_PUZS", false);
 }
 
-DosFiles DosFiles::open(const std::filesystem::path& folder) {
+DosFiles DosFiles::open(const std::filesystem::path& folder) { return open(folder, dosOverrides().get()); }
+
+DosFiles DosFiles::open(const std::filesystem::path& folder, const DosOverrides* overrides) {
     const vfs::DirectorySource dir(folder);
     const auto read = [&](std::string_view name) -> std::optional<std::vector<uint8_t>> {
         const auto p = dir.resolve(name, false);
@@ -139,15 +165,10 @@ DosFiles DosFiles::open(const std::filesystem::path& folder) {
         checkDosDataFile(index, name, *bytes);
         files.files_[static_cast<size_t>(i)] = std::move(*bytes);
     }
+    checkPuzzleWindows(files.exe_, files.bytes(FileIndex::AllPuzs));
 
-    // The quiz reads every tier's texts with one 0x7B00-byte read (Quiz_LoadQuestions 46ce:09ab).
-    const auto puzzles = PuzzleFile::parse(files.bytes(FileIndex::AllPuzs));
-    const auto tiers = QuizTiers::read(files.exe_, puzzles);
-    for (const int tier : {0, 1, 2, 3, 5}) {
-        const auto [first, end] = tiers.range(tier);
-        for (int q = first; q < end; ++q)
-            if (!puzzles.fitsWindow(first, q)) bad("ALL_PUZS", "question " + std::to_string(q) + " outside its tier's read");
-    }
+    // The mod layer works on the checked originals; what it hands back passed the same checks.
+    if (overrides) overrides->apply(files.exe_, files.files_);
     return files;
 }
 

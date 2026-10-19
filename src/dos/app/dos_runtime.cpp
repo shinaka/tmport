@@ -163,64 +163,109 @@ bool DosRuntime::frozenAt(uint64_t units) const {
     return std::any_of(frozen_.begin(), frozen_.end(), [units](const AbsSpan& s) { return units >= s.from && units < s.to; });
 }
 
-// One game tick (Timer_ISR step 5) with the original frame it belongs to.
+// A call at `units` is played by the interrupt after it, PIT tick units / 1000 + 1; the device plays a
+// command at the next interrupt, pit_ + 1, and the given number of PIT ticks after it.
+uint32_t DosRuntime::soundDelay() const {
+    if (!longFrames() || !frameTiming_.isOpen()) return 0;
+    const uint64_t pit = frameTiming_.callTime() / FrameTiming::kMilli;
+    return pit > pit_ ? static_cast<uint32_t>(pit - pit_) : 0;
+}
+
+// One original frame at the reference timing: g_stepDone cleared (unless the frame continues a
+// dissolve or a Button_Flash wait: no Frame_Begin then), the frame clock (the frame that runs after a
+// game tick takes that tick's share; one begun before its tick, when a long frame ended, none),
+// Frame_Begin, the body, and its reported cost placed at its start.
+void DosRuntime::runFrame(RuntimeClient& c, uint64_t start, uint64_t nextTick, bool continued) {
+    if (!continued) stepGate_.clear();
+    const uint64_t tick = kPitTicksPerGameTick * FrameTiming::kMilli;
+    frameClock_.beginFrame(nextTick - start >= tick ? kPitTicksPerGameTick : 0);
+    frameTiming_.clear();
+    frameTiming_.setStart(start, nextTick);
+    frameTiming_.open();
+    c.frameBegin();
+    c.frameBody();
+    ++frames_;
+    placeFrameTiming(frameTiming_.startUnits());
+    continuing_ = frameTiming_.continuesFrame();
+    frameTiming_.clear();
+    if (c.quitRequested()) running_ = false;  // main: until g_quit != 0
+}
+
+// Game_Tick with its two counters, unless the tick falls into the frame's I/O (g_quit DS:912E = 1:
+// 130f:0103 returns at once).
+void DosRuntime::runGameTick(RuntimeClient& c, uint64_t n, uint64_t timeNs, bool inFrame) {
+    const bool frozen = longFrames() && frozenAt(unitsNow());
+    if (frozen) ++ticksFrozen_;
+    if (frozen || c.quitRequested()) return;
+    TickInfo info;
+    info.gameTick = n;
+    info.ticks = ticks();
+    info.gated = stepGate_.done();
+    info.timeNs = timeNs;
+    info.inLongFrame = inFrame;
+    c.gameTick(info);
+    counters_.advance(c.uiMode());
+}
+
+// One game tick (Timer_ISR step 5) with the original frames around it.
 void DosRuntime::gameStep(uint64_t n) {
     RuntimeClient& c = client_ ? *client_ : nullClient_;
     const uint64_t t = PitClock::timeOfPitTick(pit_);
     applyScript(n, t);
     keyboard_.deliverUntil(t);  // Kbd_ISR ran for every key byte before this tick
-    const uint64_t now = pit_ * FrameTiming::kMilli;
+    const uint64_t now = unitsNow();
     if (frames_ == 0 && !frameTiming_.empty()) {
         // A cost reported before the first frame (main's start-up I/O) belongs to a frame that
         // began at PIT tick 0.
         if (longFrames()) placeFrameTiming(0);
         frameTiming_.clear();
     }
-    // Reference timing: the tick falls inside the last frame (it lasted past this tick's time), so no
-    // frame starts here.
-    const bool inFrame = longFrames() && now < frameEnd_;
-    if (inFrame) ++ticksInLongFrames_;
+    if (longFrames()) {
+        gameStepReference(n, c, t, now);
+        return;
+    }
+    // Period mode and the slow-machine mode: Frame_Begin, the game ticks of the frame, its body (the
+    // frame stands from right after the previous tick to the tick after its body; no cost is placed).
     const uint32_t perFrame = ticksPerFrame();
-    const uint64_t previousTick = now - kPitTicksPerGameTick * FrameTiming::kMilli + 1;
-    if (!inFrame && (n - 1) % perFrame == 0) {
+    if ((n - 1) % perFrame == 0) {
+        const uint64_t tick = kPitTicksPerGameTick * FrameTiming::kMilli;
         stepGate_.clear();
         frameClock_.beginFrame(perFrame * kPitTicksPerGameTick);
         frameTiming_.clear();
-        // The frame begins right after the previous tick, or when the frame before it ended if that
-        // was later (a scroll frame that ran past the previous tick: r2/fl_bridge_l3 log tick 1111,
-        // the champion's arrival in r2/fl_crown_wait).
-        frameFrom_ = std::max<uint64_t>(previousTick, frameEnd_);
-        if (longFrames()) frameTiming_.setStartOffset(static_cast<uint32_t>(frameFrom_ - previousTick));
+        frameTiming_.setStart(now - tick + 1, now + perFrame * tick);
         c.frameBegin();
-        // I/O that Frame_Begin's latches start (the scene a tick asked for): the frame began right
-        // after the previous tick (or frame), so this tick may already fall into it.
-        if (longFrames() && frameTiming_.countsFromPreviousTick()) placeFrameTiming(frameFrom_);
     }
-    // Inside the frame's I/O (g_quit DS:912E = 1) Game_Tick returns at once.
-    const bool frozen = longFrames() && frozenAt(now);
-    if (frozen) ++ticksFrozen_;
-    if (!frozen && !c.quitRequested()) {  // 130f:0103: if g_quit != 0 return
-        TickInfo info;
-        info.gameTick = n;
-        info.ticks = ticks();
-        info.gated = stepGate_.done();
-        info.timeNs = t;
-        info.inLongFrame = inFrame;
-        c.gameTick(info);
-        counters_.advance(c.uiMode());
-    }
-    if (!inFrame && n % perFrame == 0) {
+    runGameTick(c, n, t, false);
+    if (n % perFrame == 0) {
         c.frameBody();
         ++frames_;
-        if (longFrames()) {
-            const bool fromPrevious = frameTiming_.countsFromPreviousTick();
-            placeFrameTiming(fromPrevious ? frameFrom_ : now);
-            // A frame that began after this tick: the ticks inside it see g_stepDone as its
-            // Frame_Begin left it.
-            if (!fromPrevious && frameEnd_ > now + kPitTicksPerGameTick * FrameTiming::kMilli) stepGate_.clear();
-        }
         frameTiming_.clear();
         if (c.quitRequested()) running_ = false;  // main: until g_quit != 0
+    }
+}
+
+// The reference timing (lockstep at the reference frame speed: long frames, PORTING_NOTES.md §2.5).
+// The original's loop runs its frames back to back; idle ones last a fraction of a PIT tick, so the
+// frame that does a tick's work begins right after that tick. A frame that ran past a tick (a scroll
+// frame, a search frame, a bubble, a scene load) has the ticks inside it run Game_Tick without a frame
+// of their own (or not at all inside its I/O); the loop's next frame begins when it ends: before the
+// next game tick when it ended after the previous one.
+void DosRuntime::gameStepReference(uint64_t n, RuntimeClient& c, uint64_t timeNs, uint64_t now) {
+    const uint64_t tick = kPitTicksPerGameTick * FrameTiming::kMilli;
+    if (!continuing_ && frames_ > 0 && frameEnd_ > now - tick && frameEnd_ <= now) {
+        // The frame that began when the last one ended, between the previous tick and this one: it
+        // latches what the ticks before it did and may last past this tick (which then falls inside it).
+        runFrame(c, frameEnd_, now, false);
+        if (!running_) return;
+    }
+    // The tick falls inside the last frame (it lasted past this tick's time): no frame after it.
+    const bool inFrame = now < frameEnd_;
+    if (inFrame) ++ticksInLongFrames_;
+    runGameTick(c, n, timeNs, inFrame);
+    if (!inFrame && running_) {
+        // The frame after this tick: a new one (Frame_Begin latches this tick), or the next part of a
+        // dissolve or a Button_Flash wait (no Frame_Begin: g_stepDone stays as the ticks set it).
+        runFrame(c, now, now + tick, continuing_);
     }
 }
 

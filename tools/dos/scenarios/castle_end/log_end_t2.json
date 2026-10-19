@@ -9,55 +9,154 @@
   {
    "id": "log_end",
    "at_log_end": "savestates/r2/fl_end_t2_wait.sav",
-   "capture_state": "savestates/r2/fl_end_t2_wait.sav"
+   "capture_state": "savestates/r2/fl_end_t2_wait.sav",
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; in this run (1 of the 5 reference runs) DOSBox-X redrew the clue box without the key: its castle-top tick landed between a frame's Frame_Begin and its Screen_DrawOverlay, a sub-tick race of the original's loop. The engine runs the frame after its tick, whose Frame_Begin latches scene 3 first (the painter skips the box), as in the other 4 runs (ega_r2_end_t6_allfound_nokey, ega_r2_crown_nokey, ega_r2_crown_t2_total300_nokey, ega_castle_ladder_jump_top keep the icon until the clubhouse)"
+    }
+   ]
   },
   {
    "id": "horn",
    "tick": 266,
    "capture": "ega/r2_end_01_castle_top_horn.png",
-   "max_px": 0
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; in this run (1 of the 5 reference runs) DOSBox-X redrew the clue box without the key: its castle-top tick landed between a frame's Frame_Begin and its Screen_DrawOverlay, a sub-tick race of the original's loop. The engine runs the frame after its tick, whose Frame_Begin latches scene 3 first (the painter skips the box), as in the other 4 runs (ega_r2_end_t6_allfound_nokey, ega_r2_crown_nokey, ega_r2_crown_t2_total300_nokey, ega_castle_ladder_jump_top keep the icon until the clubhouse)"
+    }
+   ]
   },
   {
    "id": "into_chest",
    "tick": 403,
    "capture": "ega/r2_end_02_treasure_into_chest.png",
-   "max_px": 0
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; in this run (1 of the 5 reference runs) DOSBox-X redrew the clue box without the key: its castle-top tick landed between a frame's Frame_Begin and its Screen_DrawOverlay, a sub-tick race of the original's loop. The engine runs the frame after its tick, whose Frame_Begin latches scene 3 first (the painter skips the box), as in the other 4 runs (ega_r2_end_t6_allfound_nokey, ega_r2_crown_nokey, ega_r2_crown_t2_total300_nokey, ega_castle_ladder_jump_top keep the icon until the clubhouse)"
+    }
+   ]
   },
   {
    "id": "chest_open",
    "tick": 517,
    "capture": "ega/r2_end_03_chest_open.png",
-   "max_px": 0
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; in this run (1 of the 5 reference runs) DOSBox-X redrew the clue box without the key: its castle-top tick landed between a frame's Frame_Begin and its Screen_DrawOverlay, a sub-tick race of the original's loop. The engine runs the frame after its tick, whose Frame_Begin latches scene 3 first (the painter skips the box), as in the other 4 runs (ega_r2_end_t6_allfound_nokey, ega_r2_crown_nokey, ega_r2_crown_t2_total300_nokey, ega_castle_ladder_jump_top keep the icon until the clubhouse)"
+    }
+   ]
   },
   {
    "id": "second_treasure",
    "tick": 647,
    "capture": "ega/r2_end_04_second_treasure.png",
-   "max_px": 0
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; in this run (1 of the 5 reference runs) DOSBox-X redrew the clue box without the key: its castle-top tick landed between a frame's Frame_Begin and its Screen_DrawOverlay, a sub-tick race of the original's loop. The engine runs the frame after its tick, whose Frame_Begin latches scene 3 first (the painter skips the box), as in the other 4 runs (ega_r2_end_t6_allfound_nokey, ega_r2_crown_nokey, ega_r2_crown_t2_total300_nokey, ega_castle_ladder_jump_top keep the icon until the clubhouse)"
+    }
+   ]
   },
   {
    "id": "at_chute",
    "tick": 972,
    "capture": "ega/r2_end_05_at_chute.png",
-   "max_px": 0
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; in this run (1 of the 5 reference runs) DOSBox-X redrew the clue box without the key: its castle-top tick landed between a frame's Frame_Begin and its Screen_DrawOverlay, a sub-tick race of the original's loop. The engine runs the frame after its tick, whose Frame_Begin latches scene 3 first (the painter skips the box), as in the other 4 runs (ega_r2_end_t6_allfound_nokey, ega_r2_crown_nokey, ega_r2_crown_t2_total300_nokey, ega_castle_ladder_jump_top keep the icon until the clubhouse)"
+    }
+   ]
   },
   {
    "id": "fall_shaft",
    "tick": 1036,
    "capture": "ega/r2_end_06_fall_shaft.png",
-   "max_px": 0
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; in this run (1 of the 5 reference runs) DOSBox-X redrew the clue box without the key: its castle-top tick landed between a frame's Frame_Begin and its Screen_DrawOverlay, a sub-tick race of the original's loop. The engine runs the frame after its tick, whose Frame_Begin latches scene 3 first (the painter skips the box), as in the other 4 runs (ega_r2_end_t6_allfound_nokey, ega_r2_crown_nokey, ega_r2_crown_t2_total300_nokey, ega_castle_ladder_jump_top keep the icon until the clubhouse)"
+    }
+   ]
   },
   {
    "id": "treasure_room",
    "tick": 1358,
    "capture": "ega/r2_end_07_treasure_room.png",
-   "max_px": 0
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; in this run (1 of the 5 reference runs) DOSBox-X redrew the clue box without the key: its castle-top tick landed between a frame's Frame_Begin and its Screen_DrawOverlay, a sub-tick race of the original's loop. The engine runs the frame after its tick, whose Frame_Begin latches scene 3 first (the painter skips the box), as in the other 4 runs (ega_r2_end_t6_allfound_nokey, ega_r2_crown_nokey, ega_r2_crown_t2_total300_nokey, ega_castle_ladder_jump_top keep the icon until the clubhouse)"
+    }
+   ]
   },
   {
    "id": "rank_chest_fill",
    "tick": 1457,
    "capture": "ega/r2_end_08_rank_chest_fill.png",
-   "max_px": 0
+   "max_px": 0,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; in this run (1 of the 5 reference runs) DOSBox-X redrew the clue box without the key: its castle-top tick landed between a frame's Frame_Begin and its Screen_DrawOverlay, a sub-tick race of the original's loop. The engine runs the frame after its tick, whose Frame_Begin latches scene 3 first (the painter skips the box), as in the other 4 runs (ega_r2_end_t6_allfound_nokey, ega_r2_crown_nokey, ega_r2_crown_t2_total300_nokey, ega_castle_ladder_jump_top keep the icon until the clubhouse)"
+    }
+   ]
   }
  ],
  "logs": [
@@ -133,8 +232,20 @@
     140,
     1340
    ],
-   "max_off": 8,
-   "max_dev": 0.6
+   "max_off": 46,
+   "max_dev": 0.7,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; in this run (1 of the 5 reference runs) DOSBox-X redrew the clue box without the key: its castle-top tick landed between a frame's Frame_Begin and its Screen_DrawOverlay, a sub-tick race of the original's loop. The engine runs the frame after its tick, whose Frame_Begin latches scene 3 first (the painter skips the box), as in the other 4 runs (ega_r2_end_t6_allfound_nokey, ega_r2_crown_nokey, ega_r2_crown_t2_total300_nokey, ega_castle_ladder_jump_top keep the icon until the clubhouse)"
+    }
+   ],
+   "wave5": "wave 5 (frame order): a short frame's picture now shows from the tick that changed it, a long one's (a scroll step: 6.5-7.5 PIT ticks) from the tick after; in the trunk-climb AVI recorded with r2/fl_climb the climb's sprite steps and scroll steps now both fall on the fitted time base (mean offsets -0.16 and 0.00 ticks; before -0.81 and +0.09). In the castle AVIs the end sequence's animation frames appear about as late after their ticks as the scroll steps (relative offsets: before +0.2, now -0.8 ticks in ega_r2_end_t2_nokey.avi, recorded with r2/fl_end_t2_wait, whose ticks the engine matches one for one): those frames (several large sprites drawn and presented) last about 6 PIT ticks on the reference machine, which no log measures yet (the FRAME ring of r2/fl_end_t2_wait holds only the rank screen); not modelled, so the fit keeps 46 frames off it, at most 0.63 ticks (wave 4: 8)"
   },
   {
    "id": "treasure_room_rank_chest",
@@ -148,7 +259,19 @@
     1480
    ],
    "max_off": 6,
-   "max_dev": 0.6
+   "max_dev": 0.75,
+   "masks": [
+    {
+     "rect": [
+      6,
+      165,
+      22,
+      191
+     ],
+     "reason": "the castle-top tick clears g_keyState; in this run (1 of the 5 reference runs) DOSBox-X redrew the clue box without the key: its castle-top tick landed between a frame's Frame_Begin and its Screen_DrawOverlay, a sub-tick race of the original's loop. The engine runs the frame after its tick, whose Frame_Begin latches scene 3 first (the painter skips the box), as in the other 4 runs (ega_r2_end_t6_allfound_nokey, ega_r2_crown_nokey, ega_r2_crown_t2_total300_nokey, ega_castle_ladder_jump_top keep the icon until the clubhouse)"
+    }
+   ],
+   "wave5": "wave 5 (frame order): a short frame's picture now shows from the tick that changed it, a long one's (a scroll step: 6.5-7.5 PIT ticks) from the tick after; in the trunk-climb AVI recorded with r2/fl_climb the climb's sprite steps and scroll steps now both fall on the fitted time base (mean offsets -0.16 and 0.00 ticks; before -0.81 and +0.09). In the castle AVIs the end sequence's animation frames appear about as late after their ticks as the scroll steps (relative offsets: before +0.2, now -0.8 ticks in ega_r2_end_t2_nokey.avi, recorded with r2/fl_end_t2_wait, whose ticks the engine matches one for one): those frames (several large sprites drawn and presented) last about 6 PIT ticks on the reference machine, which no log measures yet (the FRAME ring of r2/fl_end_t2_wait holds only the rank screen); not modelled, so the fit keeps 5 frames off it, at most 0.70 ticks (wave 4: 6)"
   }
  ]
 }

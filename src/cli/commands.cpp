@@ -32,6 +32,7 @@
 #include "platform/engine_setup.h"
 #include "res/game_files.h"
 #include "tools/autoplay/autoplay.h"
+#include "dos/autoplay/dos_autoplay.h"
 #include "util/error.h"
 #include "util/file_util.h"
 #include "util/log.h"
@@ -431,7 +432,7 @@ constexpr HelpTopic kHelpTopics[] = {
     {"game", app::launchUsage},           {"inspect", inspectUsage},       {"text", textUiUsage},
     {"anim", anim::animUsage},            {"screen", game::screensUsage},  {"scene", game::scenes::scenesUsage},
     {"room", game::room::roomUsage},      {"audio", audio::audioCliUsage}, {"mods", mods::modsUsage},
-    {"dos-sound", dos::dosSoundUsage},   {"dos-gfx", dos::dosGfxUsage},
+    {"dos-sound", dos::dosSoundUsage},   {"dos-gfx", dos::dosGfxUsage},   {"dos-autoplay", dos::autoplay::dosAutoplayUsage},
 };
 
 constexpr char kHelpHeader[] =
@@ -484,6 +485,7 @@ int run(int argc, char** argv) {
     if (auto rc = game::runScreensCommand(argc, argv)) return *rc;
     if (auto rc = game::scenes::runScenesCommand(argc, argv)) return *rc;
     if (auto rc = game::room::runRoomCommand(argc, argv)) return *rc;
+    if (auto rc = dos::autoplay::runDosAutoplayCommand(argc, argv)) return *rc;  // --edition dos --autoplay (wave 5)
     if (auto rc = autoplay::runAutoplayCommand(argc, argv)) return *rc;  // --autoplay (area autoplay)
     if (auto rc = dos::runDosSoundCommand(argc, argv)) return *rc;      // --dos-sound (area dos_audio)
     if (auto rc = dos::runDosGfxCommand(argc, argv)) return *rc;        // --dos-pan/-pak/-screen (area dos_gfx)

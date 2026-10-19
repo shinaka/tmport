@@ -103,18 +103,21 @@ void DosGame::soundTick() { sound.pitTick(); }
 // The start of each original frame (the runtime has just cleared g_stepDone).
 //  * A dissolve still running: the frame continues the original's one long Frame_Present, which
 //    has no Frame_Begin, so nothing is latched and g_stepDone keeps the value the ticks of that long
-//    frame gave it. (They are normally not gated: Anim_Tick does nothing while g_transition is set,
-//    and the DOSBox-X log r2/fl_l2door_after shows no blocked tick during the 30-PIT-tick dissolve.)
+//    frame gave it (the runtime does not clear it for such a frame: FrameTiming::continueFrame). (They
+//    are normally not gated: Anim_Tick does nothing while g_transition is set, and the DOSBox-X log
+//    r2/fl_l2door_after shows no blocked tick during the 30-PIT-tick dissolve.)
 //  * A Button_Flash wait running (ui.h uiFlashPending): the original is blocked inside Menu_Update or
 //    SignIn_Update (43cb:0eb6, 72 PIT ticks), so there is no Frame_Begin either and g_stepDone keeps
 //    its value across the frames of the wait, as for the dissolve.
 //  * main 130f:003D: g_dirty = 0, then 130f:025a Frame_Begin. The title loop (Title_Run) has no
-//    Frame_Begin; it clears g_dirty and g_stepDone itself (titleFrame, and the runtime). A scene load
-//    the latches start is reported to the runtime's frame timing here (frameBeginTiming): on the
-//    reference machine it begins right after the previous game tick.
+//    Frame_Begin; it clears g_dirty and g_stepDone itself (titleFrame, and the runtime). What the
+//    latches start (a scene load, a full redraw) is noted for the frame timing (frameBeginTiming): on
+//    the reference machine it begins right after the tick that asked for it (wave 5: the runtime runs
+//    Game_Tick before Frame_Begin).
 void DosGame::frameBegin() {
     latchedLoad = false;
     latchedRedraw = false;
+    redrawCostDue = false;
     musicPlaysAtPrevBegin = musicPlaysAtBegin;
     musicPlaysAtBegin = musicPlays;
     if (dissolveRunning) {

@@ -31,12 +31,13 @@ namespace {
 
 constexpr uint8_t kUiModeTitle = 0x80;   // g_uiMode while Title_Run runs
 constexpr uint8_t kUiModeSignIn = 0x08;  // main 130f:0032 after Title_Run
-constexpr uint16_t kAreaSignIn = 4, kAreaTitle = 6;
 
 // ---- The reference frame timing (PORTING_NOTES.md §2.5, code_runtime.md §1.4) ------------------
 // What a frame costs on the DOSBox-X reference machine (cycles=fixed 6000), in thousandths of a PIT
-// tick (FrameTiming), from what it loaded and drew. The runtime runs the game ticks that fall inside
-// a frame without a frame of their own, and skips Game_Tick inside its I/O (g_quit = 1).
+// tick (FrameTiming), from what it loaded and drew, counted from where the frame began: right after
+// the tick whose work it does, or when a longer frame before it ended (wave 5: the frame after a tick
+// runs after it; DosRuntime). The runtime runs the game ticks that fall inside a frame without a
+// frame of their own, and skips Game_Tick inside its I/O (g_quit = 1).
 //
 // I/O with g_quit = 1. The lost game ticks of each kind of I/O come from the tick counters of every
 // DOSBox-X state (g_ticks / 5 game ticks fired, DS:90FE = 12 - executed Game_Ticks mod 13) and from
@@ -65,17 +66,18 @@ constexpr uint32_t kQuizLoad = 7000;         // Quiz_LoadQuestions (Game_Start 4
 //     breaking) lasts 12.5 PIT ticks from that tick: r2/fl_bridge_l3_jump log tick 264 (one tick
 //     blocked after the frame's own);
 //   * opening a message or hint bubble (the HUD redraw with the frozen actors, then the cloud, its
-//     text and Flutter) lasts 27.5 PIT ticks from the tick before: r2/fl_tierc_outside log ticks
-//     79..82 blocked after the start message opened;
-//   * a scroll frame lasts 6.5 PIT ticks (horizontal), 7 (vertical), 7.5 (both) from the tick before
-//     (camera.cpp scrollUpdate, kScrollFrameX/Y/XY: the logs' FRAME rings).
-// A frame begins right after the previous game tick, or when the frame before it ended if that was
-// later (DosRuntime: FrameTiming::startOffset): r2/fl_bridge_l3 gates log tick 1111 after a scroll
+//     text and Flutter) lasts 27.5 PIT ticks: r2/fl_tierc_outside log ticks 79..82 blocked after the
+//     start message opened when the door's dissolve ended, r2/fl_search_t g_ticks 331535..331550
+//     behind hint 4, which began when the search's result frame ended;
+//   * a scroll frame lasts 6.5 PIT ticks (horizontal), 7 (vertical), 7.5 (both) from the tick that
+//     moved the camera (camera.cpp scrollUpdate, kScrollFrameX/Y/XY: the logs' FRAME rings).
+// Frames that run past a tick follow each other: r2/fl_bridge_l3 gates log tick 1111 after a scroll
 // frame, the bridge's redraw and the fall's first scroll frame ran back to back.
 // The dissolve (130f:01C2) and a Button_Flash wait (72 PIT ticks) are long frames the game spreads
-// over its frames itself (DosGame::dissolveRunning, flashGate). The dissolve's 350 cells take 30 PIT
-// ticks (127 ms) on the reference machine; they start after the rest of the frame that latched the
-// transition, which began right after the teleporting tick: its scene load (if any) with the sprite
+// over its frames itself (DosGame::dissolveRunning, uiFlashPending: FrameTiming::continueFrame); the
+// frame after one begins when it ends. The dissolve's 350 cells take 30 PIT ticks (127 ms) on the
+// reference machine; they start after the rest of the frame that latched the transition, which began
+// right after the teleporting tick (or when the frame before it ended): its scene load (if any) with the sprite
 // bank, 1 PIT tick of redraw (or a full HUD redraw, 6 PIT ticks in a dissolving frame: the dissolve
 // presents), and 5 more when that tick started a tune (the AdLib driver's instrument set-up). The
 // doorways with their tune end the dissolve after the 7th tick (r2/fl_l2door_after,
@@ -95,51 +97,36 @@ constexpr uint32_t kPakPerKByte = 19;
 constexpr uint32_t kDissolveTuneStart = 5000;
 constexpr uint32_t kDissolveLength = 30060;  // 127 ms
 constexpr uint32_t kTickUnits = kPitTicksPerGameTick * FrameTiming::kMilli;  // one game tick
+constexpr uint32_t kButtonFlashWait = 72;  // Button_Flash 43cb:0eb6: 4 x Delay_Ticks(18) PIT ticks (ui.h)
 
 uint32_t panLoadCost(const DosGame& g, FileIndex pan) {
     return kPanLoadBase + static_cast<uint32_t>(g.files.files().bytes(pan).size() * kPanLoadPerKByte / 1000);
 }
 
-// The sprite bank Scene_Update reads with a scene (1437:0034 step 6): CLOSE.PAK / SHACK.PAK for scenes
-// 3 / 4, SPRITES.PAK when a mountain scene follows one of them (or the title).
-uint32_t pakLoadCost(const DosGame& g, uint16_t wanted, uint16_t loaded) {
-    FileIndex f;
-    if (wanted >= 3) f = static_cast<FileIndex>(wanted + 13);
-    else if (loaded >= 3) f = FileIndex::SpritesPak;
-    else return 0;
-    return static_cast<uint32_t>(g.files.files().bytes(f).size() * kPakPerKByte / 1000);
+// A g_quit section of the frame being run, where the work happens (the I/O routines below report
+// themselves): nothing outside a frame (tests and the state loader call those routines directly).
+void reportIo(DosGame& g, uint32_t units) {
+    FrameTiming& t = g.rt.frameTiming();
+    if (t.isOpen()) t.quitSection(units);
 }
 
-// What the frame body did that the reference machine took time for, noted around its calls.
+// What the frame body drew that the reference machine took time for, noted around its calls and
+// reported as soon as it is known, in the original's order (wave 5): a sound call later in the frame
+// then reaches the driver after it (DosRuntime::soundDelay). The I/O (USERS.DAT writes,
+// Quiz_LoadQuestions, PAN and sprite-bank loads) is reported by the routines that do it.
 struct FrameCosts {
-    explicit FrameCosts(const DosGame& g)
-        : writes(g.users.writes()), uiMode(g.core.uiMode), area(g.core.area), signinInit(g.ui.signinInit != 0) {}
+    explicit FrameCosts(const DosGame& g) : uiMode(g.core.uiMode) {}
 
-    // After the UI updaters (or a Button_Flash's confirm handler): what they started.
-    void afterUpdaters(const DosGame& g) {
-        // Gameover_UpdateMessages / Hints_Update opened a bubble (g_uiMode 4 / 0x10).
-        if ((uiMode & 0x14) == 0 && (g.core.uiMode & 0x14) != 0) bubble = true;
-        // Game_Start from the sign-in clears the sign-in mode bit: Quiz_LoadQuestions.
-        if ((uiMode & kUiModeSignIn) && !(g.core.uiMode & kUiModeSignIn) && g.core.quit == 0) ++quizLoads;
-        // SignIn_Update re-initialised after a game: OPENING.PAN (and BEGIN.PAK).
-        if ((uiMode & kUiModeSignIn) && signinInit && area != kAreaSignIn && area != kAreaTitle && g.core.area == kAreaSignIn)
-            pans.push_back(FileIndex::OpeningPan);
-        // MenuCmd_StartOver: its write, Game_Start and the Scene_Update it calls (a reload).
-        if (g.users.writes() > writes && g.users.lastMoment() == DosSaveMoment::StartOver) {
-            ++quizLoads;
-            pans.push_back(static_cast<FileIndex>(g.world.loadedScene));
-        }
-    }
-    // Around Scene_Update: a scene load, and the next game started from the treasure room.
-    void beforeScene(const DosGame& g) {
-        scene = g.world.loadedScene;
-        endState = g.core.endState;
-    }
-    void afterScene(const DosGame& g) {
-        if (endState == 2 && g.core.endState != 2) ++quizLoads;  // Game_End, Game_Start (its write is counted)
-        // A load Frame_Begin latched was reported by frameBeginTiming already.
-        if (g.world.loadedScene != scene && g.world.loadedScene < 5 && !g.latchedLoad)
-            pans.push_back(static_cast<FileIndex>(g.world.loadedScene));
+    // After the UI updaters (or a Button_Flash's confirm handler): Gameover_UpdateMessages /
+    // Hints_Update opened a bubble (g_uiMode 4 / 0x10): the HUD redraw with the frozen actors, the
+    // cloud, the text and Flutter, before the rest of the frame (Sound_SyncState pauses the music
+    // after it).
+    void afterUpdaters(DosGame& g) {
+        if (bubble || (uiMode & 0x14) != 0 || (g.core.uiMode & 0x14) == 0) return;
+        bubble = true;
+        FrameTiming& t = g.rt.frameTiming();
+        t.fromPreviousTick();  // asked for before this tick (the end of a transition, the hint clock)
+        t.spend((g.core.slowCpu == 1 ? 0 : kHudRedraw - redrawn(g)) + kBubbleCloud);
     }
     // Around Quiz_Update and Screen_DrawOverlay: a full HUD redraw (DS:922E consumed by Hud_Redraw:
     // the quiz's own call, or painter 0; the sign-in and quiz painters are not modelled).
@@ -147,50 +134,42 @@ struct FrameCosts {
         hudRequest = g.ui.hudRedraw;
         hudScreen = g.ui.screen;
     }
-    void afterHud(const DosGame& g, bool anyScreen) {
-        if (hudRequest != 0 && g.ui.hudRedraw == 0 && (anyScreen || hudScreen == 0)) hudRedrawn = true;
+    void afterHud(DosGame& g, bool anyScreen) {
+        if (hudRedrawn || hudRequest == 0 || g.ui.hudRedraw != 0 || !(anyScreen || hudScreen == 0)) return;
+        hudRedrawn = true;
+        g.rt.frameTiming().spend(g.world.frameTransition != 0 && !bubble ? kHudRedrawDissolving
+                                                                         : kHudRedraw - (bubble ? 0 : redrawn(g)));
+    }
+    // Before Playfield_Redraw: the full play-field redraw Frame_Begin latched (frameBeginTiming),
+    // kFullRedraw (a HUD redraw in the same frame, which draws the play field itself, counted only the
+    // rest of its own cost).
+    void beforePlayfield(DosGame& g) {
+        if (!g.redrawCostDue) return;
+        g.redrawCostDue = false;
+        g.rt.frameTiming().spend(kFullRedraw);
     }
 
-    // Posts the frame's I/O (in the original's order: it comes before the drawing) and its drawing,
-    // once: before Frame_Present (a dissolve starts after the rest of the frame) or at the end of a
-    // frame that a Button_Flash stopped. A full play-field redraw frameBeginTiming reported is part
-    // of a HUD redraw (Hud_Redraw draws the play field itself).
-    void post(DosGame& g) {
-        if (posted) return;
-        posted = true;
-        FrameTiming& t = g.rt.frameTiming();
-        uint32_t io = static_cast<uint32_t>(g.users.writes() - writes) * kUsersWrite + static_cast<uint32_t>(quizLoads) * kQuizLoad;
-        for (const FileIndex p : pans) io += panLoadCost(g, p);
-        t.quitSection(io);
-        const uint32_t redrawn = g.latchedRedraw ? kFullRedraw : 0;
-        if (bubble) {
-            t.fromPreviousTick();  // asked for before this tick (the end of a transition, the hint clock)
-            t.spend((g.core.slowCpu == 1 ? 0 : kHudRedraw - redrawn) + kBubbleCloud);
-        }
-        if (hudRedrawn)
-            t.spend(g.world.frameTransition != 0 && !bubble ? kHudRedrawDissolving : kHudRedraw - (bubble ? 0 : redrawn));
-    }
+    // A full play-field redraw that Frame_Begin latched counts in kFullRedraw (beforePlayfield), so a
+    // HUD redraw or a bubble in the same frame counts only the rest of its own cost.
+    static uint32_t redrawn(const DosGame& g) { return g.latchedRedraw ? kFullRedraw : 0; }
 
-    int writes;
     uint8_t uiMode;
-    uint16_t area;
-    bool signinInit;
-    int quizLoads = 0;
-    std::vector<FileIndex> pans;
-    uint16_t scene = 0, endState = 0;
     uint16_t hudRequest = 0;
     uint8_t hudScreen = 0;
     bool hudRedrawn = false;
     bool bubble = false;
-    bool posted = false;
 };
 
 // The search's frames on the reference machine (frame_speed = reference): each redraws the searched
 // cell's column band and presents it, 4.25 PIT ticks, 4.65 while the found treasure or key is drawn
 // above the cell (the 36 frame intervals of r2/fl_typematic, nothing found, and r2/fl_search_t, a
-// treasure), the first one 0.5 PIT ticks after the game tick that started the search. Lockstep frame n
-// runs the search frames that begin before game tick n + 1, so the 37 frames take 31 game ticks as in
-// the logs (37 in period mode: one Search_Update 4a03:0003 per frame).
+// treasure), the first one 0.5 PIT ticks after the game tick that started the search; they run back to
+// back, so a game tick falls inside one of them and the next one begins when it ends. An engine frame
+// runs the search frames that begin before the next game tick (FrameTiming::nextTickUnits) and lasts
+// until the last of them ends: the 37 frames take 31 game ticks as in the logs (37 in period mode: one
+// Search_Update 4a03:0003 per frame), and the frame after the result frame (the hint of a find) begins
+// when it ends, before the next tick (r2/fl_search_t: the result frame's FRAME mark at g_ticks 331520,
+// the hint frame 331520 -> 331543).
 constexpr uint32_t kSearchFirstFrame = 500;  // FrameTiming units after the starting tick
 constexpr uint32_t kSearchFrame = 4250;
 constexpr uint32_t kSearchContentFrame = 4650;
@@ -203,41 +182,53 @@ void searchFrames(DosGame& g) {
         g.searchRunning = p.searchTimer > 0;
         return;
     }
-    if (!g.searchRunning) g.searchClock = kSearchFirstFrame;
-    while (g.searchClock < kTickUnits) {
+    FrameTiming& t = g.rt.frameTiming();
+    const uint64_t start = t.startUnits(), next = t.nextTickUnits();
+    // The tick that started the search is the last one before this frame.
+    if (!g.searchRunning) g.searchAt = std::max<uint64_t>(start, next - kTickUnits + kSearchFirstFrame);
+    while (g.searchAt < next) {
+        // The frame stands where this search frame begins (its effects sound there).
+        if (g.searchAt > start + t.length()) t.spend(static_cast<uint32_t>(g.searchAt - start - t.length()));
         searchUpdate(g);
-        g.searchClock += p.slots[2].frame != 0xFFFF ? kSearchContentFrame : kSearchFrame;
+        g.searchAt += p.slots[2].frame != 0xFFFF ? kSearchContentFrame : kSearchFrame;
         // Player_Update must see g_searchTimer == 1 to leave state 5: the result step waits for the
         // next frame (with these frame lengths it always falls after a game tick anyway).
         if (p.searchTimer <= 1) break;
     }
-    g.searchClock = g.searchClock > kTickUnits ? g.searchClock - kTickUnits : 0;
+    if (g.searchAt > start + t.length()) t.spend(static_cast<uint32_t>(g.searchAt - start - t.length()));
     g.searchRunning = p.searchTimer > 0;
 }
 
 // A dissolve starts in this frame (Frame_Present with the transition latched): on the reference
-// machine the frame began right after the teleporting tick, the dissolve runs after the frame's other
-// work (its I/O and drawing as reported so far, then kDissolveHead of play-field redraw unless a HUD
-// redraw did it, plus the tune the teleporting tick started) for kDissolveLength. The runtime runs the
-// ticks inside the frame's other work without frames; the dissolve then continues one frame per game
-// tick (camera.h transitionDissolve, at the frame clock's rate from a fresh remainder) and must end in
-// the frame of the last tick before its end: this sets the cells of the first frame within the counts
-// that end it there, as close as possible to the cells of its own time.
+// machine the dissolve runs after the frame's other work (its I/O and drawing as reported so far, then
+// kDissolveHead of play-field redraw unless a HUD redraw did it, plus the tune the teleporting tick
+// started) for kDissolveLength, and the original's frame ends with it. The runtime runs the ticks
+// inside the frame's other work without frames; the dissolve then continues one frame per game tick
+// (camera.h transitionDissolve, at the frame clock's rate from a fresh remainder) and must end in the
+// frame of the last tick before its end, which reports the rest of the frame (DosGame::dissolveTail):
+// this sets the cells of the first frame within the counts that end it there, as close as possible to
+// the cells of its own time.
 void setDissolveStart(DosGame& g) {
     FrameTiming& t = g.rt.frameTiming();
     t.fromPreviousTick();
-    const uint32_t before = t.startOffset() + t.length();  // the frame's other work, after the previous tick
+    // Positions in units after the frame's start: its other work ends at `before`.
+    const uint32_t before = t.length();
     uint32_t start = before + (g.dissolveAfterHud ? 0 : kDissolveHead);
     // The teleporting tick started a tune (the doors set the area and play its tune; the fall shaft
     // and the ice slide change the area without one; a scene change instead loads, and its tune
     // follows later).
     if (!g.latchedLoad && g.musicPlaysAtBegin != g.musicPlaysAtPrevBegin) start += kDissolveTuneStart;
     const uint32_t end = start + kDissolveLength;
-    // The following frames: game ticks k * tick (k >= 2: tick 1 is this frame's own) after the
-    // frame's other work and before the dissolve's end.
+    // The following frames: the game ticks after this frame's body (the first one untilNextTick after
+    // its start) after the frame's other work and before the dissolve's end.
+    const uint32_t next = t.untilNextTick();
     int frames = 0;
-    for (uint32_t at = 2 * kTickUnits; at < end; at += kTickUnits)
-        if (at >= before) ++frames;
+    uint32_t last = 0;
+    for (uint32_t at = next; at < end; at += kTickUnits) {
+        if (at < before) continue;
+        ++frames;
+        last = at;
+    }
     // Cells of j following frames, at the frame clock's rate from a zero remainder.
     auto later = [](int j) {
         OriginalFrameClock c(FrameSpeed::Reference);
@@ -250,9 +241,11 @@ void setDissolveStart(DosGame& g) {
     };
     const int lo = std::max(0, kDissolveCells - later(frames));
     const int hi = frames == 0 ? kDissolveCells : std::max(lo, kDissolveCells - later(frames - 1) - 1);
-    const uint32_t until = 2 * kTickUnits;
-    const int own = start >= until ? 0 : static_cast<int>(static_cast<uint64_t>(until - start) * kDissolveCells / kDissolveLength);
+    const int own = start >= next ? 0 : static_cast<int>(static_cast<uint64_t>(next - start) * kDissolveCells / kDissolveLength);
     g.frameClock().setSteps(FrameFeature::Dissolve, std::clamp(own, lo, hi));
+    // Where the original's frame ends: after the dissolve, which the last following frame reports.
+    if (frames == 0) t.spend(end - before);
+    g.dissolveTail = frames == 0 ? 0 : end - last;
 }
 
 // The tail of a frame after its last dissolve cell (or after a present without one): main
@@ -269,6 +262,9 @@ void continueDissolve(DosGame& g) {
         return;
     }
     g.dissolveGate = false;
+    // The original's long frame ends with the dissolve: the next frame begins then (DosRuntime).
+    g.rt.frameTiming().spend(g.dissolveTail);
+    g.dissolveTail = 0;
     endFrame(g);
 }
 
@@ -302,6 +298,12 @@ bool runUiUpdaters(DosGame& g, FrameCosts& costs) {
 // Scene_Update. Returns false while the wait goes on.
 bool continueFlash(DosGame& g, FrameCosts& costs) {
     const bool fromSignIn = g.ui.dialogId >= 14;  // code_ui.md §9.6: dialogs 14..18 belong to the sign-in
+    // The wait ends kButtonFlashWait PIT ticks after it began (ui.h), between two game ticks: the rest
+    // of the frame (the confirm handler, a HUD redraw) runs from then on the reference machine, so
+    // what it costs and the sound calls it makes count from there.
+    const uint32_t elapsed = g.ticks() - g.ui.flashStart;
+    if (elapsed >= kButtonFlashWait && elapsed - kButtonFlashWait < kPitTicksPerGameTick)
+        g.rt.frameTiming().backdateStart((elapsed - kButtonFlashWait) * FrameTiming::kMilli);
     if (!uiFlashContinue(g)) {
         g.flashGate = g.stepGate().done();
         return false;
@@ -332,7 +334,6 @@ void titleLoopFrame(DosGame& g) {
     frameBeginTiming(g);
     FrameCosts costs(g);
     mainFrameParts(g, costs);
-    costs.post(g);
 }
 
 // main's loop body after Frame_Begin (130f:0041..00CF), up to where a Button_Flash stops it.
@@ -345,9 +346,7 @@ void mainFrameParts(DosGame& g, FrameCosts& costs) {
         // The UI updaters wait while a full redraw, a transition or a partial (search) redraw is latched.
         if (!runUiUpdaters(g, costs)) return;
     }
-    costs.beforeScene(g);
-    sceneUpdate(g);
-    costs.afterScene(g);
+    sceneUpdate(g);  // its loads report themselves (reportPanLoad, reportBankLoad)
     scrollUpdate(g);
     searchFrames(g);
     costs.beforeHud(g);
@@ -358,13 +357,14 @@ void mainFrameParts(DosGame& g, FrameCosts& costs) {
     costs.beforeHud(g);
     screenDrawOverlay(g);
     costs.afterHud(g, false);
+    costs.beforePlayfield(g);
     playfieldRedraw(g);
     shelfRoomDrawShelf(g);
     rankChestUpdate(g);
     // With any UI mode open only the mouse pointer (slot 0) is drawn.
     g.core.spriteSlotsDrawn = g.core.uiMode == 0 ? 13 : 1;
     spritesDrawSorted(g, 0, g.core.spriteSlotsDrawn);
-    costs.post(g);  // what the frame cost on the reference machine before its present
+    // What the frame cost on the reference machine is reported by now: a dissolve starts after it.
     g.dissolveAfterHud = costs.hudRedrawn || costs.bubble;
     framePresent(g);
     if (!g.dissolveRunning) endFrame(g);
@@ -378,11 +378,12 @@ void mainStart(DosGame& g) {
     g.core.quit = 0;
     gameInit(g);
     // Kbd_Install 43a0:0002, Timer_Install 1000:03C5: the runtime's keyboard and virtual PIT.
+    // Title_Run loads OPENING.PAN with g_quit = 1 right after Timer_Install (its cost counts from PIT
+    // tick 0, before the first frame): on the reference machine the first game tick falls into that
+    // load (one tick lost before the sign-in in every DOSBox-X state), and the title's first frame
+    // follows it; its tune starts after it.
+    g.rt.frameTiming().open();
     titleStart(g);
-    // Title_Run loads OPENING.PAN with g_quit = 1 right after Timer_Install: on the reference
-    // machine the first game tick falls into that load (one tick lost before the sign-in in every
-    // DOSBox-X state), and the title's first frame follows it.
-    g.rt.frameTiming().quitSection(panLoadCost(g, FileIndex::OpeningPan));
     g.titleRunning = true;
 }
 
@@ -391,29 +392,39 @@ void mainStart(DosGame& g) {
 void mainFrameBody(DosGame& g) {
     if (g.dissolveRunning) {
         continueDissolve(g);
-        return;
-    }
-    if (g.titleRunning) {
+    } else if (g.titleRunning) {
         titleLoopFrame(g);
-        return;
+    } else {
+        FrameCosts costs(g);  // what the frame cost on the reference machine (DosRuntime: long frames)
+        mainFrameParts(g, costs);
     }
-    FrameCosts costs(g);
-    mainFrameParts(g, costs);
-    costs.post(g);  // what the frame cost on the reference machine (DosRuntime: long frames)
+    // A dissolve or a Button_Flash wait goes on past the next game tick: the original is still in
+    // this frame (no Frame_Begin until it ends), so the engine's next frame continues it after its tick
+    // with g_stepDone as the ticks left it, and the frame after the long one begins when it ends
+    // (DosRuntime, FrameTiming::continueFrame).
+    if (g.dissolveRunning || uiFlashPending(g)) g.rt.frameTiming().continueFrame();
 }
 
-// The reference timing of the work Frame_Begin's latches start: the scene the ticks asked for (loaded
-// at the start of the frame body), then a full play-field redraw they asked for.
+// The work Frame_Begin's latches start: the scene the ticks asked for (Scene_Update loads it, which
+// reports its cost) and a full play-field redraw they asked for (reported before Playfield_Redraw).
 void frameBeginTiming(DosGame& g) {
     const WorldState& w = g.world;
-    FrameTiming& t = g.rt.frameTiming();
     g.latchedLoad = w.sceneWanted != w.loadedScene && g.core.uiMode == 0 && w.sceneWanted < 5;
     g.latchedRedraw = w.fullRedraw != 0 && w.frameTransition == 0 && w.framePartialRedraw == 0;
-    if (g.latchedLoad)
-        t.quitSection(panLoadCost(g, static_cast<FileIndex>(w.sceneWanted)) + pakLoadCost(g, w.sceneWanted, w.loadedScene));
-    if (g.latchedRedraw) t.spend(kFullRedraw);
-    if (g.latchedLoad || g.latchedRedraw) t.fromPreviousTick();
+    g.redrawCostDue = g.latchedRedraw;
+    if (g.latchedLoad || g.latchedRedraw) g.rt.frameTiming().fromPreviousTick();
 }
+
+void reportPanLoad(DosGame& g, FileIndex pan) { reportIo(g, panLoadCost(g, pan)); }
+
+// CLOSE.PAK / SHACK.PAK for scenes 3 / 4, SPRITES.PAK when a mountain scene follows one of them (or
+// the title, or a game start: g_loadedScene 0xFF).
+void reportBankLoad(DosGame& g, FileIndex pak) {
+    reportIo(g, static_cast<uint32_t>(g.files.files().bytes(pak).size() * kPakPerKByte / 1000));
+}
+
+void reportUsersWrite(DosGame& g) { reportIo(g, kUsersWrite); }
+void reportQuizLoad(DosGame& g) { reportIo(g, kQuizLoad); }
 
 // 130f:00fe Game_Tick. The runtime skips it while g_quit != 0 (130f:0103) and runs the 13-tick
 // counter and the hint "second" after it (130f:019a..01bd, TickCounters::advance).

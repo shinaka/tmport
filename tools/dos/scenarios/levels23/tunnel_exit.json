@@ -28,9 +28,9 @@
    "to": {
     "event": "dissolve=off"
    },
-   "expect_ticks": 6,
+   "expect_ticks": 7,
    "tolerance": 0,
-   "source": "the doorway dissolve (r2/fl_l2door_after)"
+   "source": "the doorway dissolve (r2/fl_l2door_after); wave 5: the dissolve=on event is in the frame that runs right after the teleporting tick (its other work and the tune first), whose first cells show in the next tick: 7 rows from on to off for the 6 ticks of the 127 ms dissolve"
   }
  ]
 }

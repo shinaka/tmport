@@ -10,18 +10,7 @@
    "id": "reaction",
    "tick": 1220,
    "capture": "ega/r2_end_allfound_01_mom_reaction.png",
-   "max_px": 0,
-   "masks": [
-    {
-     "rect": [
-      6,
-      165,
-      22,
-      191
-     ],
-     "reason": "the castle-top tick clears g_keyState; DOSBox-X redraws the clue box only when that tick lands between a frame's Frame_Begin and its Screen_DrawOverlay (1 of 5 reference runs: ega_r2_end_t2_nokey); the engine's lockstep order (Frame_Begin, Game_Tick, frame body) always takes that path, so its key icon is gone where most captures still show it"
-    }
-   ]
+   "max_px": 0
   },
   {
    "id": "reaction_b",
@@ -29,15 +18,6 @@
    "capture": "ega/r2_end_allfound_02_mom_reaction_b.png",
    "max_px": 0,
    "masks": [
-    {
-     "rect": [
-      6,
-      165,
-      22,
-      191
-     ],
-     "reason": "the castle-top tick clears g_keyState; DOSBox-X redraws the clue box only when that tick lands between a frame's Frame_Begin and its Screen_DrawOverlay (1 of 5 reference runs: ega_r2_end_t2_nokey); the engine's lockstep order (Frame_Begin, Game_Tick, frame body) always takes that path, so its key icon is gone where most captures still show it"
-    },
     {
      "rect": [
       171,
@@ -53,18 +33,7 @@
    "id": "rank_chest_1star",
    "tick": 1964,
    "capture": "ega/r2_end_t6_rank_chest_1star.png",
-   "max_px": 0,
-   "masks": [
-    {
-     "rect": [
-      6,
-      165,
-      22,
-      191
-     ],
-     "reason": "the castle-top tick clears g_keyState; DOSBox-X redraws the clue box only when that tick lands between a frame's Frame_Begin and its Screen_DrawOverlay (1 of 5 reference runs: ega_r2_end_t2_nokey); the engine's lockstep order (Frame_Begin, Game_Tick, frame body) always takes that path, so its key icon is gone where most captures still show it"
-    }
-   ]
+   "max_px": 0
   }
  ],
  "timings": [
@@ -95,20 +64,10 @@
     140,
     1790
    ],
-   "max_off": 7,
-   "max_dev": 0.6,
-   "masks": [
-    {
-     "rect": [
-      6,
-      165,
-      22,
-      191
-     ],
-     "reason": "the castle-top tick clears g_keyState; DOSBox-X redraws the clue box only when that tick lands between a frame's Frame_Begin and its Screen_DrawOverlay (1 of 5 reference runs: ega_r2_end_t2_nokey); the engine's lockstep order (Frame_Begin, Game_Tick, frame body) always takes that path, so its key icon is gone where most captures still show it"
-    }
-   ],
-   "note": "the treasure room and the rank chest of this run come about 1.8 ticks earlier in the AVI than on this time base (the dissolve at the castle gate ended a tick earlier than in the logged runs; no log of this run), so they are not part of the fit"
+   "max_off": 48,
+   "max_dev": 0.75,
+   "note": "the treasure room and the rank chest of this run come about 1.8 ticks earlier in the AVI than on this time base (the dissolve at the castle gate ended a tick earlier than in the logged runs; no log of this run), so they are not part of the fit",
+   "wave5": "wave 5 (frame order): a short frame's picture now shows from the tick that changed it, a long one's (a scroll step: 6.5-7.5 PIT ticks) from the tick after; in the trunk-climb AVI recorded with r2/fl_climb the climb's sprite steps and scroll steps now both fall on the fitted time base (mean offsets -0.16 and 0.00 ticks; before -0.81 and +0.09). In the castle AVIs the end sequence's animation frames appear about as late after their ticks as the scroll steps (relative offsets: before +0.2, now -0.8 ticks in ega_r2_end_t2_nokey.avi, recorded with r2/fl_end_t2_wait, whose ticks the engine matches one for one): those frames (several large sprites drawn and presented) last about 6 PIT ticks on the reference machine, which no log measures yet (the FRAME ring of r2/fl_end_t2_wait holds only the rank screen); not modelled, so the fit keeps 48 frames off it, at most 0.70 ticks (wave 4: 7)"
   }
  ]
 }

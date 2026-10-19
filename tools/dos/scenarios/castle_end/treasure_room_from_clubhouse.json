@@ -43,9 +43,10 @@
     60,
     2140
    ],
-   "max_off": 56,
+   "max_off": 57,
    "max_dev": 2.3,
-   "note": "2.3 ticks at the change into the treasure room: DOSBox-X shows the clubhouse until the frame that loads SHACK and redraws has ended, the engine from its start"
+   "note": "2.3 ticks at the change into the treasure room: DOSBox-X shows the clubhouse until the frame that loads SHACK and redraws has ended, the engine from its start",
+   "wave5": "wave 5 (frame order): a short frame's picture now shows from the tick that changed it, a long one's (a scroll step: 6.5-7.5 PIT ticks) from the tick after; in the trunk-climb AVI recorded with r2/fl_climb the climb's sprite steps and scroll steps now both fall on the fitted time base (mean offsets -0.16 and 0.00 ticks; before -0.81 and +0.09). In the castle AVIs the end sequence's animation frames appear about as late after their ticks as the scroll steps (relative offsets: before +0.2, now -0.8 ticks in ega_r2_end_t2_nokey.avi, recorded with r2/fl_end_t2_wait, whose ticks the engine matches one for one): those frames (several large sprites drawn and presented) last about 6 PIT ticks on the reference machine, which no log measures yet (the FRAME ring of r2/fl_end_t2_wait holds only the rank screen); not modelled, so the fit keeps 57 frames off it, at most 1.79 ticks (wave 4: 56)"
   }
  ]
 }

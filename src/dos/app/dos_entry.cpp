@@ -349,6 +349,8 @@ int runGame(platform::Host& host, const DosOptions& launchOptions, const std::fi
         log::warn("no audio device: the game runs without sound");
     }
     DosAudioSound driver(*audio, audioOffline);
+    // A long frame's sound calls reach the driver where the original's frame made them (wave 5).
+    driver.setDelaySource([&runtime] { return runtime.soundDelay(); });
     const bool keepWav = offline && !silent && !options.frameDumpDir.empty();
     driver.keepSamples(keepWav);
 

@@ -69,10 +69,13 @@ void Sequencer::sfxStop() {
 void Sequencer::musicPlay(int tune, int adlibVariant) {
     music_ = Block{};  // the whole block is zeroed (REP STOSW over 0x78 bytes)
     music_.id = static_cast<uint16_t>(tune);
+    musicHold_ = 0;
     if (!musicOn_) return;  // music off: the block stays cleared, i.e. stopped
+    int hold = 0;
     if (device_ == SoundCard::AdLib) {
         ports_.oplPlayTune(tune, adlibVariant);  // 4ac9:0002: orchestration 4 * tune + (rand() & 3)
         voices_ = 4;
+        hold = ports_.oplPlayTuneTicks();
     }
     const int shift = device_ == SoundCard::Speaker ? 1 : 3;
     const auto entry = static_cast<uint16_t>(static_cast<uint16_t>(tune) << shift);
@@ -80,13 +83,19 @@ void Sequencer::musicPlay(int tune, int adlibVariant) {
         const uint16_t off = bank_.music.headerSlot(entry / 2 + v);
         music_.ptr[v] = music_.start[v] = off;
     }
-    music_.status = 1;
+    // Status 1 is written after AdLib_PlayTune returned: the ticks during the set-up skip the music
+    // (timerTick), and the status is set after the last of them.
+    if (hold > 0)
+        musicHold_ = hold;
+    else
+        music_.status = 1;
 }
 
 // 491b:0811 Music_Stop
 void Sequencer::musicStop() {
     music_.status = 0;
     music_.id = kIdle;
+    musicHold_ = 0;  // a Music_Stop after the Music_Play: its tune never starts
     const int saved = voices_;
     if (device_ == SoundCard::AdLib) voices_ = 4;
     for (int v = 0; v < voices_; ++v) {
@@ -108,6 +117,8 @@ void Sequencer::silenceAll() {
 // 1000:0428 Timer_ISR, step 4
 void Sequencer::timerTick() {
     if (((music_.status & musicGate_) | sfx_.status) != 0) soundTick();
+    // AdLib_PlayTune still running in the main loop (the reference machine's set-up time)
+    if (musicHold_ > 0 && --musicHold_ == 0) music_.status = 1;
 }
 
 // 491b:0004 Sound_Tick
@@ -415,16 +426,19 @@ std::array<uint8_t, Sequencer::kBlockBytes> Sequencer::blockToDgroup(const Block
     return out;
 }
 
-void Sequencer::restore(const Block& sfx, const Block& music, int voices, int adlibVariant) {
+void Sequencer::restore(const Block& sfx, const Block& music, int voices, int adlibVariant, bool oplRestored) {
     sfx_ = sfx;
     music_ = music;
     owned_.fill(0);
+    musicHold_ = 0;
     if (voices >= 1 && voices <= kVoices) voices_ = voices;
     // What sounds: on the speaker and the Tandy the effect while one plays (the music is frozen);
     // on AdLib the effect on the speaker and the music on the OPL.
     if (device_ == SoundCard::AdLib) {
-        if (music_.status == 2) {
-            ports_.oplPlayTune(music_.id, adlibVariant);
+        if (music_.status == 2 && !oplRestored) {
+            // Without the driver's own variables: the tune's instruments again (the block's id is
+            // 0xFFFF once a tune has looped, Sound_AllVoicesDone; then the channels stay as they are).
+            if (music_.id < SoundFile::kTuneCount) ports_.oplPlayTune(music_.id, adlibVariant);
             for (int v = 0; v < kVoices; ++v) resumeVoice(music_, v, true);
         }
         if (sfx_.status == 2) {

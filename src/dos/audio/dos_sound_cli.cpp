@@ -12,6 +12,7 @@
 
 #include "dos/audio/dos_sound_renderer.h"
 #include "dos/data/dos_exe.h"
+#include "dos/save/dosbox_state.h"
 #include "util/error.h"
 #include "util/file_util.h"
 #include "vfs/directory_source.h"
@@ -47,6 +48,7 @@ struct Step {
     uint64_t tick = 0;  // absolute: the command runs right before this PIT tick
     char kind = 's';
     int id = 0;
+    int variant = 0;  // m: the AdLib orchestration (rand() & 3), "m:tune/variant"
 };
 
 bool parseScript(std::string_view text, std::vector<Step>& steps) {
@@ -56,14 +58,19 @@ bool parseScript(std::string_view text, std::vector<Step>& steps) {
         const std::string_view item = text.substr(0, comma);
         text = comma == std::string_view::npos ? std::string_view{} : text.substr(comma + 1);
         const size_t c1 = item.find(':'), c2 = item.rfind(':');
-        int delay = 0, id = 0;
-        if (c1 == std::string_view::npos || c2 == c1 || !parseInt(item.substr(0, c1), delay) ||
-            !parseInt(item.substr(c2 + 1), id) || c2 != c1 + 2 || delay < 0)
+        int delay = 0, id = 0, variant = 0;
+        if (c1 == std::string_view::npos || c2 == c1 || !parseInt(item.substr(0, c1), delay) || c2 != c1 + 2 || delay < 0)
             return false;
+        std::string_view idText = item.substr(c2 + 1);
         const char kind = item[c1 + 1];
+        if (const size_t slash = idText.find('/'); slash != std::string_view::npos) {
+            if (kind != 'm' || !parseInt(idText.substr(slash + 1), variant) || variant < 0 || variant > 3) return false;
+            idText = idText.substr(0, slash);
+        }
+        if (!parseInt(idText, id)) return false;
         if (kind != 's' && kind != 'm' && kind != 'x') return false;
         t += static_cast<uint64_t>(delay);
-        steps.push_back({t, kind, id});
+        steps.push_back({t, kind, id, variant});
     }
     return !steps.empty();
 }
@@ -82,6 +89,9 @@ struct Options {
     double lowPassHz = -1.0, dcBlockHz = -1.0;  // < 0: the renderer's defaults
     std::string script{kSoundTestScript};
     std::string stateLog;
+    std::string oplLog;
+    int variant = 0;  // tune: the AdLib orchestration
+    std::string fromState;  // soundtest: start with the driver of this DOSBox-X state
 };
 
 // One line per tick in which the audible device state changed.
@@ -120,11 +130,37 @@ private:
     std::string text_;
 };
 
-// The AdLib stand-in with its note calls written to the state log ('tick opl on|off voice semitone').
+// The OPL register writes, one line per write: 'tick reg value' (hex), tick = the PIT tick the write
+// belongs to; a command's writes (Music_Play, Music_Stop between two interrupts) carry a fourth
+// column 'c' and the tick they run before. tools/dos/oplcmp.py reads it.
+class OplLog {
+public:
+    explicit OplLog(bool on) : on_(on) {}
+    void write(uint64_t tick, uint8_t reg, uint8_t value) {
+        if (on_) text_ += std::format("{} {:02x} {:02x}{}\n", tick, reg, value, command_ ? " c" : "");
+    }
+    void setCommand(bool on) { command_ = on; }
+    bool enabled() const { return on_; }
+    void clear() { text_.clear(); }
+    bool save(const std::string& path) const {
+        return !on_ || writeWholeFile(pathFromUtf8(path), {reinterpret_cast<const uint8_t*>(text_.data()), text_.size()});
+    }
+
+private:
+    bool on_;
+    bool command_ = false;
+    std::string text_;
+};
+
+// The AdLib driver with its calls written to the state log ('tick opl tune|on|off ...') and its
+// register writes to the OPL log.
 class LoggingOpl final : public OplBackend {
 public:
-    LoggingOpl(double rate, StateLog& log) : inner_(rate), log_(log) {}
+    LoggingOpl(const SoundTables& tables, double rate, StateLog& log, OplLog& oplLog) : inner_(tables, rate), log_(log) {
+        inner_.setWriteObserver([this, &oplLog](uint8_t reg, uint8_t value) { oplLog.write(tick(), reg, value); });
+    }
     void setRenderer(const DosSoundRenderer* r) { r_ = r; }
+    void init() override { inner_.init(); }
     void playTune(int tune, int variant) override {
         log_.event(std::format("{} opl tune {} {}\n", tick(), tune, variant));
         inner_.playTune(tune, variant);
@@ -138,18 +174,21 @@ public:
         inner_.noteOff(voice);
     }
     void render(double* out, size_t n) override { inner_.render(out, n); }
+    void skip(size_t n) override { inner_.skip(n); }
+    bool restore(std::span<const uint8_t> dgroup) override { return inner_.restore(dgroup); }
+    int playTuneTicks() const override { return inner_.playTuneTicks(); }
 
 private:
     uint64_t tick() const { return r_ ? r_->ticks() : 0; }  // the tick being run
-    OplFallbackSynth inner_;
+    AdLibOpl inner_;
     StateLog& log_;
     const DosSoundRenderer* r_ = nullptr;
 };
 
-// A renderer for the bank; with the AdLib device and a state log, the OPL calls are logged too.
-std::unique_ptr<DosSoundRenderer> makeRenderer(const SoundBank& bank, const DosRenderConfig& rc, StateLog& log) {
-    if (bank.device != SoundCard::AdLib || !log.enabled()) return std::make_unique<DosSoundRenderer>(bank, rc);
-    auto opl = std::make_unique<LoggingOpl>(rc.sampleRate, log);
+// A renderer for the bank; with the AdLib device and a state or OPL log, the driver is logged too.
+std::unique_ptr<DosSoundRenderer> makeRenderer(const SoundBank& bank, const DosRenderConfig& rc, StateLog& log, OplLog& oplLog) {
+    if (bank.device != SoundCard::AdLib || (!log.enabled() && !oplLog.enabled())) return std::make_unique<DosSoundRenderer>(bank, rc);
+    auto opl = std::make_unique<LoggingOpl>(*bank.tables, rc.sampleRate, log, oplLog);
     LoggingOpl* raw = opl.get();
     auto r = std::make_unique<DosSoundRenderer>(bank, rc, std::move(opl));
     raw->setRenderer(r.get());
@@ -203,9 +242,9 @@ DosRenderConfig renderConfig(const Options& o) {
 }
 
 // One effect or tune (dos_sound_renderer.h renderEntry), logged per tick.
-OfflineRender renderOne(const SoundBank& bank, const Options& o, bool tune, int id, StateLog& log) {
-    auto r = makeRenderer(bank, renderConfig(o), log);
-    return renderEntry(*r, tune, id, o.loops, o.maxSeconds, [&] { log.sample(r->ticks() - 1, *r); });
+OfflineRender renderOne(const SoundBank& bank, const Options& o, bool tune, int id, StateLog& log, OplLog& oplLog) {
+    auto r = makeRenderer(bank, renderConfig(o), log, oplLog);
+    return renderEntry(*r, tune, id, o.loops, o.maxSeconds, [&] { log.sample(r->ticks() - 1, *r); }, o.variant);
 }
 
 std::string fileTag(const SoundFile& f) {
@@ -214,26 +253,45 @@ std::string fileTag(const SoundFile& f) {
     return t;  // "sfx_ibm", "tunes_tan" (dos_sound.py's WAV names)
 }
 
-int runSoundTest(const SoundBank& bank, const Options& o, StateLog& log) {
+int runSoundTest(const SoundBank& bank, const Options& o, StateLog& log, OplLog& oplLog) {
     std::vector<Step> steps;
     if (!parseScript(o.script, steps)) {
         std::fprintf(stderr, "tmport: bad --script (expected delay:kind:id,... with kind s, m or x)\n");
         return 2;
     }
     const DosRenderConfig rc = renderConfig(o);
-    auto rp = makeRenderer(bank, rc, log);
+    auto rp = makeRenderer(bank, rc, log, oplLog);
     DosSoundRenderer& r = *rp;
     Sequencer& s = r.sequencer();
     s.setMusicLoop(true);  // DS:63ba was 1 in the recorded game states (snd_speaker/tandy/adlib)
+    if (!o.fromState.empty()) {
+        // The driver as a DOSBox-X state left it (as --dos-load-state continues it): the flags, the
+        // effect and music blocks, the voice count, and on AdLib the OPL driver (its registers are
+        // written again). The OPL log starts here, like a capture started on that state.
+        const DosboxState st = DosboxState::load(pathFromUtf8(o.fromState));
+        const auto dg = st.dgroup();
+        const auto w = [&](uint16_t off) { return st.dsWord(off); };
+        s.setSoundOn(w(0x63B4) != 0);
+        s.setMusicOn(w(0x63B6) != 0);
+        s.setSfxLoop(w(0x63B8) != 0);
+        s.setMusicLoop(w(0x63BA) != 0);
+        s.setMusicGate(w(0x37CE));
+        oplLog.clear();
+        const bool opl = r.restoreOpl(dg);
+        s.restore(Sequencer::blockFromDgroup(dg.subspan(0x6448, Sequencer::kBlockBytes)),
+                  Sequencer::blockFromDgroup(dg.subspan(0x64C0, Sequencer::kBlockBytes)), w(0x63BE), 0, opl);
+    }
     size_t next = 0;
     r.setTickHook([&] {
         // ticks() is the number of ticks already run: the step for tick T runs before tick T.
+        oplLog.setCommand(true);
         while (next < steps.size() && steps[next].tick <= r.ticks()) {
             const Step& st = steps[next++];
             if (st.kind == 's') s.sfxPlay(st.id);
-            else if (st.kind == 'm') s.musicPlay(st.id, 0);
+            else if (st.kind == 'm') s.musicPlay(st.id, st.variant);
             else s.musicStop();
         }
+        oplLog.setCommand(false);
     });
     const uint64_t end = std::min<uint64_t>(steps.back().tick + static_cast<uint64_t>(2.0 * kPitTickHz),
                                             static_cast<uint64_t>(o.maxSeconds * kPitTickHz));
@@ -247,7 +305,9 @@ int runSoundTest(const SoundBank& bank, const Options& o, StateLog& log) {
         r.ticks(), samples.size() / static_cast<double>(rc.sampleRate), rc.sampleRate, o.outPath);
     for (const Step& st : steps)
         out("  tick {:6}  {:8.3f} s  {}\n", st.tick, st.tick / kPitTickHz,
-            st.kind == 's' ? std::format("Sfx_Play({})", st.id) : st.kind == 'm' ? std::format("Music_Play({})", st.id) : "Music_Stop");
+            st.kind == 's' ? std::format("Sfx_Play({})", st.id)
+            : st.kind == 'm' ? std::format("Music_Play({}), orchestration {}", st.id, st.variant)
+                             : "Music_Stop");
     return 0;
 }
 
@@ -278,9 +338,14 @@ std::string dosSoundUsage() {
            "    --noise ti|ncr|sn  Tandy noise register (default ncr = NCR 8496; ti with --raw)\n"
            "    --seconds <s>      stop after s seconds\n"
            "    --lowpass <hz>     smooth-mode low-pass (default 7000, 0 = off); --dcblock <hz> (default 12)\n"
-           "    --script <steps>   soundtest schedule, delay:kind:id,... (kind s effect, m tune, x stop)\n"
+           "    --script <steps>   soundtest schedule, delay:kind:id,... (kind s effect, m tune, x stop;\n"
+           "                       m:tune/v plays AdLib orchestration v = 0..3, else 0)\n"
+           "    --variant <v>      tune: the AdLib orchestration (rand() & 3), default 0\n"
            "    --state-log <txt>  write the speaker/PSG state per changed PIT tick\n"
-           "  (AdLib: effects on the speaker; tunes on a square-wave stand-in until the OPL2 driver exists)\n";
+           "    --opl-log <txt>    AdLib: every OPL register write as 'tick reg value' (hex)\n"
+           "    --from-state <sav> soundtest: start with the sound driver of a DOSBox-X state (its flags,\n"
+           "                       blocks and AdLib driver), as --dos-load-state continues it\n"
+           "  (AdLib: effects on the speaker; tunes by the original's AdLib driver on an emulated OPL2)\n";
 }
 
 std::optional<int> runDosSoundCommand(int argc, char** argv) {
@@ -339,6 +404,18 @@ std::optional<int> runDosSoundCommand(int argc, char** argv) {
             auto v = value(a);
             if (!v) return 2;
             o.stateLog = *v;
+        } else if (a == "--opl-log") {
+            auto v = value(a);
+            if (!v) return 2;
+            o.oplLog = *v;
+        } else if (a == "--from-state") {
+            auto v = value(a);
+            if (!v) return 2;
+            o.fromState = *v;
+        } else if (a == "--variant") {
+            auto v = value(a);
+            if (!v) return 2;
+            if (!parseInt(*v, o.variant) || o.variant < 0 || o.variant > 3) return usageError("bad --variant (0..3)");
         } else if (a.starts_with("--")) {
             return usageError(std::format("unknown option {}", a));
         } else {
@@ -377,9 +454,10 @@ std::optional<int> runDosSoundCommand(int argc, char** argv) {
         auto tables = std::make_shared<const SoundTables>(SoundTables::fromExe(exe));
         const SoundBank bank = SoundBank::load(folder, o.device, tables);
         StateLog log(!o.stateLog.empty());
+        OplLog oplLog(!o.oplLog.empty());
         int rc = 0;
         if (o.what == "soundtest") {
-            rc = runSoundTest(bank, o, log);
+            rc = runSoundTest(bank, o, log, oplLog);
         } else if (o.what == "all") {
             const auto dir = pathFromUtf8(o.outPath);
             std::filesystem::create_directories(dir);
@@ -387,7 +465,7 @@ std::optional<int> runDosSoundCommand(int argc, char** argv) {
                 const SoundFile& f = tune ? bank.music : bank.sfx;
                 const int n = tune ? SoundFile::kTuneCount : SoundFile::kSfxCount;
                 for (int i = 0; i < n; ++i) {
-                    const auto r = renderOne(bank, o, tune != 0, i, log);
+                    const auto r = renderOne(bank, o, tune != 0, i, log, oplLog);
                     const std::string path = pathToUtf8(dir / std::format("{}_{:02}.wav", fileTag(f), i));
                     if (!writeWav(path, r.samples, o, renderConfig(o).sampleRate)) return 1;
                     out("{:<10} {:2}  {:6} ticks  {:6.2f} s  {}\n", f.name(), i, r.ticks, r.ticks / kPitTickHz, path);
@@ -395,13 +473,17 @@ std::optional<int> runDosSoundCommand(int argc, char** argv) {
             }
         } else {
             const bool tune = o.what == "tune";
-            const auto r = renderOne(bank, o, tune, o.id, log);
+            const auto r = renderOne(bank, o, tune, o.id, log, oplLog);
             if (!writeWav(o.outPath, r.samples, o, renderConfig(o).sampleRate)) return 1;
             out("{} {} ({}, {}): {} ticks, {:.2f} s -> {}\n", (tune ? bank.music : bank.sfx).name(), o.id,
                 soundCardName(o.device), o.raw ? "raw" : "smooth", r.ticks, r.ticks / kPitTickHz, o.outPath);
         }
         if (rc == 0 && !log.write(o.stateLog)) {
             std::fprintf(stderr, "tmport: cannot write %s\n", o.stateLog.c_str());
+            return 1;
+        }
+        if (rc == 0 && !oplLog.save(o.oplLog)) {
+            std::fprintf(stderr, "tmport: cannot write %s\n", o.oplLog.c_str());
             return 1;
         }
         return rc;

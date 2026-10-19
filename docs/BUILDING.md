@@ -16,7 +16,9 @@ saves and settings; this document is the reference for building, running and the
   * SDL 3.4.18 (zlib license), built as a static library;
   * doctest 2.4.12 (MIT), header-only, for the unit tests only;
   * TinySoundFont (MIT, `tsf.h`, pinned to commit `853a0a1`), header-only: the software
-    synthesizer of the SoundFont MIDI output (see "Music" below).
+    synthesizer of the SoundFont MIDI output (see "Music" below);
+  * ymfm (BSD-3-Clause, pinned to commit `81aec25`): its YM3812 (OPL2) emulator plays the DOS
+    edition's AdLib music; only its OPL sources are compiled (a static library of their own).
 
 ## Windows
 
@@ -59,9 +61,12 @@ There `tmport` is an ordinary terminal program (no `tmport-cli`).
   and audio; on Debian/Ubuntu: `libasound2-dev libpulse-dev libx11-dev libxext-dev libxrandr-dev
   libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev
   wayland-protocols libdecor-0-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev
-  libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev` (the list CI installs). The engine
-  and all unit tests build and pass with GCC 15 (also with `TM_DATA` pointing at the game files; file
-  names are matched case-insensitively, so the CD's upper-case names work).
+  libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev` (the list CI installs). The whole
+  tree (both editions, the tools and the tests) builds with GCC 15 without a warning in the
+  project's code, and every unit test passes, also with `TM_DATA`, `TM_DATA_DOS` and
+  `TM_DOS_CAPTURES` pointing at the game files and the DOS reference material (file names are matched
+  case-insensitively, so the CD's upper-case names work); the DOS autoplay soak gives the same game
+  ticks per seed as on Windows (checked under WSL 2, Ubuntu).
 * **macOS**: Xcode (command-line tools) and CMake; `brew install ninja` for the Ninja presets.
 * **Music** off Windows: there is no WinMM, so use the SoundFont output (see "Music" below);
   without a SoundFont the game runs without music.
@@ -202,7 +207,7 @@ Game options (any other argument selects the command-line tools below; `tmport -
 | `--dos-layout-seed <n>` | DOS edition: new games take their layout from this srand value (0..65535, decimal or `0x` hex) instead of the clock, so scripted runs repeat exactly |
 | `--dos-load-state <file.sav>` | DOS edition: start from a DOSBox-X save state of the original instead of the boot (the reference states of `extracted\captures\dos\savestates`): the game, the screen, the random generator and the timer phase continue from that moment; the state's look and sound device are used (a `--look` wins), and its sibling `<name>.users` becomes the DOS save of the preference folder (a replaced file is kept as `.bak`: use a scratch `--pref-dir`). Ticks of `--keys`, `--dos-ticks` and `--dos-dump-state` count from the load, `--dos-dump-state 0:<file>` writes the loaded moment, and the trace's `ticks` column is the original's g_ticks (`tools/dos/README.md`); the sound driver's effect and tune go on where the state left them |
 | `--dos-grey-key-artefact` | DOS edition: the E0 prefix bytes of the grey keys (PgUp, Home, the grey arrows) reach the game's keyboard handler as on DOSBox-X, which clears the jump bit for a tick per PgUp repeat; to replay the reference frame logs exactly |
-| `--mods <dir>`, `--no-mods` | also load this mod folder (repeatable, after the `[mods]` folders of `tmport.ini`) / load no mods at all (`docs/MODDING.md`) |
+| `--mods <dir>`, `--no-mods` | also load this mod folder (repeatable, after the `[mods]` folders of `tmport.ini`; the DOS edition's after `[mods] dos_paths`) / load no mods at all (`docs/MODDING.md`) |
 | `--play` | accepted and ignored (`tmport --play` = `tmport`) |
 | `--edition win\|dos\|auto` | which edition to play when the data holds both (default: `edition =` in `[engine]` of `tmport.ini`, else detected; see "Pointing the engine at the game data") |
 | `--look ega\|tandy\|mcga\|cga` | DOS edition: the picture of that video adapter (EGA and Tandy look the same; MCGA has softer colours; CGA is dithered to 4 colours; `hercules` is accepted and looks like CGA, as in the original); default `ega`, `[dos] look` |
@@ -408,6 +413,24 @@ the token syntax.
 The audio tools (`--dump-ssnd`, `--midi-dump`, `--midi-render`, `--make-test-soundfont`) are
 described in "Music" above.
 
+### The DOS edition's tools
+
+`tmport --help dos-gfx`, `--help dos-sound` and `--help dos-autoplay` list every option.
+
+| Command | What it does |
+|---|---|
+| `tmport --dos-pan <file> <out.png>`, `--dos-pak <file> <out.png>`, `--dos-screen <name> <out.png>` | a PAN (the title picture or a scenery PAN as its world map), a contact sheet of a PAK's frames and the preview's screens to PNG, in any look (`--look`) |
+| `tmport --dos-sound <speaker\|tandy\|adlib> sfx <0..11>\|tune <0..2>\|soundtest\|all <out>` | effects and tunes to WAV through the game's own sound driver; AdLib tunes through the original's AdLib driver on the emulated OPL2 (`--variant 0..3` picks one of a tune's four orchestrations, `m:tune/v` in a `--script`). `--opl-log <txt>` writes every OPL register write (`tick reg value`), `--from-state <sav>` starts the sound test from the driver of a DOSBox-X state |
+| `tmport --export-mod-kit <dir> --edition dos`, `tmport --check-mods [<dir> ...] --edition dos` | the DOS edition's mod kit and mod checker (`docs/MODDING.md`, "The 1990 DOS edition"); a `--data` that names a DOS folder selects the edition too |
+| `tmport --edition dos --autoplay [--seeds A-B] [--climbs N] [--soak] [--look ...] [--sound ...] [--pref-dir <dir>]` | the soak test: a bot plays the game headless with the keyboard (sign-in, elves, questions, keys, treasures, the three levels, the castle, the end sequence, the treasure room, Start Over, Start New Player, Exit and Save with a resumed run) and checks the game's rules after every game tick (coins and nets, the layout, key states, clue words, the elves, USERS.DAT after every save, a resumed game against its record). `--soak` varies the look, the sound device, slow CPU, the frame speed, crafted players and the exercises per seed; a seed always plays the same way. Exit code 0 clean, 1 a rule broken or a stall (the line names the seed and the tick), 4 a hang, 5 a crash |
+| `tmport --edition dos --autoplay-vision-check` | what the bot sees on the screen against the game's elf table |
+
+A regression soak after a change: `tmport --edition dos --autoplay --soak --seeds 1-200 --climbs 3
+--pref-dir <scratch>` (a few minutes); since every seed replays exactly, a changed tick count or a
+failing seed points at a change of behaviour. `tools/dos/oplcmp.py` compares an `--opl-log` with a
+DOSBox-X OPL capture write for write and `tools/dos/audiocmp.py` the engine's sound with a recording
+(`tools/dos/README.md`).
+
 ## Tests
 
 ```
@@ -451,7 +474,7 @@ Every run passes a scratch `--pref-dir`, a headless window and dummy audio; noth
 stored in the scenarios (file names, ticks, key scripts and rectangles only). The scenario format,
 the tools around it (`savmem.py`, `fl2csv.py`, `imgcmp.py`, `avifit.py`, the playthrough driver) and
 the reference material are described in `tools/dos/README.md` and
-`re/dos/docs/ENGINE_MAP.md` §10-11 (the result after wave 4).
+`re/dos/docs/ENGINE_MAP.md` §10-12 (the results after waves 4 and 5).
 * No test opens a window or plays sound. The app-area tests write their PNGs (the decoded window
   icon, scripted-run screenshots) to a temporary folder; set `TM_APP_SHOTS=<folder>` to keep them.
 * The image comparison test needs `TM_DATA` to be the extracted folder and `TM_IMAGE` the CD

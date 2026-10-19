@@ -1,6 +1,7 @@
 // End-to-end playthroughs of the DOS edition through the real start-up (app::runGame, headless):
 // the key scripts of the playthrough driver (pt_full.py, pt_resume.py; wave 3 integration, regenerated
-// in wave 4 with the reference frame timing: extracted/scratch/dos_w4_timing/pt), built against the
+// in wave 4 with the reference frame timing and in wave 5 with the frame order, the frame after a tick
+// running after it: extracted/scratch/dos_w5_frameorder/play), built against the
 // layout of srand value 0x1EE2 (--dos-layout-seed; the layout of the Round-1 EGA capture climb). The
 // checks are the milestones of the per-tick trace (--dos-trace) and fields of the saved
 // dos_users.dat; they only hold for these scripts and that layout. The trace has no row for the game
@@ -41,15 +42,15 @@ constexpr const char* kBootAndNewPlayer =
 // the arch, the castle ladders, the end sequence, the treasure room, the rank screen, the end
 // message, Exit and Save.
 constexpr const char* kFullGame =
-    ", 2200:tap:right, 2400:tap:space, 2520:tap:down, 2600:tap:enter, 2700:tap:enter, 2721:down:left, 3469:up:left, "
-    "3483:tap:down, 3574:tap:down, 3665:tap:down, 3756:tap:down, 3843:down:up, 3857:up:up, 3867:down:down, "
-    "3906:up:down, 3916:down:left, 3992:up:left, 4006:tap:down, 4141:tap:enter, 4161:down:left, 4247:up:left, "
-    "4261:tap:down, 4376:down:right, 4407:tap:enter, 4966:up:right, 4976:down:up, 5332:up:up, 5342:down:left, "
-    "6161:up:left, 6175:tap:down, 6290:down:left, 6868:up:left, 6878:down:up, 7240:up:up, 7250:down:right, "
-    "7576:up:right, 7590:tap:down, 7705:down:right, 7955:up:right, 7969:tap:down, 8015:tap:enter, 8035:down:right, "
-    "8285:up:right, 8295:down:up, 8329:up:up, 8347:down:right, 8433:up:right, 8443:down:up, 8713:up:up, "
-    "8733:tap:pgup:4, 8835:down:up, 9053:up:up, 10517:tap:enter, 10634:tap:enter, 10698:tap:enter, 10838:tap:esc, "
-    "10898:tap:y";
+    ", 2200:tap:right, 2400:tap:space, 2520:tap:down, 2540:tap:down, 2600:tap:enter, 2700:tap:enter, "
+    "2721:down:left, 3469:up:left, 3483:tap:down, 3574:tap:down, 3665:tap:down, 3756:tap:down, 3843:down:up, "
+    "3857:up:up, 3867:down:down, 3906:up:down, 3916:down:left, 3992:up:left, 4006:tap:down, 4141:tap:enter, "
+    "4161:down:left, 4247:up:left, 4261:tap:down, 4398:tap:enter, 4418:down:right, 4976:up:right, 4986:down:up, "
+    "5342:up:up, 5352:down:left, 6171:up:left, 6185:tap:down, 6300:down:left, 6878:up:left, 6888:down:up, "
+    "7250:up:up, 7260:down:right, 7586:up:right, 7600:tap:down, 7715:down:right, 7965:up:right, 7979:tap:down, "
+    "8025:tap:enter, 8045:down:right, 8295:up:right, 8305:down:up, 8339:up:up, 8357:down:right, 8443:up:right, "
+    "8453:down:up, 8723:up:up, 8743:tap:pgup:4, 8845:down:up, 9063:up:up, 10527:tap:enter, 10643:tap:enter, "
+    "10706:tap:enter, 10846:tap:esc, 10906:tap:y";
 
 // pt_resume.py, run 1: the treasure and the key of level 0, the trunk, Exit and Save on level 1.
 constexpr const char* kSaveOnLevel1 =
@@ -187,27 +188,27 @@ TEST_CASE("dos integration: a new player plays from the title to the treasure ro
     const fs::path dir = apptest::outDir("dos_playthrough_full");
     std::ofstream(dir / "tmport.ini") << "[saves]\nimported_original = true\n";
     const auto rows = runScript(dir, std::string(kBootAndNewPlayer) + kFullGame, "full");
-    REQUIRE(rows.size() == 10889);  // 10914 game ticks (the game quits on the tick of Exit and Save), 25 in disk I/O
+    REQUIRE(rows.size() == 10897);  // 10922 game ticks (the game quits on the tick of Exit and Save), 25 in disk I/O
     // The quiz of the caught clue carrier, the right answer (+1 catch, +2 answer: 8 coins).
     CHECK(firstTick(rows, [](const Row& r) { return r.uiMode == 0x02; }) == 2444);
     CHECK(rowAt(rows, 2800)->coins == 8);
     // The net shop: 4 coins, +5 nets in the cave.
     CHECK(firstTick(rows, [](const Row& r) { return r.nets == 14; }) == 3857);
     // The trunk to level 1 (BF), the geyser to level 2 (7E), the arch into the castle hall (73).
-    CHECK(firstTick(rows, [](const Row& r) { return r.level == 1 && r.cell() == 0xBF && (r.y & 0x7F) == 0x70; }) == 5332);
-    CHECK(firstTick(rows, [](const Row& r) { return r.level == 2 && r.cell() == 0x7E && (r.y & 0x7F) == 0x70; }) == 7240);
-    CHECK(firstTick(rows, [](const Row& r) { return r.area == 0x0D && r.cell() == 0x73; }) == 8329);
+    CHECK(firstTick(rows, [](const Row& r) { return r.level == 1 && r.cell() == 0xBF && (r.y & 0x7F) == 0x70; }) == 5342);
+    CHECK(firstTick(rows, [](const Row& r) { return r.level == 2 && r.cell() == 0x7E && (r.y & 0x7F) == 0x70; }) == 7250);
+    CHECK(firstTick(rows, [](const Row& r) { return r.area == 0x0D && r.cell() == 0x73; }) == 8339);
     // The ladder jump (state 33) in the castle, then out of the exit onto the castle top (level 3).
-    CHECK(firstTick(rows, [](const Row& r) { return r.state == 33; }) == 8734);
-    CHECK(firstTick(rows, [](const Row& r) { return r.level == 3; }) == 9053);
+    CHECK(firstTick(rows, [](const Row& r) { return r.state == 33; }) == 8744);
+    CHECK(firstTick(rows, [](const Row& r) { return r.level == 3; }) == 9063);
     // The end sequence, the chute, the treasure room (scene 4, cell 99), the rank screen (1D).
-    CHECK(firstTick(rows, [](const Row& r) { return r.state == 61; }) > 9053);
-    CHECK(firstTick(rows, [](const Row& r) { return r.scene == 4 && r.cell() == 0x99; }) == 10123);
-    CHECK(firstTick(rows, [](const Row& r) { return r.scene == 4 && r.cell() == 0x1D; }) == 10217);
+    CHECK(firstTick(rows, [](const Row& r) { return r.state == 61; }) > 9063);
+    CHECK(firstTick(rows, [](const Row& r) { return r.scene == 4 && r.cell() == 0x99; }) == 10133);
+    CHECK(firstTick(rows, [](const Row& r) { return r.scene == 4 && r.cell() == 0x1D; }) == 10227);
     // Back in the clubhouse: Game_End saves, the end message; Exit and Save quits. (The frame of the
-    // write lost its own tick and six more in the disk I/O, 10518..10524: its events start the next row.)
-    CHECK(firstTick(rows, [](const Row& r) { return r.events.find("save=game end") != std::string::npos; }) == 10525);
-    CHECK(firstTick(rows, [](const Row& r) { return r.events.find("save=exit and save") != std::string::npos; }) == 10914);
+    // write runs right after the tick that read the Enter: its events are in that tick's row.)
+    CHECK(firstTick(rows, [](const Row& r) { return r.events.find("save=game end") != std::string::npos; }) == 10527);
+    CHECK(firstTick(rows, [](const Row& r) { return r.events.find("save=exit and save") != std::string::npos; }) == 10922);
     const auto rec = readRecord(dir / "dos_users.dat", 1);
     REQUIRE(rec);
     CHECK(rec->total == 1);        // the treasure of level 0 (the others had no coin left)
@@ -238,7 +239,7 @@ TEST_CASE("dos integration: a game saved on level 1 is resumed from the sign-in 
     const auto rows = runScript(dir, kResume, "resume");
     REQUIRE(rows.size() == 6414);  // quits on game tick 6433; 19 ticks in disk I/O
     const uint64_t restored = firstTick(rows, [](const Row& r) { return r.uiMode == 0x04; });
-    CHECK(restored == 424);
+    CHECK(restored == 423);
     if (const Row* r = rowAt(rows, restored)) {
         CHECK(r->level == 1);
         CHECK(r->x == 0x7C8);

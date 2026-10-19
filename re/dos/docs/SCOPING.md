@@ -181,6 +181,16 @@ emulator.
 A good stop/go point is the end of wave 2: by then the engine shows the DOS screens pixel exact and
 plays the music, and the cost of wave 3 is known from the wave 1 specs.
 
+**Status (2026-10-19): waves 0-5 done.** Wave 1 specs (`code_*.md`), wave 2 the engine foundation,
+wave 3 the game logic (playable from the title to the treasure room, `ENGINE_MAP.md`), wave 4
+fidelity (the reference frame timing, starting from DOSBox-X states, `tools/dos/fidelity.py`: 438 of
+439 checkpoints at 0 pixels, 21 of 21 frame logs tick for tick, 8 of 8 AVI time bases), wave 5 the
+options: the original's AdLib driver on ymfm's OPL2 (register streams equal to DOSBox-X's captures
+write for write, `fmt_sound.md` §11.7), mods for the DOS edition (`docs/MODDING.md`), the DOS autoplay
+soak test, the frame order and sound calls at their place inside long frames (`ENGINE_MAP.md` §12).
+Packaging (`scripts/package.*`, `--dos <folder>`) copies the DOS folder too. Still open (`ENGINE_MAP.md` §8):
+the drawing costs of the UI screens and of the looks other than EGA, which need new frame logs.
+
 ## 7. Effort estimate (Windows port = 1.0)
 
 | Wave | Relative to the Windows equivalent | Why |

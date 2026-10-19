@@ -1129,11 +1129,12 @@ TEST_CASE("dos elves: replay of the Round-1 walk to the flags (ega/outside_clue1
 }
 
 TEST_CASE("dos elves: replay of r2/fl_treasure5_found (an elf walks on screen through a treasure search)") {
-    // From r2/at_treasure5: Down at 433 (the only press tick that gives the end state's seed), the coin
+    // From r2/at_treasure5: Down at 434 (the only press tick that gives the end state's seed with the
+    // wave-5 frame order, the frame after a tick running after it; 433 before), the coin
     // throw, the search (the visible elf keeps walking, its walk script does not end during the
     // search), hint 4; the elves stop with the hint (level1/treasure5_found).
     TM_REQUIRE_DOS_GAME_FILES();
-    replayToState(*gameFiles, "savestates/r2/at_treasure5.sav", "savestates/r2/fl_treasure5_found.sav", "433:down:down, 435:up:down",
+    replayToState(*gameFiles, "savestates/r2/at_treasure5.sav", "savestates/r2/fl_treasure5_found.sav", "434:down:down, 436:up:down",
                   {"g_seconds", "g_treasuresFound"});
 }
 

@@ -1231,3 +1231,56 @@ PORTING_NOTES.md §2.5 has the resulting model):
   icon (4 of 5 reference runs keep it); the hint bubble after a search begins after the search's last
   frame (r2/fl_search_t: 4 blocked ticks, the engine gates 3); sound calls inside a long frame.
 
+## Wave 5 corrections (frame order)
+
+The order of a frame against its tick, re-derived from the frame logs (`src/dos/app/dos_runtime.cpp`,
+PORTING_NOTES.md §2.5; tools in `extracted/scratch/dos_w5_frameorder/`: `rings.py` FRAME / STEP /
+BLOCKED records of a log in a g_ticks window, `longmarks.py` long gaps between frame marks,
+`transitions.py` when an AVI shows each new engine picture, `scan.py` / `scanall.py` per-tick picture
+scans of the fidelity checkpoints):
+
+* **A frame begins after the tick whose work it does** [O]: between two ticks the loop runs idle
+  frames of a fraction of a PIT tick, so the first Frame_Begin after a tick latches it. Evidence: in
+  all 21 log end states the draw records (the snapshot of the last Frame_Begin, DS:9145) equal the live
+  sprite slots; the hint frame after a search latches the walking elf's step of the tick inside the
+  result frame (`r2/fl_treasure5_found`: the bubble shows the elf after its step); in the trunk-climb
+  AVI recorded with `r2/fl_climb` the climber's sprite steps show within a PIT tick of their tick.
+  Until wave 4 the engine ran Frame_Begin before the tick, so a picture showed the sprites and camera
+  of the tick before and the frame body read the tick's changes with the latches of the tick before
+  (the castle-top tick then always removed the HUD key icon).
+* **Frames that run past a tick** [O]: a scroll frame (6.5 / 7 / 7.5 PIT ticks from the tick that
+  moved the camera), a search frame (4.25 / 4.65), a bubble (27.5), a full HUD redraw (16), a scene
+  load or a dissolve contain the following ticks, which run Game_Tick with g_stepDone as that frame's
+  Frame_Begin left it; the next frame begins when it ends, before the next tick when it ended between
+  two ticks, and latches what the ticks inside did. This is the "from the previous tick" rule of wave 4
+  (which ran every frame's Frame_Begin before its tick) restricted to the frames that really begin
+  between two ticks. All 21 r2 logs still match tick for tick in both alignments.
+* **The search** [O `r2/fl_search_t` FRAME ring]: the search frames run back to back from 0.5 PIT ticks
+  after the starting tick (the first search frame mark 1 PIT tick after it in `r2/fl_typematic`); the
+  ring shows idle frames up to g_ticks 331354 and the first search mark at 331356, so that run's search
+  began in tick 331355 (Down one tick later than wave 4 placed it); the hint frame began when the result
+  frame ended (its mark at 331520, the hint frame's at 331543) and blocked 331535..331550: the engine
+  now gates exactly these ticks (`level1/treasure_search_log`, with the host mouse move at tick 61),
+  and the elves, g_randSeed and sprite slots of both search logs' end states equal the engine's except
+  slot 2's depth (the hidden content sprite: in DOSBox-X a tick ran Player_Update with g_searchTimer 0
+  before the hint opened, in the engine the result frame runs after the tick that saw g_searchTimer 1;
+  the engine's search frames are about a PIT tick later than DOSBox-X's at the end of the search, a
+  first frame at 0.25 PIT ticks or earlier fixes this byte but loses the elf of `ega/095` in
+  `levels23/key3_found`).
+* **The Button_Flash wait ends between two ticks** [O, R]: the rest of its frame (the confirm handler,
+  the HUD redraw of a closed box) counts from the wait's end, 72 PIT ticks after it began: the ticks
+  inside that redraw are gated (no Frame_Begin since the Enter) and the first tick after it runs (the
+  elves of `looks/state_tandy_level2_resumed` after the Exit box: 0 px against `tandy/14_net_catch`).
+* **A new player's game start reads SPRITES.PAK** with MOUNTAIN.PAN (Scene_Update after the sign-in's
+  BEGIN.PAK): 2.2 PIT ticks more of I/O, so the full HUD redraw after it ends after the fourth player
+  tick and the start message's frame begins before the fifth (the sprite slots of `ega/shack_hint1`).
+* **The castle-top key icon** [O]: in 1 of the 5 reference runs (`ega_r2_end_t2_nokey.avi`, the run of
+  `r2/fl_end_t2_wait`) the castle-top tick removed it; there the tick before did not move the camera, so
+  the tick fell into an idle frame between its Frame_Begin and its Screen_DrawOverlay, a sub-tick race
+  the engine does not model; it keeps the icon as the other 4 runs.
+* **Measured, not modelled**: the end sequence's animation frames (large sprites) appear in
+  `ega_r2_end_t2_nokey.avi` about 6 PIT ticks after their tick, as late as the chute's scroll steps; a
+  full HUD redraw on the Tandy shows 4-6 PIT ticks after its key's tick (16 on EGA); a menu opens within
+  a game tick on the Tandy (`tandy_r3_session.avi`, its audio: the music pauses at the menu frame's
+  Sound_SyncState). The UI frames (menus, boxes, the quiz screen, the sign-in, the rank screen) need
+  FRAME-ring logs made right before the key (PORTING_NOTES.md §2.5 "Not modelled").

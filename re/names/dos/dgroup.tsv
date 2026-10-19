@@ -204,6 +204,8 @@
 4d94:810b	g_cmdLists	far[6]	Command list per input context
 4d94:8124	g_oplSlotMap	u8[9][2]	Modulator and carrier slot per OPL channel
 4d94:8136	g_oplSlotOffsets	u8[18]	Operator register offset per slot
+4d94:8148	g_oplSlotCarrier	u8[18]	AdLib driver: 1 = the slot is a carrier (operator 2)
+4d94:815a	g_oplSlotChannel	u8[18]	AdLib driver: the channel of each slot
 4d94:816c	g_oplInstruments	rec4e[24]	Instrument records (timbre layout, namespace oplinstr)
 4d94:88bc	g_oplInstrumentPtrs	far[24]	Far pointer per instrument
 4d94:891c	g_oplOrchInstrument	u8[][9]	Instrument per OPL channel for arrangement k = 4*tune + (rand() & 3) (0xff unused)
@@ -426,4 +428,21 @@
 4d94:c6cc	g_signinCount	i8	Number of players
 4d94:c6ce	g_hint3Level	u16	Level of g_hint3Start
 4d94:c6d0	g_hint3Start	u16	g_seconds+1 when the second clue word of a level was seen (hint 3)
+4d94:c6e4	g_oplBlockOf	u8[96]	AdLib driver: the octave (block) of each pitch
+4d94:c744	g_oplNoteOf	u8[96]	AdLib driver: the semitone of each pitch
+4d94:c7a4	g_oplAmDepth	u8	AdLib driver: AM depth (0xBD bit 7)
+4d94:c7a5	g_oplChannelUsed	u8[9]	AdLib driver: channel in use by the orchestration
+4d94:c7ae	g_oplNoteSel	u8	AdLib driver: note select (0x08 bit 6)
+4d94:c7af	g_oplVibDepth	u8	AdLib driver: vibrato depth (0xBD bit 6)
+4d94:c7b0	g_oplNotePitch	u8[11]	AdLib driver: the pitch of each channel
+4d94:c7bb	g_oplPitchRange	u16	AdLib driver: pitch-bend range in semitones
+4d94:c7bd	g_oplFNumbers	u16[25][12]	AdLib driver: F-numbers per detuning row and semitone
+4d94:ca15	g_oplSlotParams	u8[18][14]	AdLib driver: the 13 parameters and the wave of each slot
+4d94:cb11	g_oplKeyOn	u8[11]	AdLib driver: key-on bit of each channel
+4d94:cb1c	g_oplWaveSelect	u16	AdLib driver: wave selects enabled (0x01 bit 5)
+4d94:cb1e	g_oplFNumRow	far[11]	AdLib driver: each channel's row of g_oplFNumbers
+4d94:cb4a	g_oplSlotVolume	u8[18]	AdLib driver: slot volumes (0x7F = full)
+4d94:cb5c	g_oplTranspose	i8[9]	AdLib driver: transposition of each channel (the orchestration)
+4d94:cb65	g_oplPitchRangeStep	u16	AdLib driver: g_oplPitchRange * 25
+4d94:cb67	g_oplHalfToneOffset	i16[11]	AdLib driver: half-tone offset of each channel (the pitch bend)
 4d94:cb7e	g_titleTimer	u32	Title page time-out (g_ticks + 7200), 0 = not armed

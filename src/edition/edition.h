@@ -2,7 +2,7 @@
 // Edition detection (re/dos/docs/SCOPING.md §5.1): the engine plays two editions of the game from
 // the user's files, and a data path tells which one it holds.
 //
-//   WinCd    the Windows CD edition (v1.01): a folder with TMTWINCD.EXE, a folder with a TMTWINCD\
+//   WinCd    the Windows CD edition (v1.01): a folder with TMTWINCD.EXE, a folder with a TMTWINCD
 //            subfolder, or the CD image (.cue/.bin/.iso), as before.
 //   Dos1990  the 1990 DOS edition (V 1.0): a folder with SST.EXE, SPRITES.PAK and ALL_PUZS whose
 //            SST.EXE passes dos::DosExe::loadFile (EXEPACK, image size, Turbo C copyright, palette

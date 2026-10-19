@@ -600,3 +600,18 @@ the AVI shows them): the coin toss and the net swing frame for frame; the walk-o
 ticks late unless its Enter is placed 3 ticks before the redrawn title appears (72 of 80 frames
 exact then: the original's title redraw is a long frame); the resumed game's screen about 8 ticks
 early; sound in `fmt_sound.md` §11.6.
+
+## Round 4 (wave 5, adlib agent): the AdLib driver's register stream
+
+Same setup as §1 (DOSBox-X 2026.10.01, `tools/dosbox_tmdos.conf`, EGA, SB16 OPL, host sound muted,
+window parked); `tools/tmctl.py audio opl|wav` while the harness state played, in turbo mode.
+
+| File | Content |
+|---|---|
+| `savestates/w5/snd_adlib_variants.sav` (+ `.users`) | `r2/snd_adlib` with the sound-test stub extended (scratch `dos_w5_adlib/py/soundtest_v.py`): before a Music_Play it sets the rand seed DS:8F48 so that AdLib_PlayTune's `rand() & 3` is the wanted orchestration. Schedule (PIT ticks after the previous step): 2000 Music_Stop; for orchestration v = 0..3 and tune t = 0..2: 200 Music_Play(t) with v, the tune's length + 200, Music_Stop (effect 6 3000 ticks into the first tune); 200 Music_Play(0, 0), 3000 Music_Play(2, 1) without a stop, 2000 Music_Stop (`extracted/scratch/dos_w5_adlib/variants_script.txt`) |
+| `audio/adlib_w5_variants.dro` | the raw OPL log of the whole schedule (85 873 logged writes, 654.8 s) |
+| `audio/adlib_w5_variants.wav` | the mixer output, mono (the capture's two channels were identical), 665 s, 48 kHz |
+
+Turbo mode left the register stream intact but let the capture's ms clock and its WAV slip 2.2-2.5 ms
+against the PIT once (around 510 s) and jitter the WAV's note onsets by up to 20 ms; the real-time R2
+capture (§R2.3) has neither. Comparisons: `fmt_sound.md` §11.7.

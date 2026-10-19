@@ -13,21 +13,24 @@
   },
   {
    "id": "touch_a",
-   "tick": 1463,
+   "tick": 1462,
    "capture": "ega/r2_coin_creature_03_touch_a.png",
-   "max_px": 0
+   "max_px": 0,
+   "moved": "wave 5: the frame after a game tick now runs after that tick (Game_Tick, Frame_Begin, the body), so a short frame's picture (sprites that moved in the tick) shows from that tick, one tick earlier than before (the r2 log end states hold draw records equal to the live slots: DOSBox-X's last frame began after the last tick); tick 1463 -> 1462: the per-tick scan: 0 px at 1462 (before at 1463)"
   },
   {
    "id": "touch_b",
-   "tick": 1493,
+   "tick": 1492,
    "capture": "ega/r2_coin_creature_04_touch_b.png",
-   "max_px": 0
+   "max_px": 0,
+   "moved": "wave 5: the frame after a game tick now runs after that tick (Game_Tick, Frame_Begin, the body), so a short frame's picture (sprites that moved in the tick) shows from that tick, one tick earlier than before (the r2 log end states hold draw records equal to the live slots: DOSBox-X's last frame began after the last tick); tick 1493 -> 1492: the per-tick scan: 0 px at 1492 (before at 1493)"
   },
   {
    "id": "log_end",
-   "at_log_end": "savestates/r2/fl_coin_after.sav",
+   "tick": 1746,
    "capture_state": "savestates/r2/fl_coin_after.sav",
-   "max_px": 0
+   "max_px": 0,
+   "moved": "wave 5: the frame after a game tick now runs after that tick (Game_Tick, Frame_Begin, the body), so a short frame's picture (sprites that moved in the tick) shows from that tick, one tick earlier than before (the r2 log end states hold draw records equal to the live slots: DOSBox-X's last frame began after the last tick); the state r2/fl_coin_after was saved inside Sprites_DrawSorted (4306:0497) of the frame after its last game tick (1747), before that frame presented: its screen shows the frame of tick 1746"
   }
  ],
  "logs": [

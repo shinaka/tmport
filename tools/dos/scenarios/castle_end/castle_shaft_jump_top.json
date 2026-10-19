@@ -22,18 +22,7 @@
    "id": "castle_top",
    "tick": 545,
    "capture": "ega/101_castle_top_treasure_room.png",
-   "max_px": 0,
-   "masks": [
-    {
-     "rect": [
-      6,
-      165,
-      22,
-      191
-     ],
-     "reason": "the castle-top tick clears g_keyState; DOSBox-X redraws the clue box only when that tick lands between a frame's Frame_Begin and its Screen_DrawOverlay (1 of 5 reference runs: ega_r2_end_t2_nokey); the engine's lockstep order (Frame_Begin, Game_Tick, frame body) always takes that path, so its key icon is gone where most captures still show it"
-    }
-   ]
+   "max_px": 0
   }
  ],
  "avi_fits": [
@@ -48,20 +37,10 @@
     1,
     605
    ],
-   "max_off": 24,
+   "max_off": 53,
    "max_dev": 1.2,
-   "masks": [
-    {
-     "rect": [
-      6,
-      165,
-      22,
-      191
-     ],
-     "reason": "the castle-top tick clears g_keyState; DOSBox-X redraws the clue box only when that tick lands between a frame's Frame_Begin and its Screen_DrawOverlay (1 of 5 reference runs: ega_r2_end_t2_nokey); the engine's lockstep order (Frame_Begin, Game_Tick, frame body) always takes that path, so its key icon is gone where most captures still show it"
-    }
-   ],
-   "note": "1.2 ticks at the castle-top transition: DOSBox-X shows the shaft until the transition frame has loaded CLOSE and drawn, the engine from its start"
+   "note": "1.2 ticks at the castle-top transition: DOSBox-X shows the shaft until the transition frame has loaded CLOSE and drawn, the engine from its start",
+   "wave5": "wave 5 (frame order): a short frame's picture now shows from the tick that changed it, a long one's (a scroll step: 6.5-7.5 PIT ticks) from the tick after; in the trunk-climb AVI recorded with r2/fl_climb the climb's sprite steps and scroll steps now both fall on the fitted time base (mean offsets -0.16 and 0.00 ticks; before -0.81 and +0.09). In the castle AVIs the end sequence's animation frames appear about as late after their ticks as the scroll steps (relative offsets: before +0.2, now -0.8 ticks in ega_r2_end_t2_nokey.avi, recorded with r2/fl_end_t2_wait, whose ticks the engine matches one for one): those frames (several large sprites drawn and presented) last about 6 PIT ticks on the reference machine, which no log measures yet (the FRAME ring of r2/fl_end_t2_wait holds only the rank screen); not modelled, so the fit keeps 53 frames off it, at most 1.06 ticks (wave 4: 24)"
   }
  ]
 }

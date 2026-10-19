@@ -15,16 +15,27 @@
 //                        |-- every PIT tick: RuntimeClient::soundTick()
 //                        '-- every 5th PIT tick: one ORIGINAL FRAME ("lockstep"):
 //                                scripted input of this tick, keyboard bytes due (Kbd_ISR, BIOS)
-//                                frameBegin()   Frame_Begin; the runtime clears g_stepDone first
 //                                gameTick()     Game_Tick 130f:00FE, unchanged order (the client)
 //                                               then its two counters (TickCounters, here)
+//                                frameBegin()   Frame_Begin; the runtime clears g_stepDone first
 //                                frameBody()    main loop body 130f:0037..00C8 minus the present
 //   presentation: the host shows the newest completed back buffer at each display refresh.
 //
-// In lockstep the step gate blocks only inside a long frame (below); otherwise it is cleared right
-// before each tick, which is what the DOSBox-X reference showed for normal play. FrameMode::SlowMachine keeps the gate's meaning: an original frame
-// spans several game ticks, and the ticks after the first see g_stepDone (only Anim_Tick and
-// Input_Tick run when it is set), so the game slows down with the frame rate as on a slow PC.
+// The order of a frame against its tick (wave 5, PORTING_NOTES.md §2.5): on the reference machine
+// the loop runs idle frames of a fraction of a PIT tick between two game ticks, so the frame that
+// does a tick's work begins right after that tick: Game_Tick, then Frame_Begin and the frame body.
+// A frame that ends after the next tick (a scroll frame, a search frame, a bubble, a scene load) has
+// the ticks inside it run without a frame of their own, and the loop's next frame begins when it
+// ends: when that is between two ticks, the runtime runs that frame (frameBegin(), frameBody()) before
+// the next tick, which may then fall inside it, and the frame after that tick follows if it did not.
+// Period mode and the slow-machine mode run frameBegin(), gameTick(), frameBody() for every frame
+// (their frames last a game tick or more).
+//
+// In lockstep the step gate blocks only inside a long frame (below); otherwise Frame_Begin clears it
+// between two ticks, which is what the DOSBox-X reference showed for normal play.
+// FrameMode::SlowMachine keeps the gate's meaning: an original frame spans several game ticks, and the
+// ticks after the first see g_stepDone (only Anim_Tick and Input_Tick run when it is set), so the
+// game slows down with the frame rate as on a slow PC.
 //
 // Long frames (frame_speed = reference, the default; PORTING_NOTES.md §2.5): on the reference machine
 // a frame that loads a scene, writes USERS.DAT or redraws the whole screen lasts several game ticks.
@@ -38,6 +49,7 @@
 // step counts from the OriginalFrameClock: "reference" rates measured in DOSBox-X (code_runtime.md
 // §9-10) or "period" = one step per original frame.
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <vector>
@@ -156,15 +168,15 @@ private:
 // PORTING_NOTES.md §2.5, code_runtime.md §1.4), in thousandths of a PIT tick. The game reports it
 // from what the frame loaded and drew (frameBegin and the frame body); the runtime reads it after the
 // body. On the reference machine idle frames take a fraction of a PIT tick, so a costly frame begins
-// right after whatever asked for its work:
-//   * by default the work was asked for by this frame's game tick (a key read by Input_Tick): the
-//     frame began right after that tick, its cost counts from it, and the game ticks that fall inside
-//     it start with g_stepDone clear (the runtime clears it after the body: Frame_Begin came after
-//     the tick);
-//   * fromPreviousTick(): the work was asked for before this frame's tick (Frame_Begin's latches of
-//     what the previous ticks requested, the end of the previous frame): the frame began right after
-//     the previous game tick, so this frame's own tick already fell inside it, and inside its I/O when
-//     the I/O is reported by frameBegin;
+// right after whatever asked for its work, and its cost counts from its start (setStart):
+//   * a frame that begins right after its own game tick (beganAfterTick(): the usual case; the runtime
+//     runs Game_Tick first): Frame_Begin latches what that tick asked for (a scene, a redraw, a camera
+//     step) and the body reads the key it delivered;
+//   * a frame that begins when a longer frame ends, before the next game tick (the ticks that fell
+//     inside the long one ran Game_Tick, so no Frame_Begin has latched them yet; or the long frame was
+//     a dissolve or a Button_Flash wait): the runtime runs it before that tick, which may fall inside
+//     it, and inside its I/O;
+//   * the game ticks inside a frame start with g_stepDone as its Frame_Begin left it (clear);
 //   * costs reported before the first frame (the title's start-up load in main) count from PIT tick 0.
 class FrameTiming {
 public:
@@ -178,19 +190,57 @@ public:
     // The frame goes on for `units` more (drawing, presenting).
     void spend(uint32_t units) { cursor_ += units; }
     // A g_quit section of `units` starts here (file I/O and unpacking with g_quit DS:912E = 1): the
-    // game ticks inside it return at once (130f:0103), without their two counters.
+    // game ticks inside it return at once (130f:0103), without their two counters. One that follows
+    // another directly extends it.
     void quitSection(uint32_t units) {
         if (units == 0) return;
-        quit_.push_back({cursor_, cursor_ + units});
+        if (!quit_.empty() && quit_.back().to == cursor_) quit_.back().to += units;
+        else quit_.push_back({cursor_, cursor_ + units});
         cursor_ += units;
     }
-    // The frame began right after the previous game tick (see above).
+    // The work was asked for by a game tick before the frame (Frame_Begin's latches, the end of a
+    // transition, the hint clock). Informational since wave 5: a frame's work counts from its start
+    // (the frames before wave 5 began before their own tick, and this placed such work after the
+    // previous one).
     void fromPreviousTick() { fromPrevious_ = true; }
-    // How long after the previous game tick the frame could begin: the frame before it may still have
-    // run then (a scroll frame, the chute's last step before the castle gate). Set by the runtime
-    // before Frame_Begin; costs reported with fromPreviousTick are placed after it.
-    void setStartOffset(uint32_t units) { startOffset_ = units; }
-    uint32_t startOffset() const { return startOffset_; }
+    // The original's frame goes on past the next game tick without a Frame_Begin (a dissolve that
+    // spans frames, a Button_Flash wait): the engine's next frame continues it (after its tick, g_stepDone
+    // left as the ticks set it; DosGame::frameBegin latches nothing then), and the first frame after it
+    // begins when it ends, before the next tick. Reported by the frame body; read after the body.
+    void continueFrame() { continues_ = true; }
+    bool continuesFrame() const { return continues_; }
+
+    // Where the frame stands, set by the runtime before Frame_Begin: its start (units since PIT tick 0)
+    // and the first game tick after its body. A frame that begins right after its own tick has the next
+    // tick one game tick after its start (beganAfterTick); one that begins when a longer frame ended has
+    // its own tick still to come, less than a game tick after its start.
+    void setStart(uint64_t startUnits, uint64_t nextTickUnits) {
+        start_ = startUnits;
+        nextTick_ = nextTickUnits;
+    }
+    uint64_t startUnits() const { return start_; }
+    uint64_t nextTickUnits() const { return nextTick_; }
+    // The work the frame reports began earlier than the runtime's start: a wait inside the frame
+    // (Button_Flash's Delay_Ticks) ended between two game ticks, before the tick after which the
+    // engine noticed. The runtime places the frame's cost from here.
+    void backdateStart(uint64_t units) { start_ -= std::min(units, start_); }
+    uint32_t untilNextTick() const { return static_cast<uint32_t>(nextTick_ - start_); }
+    bool beganAfterTick() const { return nextTick_ - start_ == kTickUnits; }
+
+    static constexpr uint32_t kTickUnits = kPitTicksPerGameTick * kMilli;  // one game tick
+
+    // Open while the runtime runs a frame at the reference timing (Frame_Begin and the body) and
+    // during main's start-up (mainStart, before the first frame; clear() closes it). The game reports
+    // a cost where the original does the work (wave 5: the I/O routines report themselves only while
+    // it is open, main_loop.h), so the cost reported so far is where the frame stands: a sound call
+    // made there reaches the driver at that place (DosRuntime::soundDelay).
+    void open() { open_ = true; }
+    bool isOpen() const { return open_; }
+    // A part of the frame that keeps its own clock (the coin count-up of Hud_Redraw) names the time of
+    // the calls it makes, in units since PIT tick 0; 0 (or a time before it) = where the reported cost
+    // has got to.
+    void setCallTime(uint64_t units) { callTime_ = units; }
+    uint64_t callTime() const { return std::max(callTime_, start_ + cursor_); }
 
     uint32_t length() const { return cursor_; }
     const std::vector<Span>& quitSections() const { return quit_; }
@@ -200,14 +250,22 @@ public:
         cursor_ = 0;
         quit_.clear();
         fromPrevious_ = false;
-        startOffset_ = 0;
+        continues_ = false;
+        open_ = false;
+        callTime_ = 0;
+        start_ = 0;
+        nextTick_ = kTickUnits;
     }
 
 private:
     uint32_t cursor_ = 0;
     std::vector<Span> quit_;
     bool fromPrevious_ = false;
-    uint32_t startOffset_ = 0;
+    bool continues_ = false;
+    bool open_ = false;
+    uint64_t callTime_ = 0;
+    uint64_t start_ = 0;
+    uint64_t nextTick_ = kTickUnits;
 };
 
 // ----------------------------------------------------------------------------------- the runtime
@@ -299,6 +357,14 @@ public:
     // The cost of the frame being run (the game writes it in frameBegin and the frame body, see
     // FrameTiming).
     FrameTiming& frameTiming() { return frameTiming_; }
+    // Where a sound call made now reaches the driver (wave 5). The original's driver entry points write
+    // the driver's blocks at once and the next timer interrupt plays them, so a call made partway
+    // through a long frame sounds that far into it: in a frame of the reference timing the call is at
+    // the place the frame has reached (its start plus the cost reported so far, FrameTiming), and the
+    // result is the number of PIT ticks between the runtime's next interrupt and the one after that
+    // place (DosAudioDevice delays the command by them; FrameTiming::callTime). 0 outside a frame (the
+    // calls of a game tick run in its interrupt) and at the period speed.
+    uint32_t soundDelay() const;
     PcKeyboard& keyboard() { return keyboard_; }
     MouseDriver& mouse() { return mouse_; }
     // Game ticks so far that ran inside a long frame (without a frame of their own), and those of
@@ -325,6 +391,10 @@ public:
 private:
     void runPitTicksTo(uint64_t lastPit);
     void gameStep(uint64_t n);
+    void gameStepReference(uint64_t n, RuntimeClient& c, uint64_t timeNs, uint64_t now);
+    void runFrame(RuntimeClient& c, uint64_t start, uint64_t nextTick, bool continued);
+    void runGameTick(RuntimeClient& c, uint64_t n, uint64_t timeNs, bool inFrame);
+    uint64_t unitsNow() const { return pit_ * FrameTiming::kMilli; }  // FrameTiming units since PIT tick 0
     void applyScript(uint64_t n, uint64_t timeNs);
     uint32_t ticksPerFrame() const;
     void placeFrameTiming(uint64_t base);
@@ -346,9 +416,9 @@ private:
     struct AbsSpan {
         uint64_t from = 0, to = 0;
     };
-    uint64_t frameFrom_ = 0;       // where the current frame's work asked for before its tick starts
     uint64_t frameEnd_ = 0;        // end of the current long frame (FrameTiming units since PIT tick 0)
     std::vector<AbsSpan> frozen_;  // its g_quit sections, in the same absolute units
+    bool continuing_ = false;  // the last frame body reported FrameTiming::continueFrame
     uint64_t ticksInLongFrames_ = 0;
     uint64_t ticksFrozen_ = 0;
     PcKeyboard keyboard_;

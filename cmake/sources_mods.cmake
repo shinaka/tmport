@@ -16,3 +16,15 @@ target_sources(tmcore PRIVATE
     src/mods/mod_kit.cpp
     src/mods/mods_cli.cpp
 )
+# The 1990 DOS edition's mod layer (docs/MODDING.md "The 1990 DOS edition").
+target_sources(tmcore PRIVATE
+    src/dos/mods/dos_text_codec.cpp
+    src/dos/mods/dos_pictures.cpp
+    src/dos/mods/dos_sound_text.cpp
+    src/dos/mods/dos_text_files.cpp
+    src/dos/mods/dos_exe_strings.cpp
+    src/dos/mods/dos_mod_folder.cpp
+    src/dos/mods/dos_mods.cpp
+    src/dos/mods/dos_mod_kit.cpp
+    src/dos/mods/dos_mods_cli.cpp
+)

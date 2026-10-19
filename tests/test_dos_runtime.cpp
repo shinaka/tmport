@@ -146,8 +146,9 @@ TEST_CASE("DOS runtime: lockstep order, one original frame per game tick") {
     rec.markGateInTick = true;  // Anim_Tick / Player_Move mark the gate inside the tick
     rt.setClient(&rec);
     rt.stepGameTicks(3);
-    // Timer_ISR: sound every PIT tick, Game_Tick on interrupts 5, 10, 15; the gate never blocks.
-    CHECK(rec.trace == "sssssBTFsssssBTFsssssBTF");
+    // Timer_ISR: sound every PIT tick, Game_Tick on interrupts 5, 10, 15, each followed by the frame
+    // that does its work (Frame_Begin after the tick, wave 5); the gate never blocks.
+    CHECK(rec.trace == "sssssTBFsssssTBFsssssTBF");
     REQUIRE(rec.ticks.size() == 3);
     CHECK(rec.ticks[0].gameTick == 1);
     CHECK(rec.ticks[0].ticks == 5);
@@ -190,29 +191,38 @@ namespace {
 // A client whose frame reports a cost (DosRuntime::frameTiming) on chosen game ticks.
 struct CostClient : Recorder {
     struct Cost {
-        uint64_t tick = 0;      // the frame of this game tick reports it
-        uint32_t quit = 0;      // a g_quit section first (FrameTiming units)
-        uint32_t spend = 0;     // then drawing
-        bool previous = false;  // fromPreviousTick()
-        bool atBegin = false;   // reported by frameBegin instead of the body
+        uint64_t tick = 0;        // the frame of this game tick's step reports it
+        uint32_t quit = 0;        // a g_quit section first (FrameTiming units)
+        uint32_t spend = 0;       // then drawing
+        bool beforeTick = false;  // the frame that begins before the tick (when a long frame ended)
+        bool atBegin = false;     // reported by frameBegin instead of the body
+        int continues = 0;        // the frame goes on into this many following game ticks (a dissolve)
     };
     std::vector<Cost> costs;
+    int continuing = 0;
+    std::vector<uint64_t> starts;  // FrameTiming::startUnits of each frame
     void post(bool begin) {
-        const uint64_t tick = rt->gameTicks();  // the runtime counts the tick before its frame begins
+        FrameTiming& t = rt->frameTiming();
+        const uint64_t tick = rt->gameTicks();  // the step's tick (already counted before its frames)
         for (const Cost& c : costs) {
-            if (c.tick != tick || c.atBegin != begin) continue;
-            rt->frameTiming().quitSection(c.quit);
-            rt->frameTiming().spend(c.spend);
-            if (c.previous) rt->frameTiming().fromPreviousTick();
+            if (c.tick != tick || c.atBegin != begin || c.beforeTick == t.beganAfterTick()) continue;
+            t.quitSection(c.quit);
+            t.spend(c.spend);
+            continuing = c.continues;
         }
     }
     void frameBegin() override {
         trace += 'B';
+        starts.push_back(rt->frameTiming().startUnits());
         post(true);
     }
     void frameBody() override {
         trace += 'F';
         post(false);
+        if (continuing > 0) {
+            --continuing;
+            rt->frameTiming().continueFrame();
+        }
     }
 };
 
@@ -223,6 +233,8 @@ std::string withoutSound(const std::string& t) {
     return out;
 }
 
+constexpr uint64_t kTickUnits = kPitTicksPerGameTick * FrameTiming::kMilli;
+
 }  // namespace
 
 TEST_CASE("DOS runtime: long frames at the reference speed (FrameTiming), strict lockstep in period mode") {
@@ -232,24 +244,34 @@ TEST_CASE("DOS runtime: long frames at the reference speed (FrameTiming), strict
         c.rt = &rt;
         c.markGateInTick = true;
         rt.setClient(&c);
-        // Tick 2's frame (asked for by tick 2 itself) draws for 12.5 PIT ticks: ticks 3 and 4 fall
-        // inside it; Frame_Begin came after tick 2, so tick 3 starts with the gate clear.
+        // Tick 2's frame (it began after tick 2) draws for 12.5 PIT ticks: ticks 3 and 4 fall inside it
+        // and start with the gate its Frame_Begin cleared, so tick 3 runs and tick 4 is gated; the loop's
+        // next frame begins when it ends, before tick 5, and the one after tick 5 follows.
         c.costs.push_back({2, 0, 12500});
         rt.stepGameTicks(6);
-        CHECK(withoutSound(c.trace) == "BTFBTFTgBTFBTF");
+        CHECK(withoutSound(c.trace) == "TBFTBFTgBFTBFTBF");
         CHECK(rt.ticksInLongFrames() == 2);
         CHECK(rt.ticksFrozen() == 0);
-        CHECK(rt.frames() == 4);
+        CHECK(rt.frames() == 5);
+        REQUIRE(c.starts.size() == 5);
+        CHECK(c.starts[2] == 2 * kTickUnits + 12500);  // the frame before tick 5: when the long one ended
+        CHECK(c.starts[3] == 5 * kTickUnits);
     }
-    SUBCASE("asked for before the tick: the frame began after the previous tick, the gate carries") {
+    SUBCASE("a frame that begins when a long one ended has its tick inside it") {
         DosRuntime rt;
         CostClient c;
         c.rt = &rt;
         c.markGateInTick = true;
         rt.setClient(&c);
-        c.costs.push_back({2, 0, 12500, true});  // counts from tick 1: tick 3 (offset 10) inside
-        rt.stepGameTicks(5);
-        CHECK(withoutSound(c.trace) == "BTFBTFgBTFBTF");
+        // A scroll frame after tick 2 (7 PIT ticks: tick 3 inside), then the frame that began when it
+        // ended draws 12.5 more (a redraw tick 3 asked for): ticks 4 and 5 inside it, tick 5 gated.
+        c.costs.push_back({2, 0, 7000});
+        c.costs.push_back({4, 0, 12500, true});
+        rt.stepGameTicks(7);
+        CHECK(withoutSound(c.trace) == "TBFTBFTBFTgBFTBFTBF");
+        REQUIRE(c.starts.size() >= 3);
+        CHECK(c.starts[2] == 2 * kTickUnits + 7000);
+        CHECK(rt.ticksInLongFrames() == 3);
     }
     SUBCASE("I/O: the ticks inside a g_quit section do not run Game_Tick nor its counters") {
         DosRuntime rt;
@@ -258,7 +280,7 @@ TEST_CASE("DOS runtime: long frames at the reference speed (FrameTiming), strict
         rt.setClient(&c);
         c.costs.push_back({3, 21000, 6000});  // 21 PIT ticks of I/O: ticks 4..7 frozen, 8 inside the drawing
         rt.stepGameTicks(10);
-        CHECK(withoutSound(c.trace) == "BTFBTFBTFTBTFBTF");
+        CHECK(withoutSound(c.trace) == "TBFTBFTBFTBFTBFTBF");
         CHECK(rt.ticksFrozen() == 4);
         CHECK(rt.ticksInLongFrames() == 5);
         CHECK(rt.counters().cycle13 == 12 - 6);  // 6 Game_Ticks ran
@@ -266,15 +288,51 @@ TEST_CASE("DOS runtime: long frames at the reference speed (FrameTiming), strict
         CHECK(c.ticks[3].gameTick == 8);
         CHECK(c.ticks[3].inLongFrame);
     }
-    SUBCASE("I/O that Frame_Begin's latches start covers the frame's own tick") {
+    SUBCASE("I/O of a frame that begins before its tick covers that tick") {
         DosRuntime rt;
         CostClient c;
         c.rt = &rt;
         rt.setClient(&c);
-        c.costs.push_back({3, 20309, 0, true, true});  // from tick 2: ticks 3..6 frozen, 7 runs
-        rt.stepGameTicks(8);
-        CHECK(withoutSound(c.trace) == "BTFBTFBFBTFBTF");
+        // Tick 2's frame draws 6 PIT ticks (tick 3 inside); the next frame begins then, before tick 4,
+        // and its latches start 20.309 PIT ticks of I/O: ticks 4..7 frozen, 8 runs.
+        c.costs.push_back({2, 0, 6000});
+        c.costs.push_back({4, 20309, 0, true, true});
+        rt.stepGameTicks(9);
+        CHECK(withoutSound(c.trace) == "TBFTBFTBFBFTBFTBF");
         CHECK(rt.ticksFrozen() == 4);
+    }
+    SUBCASE("a frame that continues (a dissolve): no Frame_Begin clears the gate, the next frame begins at its end") {
+        DosRuntime rt;
+        CostClient c;
+        c.rt = &rt;
+        c.markGateInTick = true;
+        rt.setClient(&c);
+        // Tick 2's frame goes on through the next two ticks (the engine's frames continue it); the last
+        // part reports the rest of the long frame (3 PIT ticks after tick 4): the frame after it begins
+        // then, before tick 5.
+        c.costs.push_back({2, 0, 0, false, false, 2});
+        c.costs.push_back({4, 0, 3000});
+        rt.stepGameTicks(6);
+        CHECK(withoutSound(c.trace) == "TBFTBFTBFgBFBFTBFTBF");
+        REQUIRE(c.starts.size() >= 5);
+        CHECK(c.starts[4] == 4 * kTickUnits + 3000);
+    }
+    SUBCASE("a wait inside a frame ended before the tick that noticed it (backdateStart)") {
+        DosRuntime rt;
+        struct Late : Recorder {
+            void frameBody() override {
+                trace += 'F';
+                if (rt->gameTicks() != 2) return;
+                rt->frameTiming().backdateStart(3000);  // the work began 3 PIT ticks before tick 2
+                rt->frameTiming().spend(10000);
+            }
+        } c;
+        c.rt = &rt;
+        rt.setClient(&c);
+        rt.stepGameTicks(5);
+        // From 3 PIT ticks before tick 2 for 10 PIT ticks: tick 3 inside, the next frame before tick 4.
+        CHECK(withoutSound(c.trace) == "TBFTBFTBFTBFTBF");
+        CHECK(rt.ticksInLongFrames() == 1);
     }
     SUBCASE("a cost reported before the first frame counts from PIT tick 0") {
         DosRuntime rt;
@@ -282,12 +340,12 @@ TEST_CASE("DOS runtime: long frames at the reference speed (FrameTiming), strict
         rt.setClient(&c);
         rt.frameTiming().quitSection(9850);  // Title_Run's OPENING load: game tick 1 falls into it
         rt.stepGameTicks(3);
-        CHECK(withoutSound(c.trace) == "BTFBTF");
+        CHECK(withoutSound(c.trace) == "TBFTBF");
         CHECK(rt.ticksFrozen() == 1);
         REQUIRE_FALSE(c.ticks.empty());
         CHECK(c.ticks[0].gameTick == 2);
     }
-    SUBCASE("period mode and the slow-machine mode ignore the costs") {
+    SUBCASE("period mode and the slow-machine mode ignore the costs; their Frame_Begin comes before the tick") {
         for (const bool slow : {false, true}) {
             RuntimeOptions o;
             if (slow) {
@@ -305,6 +363,52 @@ TEST_CASE("DOS runtime: long frames at the reference speed (FrameTiming), strict
             CHECK(withoutSound(c.trace) == "BTFBTFBTFBTFBTF");
             CHECK(rt.ticksFrozen() == 0);
         }
+    }
+}
+
+TEST_CASE("DOS runtime: a sound call inside a long frame reaches the driver where the frame stands (wave 5)") {
+    // The frame of tick 2 reports 7.25 PIT ticks of I/O, then 12 of drawing, and asks for the delay of
+    // a call before, between and after them; its game ticks ask too (in their interrupt: none).
+    struct Caller : Recorder {
+        std::vector<uint32_t> inFrame, inTicks;
+        void gameTick(const TickInfo& t) override {
+            Recorder::gameTick(t);
+            inTicks.push_back(rt->soundDelay());
+        }
+        void frameBody() override {
+            Recorder::frameBody();
+            if (rt->gameTicks() != 2) return;
+            FrameTiming& f = rt->frameTiming();
+            inFrame.push_back(rt->soundDelay());
+            f.setCallTime(rt->pitTicks() * FrameTiming::kMilli + 3320);  // a part with its own clock
+            inFrame.push_back(rt->soundDelay());
+            f.setCallTime(0);
+            f.quitSection(4000);
+            f.quitSection(3250);  // right after the first: one section
+            inFrame.push_back(rt->soundDelay());
+            f.spend(12000);
+            inFrame.push_back(rt->soundDelay());
+            f.setCallTime(rt->pitTicks() * FrameTiming::kMilli + 3320);  // never before where the frame stands
+            inFrame.push_back(rt->soundDelay());
+            f.setCallTime(0);
+            CHECK(f.quitSections().size() == 1);
+        }
+    };
+    for (const FrameSpeed speed : {FrameSpeed::Reference, FrameSpeed::Period}) {
+        CAPTURE(static_cast<int>(speed));
+        RuntimeOptions o;
+        o.frameSpeed = speed;
+        DosRuntime rt(o);
+        Caller c;
+        c.rt = &rt;
+        rt.setClient(&c);
+        rt.stepGameTicks(6);
+        // A call at PIT tick 10 + x is played by the interrupt after it: x PIT ticks after the next one.
+        const std::vector<uint32_t> expected =
+            speed == FrameSpeed::Reference ? std::vector<uint32_t>{0, 3, 7, 19, 19} : std::vector<uint32_t>{0, 0, 0, 0, 0};
+        CHECK(c.inFrame == expected);
+        for (uint32_t d : c.inTicks) CHECK(d == 0);
+        CHECK(rt.soundDelay() == 0);  // between frames
     }
 }
 

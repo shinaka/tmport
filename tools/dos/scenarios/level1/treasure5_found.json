@@ -1,9 +1,9 @@
 {
- "description": "level 1, the run of r2/fl_treasure5_found from r2/at_treasure5: Down at 433 (the only press tick that gives the end state's g_randSeed 0x84AB36A1 and elf table), the search, hint 4. Seed, elves and slots match; the elf under the bubble differs (129 px: the bubble frame's sprite snapshot, requests/level1.md 2)",
+ "description": "level 1, the run of r2/fl_treasure5_found from r2/at_treasure5: Down at 434 (the only press tick that gives the end state's g_randSeed 0x84AB36A1 and elf table with the wave-5 frame order; 433 before it), the search, hint 4. The hint frame begins when the result frame ends and latches the tick before it, in which the walking elf made its step: the bubble shows the elf as DOSBox-X does. Seed, elves and slots match except slot 2's depth (as treasure_search_log)",
  "start": {
   "state": "savestates/r2/at_treasure5.sav"
  },
- "keys": "433:down:down, 435:up:down",
+ "keys": "434:down:down, 436:up:down",
  "ticks": 836,
  "checkpoints": [
   {

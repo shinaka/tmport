@@ -81,9 +81,11 @@ host clock (ns) --> virtual PIT accumulator (236.69543 Hz = 3579545 / 3 / 5041)
                      |-- every PIT tick: sound sequencer (or run it in the audio callback by
                      |                   sample count, fmt_sound.md §9)
                      '-- every 5th PIT tick: one ORIGINAL FRAME STEP:
-                             frameBegin()            latches, g_stepDone = 0
                              gameTick()              Game_Tick 130f:00FE, unchanged order
+                             frameBegin()            latches, g_stepDone = 0
                              frameBody()             main loop body 130f:0037..00C8 minus the present
+                             (wave 5: the frame after its tick; a frame that begins when a longer one
+                             ended runs before the next tick, §2.5)
 presentation: at each display refresh, show the newest completed back buffer (320x200, 4:3)
 ```
 
@@ -93,11 +95,12 @@ presentation: at each display refresh, show the newest completed back buffer (32
   tick), which is what DOSBox-X showed. Keep the gate implemented: it is the switch for an optional
   "slow machine" mode (more ticks than frames).
 * The original's race between the interrupt-time tick and the frame body disappears; choose
-  "tick before frame body" consistently. (Wave 4: on the reference machine a tick usually lands in
-  the drawing part of a frame, so the next Frame_Begin latches it first; the engine's Frame_Begin,
-  tick, body is the rarer case of the original: §2.5 "Not modelled".) Rand() users of both sides then interleave in a fixed
-  order (the original's order was timing dependent, so bit-exact replay of a recording is not
-  possible in any case).
+  "tick before frame body" consistently. Wave 5: on the reference machine idle frames of a fraction of a
+  PIT tick run between two ticks, so the frame that does a tick's work begins right after it: the
+  engine runs Game_Tick, then Frame_Begin and the body (§2.5 "Where a frame starts"; until wave 4 it ran
+  Frame_Begin before the tick, so its pictures showed the sprites and camera of the tick before).
+  Rand() users of both sides then interleave in a fixed order (the original's order was timing
+  dependent, so bit-exact replay of a recording is not possible in any case).
 * **Per-frame features under lockstep** (DOSBox-X value in brackets) [O measurements, R choice]:
 
   | Feature | Lockstep result | Recommendation |
@@ -162,9 +165,10 @@ starts right after whatever asked for its work, and lasts as long as its work [O
   message, r2/fl_tierc_outside g_ticks 13805..13836); a full play-field redraw a tick asked for (a
   bridge breaking) 12.5 PIT ticks from that tick (r2/fl_bridge_l3_jump log tick 264); opening a
   message or hint bubble (its HUD redraw, then the cloud, the text and Flutter) 27.5 PIT ticks from
-  the tick before (r2/fl_tierc_outside log ticks 79..82 blocked); a Button_Flash 72 PIT ticks; a
-  scroll frame 6.5 PIT ticks horizontal, 7 vertical, 7.5 both, from the tick before (the FRAME rings;
-  camera.cpp scrollUpdate); a full HUD redraw in a frame that dissolves 6 (the dissolve presents);
+  where its frame began (r2/fl_tierc_outside log ticks 79..82 blocked behind the start message that
+  opened when the door's dissolve ended; r2/fl_search_t 331535..331550 behind hint 4); a Button_Flash
+  72 PIT ticks; a scroll frame 6.5 PIT ticks horizontal, 7 vertical, 7.5 both, from the tick that moved
+  the camera (the FRAME rings; camera.cpp scrollUpdate); a full HUD redraw in a frame that dissolves 6 (the dissolve presents);
   the title loop's page draws (OPENING.PAN and the page) title 12.8, story page 1 13.3, story page 2
   7.5, series page 14.3, the walk-off's backdrop about 12 (title.cpp keeps that clock itself,
   `code_ui.md` §8.5; the walk-off agrees with `tandy_r3_session.avi`, frames 419-663).
@@ -177,25 +181,32 @@ starts right after whatever asked for its work, and lasts as long as its work [O
   it after the 7th tick, the end sequence's chute after the 6th, the castle top (CLOSE load) after the
   7th, the castle gate (SHACK load) after the 8th, the champion's arrival in the clubhouse 65..70 PIT
   ticks after the gate tick (`main_loop.cpp` setDissolveStart; the cells per frame stay the frame
-  clock's).
-  Menus, Yes/No boxes and the quiz screen left no measurable trace in the logs (no tick was gated
-  behind them) and are not modelled.
+  clock's). The frame after it begins when it ends (wave 5: before the next tick).
 * **Search frames** (a partial play-field redraw and present each): 4.25 PIT ticks, 4.65 while the
-  found treasure or key is shown (the 36 intervals of r2/fl_typematic and r2/fl_search_t), the first
-  0.5 PIT ticks after the starting tick: the 37 frames take 31 game ticks (lockstep 37).
-* **Where a frame starts**: work asked for by this frame's own tick (a key read by Input_Tick) counts
-  from that tick, and the ticks inside the frame start with g_stepDone clear (its Frame_Begin came
-  after the tick); work that Frame_Begin's latches start (a scene the ticks asked for, a full redraw,
-  the end of the previous frame) counts from the previous tick, so the frame's own tick already falls
-  inside it, and inside its I/O when the I/O comes first in the body (Scene_Update): the scene-load
-  stall then loses exactly the ticks the logs lose. Such a frame begins when the frame before it has
-  ended if that is later (a scroll frame that ran past the tick): r2/fl_bridge_l3 gates log tick 1111
-  after a horizontal scroll frame, the breaking bridge's redraw and the fall's first vertical scroll
-  frame ran back to back; the champion's load begins after the chute's last scroll frame.
+  found treasure or key is shown (the 36 intervals of r2/fl_typematic and r2/fl_search_t), back to
+  back from 0.5 PIT ticks after the starting tick: the 37 frames take 31 game ticks (lockstep 37); the
+  frame after the result frame (hint 4 after a find) begins when it ends.
+* **Where a frame starts** (wave 5) [O frame logs, R]: idle frames last a fraction of a PIT tick, so
+  the frame that does a tick's work begins right after that tick, whether the tick asked for it
+  (Frame_Begin latches a scene, a redraw, a camera step) or delivered a key; its Frame_Begin comes after
+  the tick (the r2 log end states hold draw records equal to the live sprite slots: DOSBox-X's last
+  frame began after the last tick). A frame that runs past the next ticks (a scroll frame, a search
+  frame, a bubble, a scene load) has them inside it: they run Game_Tick without a frame of their own
+  (g_stepDone as its Frame_Begin left it), inside its I/O not at all; the loop's next frame begins when
+  it ends and latches what they did, before the following tick when it ended between two ticks
+  (r2/fl_bridge_l3 gates log tick 1111 behind a scroll frame, the breaking bridge's redraw and the
+  fall's first scroll frame run back to back; the champion's load begins after the chute's last scroll
+  frame; hint 4 begins when the search's result frame ends, r2/fl_search_t: the ticks it blocks are
+  DOSBox-X's 331535..331550). A dissolve and a Button_Flash wait are such long frames (no Frame_Begin
+  until they end); the flash's rest of the frame (the confirm handler, a HUD redraw) counts from the
+  wait's end (+72 PIT ticks), between two ticks. The search frames run back to back from 0.5 PIT ticks
+  after the starting tick, so a tick falls inside one of them and the next begins when it ends.
 * Engine: the game reports each frame's cost to `DosRuntime::frameTiming()` (`FrameTiming`: g_quit
-  sections and drawing time in thousandths of a PIT tick, `fromPreviousTick()`); the runtime runs the
-  ticks inside the frame without a frame of their own (no Frame_Begin: a tick after one that advanced
-  a script or moved the camera is gated) and skips Game_Tick in the I/O. Deterministic: costs come
+  sections and drawing time in thousandths of a PIT tick, from the frame's start; `continueFrame()`
+  for a dissolve or a flash wait going on, `backdateStart()` for the flash's end); the runtime runs
+  the ticks inside the frame without a frame of their own (no Frame_Begin: a tick after one that
+  advanced a script or moved the camera is gated), skips Game_Tick in the I/O, and runs the frame that
+  began when a long one ended before the next tick. Deterministic: costs come
   from what the frame loaded and drew, never from host time. The trace (`--dos-trace`) has no row for
   a tick lost in I/O, like the logs' STEP ring (the events of a frame whose own tick was lost start
   the next row).
@@ -217,17 +228,30 @@ starts right after whatever asked for its work, and lasts as long as its work [O
 * `frame_speed = period` keeps strict lockstep: every frame fits into its game tick, files load at
   once and the search runs one frame per tick (the idealised period PC whose loop runs once per tick;
   the slow-machine mode of the runtime keeps its own grouping of ticks).
-* Not modelled: the rare long Game_Tick (r2/fl_climb: a tick 4 PIT ticks long); the cost of menus,
-  Yes/No and OK boxes, the quiz screen, the sign-in and the rank screen (no log gated a tick behind
-  them); sound calls inside a long frame (they take effect at the frame's start: the resumed game's
-  tune 23 PIT ticks early, the tune after Flutter's first hint 10 early, `tandy_r3_session.avi`); the
-  order of a frame against its tick: the engine runs Frame_Begin, the tick, the frame body, while on
-  the reference machine a tick usually lands in the drawing part of a frame, so the next Frame_Begin
-  is the first to see it (visible where a picture freezes: the walking elf's feet under the hint
-  bubble after a search, 129 pixels in `level1/treasure5_found`; the castle-top tick removes the HUD
-  key icon, which 4 of 5 reference runs keep); the hint bubble that opens right after a search
-  begins after the search's last frame in DOSBox-X (it blocked 4 ticks, the engine gates 3:
-  r2/fl_search_t). Mouse moves of the reference runs are replayed with `--keys` move events.
+* Sound calls inside a long frame (wave-5 integration) [O, R]: the original's driver entry points
+  write its blocks at once and the next timer interrupt plays them, so a call made partway through a
+  long frame sounds that far into it (Game_Start's tune after Quiz_LoadQuestions and the level's PAN,
+  the music's pause after a message bubble's drawing). The engine reports the frame's costs where the
+  work happens and delays each call by the PIT ticks to its place (`ENGINE_MAP.md` §3.8): the resumed
+  game's tune of `tandy_r3_session.avi` now starts 3 PIT ticks after the recording's (23 before).
+* Not modelled: the rare long Game_Tick (r2/fl_climb: a tick 4 PIT ticks long); the sub-tick landing point of a
+  tick inside an idle frame (the castle-top tick removed the HUD key icon in 1 of 5 reference runs: its
+  tick fell between a frame's Frame_Begin and its Screen_DrawOverlay; the engine keeps it as the other
+  4). Measured in wave 5 but not modelled: the end sequence's animation frames (several large sprites
+  drawn and presented) appear in `ega_r2_end_t2_nokey.avi` about 6 PIT ticks after their tick, as late
+  as the chute's scroll steps (relative to the logged ticks of r2/fl_end_t2_wait), while the climbing
+  player's sprite steps in the trunk-climb AVI of r2/fl_climb show within a PIT tick; on the Tandy a
+  full HUD redraw (closing the Help menu or Flutter's hint) shows 4-6 PIT ticks after the key's tick,
+  against 16 on EGA (inferred: the EGA present writes four planes), and a menu opens within a game tick
+  (`tandy_r3_session.avi`: the music pauses at the menu's Sound_SyncState, the menu is complete one AVI
+  frame later); in the same AVI the resumed game's HUD redraw and the start message's bubble (HUD redraw
+  and cloud) end about 12 PIT ticks earlier than the EGA costs give (the music's pause after the bubble
+  and the bubble's AVI frame 1192): about 10 PIT ticks per Tandy HUD redraw (wave-5 integration, the
+  sound-timing check). Menus, Yes/No and OK boxes, the quiz screen, the sign-in and the rank screen block no
+  tick in any log (the UI modes freeze the world) and their frames are not in any FRAME ring; their
+  cost (and the per-look costs) needs new logs: `framelog.py install` on a state right before the
+  action, the key within 2 s (the FRAME ring holds 4096 frames), then save. Mouse moves of the
+  reference runs are replayed with `--keys` move events.
 
 ---
 
@@ -236,7 +260,7 @@ starts right after whatever asked for its work, and lasts as long as its work [O
 | Option (engine) | Original | Values | Default [R] |
 |---|---|---|---|
 | `look` | `-E` / `-C` / `-T` / `-M` / `-H` | `ega` (also Tandy: identical pixels), `cga` (4-colour dither), `tandy`, `mcga` (softer palette), `hercules` = CGA path | `ega` |
-| `sound` | `-Si` / `-St` / `-Sa` (`-Ss` = AdLib) | `speaker` (SFX.IBM + TUNES.IBM), `tandy` (SFX.TAN + TUNES.TAN on SN76496), `adlib` (TUNES.TAN on OPL2, effects SFX.IBM on the speaker; every `Music_Play` with music on draws one `rand()`, §2.4), `off` (engine only) | `tandy` (implemented in wave 2) until an OPL2 core exists; the DOSBox-X reference machine was AdLib |
+| `sound` | `-Si` / `-St` / `-Sa` (`-Ss` = AdLib) | `speaker` (SFX.IBM + TUNES.IBM), `tandy` (SFX.TAN + TUNES.TAN on SN76496), `adlib` (TUNES.TAN on OPL2, effects SFX.IBM on the speaker; every `Music_Play` with music on draws one `rand()`, §2.4), `off` (engine only) | `tandy` (implemented in wave 2) until an OPL2 core exists; the DOSBox-X reference machine was AdLib. Wave 5: `adlib` is the original's AdLib driver on an emulated OPL2 (`fmt_sound.md` §5.5, §11.7); the default is unchanged |
 | `slow_cpu` | `-X` (toggles the 8086 detection) | off / on: 7 elves processed, scroll and the player's scroll step doubled with rows 112..143 not scrolled, search shortened by 32 frames, CHAMPION timer −4 per frame, Esc opens the Exit box directly | off |
 | `music`, `sound effects` | per player (USERS.DAT +0x15E/+0x160), Ctrl+S toggles both | | from the save |
 | `frame_speed` | — (CPU speed) | `reference` (DOSBox-X per-frame rates, §2.3, and its long frames and disk I/O, §2.5) / `period` (one step per original frame, every frame within its game tick) | `reference` |

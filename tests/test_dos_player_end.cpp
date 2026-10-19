@@ -906,9 +906,9 @@ struct CaptureRun {
 };
 
 // The castle-top tick clears g_keyState. DOSBox-X redraws the clue box only when that tick lands
-// between a frame's Frame_Begin and its Screen_DrawOverlay (1 of the 5 reference runs); the engine's
-// order (Frame_Begin, Game_Tick, the frame body) always takes that path, so its key icon is gone where
-// most captures still show it (re/dos/docs/code_player.md, wave 4).
+// between a frame's Frame_Begin and its Screen_DrawOverlay (1 of the 5 reference runs: the first run
+// below, ega_r2_end_t2_nokey); the engine runs the frame after its tick (wave 5), whose Frame_Begin
+// latches scene 3 first, so the icon stays as in the other 4 runs (re/dos/docs/ENGINE_MAP.md §8).
 constexpr std::array<int, 4> kKeyIcon = {6, 165, 22, 191};
 
 int differingPixels(const DosGame& g, const tmport::mods::DecodedPng& cap, bool keyMask) {
@@ -931,14 +931,14 @@ TEST_CASE("DOS player: the end of a game from the reference states equals the ca
     const std::vector<CaptureRun> runs = {
         {"two treasures: the end sequence, the chute, the treasure room, the rank chest",
          "savestates/r2/fl_castle_upper_t2.sav", "82:down:up, 342:up:up",
-         {{266, "ega/r2_end_01_castle_top_horn.png"}, {403, "ega/r2_end_02_treasure_into_chest.png"},
-          {517, "ega/r2_end_03_chest_open.png"}, {647, "ega/r2_end_04_second_treasure.png"},
-          {972, "ega/r2_end_05_at_chute.png"}, {1036, "ega/r2_end_06_fall_shaft.png"},
-          {1358, "ega/r2_end_07_treasure_room.png"}, {1457, "ega/r2_end_08_rank_chest_fill.png"}}},
+         {{266, "ega/r2_end_01_castle_top_horn.png", true}, {403, "ega/r2_end_02_treasure_into_chest.png", true},
+          {517, "ega/r2_end_03_chest_open.png", true}, {647, "ega/r2_end_04_second_treasure.png", true},
+          {972, "ega/r2_end_05_at_chute.png", true}, {1036, "ega/r2_end_06_fall_shaft.png", true},
+          {1358, "ega/r2_end_07_treasure_room.png", true}, {1457, "ega/r2_end_08_rank_chest_fill.png", true}}},
         {"the crown: the champion branch, the clubhouse with two figures, CHAMPION",
          "savestates/r2/fl_castle_upper_t6_294.sav", "81:down:up, 342:up:up",
-         {{1277, "ega/r2_crown_01_chest_glow.png", true}, {1446, "ega/r2_crown_02_window_empty.png", true},
-          {1567, "ega/r2_crown_03_crown_on_pedestal.png", true}, {1774, "ega/r2_crown_a.png", true},
+         {{1277, "ega/r2_crown_01_chest_glow.png"}, {1446, "ega/r2_crown_02_window_empty.png"},
+          {1567, "ega/r2_crown_03_crown_on_pedestal.png"}, {1774, "ega/r2_crown_a.png"},
           {2158, "ega/r2_crown_05_treasure_room_two_figures.png"}, {2419, "ega/r2_crown_07_rank_champion_hidden.png"},
           {2423, "ega/r2_crown_06_rank_champion_visible.png"}, {2600, "ega/r2_crown_b.png"}}},
         {"Round 1: the castle hall, the ladder", "savestates/ega/castle.sav", "10:down:right, 152:up:right",
@@ -946,7 +946,7 @@ TEST_CASE("DOS player: the end of a game from the reference states equals the ca
         {"Round 1: the shaft, a ladder jump, the castle top", "savestates/ega/castle_shaft.sav",
          "30:down:pgup, 32:up:pgup, 210:down:up",
          {{1, "ega/099_castle_ladder_shaft.png"}, {119, "ega/100_castle_ladder_jump.png"},
-          {545, "ega/101_castle_top_treasure_room.png", true}}},
+          {545, "ega/101_castle_top_treasure_room.png"}}},
         {"Round 1: the rank chest, the clubhouse message, the hint", "savestates/ega/castle_top.sav",
          "10:down:enter, 11:up:enter, 200:down:enter, 201:up:enter, 450:down:enter, 451:up:enter",
          {{160, "ega/102_castle_rank_chest.png"}, {222, "ega/103_clubhouse_top_reached_msg.png"},

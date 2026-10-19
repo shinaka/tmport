@@ -23,6 +23,11 @@
 
 namespace tmport::dos {
 
+// The AdLib device's mix (the speaker's effects and the OPL's tunes, in DOSBox-X's balance) at this
+// level: the loudest tune passages and an effect over them stay below full scale at the device's
+// default volume. The speaker and the Tandy devices are not affected.
+inline constexpr double kAdLibMixLevel = 0.75;
+
 struct DosRenderConfig {
     int sampleRate = 48000;  // 44100 and 49716 (the OPL2's native rate) work as well
     SynthMode mode = SynthMode::Smooth;
@@ -34,7 +39,8 @@ struct DosRenderConfig {
 class DosSoundRenderer final : private SoundPorts {
 public:
     // `bank` must outlive the renderer. With the AdLib device and no back end given, the tunes play
-    // on OplFallbackSynth (opl_backend.h).
+    // on the original's AdLib driver and an emulated OPL2 (AdLibOpl, opl_backend.h). The OPL's output
+    // is added after the speaker's Smooth-mode filters (they model the speaker, not the AdLib card).
     DosSoundRenderer(const SoundBank& bank, DosRenderConfig cfg, std::unique_ptr<OplBackend> opl = nullptr);
 
     Sequencer& sequencer() { return seq_; }
@@ -60,10 +66,19 @@ public:
 
     SpeakerSynth& speaker() { return speaker_; }
     PsgSynth& psg() { return psg_; }
+    // The AdLib back end (nullptr on the speaker and the Tandy).
+    OplBackend* opl() { return opl_.get(); }
+    // A DOSBox-X state's AdLib driver from its DGROUP image (before Sequencer::restore with
+    // oplRestored); false without an AdLib back end.
+    bool restoreOpl(std::span<const uint8_t> dgroup) { return opl_ && opl_->restore(dgroup); }
+    // Off: the OPL is not synthesised (its registers are still written): for runs whose samples are
+    // thrown away. The speaker and the PSG are not affected.
+    void setOplSynthesis(bool on) { oplSynthesis_ = on; }
 
 private:
     void beginTick();
     void synthesize(double* out, size_t n);
+    void synthesizeOpl(double* out, size_t n);
     void filter(double* out, size_t n);
 
     // SoundPorts
@@ -82,6 +97,7 @@ private:
     void oplNoteOff(int voice) override {
         if (opl_) opl_->noteOff(voice);
     }
+    int oplPlayTuneTicks() const override { return opl_ ? opl_->playTuneTicks() : 0; }
 
     DosRenderConfig cfg_;
     SpeakerSynth speaker_;
@@ -89,6 +105,8 @@ private:
     std::unique_ptr<OplBackend> opl_;
     Sequencer seq_;  // after the synths and the OPL back end: its constructor calls oplInit()
     std::function<void()> tickHook_;
+    bool oplSynthesis_ = true;
+    std::vector<double> oplBuf_;  // the OPL's samples of the current render call
 
     double samplesPerTick_;
     double acc_ = 0.0;
@@ -111,8 +129,9 @@ struct OfflineRender {
 // block per PIT tick like tools/dos/dos_sound.py render(); the music loops `loops - 1` times.
 // `afterTick` (optional) runs after each tick. Raw mode then appends dos_sound.py's 50 ms of
 // silence, Smooth mode 200 ms of filter ring-out.
+// `variant`: the AdLib orchestration of a tune.
 OfflineRender renderEntry(DosSoundRenderer& r, bool tune, int id, int loops = 1, double maxSeconds = 600.0,
-                          const std::function<void()>& afterTick = {});
+                          const std::function<void()>& afterTick = {}, int variant = 0);
 // tools/dos/dos_sound.py write_wav: peak-normalised to 0.9 of full scale, rounded half to even.
 std::vector<int16_t> toPcm16Normalized(std::span<const double> samples);
 // A fixed gain on the synth levels, clipped.

@@ -122,6 +122,17 @@ std::span<const uint8_t> DosExe::dsBytes(uint16_t off, size_t n) const {
     return b.first(n);
 }
 
+void DosExe::writeDs(uint16_t off, std::span<const uint8_t> bytes) {
+    const size_t base = static_cast<size_t>(kDgroupSeg - kGhidraBase) * 16u;
+    if (base + off + bytes.size() > image_.size()) throw std::out_of_range("DS write past the initialised DGROUP");
+    std::copy(bytes.begin(), bytes.end(), image_.begin() + static_cast<std::ptrdiff_t>(base + off));
+}
+
+void DosExe::writeDs16(uint16_t off, uint16_t v) {
+    const uint8_t b[2] = {static_cast<uint8_t>(v & 0xFF), static_cast<uint8_t>(v >> 8)};
+    writeDs(off, b);
+}
+
 DosExe::FarPtr DosExe::readFarPtr(uint16_t dsOff) const {
     return {static_cast<uint16_t>(ds16(static_cast<uint16_t>(dsOff + 2)) + kGhidraBase), ds16(dsOff)};
 }

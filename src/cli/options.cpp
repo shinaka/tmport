@@ -51,6 +51,10 @@ std::string toolsOverview() {
         "  Mods (topic: mods; docs/MODDING.md)\n"
         "    --export-mod-kit <dir>             your game's assets in editable formats\n"
         "    --check-mods [<dir> ...]           convert and check mod folders\n"
+        "  1990 DOS edition (topics: dos-gfx, dos-sound, dos-autoplay; --edition dos for the mods)\n"
+        "    --dos-pan, --dos-pak, --dos-screen scenery, sprites and screens to PNG\n"
+        "    --dos-sound <device> sfx|tune|soundtest|all  tunes and effects to WAV (AdLib: OPL2)\n"
+        "    --edition dos --autoplay           the game played headless by a bot, rules checked\n"
         "\n"
         "  Options of every tool that reads the game:\n"
         "    --data <path>        game folder or CD image (default: TM_DATA, then auto-detection)\n"
@@ -60,7 +64,8 @@ std::string toolsOverview() {
         "    --16                 16-colour art (not --scene and the audio tools)\n"
         "    --verbose            debug logging\n"
         "\n"
-        "Help topics: game, inspect, text, anim, screen, scene, room, audio, mods, all.\n"
+        "Help topics: game, inspect, text, anim, screen, scene, room, audio, mods, dos-gfx, dos-sound,\n"
+        "dos-autoplay, all.\n"
         "More: README.md, docs/BUILDING.md (tools and scripts), docs/MODDING.md.\n";
 }
 

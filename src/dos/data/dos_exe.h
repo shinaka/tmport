@@ -43,6 +43,16 @@ public:
     // The n bytes at DS:off (a table of dgroup_offsets.h). Throws std::out_of_range past the image.
     std::span<const uint8_t> dsBytes(uint16_t off, size_t n) const;
 
+    // The initialised part of DGROUP (DS:0000..8F9F, dg::kInitSize bytes): the only part the
+    // image holds (BSS follows at run time).
+    size_t dgroupInitSize() const { return dgroup().size(); }
+    // Overwrites bytes of the initialised DGROUP: the DOS mod layer's string and palette overrides
+    // (dos/mods/dos_exe_strings.h), applied by DosFiles::open before anything reads a table, so
+    // every reader (dsString, the tables, the writable copies of the game state) sees them. Throws
+    // std::out_of_range past the initialised part.
+    void writeDs(uint16_t off, std::span<const uint8_t> bytes);
+    void writeDs16(uint16_t off, uint16_t v);
+
     // Resolves the far pointer stored at DS:off to image bytes (empty when it points outside).
     std::span<const uint8_t> farPtrAtDs(uint16_t off) const;
     // The Ghidra-style segment and offset of the far pointer stored at DS:off.

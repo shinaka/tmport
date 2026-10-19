@@ -4,6 +4,8 @@
 // dos/input/input_poll.h). DosGame's RuntimeClient methods call these (ENGINE_MAP §3).
 // Specs: re/dos/docs/code_runtime.md §3, §6; code_ui.md §6.3. Owner: mainloop agent.
 
+#include "dos/data/file_table.h"
+
 namespace tmport::dos {
 
 class DosGame;
@@ -25,15 +27,30 @@ void mainStart(DosGame& g);
 // Sprites_EraseAll follows its last cell. At the reference frame speed the frame runs as many
 // Search_Update calls as reference search frames fit into it, and reports what it cost on the
 // reference machine to the runtime (DosRuntime::frameTiming: USERS.DAT writes, Quiz_LoadQuestions and
-// PAN loads with g_quit = 1, a full HUD redraw, a bubble opening; PORTING_NOTES.md §2.5).
+// PAN loads with g_quit = 1, a full HUD redraw, a bubble opening; PORTING_NOTES.md §2.5) as the work
+// happens, in the original's order (wave 5: a sound call reaches the driver where the frame stands,
+// DosRuntime::soundDelay).
 void mainFrameBody(DosGame& g);
-// The reference frame timing (DosRuntime::frameTiming, PORTING_NOTES.md §2.5) of the I/O that
-// Frame_Begin's latches start: a scene the ticks asked for (g_sceneWanted != g_loadedScene with no UI
-// mode open) is loaded by Scene_Update right at the start of the frame body, with g_quit = 1; on the
-// reference machine that frame began right after the previous game tick. Called by
-// DosGame::frameBegin after Frame_Begin; sets DosGame::latchedLoad. (mainFrameBody reports the rest of
-// a frame's cost: the I/O the frame body starts, a full HUD redraw.)
+// What Frame_Begin's latches start, for the reference frame timing (DosRuntime::frameTiming,
+// PORTING_NOTES.md §2.5): a scene the ticks asked for (g_sceneWanted != g_loadedScene with no UI mode
+// open; Scene_Update loads it with g_quit = 1 and its load reports itself) and a full play-field
+// redraw (its cost is reported before Playfield_Redraw). On the reference machine that frame began
+// right after the tick that asked for it (or when a longer frame before it ended), and so the ticks
+// after it fall into the load. Called by DosGame::frameBegin after Frame_Begin; sets
+// DosGame::latchedLoad, latchedRedraw and redrawCostDue.
 void frameBeginTiming(DosGame& g);
+// The reference cost of the frame's I/O (a g_quit = 1 section: the game ticks inside it do not run),
+// reported by the routine that does it, where it does it, while the runtime runs a frame or main's
+// start-up (FrameTiming::isOpen; nothing otherwise):
+//   reportPanLoad     Scene_LoadPan 1460:05e8: 3.4 PIT ticks + 0.35 per 1000 bytes of the file
+//   reportBankLoad    the sprite bank Scene_Update reads with a scene change (CLOSE.PAK, SHACK.PAK,
+//                     SPRITES.PAK after them): 0.019 PIT ticks per 1000 bytes (SPRITES.PAK 2.2)
+//   reportUsersWrite  Users_WriteFile 47c7:055a: 4.5 PIT ticks
+//   reportQuizLoad    Quiz_LoadQuestions in Game_Start 47c7:08b5: 7 PIT ticks
+void reportPanLoad(DosGame& g, FileIndex pan);
+void reportBankLoad(DosGame& g, FileIndex pak);
+void reportUsersWrite(DosGame& g);
+void reportQuizLoad(DosGame& g);
 // 130f:00fe Game_Tick (per game tick; the runtime handles g_quit and the two counters): not gated:
 // player screen offsets (DS:8FA7/8FA9, wrapped rows), Mouse_Poll, Input_Tick, Anim_Tick, and with the
 // scene loaded (or the title) Input_MouseWalk, Player_Update, Elves_Update, Cells_UpdateVisible;

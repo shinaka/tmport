@@ -3,7 +3,10 @@
 // callback, so the sequencer advances by sample count at the PIT rate whatever the frame rate is
 // (fmt_sound.md §9, PORTING_NOTES.md §2.3). The game calls the driver's entry points from its
 // own thread; they are queued and take effect right before the next PIT tick of the audio thread,
-// as the original's calls from the main loop take effect at the next timer interrupt.
+// as the original's calls from the main loop take effect at the next timer interrupt. A call can
+// carry a delay in PIT ticks after that one (wave 5): the game makes a long frame's calls when the
+// frame starts, the original partway through it (DosRuntime::soundDelay); a delayed command waits in
+// the queue, and commands take effect in the order of their PIT tick (pushed order within one).
 //
 // Offline (headless) use opens no device: the caller pulls samples with renderOffline(), or with
 // renderOfflineTicks() in whole PIT ticks (5 per game tick) for deterministic captures.
@@ -53,29 +56,39 @@ public:
     bool isOpen() const { return stream_ != nullptr; }
     std::string driverName() const;
 
-    // ---- the driver's entry points (thread safe; applied before the next PIT tick)
-    void sfxPlay(int id);       // 491b:06d7 Sfx_Play
-    void sfxStop();             // 491b:074b Sfx_Stop
-    void musicPlay(int tune);   // 491b:0791 Music_Play (AdLib: draws rand() here when the music is on)
-    void musicStop();           // 491b:0811 Music_Stop
-    void silenceAll();          // 491b:0854 Sound_SilenceAll
-    void setSoundOn(bool on);   // DS:63b4 g_soundOn
-    void setMusicOn(bool on);   // DS:63b6 g_musicOn
-    void setMusicPaused(bool paused);  // DS:37ce (0 while g_uiMode != 0, Sound_SyncState 43cb:046e)
-    void setMusicLoop(bool on);        // DS:63ba
-    void setSfxLoop(bool on);          // DS:63b8 (the end sequence loops effect 2, player states 44/45/64/65)
+    // ---- the driver's entry points (thread safe; applied before the next PIT tick, or `delay` PIT
+    // ticks after it)
+    void sfxPlay(int id, uint32_t delay = 0);       // 491b:06d7 Sfx_Play
+    void sfxStop(uint32_t delay = 0);               // 491b:074b Sfx_Stop
+    void musicPlay(int tune, uint32_t delay = 0);   // 491b:0791 Music_Play (AdLib: draws rand() here when the music is on)
+    void musicStop(uint32_t delay = 0);             // 491b:0811 Music_Stop
+    void silenceAll(uint32_t delay = 0);            // 491b:0854 Sound_SilenceAll
+    void setSoundOn(bool on, uint32_t delay = 0);   // DS:63b4 g_soundOn
+    void setMusicOn(bool on, uint32_t delay = 0);   // DS:63b6 g_musicOn
+    void setMusicPaused(bool paused, uint32_t delay = 0);  // DS:37ce (0 while g_uiMode != 0, Sound_SyncState 43cb:046e)
+    void setMusicLoop(bool on, uint32_t delay = 0);        // DS:63ba
+    void setSfxLoop(bool on, uint32_t delay = 0);          // DS:63b8 (the end sequence loops effect 2, player states 44/45/64/65)
     // A DOSBox-X state's driver (wave 4): the effect block DS:6448 and the music block DS:64c0 (0x78
     // bytes each, as in DGROUP) and the voice count DS:63be, applied before the next PIT tick like the
     // other commands; the effect and the tune continue where the state left them (Sequencer::restore).
     // The flags (DS:63b4..63ba, DS:37ce) are set with the calls above.
     void restoreBlocks(std::span<const uint8_t> sfxBlock, std::span<const uint8_t> musicBlock, int voices,
                        int adlibVariant = 0);
+    // A DOSBox-X state's AdLib driver (wave 5): its variables from the state's DGROUP image (DS:0000..,
+    // the range of AdLibDriver::State), applied before the next PIT tick; the OPL registers are written
+    // again from them, and the next restoreBlocks() then sends no AdLib_PlayTune and no notes. Nothing
+    // on the speaker and the Tandy.
+    void restoreOplDriver(std::span<const uint8_t> dgroup);
 
     // ---- engine-side controls (no effect on the driver state)
     void setVolume(float v) { volume_.store(v); }
     float volume() const { return volume_.load(); }
     // Off: the output is silent but the sequencer keeps running (timing is unchanged).
     void setOutputEnabled(bool on) { outputEnabled_.store(on); }
+    // Off: the OPL2 is not synthesised (the AdLib driver still writes its registers): for headless
+    // runs whose samples are thrown away (the emulated chip is the costly part). Speaker and Tandy
+    // output are not affected.
+    void setOplSynthesis(bool on);
 
     // ---- headless (only while no SDL stream is open)
     // Renders n float samples.
@@ -83,8 +96,9 @@ public:
     // Appends the rest of the current PIT tick's samples (if renderOffline stopped inside one) and
     // those of the next `ticks` ticks (about 202.8 each at 48 kHz); returns their number. Lockstep
     // capture for a runtime that drives its virtual PIT itself. Commands
-    // queued before the call take effect at the first of these ticks, as a call made in a game
-    // tick reaches the sound tick of the next interrupt in the original (code_runtime.md §2.3).
+    // queued before the call take effect at the first of these ticks (a delayed one that many ticks
+    // later), as a call made in a game tick reaches the sound tick of the next interrupt in the
+    // original (code_runtime.md §2.3).
     size_t renderOfflineTicks(uint32_t ticks, std::vector<float>& out);
 
     struct Status {
@@ -100,13 +114,14 @@ public:
 private:
     struct Command {
         enum class Kind : uint8_t { SfxPlay, SfxStop, MusicPlay, MusicStop, SilenceAll, SoundOn, MusicOn, MusicPaused, MusicLoop,
-                                    SfxLoop, Restore };
+                                    SfxLoop, Restore, OplRestore };
         Kind kind;
         int a = 0;
         int b = 0;
+        uint32_t delay = 0;  // PIT ticks still to wait (Restore and OplRestore: always 0)
     };
     void push(Command c);
-    void applyPending();  // audio side, before a tick
+    void applyPending();  // audio side, before a tick: the commands due, the others one tick closer
     void renderFloat(float* out, size_t n);
     void publishStatus();
     static void callback(void* user, SDL_AudioStream* stream, int additional, int total);
@@ -128,6 +143,8 @@ private:
         int voices = 4, variant = 0;
     };
     std::vector<Restore> restores_;  // the payloads of queued Restore commands (in order)
+    std::vector<std::vector<uint8_t>> oplRestores_;  // the payloads of queued OplRestore commands
+    bool oplRestored_ = false;  // audio side: an OplRestore was applied, the next Restore sends no notes
     std::atomic<bool> pending_{false};
 
     std::atomic<float> volume_;

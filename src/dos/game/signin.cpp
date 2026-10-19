@@ -15,6 +15,7 @@
 #include "dos/game/hud.h"
 #include "dos/game/init.h"
 #include "dos/game/layout.h"
+#include "dos/game/main_loop.h"
 #include "dos/game/quiz.h"
 #include "dos/game/scene.h"
 #include "dos/game/sound.h"
@@ -631,6 +632,7 @@ void usersWriteFile(DosGame& g, DosSaveMoment moment) {
     uiForceRedraw(g);
     ++g.world.loadedScene;
     g.users.write(moment);  // always the whole 3243-byte image
+    reportUsersWrite(g);    // the reference machine's time for it (the frame timing)
     g.core.quit = 0;
     --g.world.loadedScene;
 }
@@ -832,6 +834,7 @@ int gameStart(DosGame& g) {
     sfxStop(g);
     core.quit = 1;
     const int loaded = quizLoadQuestions(g, saved != 0);
+    reportQuizLoad(g);  // the reference machine's time for it (the frame timing)
     core.quit = 0;
     core.uiMode &= static_cast<uint8_t>(~(kModeSignIn | kModeQuiz));
     ui.signinInit = 1;

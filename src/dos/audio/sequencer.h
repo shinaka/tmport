@@ -47,6 +47,9 @@ public:
     virtual void oplPlayTune(int /*tune*/, int /*variant*/) {}
     virtual void oplNoteOn(int /*voice*/, uint8_t /*semitone*/) {}
     virtual void oplNoteOff(int /*voice*/) {}
+    // PIT ticks the last oplPlayTune() takes on the reference machine: Music_Play sets the music
+    // block's status only after AdLib_PlayTune returns, so the tune waits that long (opl_backend.h).
+    virtual int oplPlayTuneTicks() const { return 0; }
 };
 
 class Sequencer {
@@ -107,7 +110,7 @@ public:
     const Block& sfxBlock() const { return sfx_; }
     const Block& musicBlock() const { return music_; }
     bool sfxActive() const { return sfx_.status != 0; }
-    bool musicActive() const { return music_.status != 0; }
+    bool musicActive() const { return music_.status != 0 || musicHold_ > 0; }  // (a tune held back by AdLib_PlayTune counts)
     // ---- a DOSBox-X state's driver (wave 4): the blocks as the original holds them in DGROUP
     static constexpr size_t kBlockBytes = 0x78;
     // The 0x78-byte block at DS:6448 (effects) or DS:64c0 (music) in the field order above (stream
@@ -118,8 +121,12 @@ public:
     // as they were; then the device gets what the current notes had written to it (each sounding
     // voice's pitch from the time-taking event before its stream pointer, the speaker gate off past
     // the release point, a rest as voice off; the Tandy volumes follow at the next tick's volume
-    // pass). `adlibVariant` = the orchestration of the playing tune (AdLib).
-    void restore(const Block& sfx, const Block& music, int voices, int adlibVariant = 0);
+    // pass). `adlibVariant` = the orchestration of the playing tune (AdLib). With `oplRestored` the
+    // AdLib driver was restored from the state as well (its registers hold the sounding notes), so
+    // no AdLib_PlayTune and no note is sent again.
+    void restore(const Block& sfx, const Block& music, int voices, int adlibVariant = 0, bool oplRestored = false);
+    // PIT ticks the tune of the last Music_Play still waits for AdLib_PlayTune (0 = none).
+    int musicHoldTicks() const { return musicHold_; }
 
     // Times a looping block restarted (DS:63ba / 63b8), for tools and tests.
     uint32_t musicLoops() const { return musicLoopCount_; }
@@ -166,6 +173,7 @@ private:
     bool sfxLoop_ = false;    // DS:63b8
     bool musicLoop_ = false;  // DS:63ba
     uint16_t musicGate_ = 0xFFFF;  // DS:37ce
+    int musicHold_ = 0;  // AdLib: ticks until Music_Play's status 1 (AdLib_PlayTune's set-up time)
     uint32_t musicLoopCount_ = 0;
     bool guardTripped_ = false;
 };

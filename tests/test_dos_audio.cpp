@@ -2,27 +2,38 @@
 // (fmt_sound.md §5, §7), the speaker and SN76496 models, the renderer clock and the output device.
 // Synthetic streams and tables test the rules without game data; with TM_DATA_DOS the user's files
 // are checked by lengths, event counts and CRC-32s of rendered PCM only (the renders were compared
-// sample for sample with tools/dos/dos_sound.py and with the DOSBox-X recordings).
+// sample for sample with tools/dos/dos_sound.py and with the DOSBox-X recordings). The AdLib driver
+// (4ac9) is checked register by register on synthetic tables, on the user's tunes (counts and
+// CRC-32s) and, with TM_DOS_CAPTURES, against DOSBox-X's raw OPL capture of every orchestration.
 // No test opens an audible device: the SDL test forces the silent "dummy" driver.
 
 #include <doctest/doctest.h>
 
 #include <SDL3/SDL_timer.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <filesystem>
+#include <format>
+#include <optional>
 #include <string>
 #include <vector>
 
+#include "dos/audio/adlib_driver.h"
 #include "dos/audio/dos_audio_device.h"
 #include "dos/audio/dos_sound_renderer.h"
+#include "dos/audio/opl_backend.h"
+#include "dos/audio/opl_chip.h"
 #include "dos/audio/psg_synth.h"
 #include "dos/audio/sequencer.h"
 #include "dos/audio/sound_data.h"
 #include "dos/audio/speaker_synth.h"
+#include "dos/save/dosbox_state.h"
 #include "dos_test_data.h"
 #include "util/error.h"
+#include "util/file_util.h"
 #include "vfs/directory_source.h"
 
 using namespace tmport;
@@ -774,4 +785,521 @@ TEST_CASE("DOS audio: the sound-test schedule (event counts checked against the 
             CHECK(noteOns == 1465);  // AdLib_NoteOn calls of voices 0-2; each has a key-on in the .dro
         }
     }
+}
+
+// ------------------------------------------------------------------------ the AdLib driver (4ac9)
+
+namespace {
+
+// Records the OPL register writes with the PIT tick they belong to, and the register image.
+struct OplRecorder final : OplWriter {
+    struct W {
+        uint64_t tick;
+        uint8_t reg, value;
+        bool command = false;  // made by a call between two interrupts (Music_Play, Music_Stop)
+        bool operator==(const W&) const = default;
+    };
+    std::vector<W> writes;
+    std::array<uint8_t, 256> regs{};
+    uint64_t tick = 0;
+    bool command = false;
+    void oplWrite(uint8_t reg, uint8_t value) override {
+        writes.push_back({tick, reg, value, command});
+        regs[reg] = value;
+    }
+    std::vector<std::pair<int, int>> pairs(size_t from = 0) const {
+        std::vector<std::pair<int, int>> p;
+        for (size_t i = from; i < writes.size(); ++i) p.emplace_back(writes[i].reg, writes[i].value);
+        return p;
+    }
+};
+
+// The sequencer's AdLib calls on a driver that writes to a recorder (no synthesis), as the renderer
+// wires them; `hold` = the ticks AdLib_PlayTune keeps the tune back.
+struct DriverPorts final : SoundPorts {
+    DriverPorts(const SoundTables& t, bool hold = true) : driver(t, rec), hold(hold) {}
+    OplRecorder rec;
+    AdLibDriver driver;
+    bool hold;  // AdLibOpl's set-up time
+    int lastHold = 0;
+    void speakerDivisor(uint16_t) override {}
+    void speakerEnable(bool) override {}
+    void psgWrite(uint8_t) override {}
+    void oplInit() override { driver.init(); }
+    void oplPlayTune(int t, int v) override {
+        const size_t before = rec.writes.size();
+        driver.playTune(t, v);
+        lastHold = hold ? AdLibOpl::playTuneHold(rec.writes.size() - before) : 0;
+    }
+    void oplNoteOn(int v, uint8_t s) override { driver.noteOn(v, s); }
+    void oplNoteOff(int v) override { driver.noteOff(v); }
+    int oplPlayTuneTicks() const override { return lastHold; }
+};
+
+void tickOn(Sequencer& s, OplRecorder& r, uint64_t n) {
+    for (uint64_t i = 0; i < n; ++i) {
+        s.timerTick();
+        ++r.tick;
+    }
+}
+
+// The standard OPL2 operator layout of the AdLib driver (DS:8124..816b), two synthetic instruments
+// and one orchestration (k = 6: tune 1, variant 2) in a synthetic DGROUP.
+std::shared_ptr<const SoundTables> syntheticAdLibTables() {
+    std::vector<uint8_t> ds = syntheticTables()->dgroup;
+    const auto put16 = [&](uint16_t at, uint16_t v) {
+        ds[at] = static_cast<uint8_t>(v);
+        ds[at + 1] = static_cast<uint8_t>(v >> 8);
+    };
+    const uint8_t slotMap[18] = {0, 3, 1, 4, 2, 5, 6, 9, 7, 10, 8, 11, 12, 15, 13, 16, 14, 17};
+    const uint8_t slotOffset[18] = {0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 13, 16, 17, 18, 19, 20, 21};
+    for (int i = 0; i < 18; ++i) {
+        ds[AdLibDriver::kDsSlotMap + i] = slotMap[i];
+        ds[AdLibDriver::kDsSlotOffset + i] = slotOffset[i];
+        ds[AdLibDriver::kDsSlotCarrier + i] = (i % 6) >= 3 ? 1 : 0;
+        ds[AdLibDriver::kDsSlotChannel + i] = static_cast<uint8_t>(3 * (i / 6) + i % 3);
+    }
+    // instrument records: 13 modulator and 13 carrier i16 parameters, two wave selects
+    const int16_t inst0[28] = {1, 2, 5, 15, 3, 1, 4, 6, 20, 0, 1, 0, 1, /*carrier*/ 0, 1, 0, 14, 2, 0, 5, 7, 0, 1, 0, 1, 1, 1, 2};
+    const int16_t inst1[28] = {0, 1, 3, 12, 4, 0, 6, 2, 30, 1, 0, 1, 0, /*carrier*/ 2, 3, 0, 9, 5, 1, 2, 8, 4, 0, 1, 0, 1, 3, 0};
+    for (int i = 0; i < 28; ++i) {
+        put16(static_cast<uint16_t>(0x7000 + 2 * i), static_cast<uint16_t>(inst0[i]));
+        put16(static_cast<uint16_t>(0x7100 + 2 * i), static_cast<uint16_t>(inst1[i]));
+    }
+    put16(AdLibDriver::kDsInstrumentPtrs, 0x7000);
+    put16(AdLibDriver::kDsInstrumentPtrs + 2, 0x4D94);
+    put16(AdLibDriver::kDsInstrumentPtrs + 4, 0x7100);
+    put16(AdLibDriver::kDsInstrumentPtrs + 6, 0x4D94);
+    for (int k = 0; k < 12; ++k)
+        for (int ch = 0; ch < 9; ++ch) ds[AdLibDriver::kDsOrchInstrument + 9 * k + ch] = 0xFF;
+    ds[AdLibDriver::kDsOrchInstrument + 9 * 6 + 0] = 0;  // channel 0: instrument 0, +12
+    ds[AdLibDriver::kDsOrchTranspose + 9 * 6 + 0] = 12;
+    ds[AdLibDriver::kDsOrchInstrument + 9 * 6 + 2] = 1;  // channel 2: instrument 1, -7
+    ds[AdLibDriver::kDsOrchTranspose + 9 * 6 + 2] = static_cast<uint8_t>(-7);
+    return std::make_shared<SoundTables>(SoundTables::fromDgroup(std::move(ds)));
+}
+
+using RegList = std::vector<std::pair<int, int>>;
+
+}  // namespace
+
+TEST_CASE("DOS AdLib: AdLib_Init writes and the F-number table") {
+    const auto tables = syntheticAdLibTables();
+    OplRecorder rec;
+    AdLibDriver d(*tables, rec);
+    d.init();
+    RegList want = {{0xBD, 0}, {0xBD, 0}, {0x08, 0}};
+    for (int ch = 0; ch < 9; ++ch) {
+        want.emplace_back(0xB0 + ch, 0);  // AdLib_KeyOff: 0xB0 first, then 0xA0
+        want.emplace_back(0xA0 + ch, 0);
+    }
+    for (int off : {0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 13, 16, 17, 18, 19, 20, 21}) want.emplace_back(0xE0 + off, 0);
+    want.emplace_back(0x01, 0x20);  // wave selects enabled
+    CHECK(rec.pairs() == want);
+    // Row 0 (C .. B), as the .dro captures show them; row 1 is 4/100 semitone higher, row 24 96/100.
+    const std::array<uint16_t, 12> row0 = {343, 364, 385, 408, 433, 459, 486, 515, 546, 579, 614, 650};
+    const std::array<uint16_t, 12> row1 = {344, 365, 387, 410, 434, 460, 488, 517, 548, 581, 615, 652};
+    const std::array<uint16_t, 12> row24 = {363, 385, 408, 432, 458, 485, 514, 545, 578, 612, 649, 688};
+    for (int i = 0; i < 12; ++i) {
+        CAPTURE(i);
+        CHECK(d.fnumber(0, i) == row0[static_cast<size_t>(i)]);
+        CHECK(d.fnumber(1, i) == row1[static_cast<size_t>(i)]);
+        CHECK(d.fnumber(24, i) == row24[static_cast<size_t>(i)]);
+    }
+    CHECK(d.state().slotVolume[17] == 0x7F);
+    CHECK(d.state().blockOf[95] == 7);
+    CHECK(d.state().noteOf[95] == 11);
+    CHECK(d.state().pitchRangeStep == 25);
+}
+
+TEST_CASE("DOS AdLib: AdLib_PlayTune, note on and note off write the registers in the original's order") {
+    const auto tables = syntheticAdLibTables();
+    OplRecorder rec;
+    AdLibDriver d(*tables, rec);
+    d.init();
+    size_t at = rec.writes.size();
+    d.playTune(1, 2);  // k = 6: channel 0 instrument 0 (+12), channel 2 instrument 1 (-7)
+    // SndSetAllPrm per slot: 0xBD, 0x08, KSL/level, feedback/connection (modulator only), attack/decay,
+    // sustain/release, AM/vib/EG/KSR/multiplier, wave select
+    const RegList ch0 = {{0xBD, 0}, {0x08, 0}, {0x40, 0x54}, {0xC0, 0x0A}, {0x60, 0xF4}, {0x80, 0x36}, {0x20, 0x62}, {0xE0, 1},
+                         {0xBD, 0}, {0x08, 0}, {0x43, 0x00}, {0x63, 0xE5}, {0x83, 0x27}, {0x23, 0x91}, {0xE3, 2}};
+    RegList got = rec.pairs(at);
+    REQUIRE(got.size() == 30);  // 15 writes per used channel
+    CHECK(RegList(got.begin(), got.begin() + 15) == ch0);
+    CHECK(got[15] == std::pair{0xBD, 0});
+    CHECK(got[17] == std::pair{0x42, 0x1E});  // instrument 1's modulator: KSL 0, level 30
+    CHECK(got[18] == std::pair{0xC2, 0x07});  // feedback 3, additive (connection 0)
+    CHECK(got[25] == std::pair{0x45, 0x84});  // carrier: KSL 2, level 4
+    CHECK(d.state().used == std::array<uint8_t, 9>{1, 0, 1, 0, 0, 0, 0, 0, 0});
+    CHECK(d.state().transpose[2] == -7);
+
+    // Note on, voice 0 = channels 0..2: key off (0xB0, 0xA0), then F-number and block with the key bit.
+    at = rec.writes.size();
+    d.noteOn(0, 36);  // octave nibble 3, C
+    CHECK(rec.pairs(at) == RegList{{0xB0, 0}, {0xA0, 0}, {0xA0, 0x57}, {0xB0, 0x31},     // 48: block 4, C (343)
+                                   {0xB2, 0}, {0xA2, 0}, {0xA2, 0xCB}, {0xB2, 0x29}});  // 29: block 2, F (459)
+    at = rec.writes.size();
+    d.noteOn(3, 36);  // the noise voice: no OPL channel
+    d.noteOn(1, 36);  // channels 3..5: none used
+    CHECK(rec.writes.size() == at);
+    // Note off: release rate 10 on both operators, the same pitch without the key.
+    d.noteOff(0);
+    CHECK(rec.pairs(at) == RegList{{0x80, 0x3A}, {0x83, 0x2A}, {0xA0, 0x57}, {0xB0, 0x11},
+                                   {0x82, 0x4A}, {0x85, 0x5A}, {0xA2, 0xCB}, {0xB2, 0x09}});
+    CHECK(d.state().slot[0][AdLibDriver::kRelease] == 10);  // kept until the next AdLib_PlayTune
+
+    // Pitches clamp to 0..95; the stored pitch byte is read signed by the note off.
+    at = rec.writes.size();
+    d.noteOn(0, 200);  // channel 0: 212 -> 95 (block 7, B = 650)
+    CHECK(rec.writes[at + 2].value == 0x8A);
+    CHECK(rec.writes[at + 3].value == 0x3E);
+    at = rec.writes.size();
+    d.noteOff(0);  // byte 212 = -44 -> 0: block 0, C
+    CHECK(rec.writes[at + 2] == OplRecorder::W{0, 0xA0, 0x57});
+    CHECK(rec.writes[at + 3] == OplRecorder::W{0, 0xB0, 0x01});
+}
+
+TEST_CASE("DOS AdLib: Music_Play holds the tune for AdLib_PlayTune's set-up time") {
+    Synthetic syn;
+    syn.tables = syntheticAdLibTables();
+    const SoundBank bank = syn.bank(SoundCard::AdLib);
+    // The reference machine's set-up time: 76.3 us per write, the call 0.2 tick after its interrupt.
+    CHECK(AdLibOpl::playTuneHold(30) == 0);   // 2 channels: 2.3 ms
+    CHECK(AdLibOpl::playTuneHold(90) == 1);   // 6 channels: 6.9 ms = 1.62 PIT ticks
+    CHECK(AdLibOpl::playTuneHold(105) == 2);  // 7 channels: 1.90 PIT ticks + 0.2
+    CHECK(AdLibOpl::playTuneHold(135) == 2);  // 9 channels: 2.44 PIT ticks
+    DriverPorts p(*bank.tables);
+    Sequencer s(bank, p);
+    CHECK(p.rec.writes.size() == 40);  // AdLib_Init
+    s.musicPlay(1, 2);
+    CHECK(p.rec.writes.size() == 70);  // the set-up of 2 channels, written at once
+    CHECK(s.musicBlock().status == 1);  // under one tick: status 1 before the next interrupt
+    // A set-up of two ticks (as for 7 to 9 channels).
+    struct Fixed final : SoundPorts {
+        void speakerDivisor(uint16_t) override {}
+        void speakerEnable(bool) override {}
+        void psgWrite(uint8_t) override {}
+        void oplNoteOn(int, uint8_t) override { ++notes; }
+        int oplPlayTuneTicks() const override { return 2; }
+        int notes = 0;
+    } f;
+    Sequencer s2(bank, f);
+    s2.musicPlay(1, 2);
+    CHECK(s2.musicActive());
+    CHECK(s2.musicBlock().status == 0);  // Music_Play sets status 1 only after AdLib_PlayTune
+    CHECK(s2.musicHoldTicks() == 2);
+    s2.timerTick();
+    s2.timerTick();
+    CHECK(f.notes == 0);  // the two interrupts during the set-up play nothing
+    CHECK(s2.musicBlock().status == 1);
+    s2.timerTick();
+    CHECK(f.notes == 1);  // the first note on the third
+    // A Music_Stop during the set-up: the tune never starts.
+    s2.musicPlay(1, 2);
+    s2.timerTick();
+    s2.musicStop();
+    for (int i = 0; i < 10; ++i) s2.timerTick();
+    CHECK_FALSE(s2.musicActive());
+    CHECK(s2.musicBlock().status == 0);
+    CHECK(f.notes == 1);
+}
+
+TEST_CASE("DOS AdLib: the OPL2 core: a key-on sounds at its F-number's pitch, a re-key starts a decayed note again") {
+    constexpr double kRate = 48000.0;
+    // One channel: a silent modulator (level 63), additive, a sine carrier at level 0.
+    const auto instrument = [](OplChip& c, uint8_t carrierEg, uint8_t carrierSr) {
+        for (auto [r, v] : RegList{{0x01, 0x20}, {0x20, 0x01}, {0x40, 0x3F}, {0x60, 0xF0}, {0x80, 0x0F}, {0xC0, 0x01},
+                                   {0x23, 0x01 | carrierEg}, {0x43, 0x00}, {0x63, 0xF8}, {0x83, carrierSr}})
+            c.oplWrite(static_cast<uint8_t>(r), static_cast<uint8_t>(v));
+    };
+    {
+        OplChip c(kRate);
+        instrument(c, 0x20, 0x05);  // sustaining
+        c.oplWrite(0xA0, 0x57);
+        c.oplWrite(0xB0, 0x31);  // block 4, F-number 343: 343 * 49715.9 / 65536 = 260.20 Hz
+        std::vector<double> out(static_cast<size_t>(kRate));
+        c.render(out.data(), out.size());
+        int crossings = 0;
+        size_t first = 0, last = 0;
+        for (size_t i = 24000; i < out.size(); ++i)
+            if (out[i - 1] < 0 && out[i] >= 0) {
+                if (!crossings) first = i;
+                last = i;
+                ++crossings;
+            }
+        REQUIRE(crossings > 100);
+        const double hz = (crossings - 1) * kRate / static_cast<double>(last - first);
+        CHECK(hz == doctest::Approx(260.20).epsilon(0.002));
+        double peak = 0;
+        for (double v : out) peak = std::max(peak, std::abs(v));
+        CHECK(peak > 0.2);
+    }
+    // A decaying note (EG type 0, sustain level 15) has died away after 3 s while its key is still on.
+    // AdLib_NoteOn's re-key (0xB0 = 0, 0xA0 = 0, 0xA0, 0xB0 with the key) sounds it again because the
+    // writes reach the chip one AdLib_Write apart; written at the same instant the chip never sees
+    // the key off and the channel stays silent.
+    for (double writeSeconds : {OplChip::kWriteSeconds, 0.0}) {
+        CAPTURE(writeSeconds);
+        OplChip c(kRate, writeSeconds);
+        instrument(c, 0x00, 0xF5);
+        c.oplWrite(0xA0, 0x57);
+        c.oplWrite(0xB0, 0x31);
+        std::vector<double> out(static_cast<size_t>(3 * kRate));
+        c.render(out.data(), out.size());
+        double tail = 0;
+        for (size_t i = out.size() - 4800; i < out.size(); ++i) tail = std::max(tail, std::abs(out[i]));
+        CHECK(tail < 1e-3);
+        for (auto [r, v] : RegList{{0xB0, 0x00}, {0xA0, 0x00}, {0xA0, 0x57}, {0xB0, 0x31}})
+            c.oplWrite(static_cast<uint8_t>(r), static_cast<uint8_t>(v));
+        std::vector<double> again(4800);
+        c.render(again.data(), again.size());
+        double peak = 0;
+        for (double v : again) peak = std::max(peak, std::abs(v));
+        if (writeSeconds > 0)
+            CHECK(peak > 0.2);
+        else
+            CHECK(peak < 1e-3);
+    }
+}
+
+TEST_CASE("DOS AdLib: a driver restored from its DGROUP image holds the same registers and goes on alike") {
+    const auto tables = syntheticAdLibTables();
+    Synthetic syn;
+    syn.tables = tables;
+    syn.tunes[1] = cat({tempo(25), note(3, 1, 2), note(4, 5, 3), rest(3), note(2, 9, 1)});
+    const SoundBank bank = syn.bank(SoundCard::AdLib);
+    DriverPorts pa(*tables), pb(*tables, false);
+    Sequencer a(bank, pa), b(bank, pb);
+    a.setMusicLoop(true);
+    b.setMusicLoop(true);
+    a.musicPlay(1, 2);
+    tickOn(a, pa.rec, 40);  // inside the second note
+    std::vector<uint8_t> dg(0x10000, 0);
+    pa.driver.saveTo(dg);
+    pb.rec.regs = {};
+    pb.driver.restore(dg);  // b's chip: only what restore() writes
+    b.restore(a.sfxBlock(), a.musicBlock(), 4, 0, true);
+    for (int r = 0x20; r < 0x100; ++r) {
+        CAPTURE(r);
+        CHECK(pb.rec.regs[static_cast<size_t>(r)] == pa.rec.regs[static_cast<size_t>(r)]);
+    }
+    std::vector<uint8_t> dg2(0x10000, 0);
+    pb.driver.saveTo(dg2);
+    CHECK(dg2 == dg);
+    const size_t na = pa.rec.writes.size(), nb = pb.rec.writes.size();
+    tickOn(a, pa.rec, 300);
+    tickOn(b, pb.rec, 300);
+    CHECK(pa.rec.pairs(na) == pb.rec.pairs(nb));
+    CHECK(pa.rec.pairs(na).size() > 20);
+}
+
+namespace {
+
+// A DOSBox raw OPL capture (v2): (ms, register, value); `dump` = the register dump at its start.
+struct Dro {
+    std::vector<std::array<uint32_t, 3>> writes;
+    size_t dump = 0;
+};
+
+std::optional<Dro> readDro(const std::filesystem::path& path) {
+    const auto file = readWholeFile(path);
+    if (!file) return std::nullopt;
+    const std::vector<uint8_t>& d = *file;
+    if (d.size() < 26 || std::memcmp(d.data(), "DBRAWOPL", 8) != 0 || d[8] != 2) return std::nullopt;
+    const uint32_t pairs = d[12] | (d[13] << 8) | (d[14] << 16) | (static_cast<uint32_t>(d[15]) << 24);
+    const uint8_t shortDelay = d[23], longDelay = d[24], mapLen = d[25];
+    size_t p = 26u + mapLen;
+    uint32_t t = 0;
+    Dro out;
+    for (uint32_t i = 0; i < pairs && p + 1 < d.size(); ++i, p += 2) {
+        const uint8_t c = d[p], v = d[p + 1];
+        if (c == shortDelay)
+            t += v + 1u;
+        else if (c == longDelay)
+            t += (v + 1u) << 8;
+        else
+            out.writes.push_back({t, static_cast<uint32_t>((c & 0x80 ? 0x100 : 0) | d[26 + (c & 0x7F)]), v});
+    }
+    int prev = -1;
+    while (out.dump < out.writes.size() && out.writes[out.dump][0] == 0 && static_cast<int>(out.writes[out.dump][1] & 0xFF) > prev)
+        prev = static_cast<int>(out.writes[out.dump++][1] & 0xFF);
+    return out;
+}
+
+}  // namespace
+
+TEST_CASE("DOS AdLib: the user's tunes: every orchestration's register stream (counts and CRC-32)") {
+    TM_REQUIRE_DOS_DATA();
+    const SoundBank bank = userBank(*dosExe, SoundCard::AdLib);
+    struct Want {
+        size_t setup, writes;
+        uint32_t crc;
+    };
+    // tune t, variant v -> AdLib_PlayTune's writes (15 per used channel), the whole tune's writes
+    // (from Music_Play to the last note off) and the CRC-32 of its (tick, register, value) bytes.
+    // Tune 1's orchestrations 0 and 3 are the same rows in SST.EXE (DS:8940 = DS:895B, DS:89AC = DS:89C7).
+    // Every stream here equals the capture's (the test below).
+    const Want want[12] = {
+        {135, 16239, 0x75841034}, {135, 16239, 0xa54fdf56}, {135, 16239, 0xb27c70e5}, {120, 13864, 0x0607965a},
+        {135, 14235, 0xcbeb5cb2}, {105, 9973, 0x6a70e34e},  {135, 14235, 0x9dc8f1f4}, {135, 14235, 0xcbeb5cb2},
+        {90, 3666, 0x27b12a5b},   {135, 3723, 0x3fadc789},  {135, 3723, 0x59c84a86},  {135, 3723, 0xa39d6e06},
+    };
+    for (int t = 0; t < 3; ++t)
+        for (int v = 0; v < 4; ++v) {
+            CAPTURE(t);
+            CAPTURE(v);
+            DriverPorts p(*bank.tables);
+            Sequencer s(bank, p);
+            const size_t init = p.rec.writes.size();
+            s.musicPlay(t, v);
+            const size_t setup = p.rec.writes.size() - init;
+            while (s.musicActive() && p.rec.tick < 30000) tickOn(s, p.rec, 1);
+            uint32_t c = 0xFFFFFFFFu;
+            for (size_t i = init; i < p.rec.writes.size(); ++i) {
+                const auto& w = p.rec.writes[i];
+                const uint8_t bytes[4] = {static_cast<uint8_t>(w.tick), static_cast<uint8_t>(w.tick >> 8), w.reg, w.value};
+                for (uint8_t b : bytes) {
+                    c ^= b;
+                    for (int k = 0; k < 8; ++k) c = (c >> 1) ^ (0xEDB88320u & (0u - (c & 1u)));
+                }
+            }
+            const Want& w = want[4 * t + v];
+            CHECK(setup == w.setup);
+            CHECK(p.rec.writes.size() - init == w.writes);
+            CHECK(~c == w.crc);
+        }
+}
+
+TEST_CASE("DOS AdLib: the driver against DOSBox-X's OPL capture of all 12 orchestrations (.dro)") {
+    TM_REQUIRE_DOS_DATA();
+    TM_REQUIRE_DOS_CAPTURES();
+    // The capture (fmt_sound.md §11.7): the sound-test harness state w5/snd_adlib_variants plays every
+    // tune in every orchestration (rand seed set before each Music_Play), an effect under the first
+    // tune, and a tune change without Music_Stop; DOSBox-X's .dro logs the register writes that change
+    // a register, in ms.
+    const auto state = testdata::dosCapture("savestates/w5/snd_adlib_variants.sav");
+    const auto dro = testdata::dosCapture("audio/adlib_w5_variants.dro");
+    if (!state || !dro) {
+        MESSAGE("the wave-5 AdLib capture is not in TM_DOS_CAPTURES: test skipped");
+        return;
+    }
+    const auto ref = readDro(*dro);
+    REQUIRE(ref);
+    // The schedule of the harness: delay in PIT ticks after the previous step, kind, tune/effect, variant.
+    struct Step {
+        uint64_t delay;
+        char kind;
+        int id, variant;
+    };
+    std::vector<Step> steps = {{2000, 'x', 0, 0}};
+    const uint64_t len[3] = {12993, 17032, 5761};
+    for (int v = 0; v < 4; ++v)
+        for (int t = 0; t < 3; ++t) {
+            steps.push_back({200, 'm', t, v});
+            if (v == 0 && t == 0) {
+                steps.push_back({3000, 's', 6, 0});
+                steps.push_back({len[0] - 3000 + 200, 'x', 0, 0});
+            } else {
+                steps.push_back({len[t] + 200, 'x', 0, 0});
+            }
+        }
+    steps.push_back({200, 'm', 0, 0});
+    steps.push_back({3000, 'm', 2, 1});
+    steps.push_back({2000, 'x', 0, 0});
+
+    const SoundBank bank = userBank(*dosExe, SoundCard::AdLib);
+    DriverPorts p(*bank.tables);
+    Sequencer s(bank, p);
+    // the driver as the state left it (what --dos-load-state does)
+    const DosboxState st = DosboxState::load(*state);
+    const auto dg = st.dgroup();
+    s.setSoundOn(st.dsWord(0x63B4) != 0);
+    s.setMusicOn(st.dsWord(0x63B6) != 0);
+    s.setMusicLoop(st.dsWord(0x63BA) != 0);
+    p.rec.writes.clear();
+    p.driver.restore(dg);
+    s.restore(Sequencer::blockFromDgroup(dg.subspan(0x6448, 0x78)), Sequencer::blockFromDgroup(dg.subspan(0x64C0, 0x78)),
+              st.dsWord(0x63BE), 0, true);
+    for (const Step& stp : steps) {
+        tickOn(s, p.rec, stp.delay);
+        p.rec.command = true;
+        if (stp.kind == 's') s.sfxPlay(stp.id);
+        else if (stp.kind == 'm') s.musicPlay(stp.id, stp.variant);
+        else s.musicStop();
+        p.rec.command = false;
+    }
+    tickOn(s, p.rec, 500);
+
+    // The capture started inside the group of writes of a tick: its registers are the dump (key bits
+    // of 0xB0-0xB8 masked) and the writes of its first millisecond; it continues with engine tick 180
+    // (tools/dos/oplcmp.py finds the tick). There the engine's registers equal the capture's.
+    constexpr uint64_t kFirstTick = 180;
+    size_t d0 = ref->dump;
+    while (d0 < ref->writes.size() && ref->writes[d0][0] <= 1) ++d0;
+    std::array<int, 512> cache;
+    cache.fill(0);
+    for (size_t i = 0; i < d0; ++i) cache[ref->writes[i][1]] = static_cast<int>(ref->writes[i][2]);
+    std::array<int, 256> image{};
+    size_t e0 = 0;
+    for (; e0 < p.rec.writes.size() && p.rec.writes[e0].tick < kFirstTick; ++e0) image[p.rec.writes[e0].reg] = p.rec.writes[e0].value;
+    int differ = 0;
+    for (int r = 0x20; r < 0xF6; ++r) {
+        const bool key = r >= 0xB0 && r <= 0xB8;
+        differ += key ? (image[static_cast<size_t>(r)] & ~0x20) != (cache[static_cast<size_t>(r)] & ~0x20)
+                      : image[static_cast<size_t>(r)] != cache[static_cast<size_t>(r)];
+        if (key) cache[static_cast<size_t>(r)] = image[static_cast<size_t>(r)];
+    }
+    CHECK(differ == 0);
+
+    // DOSBox-X's filter: a write of the value the register holds is not logged. k = the writes before
+    // it in its tick (of its kind), for the timing.
+    std::vector<OplRecorder::W> logged;
+    std::vector<int> pos;
+    int k = 0;
+    for (size_t i = e0; i < p.rec.writes.size(); ++i) {
+        const auto& w = p.rec.writes[i];
+        k = i > e0 && p.rec.writes[i - 1].tick == w.tick && p.rec.writes[i - 1].command == w.command ? k + 1 : 0;
+        if (cache[w.reg] == w.value) continue;
+        cache[w.reg] = w.value;
+        logged.push_back(w);
+        pos.push_back(k);
+    }
+    const size_t n = ref->writes.size() - d0;
+    CHECK(logged.size() == n);
+    size_t same = 0;
+    while (same < std::min(n, logged.size()) && logged[same].reg == ref->writes[d0 + same][1] &&
+           logged[same].value == ref->writes[d0 + same][2])
+        ++same;
+    CHECK(same == n);
+    CHECK(n == 85767);
+    MESSAGE(std::format("{} writes identical of {} logged by DOSBox-X", same, n));
+
+    // Timing (capture: whole ms, 4.2248 ms per PIT tick): every write of a timer interrupt at its tick
+    // plus 70 us per write before it in the tick, the time base fitted per segment between two tune
+    // starts (the capture's ms clock drifted 2.2 ms against the PIT once, in turbo mode).
+    const double tickMs = 1000.0 * kTimerDivisor / kPitHz;
+    std::vector<std::vector<double>> segments(1);
+    for (size_t i = 0; i < same; ++i) {
+        if (logged[i].command) {
+            if ((logged[i].reg >= 0x40 && logged[i].reg <= 0x55) && !segments.back().empty()) segments.emplace_back();
+            continue;
+        }
+        segments.back().push_back(ref->writes[d0 + i][0] - logged[i].tick * tickMs - pos[i] * OplChip::kWriteSeconds * 1000.0);
+    }
+    size_t total = 0, within = 0, within60 = 0;
+    for (auto& seg : segments) {
+        if (seg.empty()) continue;
+        std::vector<double> sorted = seg;
+        std::sort(sorted.begin(), sorted.end());
+        const double base = sorted[sorted.size() / 2];
+        for (double x : seg) {
+            ++total;
+            within += std::abs(x - base) <= tickMs / 4;
+            within60 += std::abs(x - base) <= tickMs * 0.6;
+        }
+    }
+    MESSAGE(std::format("{} of {} timer-interrupt writes within a quarter tick of their segment's time base", within, total));
+    CHECK(segments.size() == 15);  // the restored tune and the 14 tune starts
+    CHECK(within60 == total);
+    CHECK(within >= 81700);
 }

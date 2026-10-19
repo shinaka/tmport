@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <optional>
 
 #include "dos/game/anim.h"
 #include "dos/game/camera.h"
@@ -61,10 +62,12 @@ constexpr uint64_t kCountUpFrame = 3320;
 
 // How many count-up steps this frame runs. At the reference speed the count-up's frames follow each
 // other from the frame after the game tick that changed g_coins: coin k at k * kCountUpFrame after it,
-// and the lockstep frame of tick n runs those that begin before tick n + 1. At the period speed one
-// per frame (the frame clock).
-int countUpSteps(DosGame& g) {
+// and the lockstep frame of tick n runs those that begin before tick n + 1; `firstAt` is where the
+// first of them begins (thousandths of a PIT tick of g_ticks). At the period speed one per frame (the
+// frame clock).
+int countUpSteps(DosGame& g, std::optional<uint64_t>& firstAt) {
     UiState& ui = g.ui;
+    firstAt.reset();
     if (!g.rt.longFrames()) return g.frameClock().steps(FrameFeature::CoinCountUp);
     const uint64_t tick = uint64_t{g.ticks()} * FrameTiming::kMilli;
     const uint64_t next = tick + 5 * FrameTiming::kMilli;
@@ -75,6 +78,7 @@ int countUpSteps(DosGame& g) {
         ui.countUpDone = 0;
     }
     const uint64_t due = dueBy();
+    firstAt = ui.countUpStart + uint64_t{ui.countUpDone} * kCountUpFrame;
     const int steps = due > ui.countUpDone ? static_cast<int>(due - ui.countUpDone) : 0;
     const int left = std::abs(int{g.core.coins} - int{ui.coinsShown});
     const int run = std::min(steps, left);
@@ -161,10 +165,20 @@ void hudRedraw(DosGame& g) {
             ++core.dirty;
         }
         // The count-up: one coin (and effect 4, restarted each time) per original frame; a loss
-        // counts down silently.
-        const int steps = countUpSteps(g);
+        // counts down silently. At the reference speed each coin's effect sounds where its frame
+        // begins on the count-up's clock (wave 5, FrameTiming::setCallTime).
+        std::optional<uint64_t> firstAt;
+        const int steps = countUpSteps(g, firstAt);
+        FrameTiming& timing = g.rt.frameTiming();
         for (int s = 0; s < steps; ++s) {
             if (ui.coinsShown < core.coins) {
+                if (firstAt) {
+                    // g_ticks units to the runtime's (they differ by a loaded state's g_ticks).
+                    const int64_t rel = static_cast<int64_t>(*firstAt + static_cast<uint64_t>(s) * kCountUpFrame) -
+                                        static_cast<int64_t>(uint64_t{g.ticks()} * FrameTiming::kMilli);
+                    timing.setCallTime(static_cast<uint64_t>(
+                        std::max<int64_t>(0, static_cast<int64_t>(g.rt.pitTicks() * FrameTiming::kMilli) + rel)));
+                }
                 sfxPlay(g, 4);
                 ++ui.coinsShown;
             } else if (core.coins < ui.coinsShown) {
@@ -173,6 +187,7 @@ void hudRedraw(DosGame& g) {
                 break;
             }
         }
+        timing.setCallTime(0);
         hudDrawNumber(g, 0x6E, 0xBA, 0xCCCC, ui.coinsShown);
         hudDrawNumber(g, 0x7D, 0xBA, 0xCCCC, core.nets);
         hudDrawNumber(g, 0x8F, 0xBA, 0xCCCC, core.treasuresFound);

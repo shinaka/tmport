@@ -1,5 +1,5 @@
 {
- "description": "level 1, Ada at the signs (cell 0xE9, treasure 5; hint4 6 ticks after the hint opens: its bubble frame presents about 5 ticks later): the run of avi/ega_r2_treasure_found.avi (Down at 488 after ega/r2_treasure_spot, pinned by the elf entering at AVI frame 64): coin throw, POOF, the blink with the treasure, the close with the HUD count, hint 4. The AVI frames match the engine at 0 px up to the close; in the AVI the search ends about 5 ticks and the hint 9 ticks later than in the engine, while the logged runs of the same search agree with the engine (requests/level1.md 3); the elf under the bubble is drawn from the snapshot before its step (requests/level1.md 2: 129 px)",
+ "description": "level 1, Ada at the signs (cell 0xE9, treasure 5; hint4 6 ticks after the hint opens: its bubble frame presents about 5 ticks later): the run of avi/ega_r2_treasure_found.avi (Down at 488 after ega/r2_treasure_spot, pinned by the elf entering at AVI frame 64): coin throw, POOF, the blink with the treasure, the close with the HUD count, hint 4. The AVI frames match the engine at 0 px up to the close; in the AVI the search ends about 5 ticks and the hint 9 ticks later than in the engine, while the logged runs of the same search agree with the engine (requests/level1.md 3). Hint 4: 129 px, the walking elf under the bubble one step further in the AVI (its hint opened 8 ticks later than the engine's, the AVI's slower search: AVI frames 183, 192 show the elf's last two steps before the hint at 204); the bubble frame now latches the tick before it as the reference (treasure5_found: 0 px)",
  "start": {
   "state": "savestates/ega/r2_treasure_spot.sav"
  },
@@ -20,15 +20,17 @@
   },
   {
    "id": "blink_a",
-   "tick": 562,
+   "tick": 560,
    "capture": "ega/r2_treasure_04_blink_a.png",
-   "max_px": 0
+   "max_px": 0,
+   "moved": "wave 5: the frame after a game tick now runs after that tick (Game_Tick, Frame_Begin, the body), so a short frame's picture (sprites that moved in the tick) shows from that tick, one tick earlier than before (the r2 log end states hold draw records equal to the live slots: DOSBox-X's last frame began after the last tick); tick 562 -> 560: the search frames now begin when the one before ends, so a tick falls inside one and the frame that runs before it shows from that tick: the engine shows this blink picture at tick 560 only (before at 562)"
   },
   {
    "id": "blink_b",
-   "tick": 563,
+   "tick": 564,
    "capture": "ega/r2_treasure_05_blink_b.png",
-   "max_px": 0
+   "max_px": 0,
+   "moved": "wave 5: the frame after a game tick now runs after that tick (Game_Tick, Frame_Begin, the body), so a short frame's picture (sprites that moved in the tick) shows from that tick, one tick earlier than before (the r2 log end states hold draw records equal to the live slots: DOSBox-X's last frame began after the last tick); tick 563 -> 564: as blink_a: the engine shows this blink picture at ticks 564 and 566 (before at 563 and 565)"
   },
   {
    "id": "opened",
@@ -40,7 +42,9 @@
    "id": "closed_count",
    "event": "sfx=7",
    "nth": 1,
-   "capture": "ega/r2_treasure_07_closed_count1.png"
+   "capture": "ega/r2_treasure_07_closed_count1.png",
+   "offset": 1,
+   "moved": "wave 5: the frame that plays the result sound (sfx 7) began when the search frame before it ended, between two ticks: its events are in the row of the tick before it, its picture shows from the next tick (offset 1)"
   },
   {
    "id": "hint4",

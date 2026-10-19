@@ -14,7 +14,11 @@ Contents: [Where mods live](#where-mods-live) · [Folder layout](#folder-layout)
 [Bundles](#bundles-bndl-json) · [Font, palette, binary data](#font-palette-and-binary-data) ·
 [Music](#music-midi-mid) · [Tables](#tables-tables-json) ·
 [Constraints](#constraints-a-mod-must-respect) · [Tools](#tools) ·
-[How it works](#how-it-works) · [Limits](#limits)
+[How it works](#how-it-works) · [Limits](#limits) ·
+[The 1990 DOS edition](#the-1990-dos-edition)
+
+Everything up to [Limits](#limits) is about the Windows CD edition. The 1990 DOS edition has files
+of its own and therefore mods of its own: see [The 1990 DOS edition](#the-1990-dos-edition).
 
 ## Where mods live
 
@@ -353,3 +357,232 @@ to PNG frames without playing (see `docs/BUILDING.md`, "Command-line tools").
 Not supported yet: high-resolution replacement art (the logical size is fixed), pre-rendered
 music (OGG), changing tables other than those listed (menus, dialog texts, voice-id and animation
 tables), and adding new rooms or questions beyond the game's fixed counts.
+
+## The 1990 DOS edition
+
+The DOS edition (`SST.EXE` V 1.0, `--edition dos`) keeps its pictures, music, questions and
+texts in other files than the Windows edition: sprite packs (`*.PAK`), tile pictures (`*.PAN`),
+note-stream music and effects (`TUNES.*`, `SFX.*`), a compressed question file (`ALL_PUZS` with
+its word table `PRG_DICT`), the help pages (`HELP.DAT`) and the messages, boxes, menus and title
+pages inside `SST.EXE`. A DOS mod is a folder of replacements for those, in editable formats. As
+for the Windows edition, nothing is ever written back into the game files.
+
+### Where DOS mods live
+
+```ini
+[mods]
+enabled = true                       ; false: no mods for either edition
+dos_paths = dos_mods\Retro ; D:\Big  ; the DOS edition's mod folders (';'-separated, relative to tmport.ini)
+```
+
+Without a `dos_paths` line the engine uses `<preference directory>\dos_mods`, then
+`<directory of tmport.exe>\dos_mods`. Each is **one** mod folder; folders that do not exist are
+skipped. `--mods <dir>` adds a folder after them (highest precedence) and `--no-mods` loads none,
+for the DOS edition as for the Windows one. Later folders win: per sprite frame, per picture and per
+file; `strings.json`, `palettes.json` and the frame headers merge entry by entry.
+
+### Folder layout
+
+Folder and file names are case-insensitive.
+
+| File | Replaces | Format |
+|---|---|---|
+| `mod.json` | – | optional: `{"name": "...", "edition": "dos", "resizable": ["SPRITES.PAK:72", "BEGIN.PAK:31-35"]}` |
+| `PAK\<STEM>\<k>.png` | frame *k* of `<STEM>.PAK` (`SPRITES`, `BEGIN`, `CLOSE`, `SHACK`) | PNG, 16 colours |
+| `PAK\<STEM>.json` | frame hotspots and header words | JSON: `{"frames": {"72": {"x": -3, "y": -20}}}` |
+| `PAN\<STEM>\<k>.png` | picture *k* of `<STEM>.PAN`: `OPENING` (the title picture, 0), the scenery files `MOUNTAIN`, `MOUNT2N3`, `MOUNT3`, `CLOSE`, `SHACK` (128 × 128 blocks) | PNG, 16 colours |
+| `SOUND\<NAME>.txt` | `TUNES.IBM`, `SFX.IBM`, `TUNES.TAN`, `SFX.TAN` | note text |
+| `TEXT\ALL_PUZS.txt` | the elf questions | text |
+| `TEXT\PRG_DICT.txt` | the questions' word table | text |
+| `TEXT\HELP.DAT.txt` | the help pages | text |
+| `EXE\strings.json` | the player-visible strings of `SST.EXE` | JSON keyed by DS offset |
+| `EXE\palettes.json` | the colour tables of the four looks in `SST.EXE` | JSON |
+| `FILES\<NAME>` | a whole data file, in its original binary form | as the game's |
+
+`FILES\` replacements are applied first and the finer overrides on top of them. `USERS.DAT` cannot
+be replaced (the engine keeps the players in its preference folder). Unknown folders (a Windows
+mod's `PMAP`, say) and badly named files are reported.
+
+### Pictures: colours and the four looks
+
+All DOS pictures are made of **logical colours 0–15**. In the PNGs the palette index is the logical
+colour, and the palette shows the EGA colours. The looks derive from the same pixels the way the
+engine draws them: EGA and Tandy show identical RGBI colours, MCGA shows each logical colour through
+its own (softer) DAC colour, and CGA shows a pattern of four 2-bit pixels per logical colour that
+alternates from row to row. So one edited picture changes all four looks; to change the colours
+themselves, edit `EXE\palettes.json`.
+
+* **Indexed PNG with the kit's palette** (what `--export-mod-kit` writes): the indices are used as
+  they are (an index above 15 is an error). Keep the image in indexed mode in your paint program.
+* **Any other PNG**: every pixel takes the nearest of the 16 EGA colours (the log counts the pixels
+  that were not exactly one of them). A pixel with alpha below 128 becomes colour 0 in a sprite
+  frame and is an error in a scenery picture.
+* **Sprite frames** (`PAK`): colour 0 is the colour the game leaves out when it draws a sprite over
+  the scenery (the kit marks it transparent); a frame drawn opaque (a panel of the status bar, the
+  title pictures of `BEGIN.PAK`) shows it as its colour. A frame keeps its width and height unless
+  `mod.json` lists it in `resizable` (`"SPRITES.PAK:72"`, a range `"BEGIN.PAK:31-35"`, or `"SHACK.PAK:*"`);
+  widths are even (two pixels per byte). The hotspot is in `PAK\<STEM>.json`: `x` in 2-pixel steps,
+  `y` in rows; for the status bar, the hint cloud and the title frames it is the position on the
+  screen. `a`, `c`, `e` are header words the game does not read (kept for an exact copy). The number
+  of frames of a pack never changes: the game addresses them by number.
+* **Scenery** (`PAN`): `OPENING` is one 320 × 200 picture; the other files are blocks of 128 × 128,
+  placed on the mountain by a grid in `SST.EXE`. A picture keeps its size; the number of pictures
+  never changes. Pictures are stored as 8 × 8 tiles, and identical tiles are stored once: the game's
+  tile buffer holds 1860 different tiles per file. Room for new tiles in the original files:
+  `MOUNTAIN` 11, `MOUNT3` 459, `MOUNT2N3` 492, `OPENING` 1187, `SHACK` 1530, `CLOSE` 1568 (tiles a
+  change no longer uses are dropped). A file that would not unpack correctly in the game's buffers
+  is refused.
+
+The engine packs a changed file the way the original's packer did (sprite rows as runs or raw
+bytes, the map's runs and row references, the tiles' A5h escapes), so an unchanged frame or file is
+byte for byte the original: the kit's round trip shows it for every frame and every picture file.
+
+### Sound files (`SOUND\*.txt`)
+
+The speaker plays `SFX.IBM` and `TUNES.IBM`, the Tandy (and PS/1) sound chip `SFX.TAN` and
+`TUNES.TAN`, the AdLib `TUNES.TAN` on the OPL2 and `SFX.IBM` on the speaker. Each file holds 3 tunes
+or 12 effects; the `.TAN` files have four voices per entry (voice 3 is the Tandy's noise channel).
+The driver ticks 236.7 times a second; `tempo N` makes a whole note last 4·N ticks.
+
+```text
+tune 0
+  voice 0
+    tempo 110          # commands: tempo N, tempo+ N, tempo- N (percent), release N, legato,
+    envelope 3         #   rawdur N, envelope N (Tandy, 0-35), sustain N (Tandy, 0-15)
+    C4 1/4             # a note: C C# D D# E F F# G G# A A# B (Db = C#), octave 1-16, C4 = middle C
+    E4 1/8.            # durations 1 1/2 1/4 1/8 1/16 1/32 1/64 1/128 or full; "." dotted
+    G4 1/8 tie         # "tie" binds the note to the next one
+    rest 1/2
+    raw 3 120          # a raw-pitch step (effects): octave code 0-15 as stored, value 0-255
+    end                # every voice ends with "end"
+  voice 1
+    end                # a silent voice
+```
+
+`bytes 0xHH 0xHH` writes any other event as stored, `pad` lines keep bytes that no entry uses and
+`slots` the unused header words of the original files (both only for an exact copy). A word that
+starts with `#` begins a comment. Rules: exactly 3 tunes or 12 effects in order (the game asks for no
+others), four voices per `.TAN` entry, `end` in every voice, and the file must fit the driver's
+static buffer: 1712 bytes for the effects, 5056 for the music. The original files leave 32 bytes
+(`SFX.IBM`), 90 (`SFX.TAN`), 1904 (`TUNES.IBM`) and 56 (`TUNES.TAN`) free.
+
+### Questions, word table and help (`TEXT\*.txt`)
+
+`ALL_PUZS.txt` holds the 360 questions in order, with their words written out:
+
+```text
+=== question 0 (tier 0)
+  Which of these
+can swim?
+                       <- an empty last line: the question ends with a line break
+--- answers
+A fish                 <- the FIRST answer is the correct one (the game shuffles them on screen)
+A brick
+A spoon
+```
+
+The question lines are as drawn (the first one starts with the game's two indent spaces); lines
+starting with `---` are markers. `--- after <codes>` keeps bytes the original stores after the third
+answer (never shown) and `--- no final break` marks a third answer without a line break. The engine
+compresses the questions again with `PRG_DICT` the way the original was (a word is replaced where it
+stands as a whole token), so changing only `PRG_DICT.txt` keeps every question's text.
+
+Rules for the questions (the quiz code relies on them): exactly 360 questions with exactly three
+answers each; an answer has at most 34 characters (the game keeps each in 35 bytes) and a question
+at most 999; no `~` in a question (it ends the question in the game); the nine longest questions of
+a tier, written out, take at most 2880 bytes (the nine dealt questions are expanded into one buffer);
+the questions of a tier lie inside the one 31488-byte read the game makes (tiers: questions 0–62,
+63–179, 180–302, 303–359, and the last part of the file); the file is at most 64 KB. A question that
+reaches the answers' rows or an answer wider than the screen gives a warning.
+
+`PRG_DICT.txt` has one `N word` line per entry (`N` from 0); the questions can use entries 0–127;
+a word has at most 15 characters; 128 to 208 entries.
+
+`HELP.DAT.txt` holds the 15 help pages as `=== topic T page P` sections (topics = the Help menu's
+items, 6, 4, 4 and 1 pages: the page pictures of the game are fixed per page, so the counts stay).
+Every line up to the next `===` belongs to the page. The whole file must fit the game's 3800-byte
+help buffer (the original leaves 74 bytes free); text outside the page area gives a warning.
+
+### Text codes
+
+DOS text is plain ASCII drawn with the game's font (128 glyphs; no accented letters):
+
+| In the file | In the game |
+|---|---|
+| ordinary characters | ASCII, except `{` which is written `{{` |
+| a line break (`\r` in JSON; `{cr}` where a line cannot break, as in `--- after`) | new line |
+| `{lf}`, `{tab}` (`\n`, `\t` in JSON) | LF (also a new line), TAB |
+| `{up}` `{down}` `{left}` `{right}` `{enter}` `{spacebar}` `{menu}` `{crown}` | the font's key and crown pictograms |
+| `{xHH}` | any other byte (not 00) |
+
+The markup of the game's text drawing stays as it is: `~XXXYYY` moves to pixel column XXX, row YYY
+(six digits; the new left margin), `` ` `` switches the red highlight on and off, `|NN` sets colour
+NN (two digits), TAB NN indents by NN 2-pixel steps (two digits). Malformed markup is an error.
+
+### SST.EXE strings (`EXE\strings.json`)
+
+The kit's `strings.json` lists every message, box title and text, menu item list, button label,
+help topic title, clue word, sign-in text, Flutter message and title page, keyed by its DS offset
+(`"DS:5345"`), with a description (`what`) and its room (`max` or `pool`). In a mod keep only the
+entries you change; only `text` (and `countAt` / `pluralAt`) are read.
+
+* **Fixed places** (`max`): strings the code addresses directly (the champion banner, the button
+  labels, the rank labels, the sign-in lines, the title and story pages, Flutter's two champion
+  messages). A new text must fit the original's bytes.
+* **Pools** (`pool`): strings reached only through pointer tables (box titles and texts, menu item
+  lists, box footers and help titles, clue words, the sign-in headings, Flutter's messages 0–34).
+  Their texts may grow and shrink as long as the whole pool fits its place; a changed pool is packed
+  again in the original order and its pointers rewritten. The `pools` object of the kit gives each
+  pool's size and use: in V 1.0 only the box pool has room (155 bytes of strings no table points
+  at); in the others a longer text needs a shorter one elsewhere. The messages' pool is the
+  game's working copy of them, so it cannot grow.
+
+Rules: a drop-down menu keeps its number of items (one per line); a message box must stay on the
+320 × 200 screen (its size follows from the title and the longest line, as in the game); Flutter's
+message 35 keeps at least 29 characters (the champion's name is written over characters 22–29 at a
+fixed address); `countAt` / `pluralAt` of the rank and end messages (23–34) give where the game
+writes the treasure count (two characters) and the plural letter, and must lie inside the text.
+Text that runs out of its box, button, panel, Flutter's cloud or the screen gives a warning.
+
+### Palettes (`EXE\palettes.json`)
+
+`ega`: 17 attribute registers (RGBI bits: 1 blue, 2 green, 4 red, 16 intensity; the 17th is the
+border), `tandy`: 16 palette registers (IRGB, 0–15), `mcga`: 16 `[r, g, b]` DAC colours (0–63),
+`mcgaModeSet`: the colours of the mode set (replaced right away, never visible), `cga`: 16 dither
+bytes (four 2-bit pixels: 0 black, 1 cyan, 2 magenta, 3 white). Entry *i* is how logical colour *i*
+looks. `null` keeps an element; a file with a bad value is ignored as a whole. A changed EGA table
+also changes the PNG palette the pictures of the same mod are matched against.
+
+### Tools
+
+```
+tmport --export-mod-kit <dir> --edition dos [--data <DOS folder>] [--force] [--no-verify]
+tmport --check-mods [<dir> ...] --edition dos [--data <DOS folder>] [--compare]
+```
+
+`--edition dos` selects the DOS edition (a `--data` that names a DOS folder does it too); the DOS
+folder comes from `--data`, else `TM_DATA_DOS`, else `[dos] data` in `tmport.ini`. The kit holds
+every frame, picture, sound file, text file, string and colour table in the formats above, plus a
+`README.txt` and a `mod.json`. With the round-trip check, the kit is applied as a mod over the
+original files through the same code a real mod goes through, and every data file and the DGROUP of
+`SST.EXE` must come back byte for byte; the packers are also run on every frame and picture file
+(the summary shows 524 of 524 frames and 6 of 6 picture files reproduced). **The kit is your private
+copy of the game's data: do not share or publish it.**
+
+`--check-mods` converts and checks every file of the given DOS mod folders (default: the configured
+ones) and lists every problem (exit code 1 if there are errors); `--compare` also lists which data
+files and whether the strings differ from the game's. To see a mod in the game without a window, run
+it headless with a frame dump: `tmport --edition dos --headless --pref-dir <scratch> --mods <dir>
+--keys "300:tap:enter" --dos-ticks 450 --frame-dump <folder>`. A DOSBox-X state of the original
+(`--dos-load-state`) holds the original's pictures in its memory: load one with `--no-mods` (the
+fidelity tools of `tools/dos/` compare with the original files: keep no `dos_mods` folder next to
+the engine they run). The DOS picture and sound tools (`--dos-screen`, `--dos-sound`) show the
+original files only.
+
+### What a DOS mod cannot change
+
+The frame and picture counts, the number of tunes, effects, questions and help pages, the block
+grid of the mountain, the animation scripts and other tables of `SST.EXE` (only the strings and the
+colour tables are exported), the font, and a string beyond the room of its place or pool. The
+castle chute shows two blocks of `MOUNT3.PAN` from the memory `CLOSE.PAN` leaves alone: a
+`CLOSE.PAN` or `MOUNT3.PAN` that overlaps them gives a warning (the fall would look wrong).

@@ -16,6 +16,7 @@
 #include "dos/app/dos_entry.h"
 #include "dos/app/script_input.h"
 #include "dos/data/dos_files.h"
+#include "dos/mods/dos_mods.h"
 #include "game/game_main.h"
 #include "game/game_state.h"
 #include "game/game_tables.h"
@@ -407,6 +408,14 @@ void App::initDos(const std::filesystem::path& folder) {
         if (!std::filesystem::is_regular_file(p.dosOptions.loadState, ec))
             throw StartupError("--dos-load-state: " + pathToUtf8(p.dosOptions.loadState) + " is not a file");
         if (p.dosOptions.preview) throw StartupError("--dos-load-state does not work with --dos-preview");
+    }
+    // DOS mods (docs/MODDING.md, "The 1990 DOS edition"): tmport.ini [mods] dos_paths (default
+    // <pref>/dos_mods, <exe>/dos_mods), then --mods. Every DosFiles::open applies them from here on;
+    // broken mod files are logged and the original data is used.
+    if (!o.noMods) {
+        std::vector<std::filesystem::path> extra;
+        for (const auto& d : o.modDirs) extra.push_back(pathFromUtf8(d));
+        dos::installDosMods(dos::configuredDosModDirs(p.paths, extra));
     }
     try {
         (void)dos::DosFiles::open(folder);

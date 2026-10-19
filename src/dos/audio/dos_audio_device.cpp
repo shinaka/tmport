@@ -117,15 +117,23 @@ void DosAudioDevice::applyPending() {
     if (!pending_.load()) return;
     std::vector<Command> cmds;
     std::vector<Restore> restores;
+    std::vector<std::vector<uint8_t>> oplRestores;
     {
         std::lock_guard lock(queueMutex_);
         cmds.swap(queue_);
         restores.swap(restores_);
+        oplRestores.swap(oplRestores_);
         pending_.store(false);
     }
     Sequencer& s = renderer_->sequencer();
-    size_t nextRestore = 0;
-    for (const Command& c : cmds) {
+    size_t nextRestore = 0, nextOplRestore = 0;
+    std::vector<Command> later;  // delayed commands, one tick closer now (kept in their order)
+    for (Command c : cmds) {
+        if (c.delay > 0) {
+            --c.delay;
+            later.push_back(c);
+            continue;
+        }
         switch (c.kind) {
             case Command::Kind::SfxPlay: s.sfxPlay(c.a); break;
             case Command::Kind::SfxStop: s.sfxStop(); break;
@@ -140,21 +148,30 @@ void DosAudioDevice::applyPending() {
             case Command::Kind::Restore:
                 if (nextRestore < restores.size()) {
                     const Restore& r = restores[nextRestore++];
-                    s.restore(r.sfx, r.music, r.voices, r.variant);
+                    s.restore(r.sfx, r.music, r.voices, r.variant, oplRestored_);
+                    oplRestored_ = false;
                 }
+                break;
+            case Command::Kind::OplRestore:
+                if (nextOplRestore < oplRestores.size()) oplRestored_ = renderer_->restoreOpl(oplRestores[nextOplRestore++]);
                 break;
         }
     }
+    if (later.empty()) return;
+    // Back in front of whatever the game queued meanwhile (pushed after them).
+    std::lock_guard lock(queueMutex_);
+    queue_.insert(queue_.begin(), later.begin(), later.end());
+    pending_.store(true);
 }
 
-void DosAudioDevice::sfxPlay(int id) { push({Command::Kind::SfxPlay, id}); }
-void DosAudioDevice::sfxStop() { push({Command::Kind::SfxStop}); }
-void DosAudioDevice::musicStop() { push({Command::Kind::MusicStop}); }
-void DosAudioDevice::silenceAll() { push({Command::Kind::SilenceAll}); }
-void DosAudioDevice::setSoundOn(bool on) { push({Command::Kind::SoundOn, on ? 1 : 0}); }
-void DosAudioDevice::setMusicPaused(bool paused) { push({Command::Kind::MusicPaused, paused ? 1 : 0}); }
-void DosAudioDevice::setMusicLoop(bool on) { push({Command::Kind::MusicLoop, on ? 1 : 0}); }
-void DosAudioDevice::setSfxLoop(bool on) { push({Command::Kind::SfxLoop, on ? 1 : 0}); }
+void DosAudioDevice::sfxPlay(int id, uint32_t delay) { push({Command::Kind::SfxPlay, id, 0, delay}); }
+void DosAudioDevice::sfxStop(uint32_t delay) { push({Command::Kind::SfxStop, 0, 0, delay}); }
+void DosAudioDevice::musicStop(uint32_t delay) { push({Command::Kind::MusicStop, 0, 0, delay}); }
+void DosAudioDevice::silenceAll(uint32_t delay) { push({Command::Kind::SilenceAll, 0, 0, delay}); }
+void DosAudioDevice::setSoundOn(bool on, uint32_t delay) { push({Command::Kind::SoundOn, on ? 1 : 0, 0, delay}); }
+void DosAudioDevice::setMusicPaused(bool paused, uint32_t delay) { push({Command::Kind::MusicPaused, paused ? 1 : 0, 0, delay}); }
+void DosAudioDevice::setMusicLoop(bool on, uint32_t delay) { push({Command::Kind::MusicLoop, on ? 1 : 0, 0, delay}); }
+void DosAudioDevice::setSfxLoop(bool on, uint32_t delay) { push({Command::Kind::SfxLoop, on ? 1 : 0, 0, delay}); }
 
 void DosAudioDevice::restoreBlocks(std::span<const uint8_t> sfxBlock, std::span<const uint8_t> musicBlock, int voices,
                                    int adlibVariant) {
@@ -164,17 +181,30 @@ void DosAudioDevice::restoreBlocks(std::span<const uint8_t> sfxBlock, std::span<
     pending_.store(true);
 }
 
-void DosAudioDevice::setMusicOn(bool on) {
-    musicOnMirror_ = on;
-    push({Command::Kind::MusicOn, on ? 1 : 0});
+void DosAudioDevice::restoreOplDriver(std::span<const uint8_t> dgroup) {
+    if (bank_->device != SoundCard::AdLib) return;
+    std::lock_guard lock(queueMutex_);
+    oplRestores_.emplace_back(dgroup.begin(), dgroup.end());
+    queue_.push_back({Command::Kind::OplRestore});
+    pending_.store(true);
 }
 
-void DosAudioDevice::musicPlay(int tune) {
+void DosAudioDevice::setOplSynthesis(bool on) {
+    std::lock_guard lock(renderMutex_);
+    renderer_->setOplSynthesis(on);
+}
+
+void DosAudioDevice::setMusicOn(bool on, uint32_t delay) {
+    musicOnMirror_ = on;
+    push({Command::Kind::MusicOn, on ? 1 : 0, 0, delay});
+}
+
+void DosAudioDevice::musicPlay(int tune, uint32_t delay) {
     int variant = 0;
     // 4ac9:0002 AdLib_PlayTune: rand() & 3 picks one of 4 orchestrations (only reached when the
-    // music is on, 491b:07b9).
+    // music is on, 491b:07b9); drawn now, in the game's order of rand() calls, whatever the delay.
     if (bank_->device == SoundCard::AdLib && musicOnMirror_ && rand_) variant = rand_() & 3;
-    push({Command::Kind::MusicPlay, tune, variant});
+    push({Command::Kind::MusicPlay, tune, variant, delay});
 }
 
 // ----------------------------------------------------------------------------------- status

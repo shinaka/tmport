@@ -64,6 +64,7 @@ public:
     void restoreDriver(std::span<const uint8_t> sfxBlock, std::span<const uint8_t> musicBlock, int voices) override {
         inner_.restoreDriver(sfxBlock, musicBlock, voices);
     }
+    void restoreOplDriver(std::span<const uint8_t> dgroup) override { inner_.restoreOplDriver(dgroup); }
 
     // The events since the last call.
     std::vector<std::string> takeEvents();

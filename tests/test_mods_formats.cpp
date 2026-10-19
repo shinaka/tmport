@@ -686,11 +686,17 @@ TEST_CASE("mods/folder: configured folders from tmport.ini") {
     REQUIRE(dirs.size() == 2);
     CHECK(dirs[0] == pref / "mods");
     CHECK(dirs[1] == exe / "mods");
-    const auto ini = save::IniFile::parse("[mods]\npaths = mine ; D:/abs/x ;; mine\n");
+    // An absolute path of the platform (a drive path is relative off Windows).
+#ifdef _WIN32
+    const std::string absDir = "D:/abs/x";
+#else
+    const std::string absDir = "/abs/x";
+#endif
+    const auto ini = save::IniFile::parse("[mods]\npaths = mine ; " + absDir + " ;; mine\n");
     dirs = modDirsFromIni(&ini, iniDir, pref, exe);
     REQUIRE(dirs.size() == 2);
     CHECK(dirs[0] == iniDir / "mine");
-    CHECK(dirs[1] == std::filesystem::path("D:/abs/x"));
+    CHECK(dirs[1] == std::filesystem::path(absDir));
     const auto off = save::IniFile::parse("[mods]\nenabled = false\npaths = mine\n");
     CHECK(modDirsFromIni(&off, iniDir, pref, exe).empty());
 }

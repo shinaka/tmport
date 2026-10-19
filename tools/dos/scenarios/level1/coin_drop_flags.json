@@ -20,9 +20,10 @@
   },
   {
    "id": "blink",
-   "tick": 83,
+   "tick": 82,
    "capture": "ega/036_coin_place_blink.png",
-   "max_px": 0
+   "max_px": 0,
+   "moved": "wave 5: the frame after a game tick now runs after that tick (Game_Tick, Frame_Begin, the body), so a short frame's picture (sprites that moved in the tick) shows from that tick, one tick earlier than before (the r2 log end states hold draw records equal to the live slots: DOSBox-X's last frame began after the last tick); tick 83 -> 82: the blinking place shows this capture at ticks 82, 84, 86 (before: 83, 85, 88)"
   }
  ]
 }

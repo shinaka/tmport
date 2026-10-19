@@ -9,6 +9,7 @@
 #include "dos/game/game.h"
 #include "dos/game/hud.h"
 #include "dos/game/layout.h"
+#include "dos/game/main_loop.h"
 #include "dos/game/quiz.h"
 #include "dos/game/signin.h"
 #include "dos/game/sound.h"
@@ -60,8 +61,12 @@ uint16_t sceneUpdate(DosGame& g) {
             elvesSpawn(g, carriers);
         }
         sceneLoadPan(g, w.sceneWanted);
-        if (w.sceneWanted >= 3) loadSpriteBank(g, static_cast<FileIndex>(w.sceneWanted + 13));  // CLOSE / SHACK
-        else if (w.loadedScene >= 3) loadSpriteBank(g, FileIndex::SpritesPak);  // also the initial 0xFF
+        FileIndex bankFile = FileIndex::SpritesPak;
+        if (w.sceneWanted >= 3) bankFile = static_cast<FileIndex>(w.sceneWanted + 13);  // CLOSE / SHACK
+        if (w.sceneWanted >= 3 || w.loadedScene >= 3) {  // SPRITES.PAK also after the initial 0xFF
+            loadSpriteBank(g, bankFile);
+            reportBankLoad(g, bankFile);
+        }
         w.loadedScene = w.sceneWanted;
         setMusicLoop(g, true);
         c.quit = 0;
@@ -89,13 +94,15 @@ uint16_t sceneUpdate(DosGame& g) {
 }
 
 // 1460:05e8 Scene_LoadPan. Quirk kept (code_world.md §6.10): the buffers are not cleared, so the
-// previous PAN stays readable where a smaller one did not write (camera.h reads both).
+// previous PAN stays readable where a smaller one did not write (camera.h reads both). The engine's
+// load is instant; the reference machine's unpacking time is reported to the frame timing.
 int sceneLoadPan(DosGame& g, int fileIndex) {
     const PanFile& pan = g.files.pan(stemOf(g.files.files().fileTable().entry(fileIndex).name));
     if (&pan != g.pan) {  // reloading the same PAN rewrites the same bytes: the stale part stays
         g.prevPan = g.pan;
         g.pan = &pan;
     }
+    reportPanLoad(g, static_cast<FileIndex>(fileIndex));
     return 1;
 }
 

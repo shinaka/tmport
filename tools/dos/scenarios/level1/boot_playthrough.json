@@ -11,19 +11,22 @@
    "tick": 900,
    "capture": "ega/024_outside1.png",
    "id": "outside1",
-   "info": "the boot playthrough's route and elves differ from the Round-1 run; the same layout"
+   "info": "the boot playthrough's route and elves differ from the Round-1 run; the same layout",
+   "wave5": "pt_full_script.txt regenerated with tools/dos/pt_full.py for the wave-5 frame order (the old script answered the quiz wrong once the frame after a tick ran after it); its route and elves differ from the capture run as before"
   },
   {
    "tick": 2450,
    "capture": "ega/030_quiz_question.png",
    "id": "quiz",
-   "info": "the boot playthrough's route and elves differ from the Round-1 run; the same layout"
+   "info": "the boot playthrough's route and elves differ from the Round-1 run; the same layout",
+   "wave5": "pt_full_script.txt regenerated with tools/dos/pt_full.py for the wave-5 frame order (the old script answered the quiz wrong once the frame after a tick ran after it); its route and elves differ from the capture run as before"
   },
   {
    "tick": 5607,
    "capture": "ega/076_level2_three_clues.png",
    "id": "level2_clues",
-   "info": "the boot playthrough's route and elves differ from the Round-1 run; the same layout"
+   "info": "the boot playthrough's route and elves differ from the Round-1 run; the same layout",
+   "wave5": "pt_full_script.txt regenerated with tools/dos/pt_full.py for the wave-5 frame order (the old script answered the quiz wrong once the frame after a tick ran after it); its route and elves differ from the capture run as before"
   }
  ]
 }

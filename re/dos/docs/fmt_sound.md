@@ -40,11 +40,13 @@ Labels: **[obs]** = read from bytes, disassembly or decoder output. **[inf]** = 
   (e.g. tune 0 is a whole tone higher and starts with a one-bar rest) [obs].
 * The AdLib path plays **TUNES.TAN** through an OPL2 instrument driver (instrument data in
   DGROUP, 4 random orchestrations per tune) and plays effects from **SFX.IBM on the PC
-  speaker** [obs]. This document specifies the AdLib note mapping and table locations, but
-  not a full OPL2 rendering.
+  speaker** [obs]. The driver (segment `4ac9`) is specified register by register in §5.5
+  (wave 5).
 * Verified (§11): the engine's driver (`src/dos/audio/`) renders all 30 entries sample for
   sample like `tools/dos/dos_sound.py`, and its timing, pitches, levels and the Tandy noise
-  register agree with the DOSBox-X recordings of all 12 effects and 3 tunes [obs].
+  register agree with the DOSBox-X recordings of all 12 effects and 3 tunes [obs]. Its AdLib
+  driver writes the original's OPL register stream write for write, at the original's PIT
+  ticks, for every tune in every orchestration (§11.7).
 
 ---
 
@@ -97,7 +99,7 @@ static: segment `415f` holds 1712 bytes (CODE_14 in the Ghidra segment list), `4
   SN76496 to the speaker; PCjr/Tandy sound multiplexer).
 * PS/1: port = 0x205, voices = 4, **device rewritten to 1**: from here on the PS/1 is treated
   exactly as a Tandy PSG on another port.
-* AdLib: voices = 4, `4ac9:00b7` initialises the OPL2.
+* AdLib: voices = 4, `4ac9:00b7` initialises the OPL2 (§5.5: 40 register writes, no instrument yet).
 
 ---
 
@@ -271,7 +273,7 @@ flags, so the mask is never non-zero in practice [obs].
 |---|---|
 | `Sfx_Play` 06d7 | returns if `g_soundOn` (DS:63b4) is 0; AdLib: voice count = 1; ignores the call if `id > current id` (unsigned; idle = 0xFFFF); stores the id; **Tandy: calls `Sfx_Stop`, which sets the current id back to 0xFFFF, so on the Tandy (and PS/1) there is no priority: every effect replaces the running one**; sets the stream pointers and starts, status 1. **The block is not cleared**: tempo, envelope pointers and sustain of the previous effect remain until the new streams set them (every shipped effect sets its tempo and envelopes first, so it is not audible) |
 | `Sfx_Stop` 074b | status 0, id 0xFFFF; speaker and AdLib: `port 0x61 &= 0xFC` directly and active[0] = 0; Tandy: for each voice active = 0, owned = 0, `Sound_VoiceOff` (attenuation 15 + period 0) |
-| `Music_Play` 0791 | **zeroes the whole music block**, stores the tune id, then returns if `g_musicOn` (DS:63b6) is 0 (the block stays cleared: the music is stopped); AdLib: `AdLib_PlayTune(t)` (**one `rand()` per call**, which shifts the game's random sequence) and voice count 4; pointers; status 1. A call while the same tune plays restarts it |
+| `Music_Play` 0791 | **zeroes the whole music block**, stores the tune id, then returns if `g_musicOn` (DS:63b6) is 0 (the block stays cleared: the music is stopped); AdLib: `AdLib_PlayTune(t)` (**one `rand()` per call**, which shifts the game's random sequence) and voice count 4; pointers; status 1. A call while the same tune plays restarts it. On AdLib status 1 comes only after `AdLib_PlayTune`'s register writes, so the timer interrupts during them play no music (§5.5: 1 or 2 interrupts on the reference machine) |
 | `Music_Stop` 0811 | status 0, id 0xFFFF; voice count 4 on AdLib (temporarily); for each voice active = 0, owned = 0, `Sound_VoiceOff`. On the speaker this also cuts a playing effect's current note (the gate is shared) until its next note |
 | `Sound_SilenceAll` 0854 | `Sound_VoiceOff` on every voice (4 on AdLib, where it keys off the OPL voices, not the speaker) |
 
@@ -326,29 +328,124 @@ Tunes mainly use 6, 35 (silent: rests between phrases) and 2; effects use 20 (fu
 volume), 35 and 2. A voice with no envelope command would read from DS:0000 (RTL data);
 no shipped stream does this (checked by `dos_sound.py`).
 
-### 5.5 AdLib path (segment `4ac9`) [obs, partly inf]
+### 5.5 AdLib path (segment `4ac9`, Turbo C) [obs, wave 5]
 
-* Register writes go through `491b:0875` (port DS:656c = 0x388, data at +1, 6 and 35 status
-  reads as delays).
-* Play tune *t* (`4ac9:0002`): `k = 4t + (rand() & 3)` picks one of **4 orchestrations**. Three
-  9-byte rows at DS:891c, 8988, 89f4 (+9k) are addressed per OPL channel 0..8. The first
-  gives the instrument index (0xFF = channel unused), the second the transposition in
-  semitones (signed, copied to DS:cb5c+ch). The pointer into the third row is computed but
-  never read in `4ac9:0002`; for k ≥ 9 it would run into the text at DS:8a48, so it is not a
-  real 12-row table. Each used channel gets the instrument whose far pointer is entry
-  *index* of DS:88bc (24 instruments, records at DS:816c.., stride 0x4E). Listing:
-  `dos_sound.py adlib` → `adlib_tables.txt`.
-* Instrument record [obs layout, inf meaning]: 13 int16 operator parameters for the
-  modulator at +0x00, 13 for the carrier at +0x1A, wave-select words at +0x34/+0x36
-  (`4ac9:019a`, `4ac9:0847`); this is the AdLib sample-driver "timbre" layout. Operator
-  slots map through DS:8124 and DS:8136 (the standard OPL2 operator offsets).
-* Note on (`4ac9:029e`): sequencer voice 0 drives OPL channels 0-2, voice 1 channels 3-5,
-  voice 2 channels 6-8 (each channel only if its instrument slot is used), each at
-  `semitone + transposition`; voice 3 (the noise voice) is ignored. Pitch uses a 25-steps-
-  per-semitone F-number table built at start-up (`4ac9:067e`, DS:c7bd).
-* Note off (`4ac9:0432`) keys off the same channel group.
-* Rendering this needs an OPL2 emulator plus the 24 instrument records; not done in this
-  pass.
+The driver is a cut-down AdLib sample driver (the "timbre" records, `SetVoiceTimbre`,
+`SndSetAllPrm` and friends of the AdLib programmer's toolkit), melodic mode only (the percussion
+code is gone), with the game's own play/note entry points. The table gives the role found in the
+disassembly; the canonical names follow it since the wave-5 integration (18 functions renamed: the
+older names, e.g. AdLib_SetTempo for 054a, are listed in `re/names/dos/README.md`, and the driver's
+variables DS:C6E4..CB7C, 8148, 815A are named in `re/names/dos/dgroup.tsv`, g_opl*):
+
+| Address | Canonical name | Role (sample-driver equivalent) | Called |
+|---|---|---|---|
+| 0002 | AdLib_PlayTune | orchestration k = 4 * tune + (rand() & 3): instruments and transpositions | Music_Play 491b:07c9 |
+| 00b7 | AdLib_Init | the initialisation below | Sound_Init 491b:06a9 |
+| 0103 | AdLib_SetMode | SetMode(0): only writes 0xBD | AdLib_Init |
+| 010d | AdLib_SetWaveSel | SetWaveSel(on): every slot's 0xE0+ = 0, then 0x01 = 0x20 | AdLib_Init |
+| 0150 | AdLib_SetPitchRange | SetPitchRange (1..12; range * 25 kept for the pitch bend) | AdLib_Init |
+| 0179 | AdLib_SetGlobalParams | SetGParam(AM depth, vibrato depth, note select): 0xBD, 0x08 | AdLib_Init |
+| 019a | AdLib_SetVoiceTimbre | SetVoiceTimbre(channel, record) | AdLib_PlayTune |
+| 029e | AdLib_NoteOn | note on, voice v -> channels 3v..3v+2 | Speaker_On 491b:05a3 |
+| 0432 | AdLib_NoteOff | note off, same groups | Sound_VoiceOff 491b:05e2 |
+| 04ef | AdLib_NoteOffVoice | one channel's note off (the game's own, below) | AdLib_NoteOff |
+| 054a | AdLib_InitSlotVolume | InitSlotVolume: the 18 slot volumes = 0x7F | AdLib_Init |
+| 055c / 0601 / 067e | AdLib_CalcFNum / SetFNumRow / InitFNums | CalcPremFNum / SetFNum / InitFNums | AdLib_Init |
+| 081a | AdLib_SetSlotParam | SetASlotParam(slot, parameter, value) | AdLib_NoteOffVoice |
+| 0847 | AdLib_SetSlotParams | SetSlotParam(slot, 13 parameters, wave) | AdLib_SetVoiceTimbre |
+| 08db | AdLib_WriteParam | SndSetPrm(slot, parameter): jump table 4ac9:08f3 | AdLib_SetSlotParam |
+| 095e | AdLib_WriteAllParams | SndSetAllPrm(slot) | AdLib_SetSlotParams |
+| 099c | AdLib_WriteKslLevel | SndSKslLevel: 0x40 + slot offset | |
+| 0a0e | AdLib_WriteNoteSel | SndSNoteSel: 0x08 | |
+| 0a29 | AdLib_WriteFeedbackFm | SndSFeedFm: 0xC0 + channel (modulator slots only) | |
+| 0a86 / 0ad6 | AdLib_SetAD / AdLib_SetSR | 0x60 / 0x80 + slot offset | |
+| 0b26 | AdLib_WriteAmVibEgKsrMulti | SndSAVEK: 0x20 + slot offset | |
+| 0bd6 | AdLib_WriteAmVibRhythm | SndSAmVibRhythm: 0xBD (AM and vibrato depth bits only) | |
+| 0c03 | AdLib_SetWave | 0xE0 + slot offset | |
+| 0c44 | AdLib_SetFreq | SetFreq(channel, pitch, key) | |
+| 0ce8 | AdLib_KeyOff | SoundChut: 0xB0 + channel = 0, then 0xA0 + channel = 0 | |
+| 0d0f | AdLib_Detect | the timer test of §2.1 (registers 2 and 4 only) | Hw_Detect 1000:04a1 |
+| 020f, 0251, 0271, 071d, 089d | AdLib_SetVoiceA/B, AdLib_SetReg, AdLib_PitchBend, AdLib_SetPercInstr | SetVoiceVolume, ..., SetVoicePitch, the percussion timbre | **never called** |
+
+Every register write goes through `AdLib_Write` 491b:0875: OUT register to port DS:656C (0x388),
+6 status reads, OUT value to the next port, 35 status reads.
+
+**Variables** (BSS of DGROUP): C6E4 u8[96] block of a pitch, C744 u8[96] semitone of a pitch, C7A4
+AM depth, C7A5 u8[9] channel used by the orchestration, C7AE note select, C7AF vibrato depth, C7B0
+u8[11] last pitch per channel (stored as a byte, read back signed), C7BB pitch range, C7BD
+u16[25][12] F-numbers, CA15 u8[18][14] parameters per operator slot, CB11 u8[11] key bit per
+channel, CB1C wave-select enable (0x20), CB1E far[11] F-number row per channel, CB4A u8[18] slot
+volume, CB5C i8[9] transposition per channel, CB65 pitch-range step, CB67 i16[11] half-tone offset.
+**Tables** (initialised data): 8124 u8[9][2] modulator and carrier slot of each channel, 8136
+u8[18] register offset of each slot, 8148 u8[18] 1 = carrier slot, 815A u8[18] channel of each slot
+(the standard OPL2 layout), 816C 24 instrument records of 0x4E bytes (13 i16 modulator parameters,
+13 i16 carrier parameters, the two wave selects at +0x34 / +0x36; the 0x16 bytes after +0x38 are
+never read), 88BC far[24] to the records, 891C and 8988 the instrument (0xFF = channel unused) and
+the transposition of each channel for k = 0..11. The third row DS:89F4 + 9k is addressed but never
+read (for k >= 9 it would run into text).
+
+**Parameters** of a slot, in the records' order (= DS:CA15 rows, the jump table's cases): 0 KSL, 1
+multiplier, 2 feedback, 3 attack, 4 sustain level, 5 sustaining (EG type), 6 decay, 7 release, 8
+output level, 9 AM, 10 vibrato, 11 KSR, 12 connection (non-zero = FM), 13 wave select. Only the low
+byte of each i16 is used. The register values (each written alone, low byte, CBW sign extension
+on the parameters):
+
+| Register | Value | Writer |
+|---|---|---|
+| 0x20 + offset | (AM ? 0x80) + (vibrato ? 0x40) + (sustaining ? 0x20) + (KSR ? 0x10) + (multiplier & 15) | 0b26 |
+| 0x40 + offset | (KSL << 6) \| (63 - t / 254), t = 2 * volume * (63 - (level & 63)) + 127 (volume 0x7F: the level itself) | 099c |
+| 0x60 + offset | attack << 4 \| (decay & 15) | 0a86 |
+| 0x80 + offset | sustain << 4 \| (release & 15) | 0ad6 |
+| 0xE0 + offset | wave & 3 while CB1C != 0, else 0 | 0c03 |
+| 0xC0 + channel | feedback << 1 \| (connection ? 0 : 1); skipped for carrier slots | 0a29 |
+| 0xBD | (AM depth ? 0x80) \| (vibrato depth ? 0x40) | 0bd6 |
+| 0x08 | note select ? 0x40 : 0 | 0a0e |
+
+**AdLib_Init** (40 writes): slot volumes 0x7F; the F-number rows; 0xBD = 0 (SetMode); 0xBD = 0,
+0x08 = 0 (SetGParam 0, 0, 0); for channels 0..8: 0xB0+ch = 0, 0xA0+ch = 0; pitch range 1; for the 18
+slots 0xE0+offset = 0, then 0x01 = 0x20 (wave selects enabled). No instrument is loaded.
+
+**F-numbers** (055c, 0601, 067e, Turbo C long arithmetic): row r detunes by 4r/100 semitone:
+v = (((10000 + 24r) * 52088) / 250000 << 14) * 9 / 111875, entry 0 = (v + 4) >> 3, then 11 times
+v = v * 106 / 100, entry = (v + 4) >> 3 (16-bit). Row 0 is C..B = 343, 364, 385, 408, 433, 459, 486,
+515, 546, 579, 614, 650. Every channel uses row 0 with half-tone offset 0 (only the never-called pitch
+bend would change them). C6E4 / C744 give block i and semitone j of pitch 12i + j, i < 8.
+
+**AdLib_PlayTune(t)**: k = 4t + (rand() & 3) (16-bit); C7A5[0..8] = 0; for each channel whose row-1
+entry is not 0xFF: CB5C[ch] = the row-2 entry, SetVoiceTimbre(ch, record of that instrument), C7A5[ch] =
+1. SetVoiceTimbre loads the record's first 13 parameters and wave into the channel's modulator slot,
+the next 13 and the second wave into its carrier slot, each slot written by SndSetAllPrm: 0xBD,
+0x08, 0x40+off, [0xC0+ch for the modulator], 0x60+off, 0x80+off, 0x20+off, 0xE0+off: **15 writes per
+used channel** (the orchestrations use 6 to 9 channels: 90 to 135 writes). Nothing is keyed off: a
+channel the new orchestration leaves unused keeps whatever it held (Music_Stop's note off only
+reaches used channels) [obs code]. Tune 1's orchestrations 0 and 3 are the same rows.
+
+**AdLib_NoteOn(v, pitch)** (pitch = DS:63AC[v] = note - 1 + 12 * octave, written by Sound_NoteOn):
+voices above 2 do nothing (voice 3, the noise voice, has no channel); for each used channel ch of
+3v..3v+2: AdLib_KeyOff(ch) (0xB0 = 0, 0xA0 = 0), then AdLib_SetFreq(ch, CB5C[ch] + pitch, key on).
+**AdLib_SetFreq(ch, p, key)**: CB11[ch] = key, C7B0[ch] = p (low byte); p += CB67[ch]; clamped to
+0..95; F = row CB1E[ch] entry C744[p]; 0xA0+ch = F & 0xFF; 0xB0+ch = (key ? 0x20) + (C6E4[p] << 2) + (F >> 8
+& 3). So the OPL pitch is semitone + transposition: block = p / 12 (frequency F * 49716 / 2^(20 - block),
+260.2 Hz for p = 48, 9 cents below C4); a transposition of +12 plays the PSG and speaker pitch
+(octave nibble 3, note 1 = C4).
+
+**AdLib_NoteOff(v)**: for each used channel of the group, **AdLib_NoteOffVoice(ch)**: release rate 10
+on both slots (SetASlotParam(slot, 7, 10): 0x80+off rewritten; it stays until the next PlayTune
+reloads the instrument), then AdLib_SetFreq(ch, (signed) C7B0[ch], key off). The key-off pitch is
+the stored byte read signed: a pitch above 127 would key off at pitch 0 (no tune reaches it).
+
+**Timing on the reference machine** (DOSBox-X, cycles=fixed 6000; the .dro captures, §11.7): each
+`AdLib_Write` of the timer interrupt takes about 70 us, so the writes of one interrupt follow each
+other at that pace (a heavy one, e.g. a loop restart with all voices off and on, reaches its last
+note about 5 ms after the interrupt). AdLib_PlayTune costs about 76 us per write (6.9 ms for 6
+channels, 10.3 ms for 9): Music_Play sets status 1 after it, so the timer interrupts of the set-up
+play no music; with the call about 0.2 PIT tick after its interrupt that is 1 interrupt for up to 6
+used channels and 2 for 7 to 9, which every tune start of the captures shows.
+
+**Engine** (`src/dos/audio/`): `adlib_driver.h` (AdLibDriver: the functions above writing to an
+OplWriter, the variables at their DS offsets, `restore` / `saveTo` for DOSBox-X states),
+`opl_chip.h` (OplChip: ymfm's YM3812 at 3579545 / 72 Hz, writes 70 us apart, cubic resampling),
+`opl_backend.h` (AdLibOpl: the two together for the sequencer; the set-up hold).
 
 ---
 
@@ -447,18 +544,20 @@ Outputs (`python -P tools/dos/dos_sound.py all`): `tunes_ibm_00..02.wav`,
   tie/envelope continuation, envelope 0xFF tick with no write.
 * The user may prefer Tandy sound over the speaker on a modern PC: device choice is a
   backend option (the data for both exists for every entry).
-* AdLib needs an OPL2 core and the instrument tables; it is optional for a first version.
+* AdLib needs an OPL2 core and the instrument tables: done in wave 5 (§5.5, §11.7).
 * The engine implementation (§11): `src/dos/audio/` — `sound_data` (files, DGROUP tables),
   `sequencer` (491b, device independent, `timerTick()` = one PIT interrupt), `speaker_synth`,
-  `psg_synth`, `opl_backend` (interface for the wave-5 OPL2 driver and a square-wave stand-in),
-  `dos_sound_renderer` (sequencer + models advanced by sample count), `dos_audio_device` (SDL3
-  pull stream, thread-safe command queue, offline mode) and the `--dos-sound` tool.
+  `psg_synth`, `adlib_driver` (4ac9), `opl_chip` (ymfm's YM3812), `opl_backend` (the two for the
+  sequencer), `dos_sound_renderer` (sequencer + models advanced by sample count), `dos_audio_device`
+  (SDL3 pull stream, thread-safe command queue, offline mode) and the `--dos-sound` tool.
 
 ## 10. Open questions
 
-* The exact OPL parameter order in the instrument records (needs `4ac9:08db`, which Ghidra
-  decompiled badly), and what the 0x16 bytes after each 0x38-byte record hold. The .dro log
-  of the sound test (§11.4) has every register write of the three tunes for wave 5.
+* ~~The exact OPL parameter order in the instrument records~~: answered in wave 5 (§5.5): the AdLib
+  timbre order (KSL, multiplier, feedback, attack, sustain, sustaining, decay, release, level, AM,
+  vibrato, KSR, connection), as the jump table at 4ac9:08f3 dispatches them; the 0x16 bytes after
+  each 0x38-byte record are never read. Every register write of every tune and orchestration is
+  checked against .dro captures (§11.7).
 * ~~Tandy 1000 noise LFSR taps~~: answered for the DOSBox-X reference (§6.2: NCR 8496, 16 bits,
   taps 0x0002/0x0020, XNOR, restart only when the mode bit flips). A real NCR 8496 was not
   measured.
@@ -510,7 +609,8 @@ sound test; every call has a key-on (register 0xB0+ch bit 5) in its channel grou
 channels 0-2, 1 → 3-5, 2 → 6-8) within 20 ms: 1 462 within 0.5 tick, max 1.0 tick (the .dro has
 1 ms resolution). The OPL pitch (F-number, block) equals the engine's semitone `note - 1 + 12 ×
 octave` plus 0 or ±12 semitones per channel (the orchestration transposition) and a tuning
-offset of −5.6 cents on average (max 9 cents) from the F-number table.
+offset of −5.6 cents on average (max 9 cents) from the F-number table. (Wave 2; the register-level
+comparison of wave 5 is §11.7: every write of this capture is reproduced.)
 
 ### 11.5 Deviations of the engine (by design)
 
@@ -519,9 +619,15 @@ offset of −5.6 cents on average (max 9 cents) from the F-number table.
   reloads at half periods and PIT gate restarts as in §6.1/§6.2; NCR 8496 noise.
 * A stream whose events never take time (it would hang the original's interrupt) is cut after
   4 096 events; a block whose streams end at once restarts at most once per tick when looping.
-* AdLib (wave 5 not done): the tunes play on a square-wave stand-in at the Tandy pitches; the
-  AdLib timing rules (music not frozen by effects, effects on the speaker, one `rand()` per
-  `Music_Play`) are those of the original.
+* AdLib (wave 5): the original's driver on ymfm's YM3812 (§5.5, §11.7). Modelled on top of the
+  original: each register write reaches the chip 70 us after the previous one (the reference
+  machine's pace; the chip must see AdLib_NoteOn's key off for a re-keyed note to start again), and
+  the tune's first notes wait the interrupts of AdLib_PlayTune's set-up (76.3 us per write, the call
+  0.2 tick after its interrupt). The AdLib mix: the OPL against the speaker as DOSBox-X mixes them,
+  both at 0.75 (the speaker and Tandy devices are unchanged). Not modelled: AdLib_Detect's timer
+  writes, the speaker work of Sound_Tick before the OPL writes, AdLib_PlayTune's own write pace (70
+  instead of 76 us). A DOSBox-X state's driver is restored from its variables (the registers are
+  written again, the envelopes start anew at the load).
 
 ### 11.6 Wave 4: the driver of a saved state, and the sound of the whole game (looks agent)
 
@@ -553,4 +659,111 @@ offset of −5.6 cents on average (max 9 cents) from the F-number table.
     ticks later than in the recording (within the ±4 of the alignment) and their pulses (16 PIT ticks
     apart) and the frozen tune match; the resumed game's tune 0 starts 23 PIT ticks earlier in the
     engine after Yes on the saved-game prompt and resumes 10 PIT ticks earlier when Flutter's hint is
-    closed (sound calls made inside a long frame take effect at the frame's start in the engine).
+    closed (sound calls made inside a long frame took effect at the frame's start in the engine; wave
+    5 places them in the frame, §11.8).
+
+### 11.7 Wave 5: the AdLib driver against DOSBox-X (register streams and audio)
+
+**Captures** (`extracted/captures/dos/`, DOSBox-X 2026.10.01, SB16 OPL3 in OPL2 use, oplemu default):
+`audio/adlib_w5_variants.dro` + `.wav` from the harness state `savestates/w5/snd_adlib_variants`
+(the R2 sound-test stub extended: before a Music_Play it writes the rand seed DS:8F48 so that
+AdLib_PlayTune's rand() & 3 is the wanted orchestration; scratch `dos_w5_adlib/py/soundtest_v.py`):
+every tune in every orchestration (k = 0..11) for its whole length plus 200 ticks, effect 6 under the
+first, and a tune change without Music_Stop at the end; recorded in turbo mode (655 s emulated).
+Also the R2 capture `audio/adlib_soundtest_sfx0-11_tunes0-2.dro` + `.wav` (real time; its
+orchestrations, drawn by rand(), were 1, 0, 1: k = 1, 4, 9).
+
+**Register streams** (`tools/dos/oplcmp.py`; engine: `tmport --dos-sound adlib soundtest OUT
+--from-state STATE --script ... --opl-log LOG`, the driver restored from the capture's start state;
+DOSBox-X logs only the writes that change a register, which the comparison applies to the engine's
+stream too):
+
+| Capture | Engine writes | Logged writes compared | Identical in order | Registers where the capture continues | Timer-interrupt writes against their engine tick |
+|---|---|---|---|---|---|
+| w5 variants (12 orchestrations, 14 tune starts) | 138 956 | 85 767 | 85 767 | 120 of 120 equal | 66 230 before the capture's clock slip: −0.14 .. +0.24 tick; per segment 81 753 of 84 757 within a quarter tick, all within 0.56 |
+| R2 sound test (k = 1, 4, 9) | 34 785 | 21 324 | 21 324 | 120 of 120 equal | 21 162: −0.13 .. +0.19 tick |
+
+A write is expected at its PIT tick plus 70 us per write before it in the tick (the capture's ms are
+whole: up to 1 ms early). Every tune start's first note falls on the engine's tick (the set-up hold of
+§5.5: 2 interrupts for 7-9 channels, 1 for the 6-channel orchestration). The turbo-mode capture's ms
+clock slips by 2.2 ms against the PIT around tick 122 000 (its WAV by the same); the R2 capture (real
+time) has no slip. The commands' own writes (Music_Play's set-up, Music_Stop's note off) come between
+the tick before and their tick (−1.35 .. −0.6). `tests/test_dos_audio.cpp` repeats the w5 comparison
+(write for write, registers, timing) and pins every orchestration's stream by CRC-32.
+
+**Audio** (scratch `dos_w5_adlib/py/audio_detail.py`, `avi_batch.py`): the engine's render against
+DOSBox-X's, aligned by the speaker effects (WAV) or by content (AVI audio; `audiocmp.py align`). Onsets:
+the lag aligning the two energy envelopes around each engine key-on, measured around the common lag;
+pitch: the strongest partial of sustained notes (8192 samples, zero-padded); sample level: the
+normalised correlation of the waveforms (2048 samples, best lag within ±2.5 ms) and the cosine of
+their magnitude spectra.
+
+| Recording | Onsets within 1 ms | Pitch (cents) | Waveform correlation (median) | Spectrum cosine (median) |
+|---|---|---|---|---|
+| R2 sound test WAV (real time) | 542 of 548 | 26 notes, median −0.01, max 1.07 | 0.977 | 0.995 |
+| w5 variants WAV (turbo) | 2 644 of 3 385 (the turbo recording jitters; the same tune and orchestration in the R2 WAV: 99 %) | 60 notes, median +0.04 | 0.971 | 0.993 |
+| `avi/ega_opening_title.avi` (boot: tune 1, orchestration 2 from rand() = 346) | 142 of 194 | 17, max 0.78 | 0.983 | 0.986 |
+| `avi/ega_r2_end_t2_nokey.avi` (log_end_t2) | 271 of 283 | 29, max 1.32 | 0.982 | 0.997 |
+| `avi/ega_r2_crown_nokey.avi` (log_crown) | 334 of 353 | 30, max 2.47 | 0.979 | 0.996 |
+| `avi/ega_r2_end_t6_allfound_nokey.avi` | 224 of 237 | 23, median +0.02 | 0.982 | 0.991 |
+| `avi/ega_r2_castle_tier3_climb.avi` | 43 of 52 | 11, median +1.15 | 0.946 | 0.973 |
+| `avi/ega_castle_ladder_jump_top.avi` | 38 of 47 | 2, max 0.27 | 0.909 | 0.959 |
+
+Onsets outside 1 ms are mostly the detector's (effects and noise among the candidates of the
+AVI runs, which have no OPL log). `avi/ega_r2_treasure_room_from_clubhouse.avi` does not match at any
+alignment (its effects line up with the engine's at offset 0, its music is not the state's tune):
+that AVI was not recorded from the sound driver of its scenario's state. DOSBox-X's AVI audio is not
+in step with its frames: against the engine runs from the scenarios' states the audio tracks come
+0.68-1.07 s early, 0.55-1.1 s ahead of their own pictures as the scenarios' AVI fits place them; the
+comparisons therefore align the AVI audio by content.
+
+**DOSBox-X's OPL core against ymfm**: the same frequencies (pitch within 1-2.5 cents), the same
+onsets; at sample level the best-scaled engine render leaves −13 to −15 dB of the recording
+(correlation 0.977-0.983 in the clean recordings), from the envelope generators' rounding, ymfm's
+YM3014 floating-point DAC and DOSBox-X's own resampling. **Level**: in the R2 recording the tunes' RMS
+is 0.391 / 0.437 / 0.501 of the effects' peak; the engine's AdLib mix gives 0.395 / 0.435 / 0.500
+(OplChip::kDefaultGain), the whole mix at kAdLibMixLevel 0.75: the loudest tune passage peaks at
+0.82 of full scale at the device's default volume.
+
+**The game**: `--sound adlib` (or an EGA state, whose device is AdLib) plays the real music in the
+headless frame-dump `sound.wav` and in the windowed device; `--dos-load-state` continues the state's
+orchestration and notes (`soundRestoreDriver` → `SoundFacade::restoreOplDriver`). Headless runs that
+keep no sound do not synthesise the OPL (`DosAudioSound::keepSamples(false)`).
+
+### 11.8 Wave 5 integration: sound calls inside long frames
+
+The driver's entry points (`Sfx_Play`, `Music_Play`, the flags) write its blocks at once; the next
+timer interrupt plays them. A call made partway through a long frame of the reference machine
+therefore sounds that far into the frame, not at its start. The engine reports a frame's costs where
+the work happens and passes each call the PIT ticks between the next interrupt and the one after its
+place (`DosRuntime::soundDelay`, `DosAudioDevice`'s per-command delay; `ENGINE_MAP.md` §3.8): Game_Start's
+Music_Play after Quiz_LoadQuestions (7 PIT ticks), Sound_SyncState's gate and Music_Play after the
+level's PAN and sprite bank, the music's pause after a message bubble's drawing (27.5), a search
+frame's effect at that frame, each coin of the count-up on its own 3.32-tick clock; Title_Run's tune
+after the OPENING load (9.85: Title_Run 4ba4:0434 loads before Music_Play). A game tick's calls and
+the period speed have no delay. The game sees nothing of it: the 164 fidelity scenarios' traces are
+byte-identical with and without the delays.
+
+Checked with `avi/tandy_r3_session.avi` (the R3 Tandy session; sound edges per PIT tick at the
+scenario's time base, engine PIT = AVI seconds x PIT + 10336; scripts in
+`extracted/scratch/dos_w5_integration/`, `sess.py`, `edges.py`, `sessfit.py`):
+
+| Event | Recording | Engine before | Engine now |
+|---|---|---|---|
+| the resumed game's tune 0 starts (after Yes) | 15013 | 14990 (23 early) | 15016 (3 late) |
+| the tune resumes after Flutter's first hint | 16201 | 16191 (10 early) | 16192 (9 early) |
+| the attract tune (AVI 0.5-3.5 s), at the title pages' time base | edges | 11-12 early | 2-3 early |
+
+The pictures give the time base of each part (`avifit.py`): the title pages' walk-off (AVI frames
+385-462) 10348.0, the sign-in and the resumed game (frames 892-1000, 1139-1222) 10331-10336.6, the net
+swing 10326. At the title pages' base the attract tune now runs 2-3 PIT ticks ahead of the recording
+(Title_Run's tune after the OPENING load; 11-12 ahead before). At the resumed game's base the tune's
+start is within 1-5 PIT ticks: the
+model's 29.5 PIT ticks of I/O before the second Music_Play (7 + MOUNT2N3 20.3 + SPRITES.PAK 2.2)
+against about 23-26 in the recording. The resume after the hint keeps its offset for another reason:
+the start-of-game message pauses the music after its bubble's drawing, which the engine now does at
+the right place in the frame, but the bubble's frame begins when the resume frame's HUD redraw ends,
+and the Tandy draws both HUD redraws in about 10 PIT ticks each where the engine takes the EGA's 16
+(the bubble is complete at AVI frame 1192, 13 PIT ticks before the engine's): the tune runs 31 PIT
+ticks before the pause in the recording, 42 in the engine, and resumes 11 earlier in its note. Per-look
+drawing costs are not modelled (`ENGINE_MAP.md` §8).

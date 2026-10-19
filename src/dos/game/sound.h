@@ -9,6 +9,7 @@
 // Owner: mainloop agent (the wiring in runDosEdition); the facade itself is plumbing, not logic.
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <span>
 #include <string>
@@ -43,6 +44,11 @@ public:
     // tune go on where the state left them (Sequencer::restore). A wrapper facade forwards it.
     virtual void restoreDriver(std::span<const uint8_t> /*sfxBlock*/, std::span<const uint8_t> /*musicBlock*/,
                                int /*voices*/) {}
+    // A DOSBox-X state's AdLib driver (wave 5): its variables (orchestration, instruments, the channels'
+    // pitches and keys) from the state's whole DGROUP image; called right before restoreDriver, which
+    // then sends no AdLib_PlayTune and no notes (DosAudioDevice::restoreOplDriver). A wrapper facade
+    // forwards it.
+    virtual void restoreOplDriver(std::span<const uint8_t> /*dgroup*/) {}
 };
 
 // A facade that only records the calls (tests, headless runs without sound).
@@ -73,7 +79,14 @@ public:
     void restoreDriver(std::span<const uint8_t> sfxBlock, std::span<const uint8_t> musicBlock, int voices) override;
 
     const std::vector<Call>& calls() const { return calls_; }
-    void clear() { calls_.clear(); }
+    void clear() {
+        calls_.clear();
+        delays_.clear();
+    }
+    // Tests of the frame timing: the delay each call was made with (DosAudioSound::setDelaySource),
+    // parallel to calls(); empty while no source is set.
+    void setDelaySource(std::function<uint32_t()> delay) { delay_ = std::move(delay); }
+    const std::vector<uint32_t>& delays() const { return delays_; }
     // The model of the effect status: set by sfxPlay, cleared by sfxStop/silenceAll and here.
     void setSfxActive(bool a) { sfxActive_ = a; }
     uint64_t pitTicks() const { return pitTicks_; }
@@ -81,7 +94,11 @@ public:
     std::string describe() const;
 
 private:
+    void record(Op op, int arg);
+
     std::vector<Call> calls_;
+    std::vector<uint32_t> delays_;
+    std::function<uint32_t()> delay_;
     bool sfxActive_ = false;
     uint64_t pitTicks_ = 0;
 };
@@ -91,6 +108,11 @@ private:
 class DosAudioSound final : public SoundFacade {
 public:
     DosAudioSound(DosAudioDevice& device, bool offline);
+
+    // Where a call takes effect (wave 5): the PIT ticks after the next timer interrupt that each call
+    // waits, asked when it is made (DosRuntime::soundDelay: a long frame's calls sound where the
+    // original's frame made them). Unset: every call at the next interrupt.
+    void setDelaySource(std::function<uint32_t()> delay) { delay_ = std::move(delay); }
 
     void sfxPlay(int id) override;
     void sfxStop() override;
@@ -105,13 +127,19 @@ public:
     bool sfxActive() const override;
     void pitTick() override;
     void restoreDriver(std::span<const uint8_t> sfxBlock, std::span<const uint8_t> musicBlock, int voices) override;
+    void restoreOplDriver(std::span<const uint8_t> dgroup) override;
 
-    void keepSamples(bool keep) { keepSamples_ = keep; }
+    // Offline: whether the samples are kept (samples()); when they are not, the OPL2 is not
+    // synthesised either (DosAudioDevice::setOplSynthesis), as nobody hears it.
+    void keepSamples(bool keep);
     const std::vector<float>& samples() const { return samples_; }
 
 private:
+    uint32_t delay() const { return delay_ ? delay_() : 0; }
+
     DosAudioDevice& device_;
     bool offline_;
+    std::function<uint32_t()> delay_;
     bool keepSamples_ = false;
     bool soundOn_ = true;
     // The last Sfx_Play / Sfx_Stop and the device's tick count when it was made: until the device
@@ -140,8 +168,9 @@ bool sfxBlockActive(const DosGame& g);     // DS:6448 != 0
 // Pushes every flag of CoreState to the facade (after loadFromDgroup or a state restore).
 void syncSoundFlags(DosGame& g);
 // A DOSBox-X state's sound driver from its DGROUP image (DS:0000..): the blocks DS:6448 / DS:64C0 and
-// the voice count DS:63BE through SoundFacade::restoreDriver (after syncSoundFlags). The AdLib
-// orchestration of the playing tune is not carried (the OPL driver's tables, wave 5).
+// the voice count DS:63BE through SoundFacade::restoreDriver (after syncSoundFlags), and before them
+// the AdLib driver's variables (SoundFacade::restoreOplDriver: the orchestration and instruments of the
+// playing tune, the channels' pitches and keys).
 void soundRestoreDriver(DosGame& g, std::span<const uint8_t> dgroup);
 // The tune of a music area (code_ui.md §6.2): 0 below area 4, 1 below 7, 2 below 15, else -1.
 int tuneForArea(uint16_t area);
