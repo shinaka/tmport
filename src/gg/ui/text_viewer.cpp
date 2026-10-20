@@ -141,13 +141,13 @@ void TextViewer::open(const UiCanvas& ui, ClickZones* zones) {
         zones->addLocal(upZone_);
         zones->addLocal(downZone_);
     }
-    scrollMax_ = std::max(TextViewLayout::countLines(ui.fonts, text_) - 10, 1);
-    if (zones && scrollMax_ != 1) {
+    *scrollMax_ = static_cast<int16_t>(std::max(TextViewLayout::countLines(ui.fonts, text_) - 10, 1));
+    if (zones && *scrollMax_ != 1) {
         zones->addLocal(pageUpZone_);
         zones->addLocal(thumbZone_);
         zones->addLocal(pageDownZone_);
     }
-    thumbStep_ = 104 / scrollMax_;  // 4140:00f3 TextView_SetThumbStep
+    *thumbStep_ = static_cast<int16_t>(104 / *scrollMax_);  // 4140:00f3 TextView_SetThumbStep
     setThumbY(45);
     line_ = 0;
     redraw(ui, false, false);
@@ -171,9 +171,9 @@ void TextViewer::drawBar(const UiCanvas& ui) {
     Screen& s = ui.screen;
     s.setDrawColor(15);
     s.fillRect(118, 45, 9, 104);
-    s.fillRect(118, thumbY_, 9, 11);
+    s.fillRect(118, *thumbY_, 9, 11);
     s.setDrawColor(0);
-    s.frameRect(118, thumbY_, 9, 11);
+    s.frameRect(118, *thumbY_, 9, 11);
     ui.dirtyFlush();
     if (zones_) updateBarZones(*zones_);
 }
@@ -182,7 +182,7 @@ void TextViewer::drawBar(const UiCanvas& ui) {
 void TextViewer::redraw(const UiCanvas& ui, bool upPressed, bool downPressed) {
     drawPanel(ui, upPressed, downPressed);
     TextViewLayout::drawText(ui.screen, ui.fonts, text_, line_);
-    if (scrollMax_ != 1) drawBar(ui);
+    if (*scrollMax_ != 1) drawBar(ui);
     ui.dirtyFlush();
 }
 
@@ -195,39 +195,39 @@ void TextViewer::close(const UiCanvas& ui) {
 void TextViewer::scrollBy(int delta) {
     line_ += delta;
     if (line_ < 0) line_ = 0;
-    if (line_ >= scrollMax_) line_ = scrollMax_ - 1;
+    if (line_ >= *scrollMax_) line_ = *scrollMax_ - 1;
 }
 
 // 4140:00b1 TextView_ThumbDown
 void TextViewer::thumbDown() {
-    thumbY_ += thumbStep_;
-    if (138 - thumbStep_ < thumbY_) thumbY_ = 138;
+    *thumbY_ = static_cast<int16_t>(*thumbY_ + *thumbStep_);
+    if (138 - *thumbStep_ < *thumbY_) *thumbY_ = 138;
 }
 
 // 4140:00d3 TextView_ThumbUp
 void TextViewer::thumbUp() {
-    thumbY_ -= thumbStep_;
-    if (thumbStep_ + 45 > thumbY_) thumbY_ = 45;
+    *thumbY_ = static_cast<int16_t>(*thumbY_ - *thumbStep_);
+    if (*thumbStep_ + 45 > *thumbY_) *thumbY_ = 45;
 }
 
 // 4140:0081 TextView_SetThumbY
-void TextViewer::setThumbY(int y) { thumbY_ = std::clamp(y, 45, 138); }
+void TextViewer::setThumbY(int y) { *thumbY_ = static_cast<int16_t>(std::clamp(y, 45, 138)); }
 
 // 4140:0102 TextView_UpdateBarZones
 void TextViewer::updateBarZones(ClickZones& zones) {
     zones.removeLocal(&pageUpZone_);
     zones.removeLocal(&pageDownZone_);
     zones.removeLocal(&thumbZone_);
-    if (thumbY_ != 45) {
-        pageUpZone_.h = static_cast<int16_t>(thumbY_ - 45);
+    if (*thumbY_ != 45) {
+        pageUpZone_.h = static_cast<int16_t>(*thumbY_ - 45);
         zones.addLocal(pageUpZone_);
     }
-    if (thumbY_ != 138) {
-        pageDownZone_.y = static_cast<int16_t>(thumbY_ + 11);
-        pageDownZone_.h = static_cast<int16_t>(138 - thumbY_);
+    if (*thumbY_ != 138) {
+        pageDownZone_.y = static_cast<int16_t>(*thumbY_ + 11);
+        pageDownZone_.h = static_cast<int16_t>(138 - *thumbY_);
         zones.addLocal(pageDownZone_);
     }
-    thumbZone_.y = static_cast<int16_t>(thumbY_);
+    thumbZone_.y = *thumbY_;
     zones.addLocal(thumbZone_);
 }
 

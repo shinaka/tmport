@@ -726,9 +726,9 @@ Next Preview::warehouse(int building) {
     b.setup(building, level, ctx_.rand, hud_, video_);
     // A new visit's counters (12e0:08e3..0905: g_partsNeeded = Parts_NeededCount(), 10 bananas at
     // level 0); the actors are wave 3's (Building_NewVisit, Chimps_Spawn, the brains): none is placed.
-    b.counters.partsNeeded = b.parts().neededCount;
-    if (level == 0) b.counters.projectiles = 10;
-    counters_ = b.counters;
+    b.state().player.live.partsNeeded = static_cast<int16_t>(b.parts().neededCount);
+    if (level == 0) b.state().player.live.projectiles = 10;
+    counters_ = b.counters();
     for (Actor& a : b.actors()) {
         a.disabled = 1;
         a.sprite.flags |= Actor::kHidden;

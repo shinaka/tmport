@@ -39,9 +39,14 @@ void Hud::init(const GgExe& exe, const Archive& archive, PicCache& cache) {
     for (size_t s = 0; s < triples_.size(); ++s)
         for (size_t k = 0; k < 4; ++k) triples_[s][k] = exe.ds8(static_cast<uint16_t>(dg::kHudDigitColors + 4 * s + k));
     for (size_t k = 0; k < pow10_.size(); ++k) pow10_[k] = exe.ds32(static_cast<uint16_t>(dg::kPow10 + 4 * k));
-    scheme_ = exe.dsS16(dg::kHudColorScheme);
-    dirty = 0;
-    labelsShown = true;
+    st_->colorScheme = exe.dsS16(dg::kHudColorScheme);
+    pictureScheme_ = st_->colorScheme;  // the copy's digits are in the scheme DS:1318 names
+    st_->dirty = 0;
+    st_->labelsShown = 1;
+}
+
+HudCounters Hud::shown() const {
+    return HudCounters{st_->shownPartsNeeded, st_->shownProjectiles, st_->shownScore};
 }
 
 // 1a04:00eb Hud_DrawBar
@@ -67,16 +72,36 @@ void Hud::drawLabels(Screen& screen, unsigned bits) const {
     if (bits & 1) screen.lpxDraw(kLabelX, 188, pictureAt(sprites_, 2));
 }
 
-// 1a04:000e Hud_SetDigitColors
+// 1a04:000e Hud_SetDigitColors: nothing when the scheme is in effect, else the ten pictures recoloured
+// from the scheme in effect and DS:1318 = scheme. "In effect" is the scheme the engine's pictures are in,
+// which is DS:1318 as in the original unless DS:1318 was loaded from a state without syncDigitColors.
 void Hud::setDigitColors(int scheme) {
-    if (scheme == scheme_) return;
-    if (scheme < 0 || static_cast<size_t>(scheme) >= triples_.size() || scheme_ < 0 ||
-        static_cast<size_t>(scheme_) >= triples_.size()) {
-        log::debug("Hud_SetDigitColors: scheme {} -> {} outside the table", scheme_, scheme);
+    const int current = pictureScheme_;
+    if (scheme == current) {
+        st_->colorScheme = static_cast<int16_t>(scheme);
         return;
     }
-    for (auto& d : digits_) recolorPicture(d, triples_[static_cast<size_t>(scheme_)], triples_[static_cast<size_t>(scheme)]);
-    scheme_ = scheme;
+    if (scheme < 0 || static_cast<size_t>(scheme) >= triples_.size() || current < 0 ||
+        static_cast<size_t>(current) >= triples_.size()) {
+        log::debug("Hud_SetDigitColors: scheme {} -> {} outside the table", current, scheme);
+        return;
+    }
+    for (auto& d : digits_) recolorPicture(d, triples_[static_cast<size_t>(current)], triples_[static_cast<size_t>(scheme)]);
+    pictureScheme_ = scheme;
+    st_->colorScheme = static_cast<int16_t>(scheme);
+}
+
+void Hud::syncDigitColors() {
+    const int want = st_->colorScheme;
+    if (want == pictureScheme_) return;
+    if (want < 0 || static_cast<size_t>(want) >= triples_.size() || pictureScheme_ < 0 ||
+        static_cast<size_t>(pictureScheme_) >= triples_.size()) {
+        log::debug("Hud: digit scheme {} -> {} outside the table", pictureScheme_, want);
+        return;
+    }
+    for (auto& d : digits_)
+        recolorPicture(d, triples_[static_cast<size_t>(pictureScheme_)], triples_[static_cast<size_t>(want)]);
+    pictureScheme_ = want;
 }
 
 // 1a04:0058 Hud_DrawNumber
@@ -98,7 +123,9 @@ void Hud::drawCounters(Screen& screen, const HudCounters& c) {
     drawNumber(screen, 0x129, 0xA6, static_cast<uint32_t>(static_cast<uint16_t>(c.partsNeeded)), 2, 1);
     drawNumber(screen, 0x11E, 0xB1, static_cast<uint32_t>(static_cast<uint16_t>(c.projectiles)), 3, 0);
     drawNumber(screen, 0xFD, 0xBC, c.score, 6, 2);
-    shown_ = c;
+    st_->shownPartsNeeded = static_cast<int16_t>(c.partsNeeded);
+    st_->shownProjectiles = static_cast<int16_t>(c.projectiles);
+    st_->shownScore = c.score;
 }
 
 // 1a04:02c2 Hud_DrawAll
@@ -122,7 +149,7 @@ void Hud::drawStrip(Screen& screen, std::span<const HudStripEntry> strip) const 
 // 1a04:0a11 Hud_DrawInfoText
 void Hud::drawInfoText(Screen& screen, Fonts& fonts, std::span<const uint8_t> text) {
     const int old = fonts.select(1);
-    labelsShown = false;
+    st_->labelsShown = 0;
     clearInfo(screen);
     fonts.setColor(0);
     textDrawBox(screen, fonts, kLabelX, 168, kInfoWidth, text);
@@ -132,6 +159,7 @@ void Hud::drawInfoText(Screen& screen, Fonts& fonts, std::span<const uint8_t> te
 // 1a04:0b69 Hud_Update (without the flash and the label return)
 uint16_t Hud::update(Screen& screen, uint16_t skip, const HudCounters& c, int displayRoom,
                      std::span<const HudStripEntry> strip, Fonts* fonts, std::span<const uint8_t> infoText) {
+    uint16_t& dirty = st_->dirty;
     dirty &= static_cast<uint16_t>(~skip);
     if (dirty == 0) return 0;
     const uint16_t was = dirty;

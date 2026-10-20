@@ -1,9 +1,9 @@
 // ggport: engine re-implementation of Super Solvers: Gizmos & Gadgets! (DOS v1.0, 1993). The engine
 // contains no game data; it reads the user's original files at run time (re/gg/docs/SCOPING.md §9).
 //
-// `ggport` (no arguments, --play, or only game options) starts the game (gg/app/gg_app.h; until wave 3
-// the preview, gg/app/preview.h); a tool command (--gg-info, --gg-screen, ...; gg/app/cli_dispatch.h)
-// runs that tool instead.
+// `ggport` (no arguments, --play, or only game options) starts the game (gg/app/gg_app.h with
+// gg/game/flow.h gameMain; --gg-preview the wave 2 preview, gg/app/preview.h); a tool command
+// (--gg-info, --gg-screen, ...; gg/app/cli_dispatch.h) runs that tool instead.
 //
 // Windows: ggport.exe is a GUI-subsystem program (no console window on a double-click; SDL_main.h
 // supplies WinMain, which calls main() with UTF-8 arguments). Started from a console it attaches to
@@ -18,6 +18,7 @@
 #include "gg/app/cli_dispatch.h"
 #include "gg/app/gg_app.h"
 #include "gg/app/preview.h"
+#include "gg/game/flow.h"
 #include "platform/console.h"
 
 int main(int argc, char** argv) {
@@ -25,5 +26,7 @@ int main(int argc, char** argv) {
     const std::vector<std::string> args(argv + (argc > 0 ? 1 : 0), argv + argc);
     int exitCode = 0;
     if (tmport::gg::runToolCli(args, exitCode)) return exitCode;
-    return tmport::gg::runGgApp(args, &tmport::gg::previewMain);
+    return tmport::gg::runGgApp(args, [](tmport::gg::GgContext& ctx) {
+        return ctx.launch.options.preview ? tmport::gg::previewMain(ctx) : tmport::gg::gameMain(ctx);
+    });
 }

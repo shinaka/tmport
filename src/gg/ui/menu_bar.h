@@ -29,6 +29,8 @@
 
 namespace tmport::gg {
 
+class GgGame;
+
 class Archive;
 class GgExe;
 
@@ -103,5 +105,17 @@ std::vector<Zone> menuTitleZones(const MenuBarDef& bar);
 inline constexpr uint16_t kMenuOutsideCode = 0x044F;
 inline constexpr uint16_t kMenuItemCodeBase = 0x0FD0;
 std::vector<Zone> menuItemZones(const MenuDef& menu, const DialogLayout& dropDown);
+
+
+// ---- wave 3: the run (owner: ui agent; ui/menu_run.cpp) ---------------------------------------------
+// 40a4:0000 Menu_SetMenuBar(bar): install (true: g_menuBar DS:4053) draws the bar, sets the menu hook
+// (Input_GetCode's F1..F3 / Alt+H, F, O: menuRunDropDown) and adds the title zones (global); remove
+// (false) clears the hook, removes the zones, g_menuBarCur = DS:405a and blacks the strip. The
+// MenuBarDef, its pictures and the zones are UiObjects'.
+void menuSetMenuBar(GgGame& g, bool install);
+// 40a4:020b Menu_RunDropDown(i): the drop-down loop of code_ui.md §6.4 (Snd_Pause, the hook cleared,
+// play mode 0, Mouse_ForceDefault(1), Zones_Push at the first nesting level g_menuNesting, Up / Down /
+// Left / Right / F keys / clicks, a handler's non-zero result reopens the menu; time runs).
+void menuRunDropDown(GgGame& g, int index);
 
 }  // namespace tmport::gg

@@ -99,14 +99,17 @@ program on Windows), `ggport-cli` (Windows: the console version, for the tools a
   game files read-only and refuses other versions with a message naming the file.
 * **Preference folder:** `--pref-dir <dir>`, default SDL's `GGPort/GGPort` (`ggport.ini`,
   `players.dat`, screenshots).
-* **Running:** `ggport` shows the wave 2 preview (the attract with its music, then the sign-in, the
-  hub, a warehouse room and the eight puzzle screens; README "Gizmos & Gadgets (in progress)").
-  Options: `ggport --help` (`--sound off|speaker|fm`, `--gg-args "<the original's switches>"`,
+* **Running:** `ggport` plays the game (README "Gizmos & Gadgets"); `--gg-preview` shows the wave 2
+  preview of the engine's screens instead. Options: `ggport --help` (`--sound off|speaker|fm`, `--gg-args "<the original's switches>"`,
   `--cpu 286|386`, `--seed N`, `--fullscreen`, `--windowed`, `--square-pixels`, `--scale N`,
   `--integer-scale`, `--no-pause`, `--screenshot-dir`, `--verbose`). Headless and scripted runs:
   `--headless` (deterministic virtual time; the run ends after `--ticks N` PIT ticks or the script),
   `--keys` / `--mouse` (input in PIT ticks: `TICK:tap:KEY`, `TICK:click:X:Y`, ...), `--frame-dump
-  DIR|FILE.png`, `--wav-dump FILE.wav` (the sound rendered offline), `--opl-log FILE`.
+  DIR|FILE.png`, `--wav-dump FILE.wav` (the sound rendered offline), `--opl-log FILE`. For the
+  fidelity work: `--gg-trace FILE` (a CSV row per frame, with `--gg-trace-polls` per input poll
+  too), `--gg-dump-state TICK FILE` (the DGROUP image at a PIT tick, and `FILE.fields.tsv`),
+  `--gg-load-state FILE` (start from a DOSBox-X save state of the hub, the workshop, a warehouse
+  room, a puzzle or a race; `re/gg/docs/ENGINE_MAP.md` §10.6).
 * **Tools** (`ggport-cli`, each with `--data <dir>`; they never write into the game folder):
   data `--gg-info`, `--gg-list [--leaves]`, `--gg-selftest`, `--gg-extract ID OUT`; graphics
   `--gg-pic`, `--gg-pal`, `--gg-font`, `--gg-movie`, `--gg-title`, `--gg-fade`, `--gg-wipe`,

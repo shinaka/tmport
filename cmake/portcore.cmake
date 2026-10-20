@@ -97,6 +97,10 @@ add_library(portcore STATIC
     src/dos/input/int33_mouse.cpp
     src/dos/app/script_input.h
     src/dos/app/script_input.cpp
+    # DOSBox-X save states: the archive, the RAM, the CPU registers, the BIOS keys, mode 13h video
+    # memory and the DAC (the games' readers: dos/save/dosbox_state, gg/save/gg_state_file)
+    src/dos/save/dosbox_state_file.h
+    src/dos/save/dosbox_state_file.cpp
 )
 # Test helpers that use only the core (header-only, under tests/): the G&G tests may include them too.
 # tools/check_core_deps.py checks them like the core's files.

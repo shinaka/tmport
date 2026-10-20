@@ -134,4 +134,16 @@ private:
     std::vector<ScreenAnim*> list_;
 };
 
+// ---- wave 3: the run (owner: world agent; game/world_rooms.cpp) ------------------------------------
+// The one running list of the game is GgGame::screenAnims (g_screenAnims DS:7a46, ScreenAnim_Init
+// 174b:0009); the wave 2 screens' own lists (Hub, AttractAnims) move there when their states run on the
+// game.
+class GgGame;
+// 174b:0522 ScreenAnim_PlayModal(done): Sprites_Reset, then 4-tick frames of ScreenAnim_Frame (the
+// running list GgGame::screenAnims, its sound ops on g_effectBank) and Dirty_Flush until *done != 0.
+void screenAnimPlayModal(GgGame& g, const int16_t& done);
+// The same in the form its callers use (2dee:0156, 1cb2, 1d56 pass the running animation + 8): until
+// the animation's state word +0x08 is non-zero (1 finished at op -1000, 2 holding at op -2).
+void screenAnimPlayModal(GgGame& g, const ScreenAnim& anim);
+
 }  // namespace tmport::gg

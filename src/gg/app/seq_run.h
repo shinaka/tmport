@@ -27,9 +27,16 @@ namespace tmport::gg {
 // A state function: returns 0 (next), -1 (stop), -2 (back) or the next state.
 using StateFn = std::function<int16_t()>;
 
+// How a game state function is entered: from Seq_Run (its own entry code runs), or into the moment of
+// a DOSBox-X save state (wave 3, gg/game/load_state.h: its loop goes on from the state, with no entry
+// code, fade or wipe; the next frame begins).
+enum class StateEntry : uint8_t { Normal, Resume };
+
 // 12e0:000f Seq_Run. An empty function, or a state outside the table (the original would read past
-// it; no shipped state does), ends the run with 0 (logged when outside).
-int16_t seqRun(std::span<const StateFn> table, int16_t& state);
+// it; no shipped state does), ends the run with 0 (logged when outside). `prev` is Seq_Run's history
+// word at the start (-1 in the original; a run resumed from a DOSBox-X state passes the state it left,
+// gg/game/load_state.h).
+int16_t seqRun(std::span<const StateFn> table, int16_t& state, int16_t prev = -1);
 
 // The process exit codes of ssg.exe (code_runtime.md §4).
 namespace exit_code {

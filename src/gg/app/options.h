@@ -21,6 +21,10 @@
 //                         PIT) as a 16-bit mono WAV
 //   --opl-log FILE        the run's OPL register writes, as tools/dos/oplcmp.py and --gg-dro-compare
 //                         read them
+//   --gg-preview          the wave 2 preview (gg/app/preview.h) instead of the game
+//   --gg-trace FILE       a CSV row per frame (gg/game/trace_log.h); --gg-trace-polls: per input poll too
+//   --gg-dump-state TICK FILE   the DGROUP image (and FILE.fields.tsv) at PIT tick TICK
+//   --gg-load-state FILE  start from a DOSBox-X save state (gg/game/load_state.h)
 //
 // The original's switches (Init_CommandLine 303a:005c step 3): an argument whose first character is
 // not '-' or '/' is ignored; the second character, upper-cased, selects: '?' usage; 'G' with a
@@ -85,6 +89,13 @@ struct GgOptions {
     bool help = false;
     std::string wavDump;  // --wav-dump (headless runs)
     std::string oplLog;   // --opl-log
+    // The game's tools (gg/game/flow.h gameMain).
+    bool preview = false;                  // --gg-preview
+    std::string traceFile;                 // --gg-trace
+    bool tracePolls = false;               // --gg-trace-polls
+    std::optional<uint64_t> dumpStateTick; // --gg-dump-state TICK FILE
+    std::string dumpStateFile;
+    std::string loadState;                 // --gg-load-state
 };
 
 // Parses the arguments (without argv[0]); nullopt with `error` set on an unknown option or a bad

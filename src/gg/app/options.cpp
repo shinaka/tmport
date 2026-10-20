@@ -100,7 +100,7 @@ namespace {
 
 struct OptionSpec {
     std::string_view name;
-    int values;  // 0 flag, 1 takes a value
+    int values;  // 0 flag, else the number of values it takes
 };
 
 constexpr OptionSpec kOptions[] = {
@@ -110,6 +110,8 @@ constexpr OptionSpec kOptions[] = {
     {"--windowed", 0},    {"--square-pixels", 0}, {"--scale", 1},       {"--integer-scale", 0},
     {"--no-pause", 0},    {"--screenshot-dir", 1}, {"--verbose", 0},    {"--help", 0},
     {"-h", 0},            {"--play", 0},       {"--wav-dump", 1},       {"--opl-log", 1},
+    {"--gg-preview", 0},  {"--gg-trace", 1},   {"--gg-trace-polls", 0}, {"--gg-dump-state", 2},
+    {"--gg-load-state", 1},
 };
 
 template <class T>
@@ -131,13 +133,14 @@ std::optional<GgOptions> parseGgOptions(std::span<const std::string> args, std::
             error = std::format("unknown option '{}'", a);
             return std::nullopt;
         }
-        std::string v;
-        if (spec->values == 1) {
-            if (i + 1 >= args.size()) {
-                error = std::format("{} needs a value", a);
+        std::string v, v2;
+        if (spec->values >= 1) {
+            if (i + static_cast<size_t>(spec->values) >= args.size()) {
+                error = spec->values == 1 ? std::format("{} needs a value", a) : std::format("{} needs {} values", a, spec->values);
                 return std::nullopt;
             }
             v = args[++i];
+            if (spec->values == 2) v2 = args[++i];
         }
         auto bad = [&](std::string_view what) {
             error = std::format("{} {}: {}", a, v, what);
@@ -177,6 +180,15 @@ std::optional<GgOptions> parseGgOptions(std::span<const std::string> args, std::
         else if (a == "--verbose") o.verbose = true;
         else if (a == "--wav-dump") o.wavDump = v;
         else if (a == "--opl-log") o.oplLog = v;
+        else if (a == "--gg-preview") o.preview = true;
+        else if (a == "--gg-trace") o.traceFile = v;
+        else if (a == "--gg-trace-polls") o.tracePolls = true;
+        else if (a == "--gg-dump-state") {
+            uint64_t n = 0;
+            if (!parseNumber(v, n)) return bad("expected a PIT tick, then a file");
+            o.dumpStateTick = n;
+            o.dumpStateFile = v2;
+        } else if (a == "--gg-load-state") o.loadState = v;
         else if (a == "--help" || a == "-h") o.help = true;
         // --play: the game (the default), accepted for symmetry with tmport.
     }
@@ -214,13 +226,19 @@ std::string ggUsage() {
            "                        the last picture\n"
            "  --wav-dump <file>     headless: the sound of the run, rendered offline, as a WAV file\n"
            "  --opl-log <file>      the OPL register writes of the run ('tick reg value [c]' lines)\n"
-           "  --verbose             debug messages\n"
+           "  --verbose             debug messages (with every sound call)\n"
            "  --help                this text\n"
            "\n"
-           "Wave 2 preview (until the game is ported): the attract sequence with its music (Enter: the\n"
-           "next page; Space: on to the screens), then Enter or Space steps through the sign-in, the hub,\n"
-           "a warehouse room (Left / Right: the next room) and the eight puzzle screens; number keys play\n"
-           "the screen's sound effects, Ctrl+S switches the sound off and on, Esc quits.\n"
+           "the game's diagnostic tools:\n"
+           "  --gg-trace <file>     a CSV row per frame (PIT tick, g_state, rooms, the player, rand() calls)\n"
+           "  --gg-trace-polls      with --gg-trace: a row per input poll too (dialogs, menus, puzzles)\n"
+           "  --gg-dump-state <tick> <file>   the game's DGROUP (DS:0000..BD03) at that PIT tick, and\n"
+           "                        <file>.fields.tsv, to compare with a DOSBox-X state\n"
+           "  --gg-load-state <sav> start from a DOSBox-X save state of ssg.exe (the hub, the workshop, a\n"
+           "                        warehouse room, a puzzle or a race) and its .players copy\n"
+           "  --gg-preview          the wave 2 preview instead of the game: the attract, then Enter or\n"
+           "                        Space steps through the sign-in, the hub, a warehouse room and the\n"
+           "                        eight puzzle screens; number keys play the screen's effects\n"
            "\n"
            "tools (ggport-cli): --gg-info, --gg-list, --gg-selftest, --gg-extract (data); --gg-pic,\n"
            "--gg-pal, --gg-font, --gg-movie, --gg-title, --gg-fade, --gg-wipe (graphics); --gg-sound,\n"

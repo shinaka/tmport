@@ -1,8 +1,9 @@
 # Porting notes: Gizmos & Gadgets in the tmport engine
 
-**Status: wave 2.** Written in wave 0, extended at the wave 1 integration from the topic specs and
-the round 2 reference captures, and corrected at the wave 2 integration from the engine foundation
-(what was built and verified: [ENGINE_MAP.md](ENGINE_MAP.md)). It records what matters for the engine (`ggport`, `src/gg/`):
+**Status: wave 3.** Written in wave 0, extended at the wave 1 integration from the topic specs and
+the round 2 reference captures, corrected at the wave 2 integration from the engine foundation and
+at the wave 3 integration from the game logic and its playthroughs (what was built and verified:
+[ENGINE_MAP.md](ENGINE_MAP.md)). It records what matters for the engine (`ggport`, `src/gg/`):
 the runtime model, the screen, the clocks, the order of `rand()` calls, the CPU-dependent path, why
 the overlays do not matter, the original's switches as options, input, saves, the UI library, and
 which quirks to keep.
@@ -501,14 +502,15 @@ Puzzles (`code_puzzles_a.md` §9, `code_puzzles_b.md` §9):
 
 * the choice rule (the first three unsolved variants of a random kind) and its exact `rand()`
   calls; a stale DS:b144 after leaving a puzzle through the menu;
-* electric: no success test after placing a piece, wires lost on a pickup or a missed second
-  click, stale piece types in free slots, the Hint button's 35-column restore, the literal path
+* electric: no success test after placing a piece, a second board click after a miss with the
+  pointer unmoved stringing a wire (the wires of a picked-up piece and a missed wire go back into
+  the toolbox: wave 3 corrected the "wires lost" reading), stale piece types in free slots, the Hint button's 35-column restore, the literal path
   search with its 10-row table;
 * launch: solvable with no object in variants 24, 25, 27, 28 and 29; the 19-tick DAM step;
 * machine pieces: the `rand()` retry loop, groups that never split; gears: the pointer moved by the
   game, a jammed step that flicks, no input during the drag; balance: the swing speed and the
-  transposed swing effects; magnets: the 16-bit force arithmetic, the threshold asymmetry and the
-  phantom poles.
+  transposed swing effects; magnets: the 16-bit force arithmetic (and the literal square root,
+  which returns 2 for 65 540 and 65 541), the threshold asymmetry and the phantom poles.
 
 Make optional:
 

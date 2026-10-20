@@ -12,8 +12,8 @@
 //     --keys / --mouse scripts, the run limit (headless: --ticks and the script's end + 32 ticks;
 //     in a window only --ticks), Input_InstallHandlers
 //   srand: --seed, else the low word of time() (303a:0229)
-//   the entry (the game; until it exists the preview), with GgExit / GgRunEnd caught here and
-//     the atexit functions run (Game_Shutdown's place)
+//   the entry (the game, gg/game/flow.h gameMain; --gg-preview the wave 2 preview), with GgExit /
+//     GgRunEnd caught here and the atexit functions run
 //   --frame-dump: a folder gets one PNG per new picture (NNNNN_tTICKS.png) and end.png; a file the
 //     last picture
 //
@@ -67,7 +67,8 @@ struct GgContext {
 using GgEntry = std::function<int(GgContext&)>;
 
 // The program (arguments without argv[0]); `entry` empty: the test pattern (the runtime's tests).
-// ggport's main passes the wave 2 preview (gg/app/preview.h), wave 3 the game.
+// ggport's main passes the game (gg/game/flow.h gameMain), or with --gg-preview the wave 2 preview
+// (gg/app/preview.h).
 int runGgApp(std::span<const std::string> args, const GgEntry& entry = {});
 
 // The window title.

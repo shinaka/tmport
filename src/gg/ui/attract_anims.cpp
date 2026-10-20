@@ -7,8 +7,9 @@
 
 namespace tmport::gg {
 
-AttractAnimHost::AttractAnimHost(Video& video, PicCache& cache, BorlandRand& rng, ScreenAnimSound sound)
-    : video_(video), cache_(cache), rng_(rng), sound_(std::move(sound)) {}
+AttractAnimHost::AttractAnimHost(Video& video, PicCache& cache, BorlandRand& rng, ScreenAnimSound sound,
+                                 ScreenAnims* running)
+    : video_(video), cache_(cache), rng_(rng), sound_(std::move(sound)), running_(running ? running : &list_) {}
 
 AttractAnimHost::~AttractAnimHost() {
     for (int h = 0; h < static_cast<int>(slots_.size()); ++h)
@@ -32,20 +33,20 @@ int AttractAnimHost::load(uint16_t id) {
 }
 
 // 174b:02ab ScreenAnim_StartAt
-void AttractAnimHost::startAt(int handle, int pos) { list_.startAt(slot(handle).anim, pos); }
+void AttractAnimHost::startAt(int handle, int pos) { running_->startAt(slot(handle).anim, pos); }
 
 bool AttractAnimHost::inList(int handle) const { return slot(handle).anim.active; }
 
 bool AttractAnimHost::stopped(int handle) const { return slot(handle).anim.state() != 0; }
 
 // 174b:0510 ScreenAnim_Frame
-void AttractAnimHost::frame() { list_.frame(video_.screen(), video_.sprites(), rng_, sound_); }
+void AttractAnimHost::frame() { running_->frame(video_.screen(), video_.sprites(), rng_, sound_); }
 
 // 174b:0444 ScreenAnim_Free: out of the running list, the frame bundle released (PicCache_ReleaseBundle)
 void AttractAnimHost::release(int handle) {
     Slot& s = slot(handle);
     if (!s.loaded) return;
-    list_.stop(s.anim);
+    running_->stop(s.anim);
     cache_.releaseBundle(s.anim.frameBundle());
     s.loaded = false;
 }

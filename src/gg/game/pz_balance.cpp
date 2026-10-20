@@ -5,6 +5,7 @@
 #include "gg/data/archive.h"
 #include "gg/data/dgroup_offsets.h"
 #include "gg/data/gg_exe.h"
+#include "gg/game/game.h"
 #include "gg/gfx/cursor.h"
 #include "gg/gfx/video.h"
 #include "gg/text/font.h"
@@ -43,9 +44,9 @@ void PzBalance::loadVariant(int variant) {
     const size_t o = 2 + 42 * static_cast<size_t>(variant);
     if (o + 42 > table_.size()) throw FormatError(std::format("balance table: no variant {}", variant));
     size_t k = o;
-    for (int& s : stock_) s = s16(table_, k), k += 2;
-    for (size_t h = 0; h < hooks_.size(); ++h)
-        for (int& w : hooks_[h]) {
+    for (int16_t& s : st_->stock) s = s16(table_, k), k += 2;
+    for (size_t h = 0; h < st_->hookWeights.size(); ++h)
+        for (int16_t& w : st_->hookWeights[h]) {
             if (h < 5) {
                 w = -1;
             } else {
@@ -56,12 +57,9 @@ void PzBalance::loadVariant(int variant) {
     variant_ = variant;
 }
 
-// 32fe:0aa0 PzBalance_Run, up to PzBalance_Loop
-void PzBalance::setup(Video& video, Fonts& fonts, int variant) {
-    held = -1;
-    tilt = -5;
-    zoneSet = -1;
-    // TODO(wave 3): PzSnd_LoadBank(0x11c6) is the audio area's.
+void PzBalance::loadResources(int variant) {
+    hintPressed_ = archive_.read(kHintPressed);
+    hintText_ = puzzleText(archive_, static_cast<uint16_t>(kHintTextFirst + variant));
     panelText_ = puzzleText(archive_, kPanelText);
     counts_ = Bundle::load(archive_, kCountPics);
     right_ = Bundle::load(archive_, kRightPics);
@@ -70,11 +68,25 @@ void PzBalance::setup(Video& video, Fonts& fonts, int variant) {
     ring_ = archive_.read(kRingPic);
     stack_ = archive_.read(kStackPic);
     table_ = archive_.read(kVariantTable);
+}
+
+void PzBalance::flush(Video& video) {
+    if (game_) game_->display.flush();
+    else video.flush();
+}
+
+// 32fe:0aa0 PzBalance_Run, up to PzBalance_Loop (a tool's picture of it)
+void PzBalance::setup(Video& video, Fonts& fonts, int variant) {
+    game_ = nullptr;
+    BalanceState& s = *st_;
+    s.held = -1;
+    s.tilt = -5;
+    s.zoneSet = -1;
+    s.solved = 0;
+    loadResources(variant);
     loadVariant(variant);
     cursor_ = loadCursor(archive_, kPuzzleCursor);
     video.cursor().setCursorPicture(cursor_.get());
-    // TODO(wave 3): the zones DS:27fc, DS:2812, DS:2828 and PzBalance_InitZones (the runtime's
-    // zone list) and Hint_Show(0x1052) (the UI's).
     drawPuzzlePicture(video, archive_, puzzleKindInfo(4).picture, puzzleKindInfo(4).palette);
     PuzzlePanel panel;
     panel.init(video.screen(), fonts, archive_, panelText_);
@@ -85,58 +97,64 @@ void PzBalance::setup(Video& video, Fonts& fonts, int variant) {
 }
 
 // 32fe:0235 PzBalance_DrawInventory
-void PzBalance::drawInventory(Video& video) const {
+void PzBalance::drawInventory(Video& video) {
     Screen& screen = video.screen();
     screen.restoreRect(8, 67, 38, 93);
-    for (size_t t = 0; t < stock_.size(); ++t) {
-        if (stock_[t] <= 0) continue;
+    for (size_t t = 0; t < st_->stock.size(); ++t) {
+        const int n = st_->stock[t];
+        if (n <= 0) continue;
         screen.lpxDrawKeyed(types_[t].picX, types_[t].picY, memberOf(carry_, static_cast<int>(t)), 0);
-        screen.lpxDrawKeyed(types_[t].countX, types_[t].countY, memberOf(counts_, stock_[t]), 0);
+        screen.lpxDrawKeyed(types_[t].countX, types_[t].countY, memberOf(counts_, n), 0);
     }
-    video.flush();
+    flush(video);
 }
 
 // 32fe:02c8 PzBalance_DrawHook
-void PzBalance::drawHook(Screen& screen, int x, int y, const std::array<int, 3>& weights, bool right) const {
+void PzBalance::drawHook(Screen& screen, int x, int y, const std::array<int16_t, 3>& weights, bool right) const {
     const Bundle& pics = right ? right_ : left_;
     int n = 0;
-    for (; n < 3; ++n) {
+    for (; n < kSlots; ++n) {
         const int w = weights[static_cast<size_t>(n)];
         if (w == -1) break;
         screen.lpxDrawKeyed(x, y, ring_, 0);
-        const int dx = w >= 0 && w < 6 ? dx_[static_cast<size_t>(w)] : 0;
+        const int dx = w >= 0 && w < kTypes ? dx_[static_cast<size_t>(w)] : 0;
         screen.lpxDrawKeyed(x + dx, y + 2, memberOf(pics, w), 0);
         y += 15;
     }
-    if (n > 0 && n < 3 && !right) screen.lpxDrawKeyed(x - 1, y, stack_, 0);
+    // On the left side, below the last of 1 or 2 weights, the hook where another one can go.
+    if (n > 0 && n < kSlots && !right) screen.lpxDrawKeyed(x - 1, y, stack_, 0);
 }
 
 // 32fe:0375 PzBalance_DrawBeam
 void PzBalance::drawBeam(Video& video) {
-    // PzBalance_SelectHookZones (32fe:0079): the zones of set 0 (tilt -5), 1 (+5), 2 (level) are the
-    // runtime's; the set is remembered.
-    if (tilt >= 5) {
-        zoneSet = 1;
-        tilt = 5;
-    } else if (tilt < -4) {
-        zoneSet = 0;
-        tilt = -5;
-    } else if (tilt == 0) {
-        zoneSet = 2;
+    BalanceState& s = *st_;
+    // The hook zones follow the beam only at the resting tilts -5, 0 and +5 (32fe:0079).
+    auto select = [&](int set) {
+        if (game_) selectHookZones(*game_, set, true);
+        else s.zoneSet = static_cast<int16_t>(set);
+    };
+    if (s.tilt > 4) {
+        select(1);
+        s.tilt = 5;
+    } else if (s.tilt < -4) {
+        select(0);
+        s.tilt = -5;
+    } else if (s.tilt == 0) {
+        select(2);
     }
-    const int t = tilt + 5;
+    const int t = s.tilt + 5;
     const auto beam = archive_.read(static_cast<uint16_t>(kBeamFirst + t));  // Res_Read(tilt + 0x2123)
     video.screen().lpxDrawKeyed(53, 14, beam, 0);
-    for (int h = 0; h < 10; ++h) {
+    for (int h = 0; h < kHooks; ++h) {
         const auto [x, y] = hookPos(t, h);
-        drawHook(video.screen(), x, y, hooks_[static_cast<size_t>(h)], h > 4);
+        drawHook(video.screen(), x, y, s.hookWeights[static_cast<size_t>(h)], h > 4);
     }
-    video.flush();
+    flush(video);
 }
 
 std::string PzBalance::describe() const {
     int weights = 0;
-    for (const int s : stock_) weights += s;
+    for (const int s : st_->stock) weights += s;
     return std::format("balance variant {}: {} weights in the inventory", variant_, weights);
 }
 

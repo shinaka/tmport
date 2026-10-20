@@ -132,6 +132,11 @@ public:
 
     // The active copy DS:7a6a.
     const CursorRecord& active() const { return active_; }
+    // The active copy for the code that writes its fields directly, as the original writes DGROUP: the
+    // electric plug picture (DS:7a78, 3083:1a94), the save-under position after a puzzle clamps the
+    // pointer (DS:7a6c / 7a6e, 3083:0d1a, 33cd:022a), and a DOSBox-X state's save-under
+    // (GgStateFile::apply).
+    CursorRecord& activeCopy() { return active_; }
     int hotX() const { return active_.hotX; }
     int hotY() const { return active_.hotY; }
     bool shown() const { return active_.shown != 0; }

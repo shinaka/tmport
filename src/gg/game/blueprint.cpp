@@ -79,7 +79,8 @@ void BlueprintView::load(int raceIndex) {
         const auto page = static_cast<size_t>(h.page);
         regions_.push_back({h.shape, h.x, h.y, h.w, h.h, 5, h.page >= 0 && page < cursors_.size() ? cursors_[page].get() : nullptr});
     }
-    // TODO(wave 3): the zones (release 2000 + page) are the runtime's zone list.
+    // The click zones (release 2000 + page) are linked into the runtime's list by Blueprint_Run
+    // (game/workshop.cpp, from hotSpots()).
 }
 
 // 2dee:17eb Blueprint_Open

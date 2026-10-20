@@ -85,14 +85,16 @@ DialogLayout dlgLayout(Fonts& fonts, const DialogDesc& desc) {
     L.h = H;
     L.x = desc.x == -1 ? half(320 - W) : desc.x;
     L.y = desc.y == -1 ? half(200 - H) : desc.y;
-    if (desc.title) {
-        L.titleX = L.x + half(W - 2 - tw);
-        L.titleY = titleY + L.y;
-    }
+    // g_dlgTitleY is the accumulator itself (3f56:0055 = 6, 007c - 2 compact); the box's y is added only
+    // with a title (3f56:01c4..01e4), so a box without one leaves the box-relative value.
+    if (desc.title) L.titleX = L.x + half(W - 2 - tw);
+    L.titleY = desc.title ? titleY + L.y : titleY;
     L.bodyX = L.x + half(W - 2 - L.bodyW);
     L.bodyY = bodyY + L.y;
+    // The footer's place moves with the box only when there is a footer (3f56:0210..0229): without one
+    // g_dlgFooterY keeps the box-relative value (nothing draws it then).
     if (desc.footer) L.footerX = L.x + half(W - 2 - fw);
-    L.footerY = footerY + L.y;
+    L.footerY = desc.footer ? footerY + L.y : footerY;
     if (n > 0) {
         int bx = 0;
         switch (desc.align) {

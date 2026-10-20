@@ -21,7 +21,7 @@ void HintQueue::clear() {
 }
 
 // 3060:0037 Hint_Queue
-void HintQueue::queue(uint16_t id, uint16_t delay, uint32_t now, bool hintsOff, bool seen, Cancel cancel) {
+void HintQueue::queue(uint16_t id, uint16_t delay, uint32_t now, bool hintsOff, bool seen, Cancel cancel, uint16_t cancelDs) {
     if (hintsOff || seen) return;
     int k = 0;
     while (k < kSlots && slots_[k].id != -1) ++k;
@@ -29,7 +29,7 @@ void HintQueue::queue(uint16_t id, uint16_t delay, uint32_t now, bool hintsOff, 
         log::warn("Hint_Queue({:04x}): all {} slots taken; the original writes past its array", id, kSlots);
         if (slots_[k].id != -1) std::erase(order_, k);  // the original would relink the same record
     }
-    slots_[k] = Slot{id, now + delay, std::move(cancel)};
+    slots_[k] = Slot{id, now + delay, std::move(cancel), cancelDs};
     // 19c0:00a6 List_InsertSorted with 3060:0000 Hint_CompareDue(cur, new) = new.due - cur.due on the
     // low words: walk on while the result is >= 0.
     auto pos = order_.begin();
@@ -42,15 +42,32 @@ void HintQueue::queue(uint16_t id, uint16_t delay, uint32_t now, bool hintsOff, 
 }
 
 // 3060:00bc Hint_Update
-std::optional<uint16_t> HintQueue::update(uint32_t now) {
+std::optional<uint16_t> HintQueue::update(uint32_t now, const CancelByDs& cancelled) {
     if (order_.empty()) return std::nullopt;
     Slot& head = slots_[order_.front()];
     if (!(head.due < now)) return std::nullopt;
     std::optional<uint16_t> show;
-    if (!head.cancel || !head.cancel()) show = static_cast<uint16_t>(head.id);
+    const bool byFunction = head.cancel && head.cancel();
+    const bool byFlag = head.cancelDs != 0 && cancelled && cancelled(head.cancelDs);
+    if (!byFunction && !byFlag) show = static_cast<uint16_t>(head.id);
     order_.erase(order_.begin());
     head = Slot{};
     return show;
+}
+
+HintQueue::SlotInfo HintQueue::slot(int k) const {
+    if (k < 0 || k >= kSlots) return {};
+    return SlotInfo{slots_[k].id, slots_[k].due, slots_[k].cancelDs};
+}
+
+void HintQueue::restore(const std::array<SlotInfo, kSlots>& slots, std::vector<int> order) {
+    clear();
+    for (int k = 0; k < kSlots; ++k) {
+        const SlotInfo& s = slots[static_cast<size_t>(k)];
+        slots_[k] = Slot{s.id, s.due, {}, s.cancelDs};
+    }
+    std::erase_if(order, [](int k) { return k < 0 || k >= kSlots; });
+    order_ = std::move(order);
 }
 
 std::vector<uint16_t> HintQueue::pendingIds() const {

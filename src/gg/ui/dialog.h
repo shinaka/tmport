@@ -35,6 +35,8 @@
 
 namespace tmport::gg {
 
+class GgGame;
+
 class Archive;
 class GgExe;
 
@@ -81,8 +83,8 @@ struct DialogLayout {
     int innerW = 0;                        // g_dlgInnerW: content width + 12 (the menu highlight width)
     int lineH = 0;                         // g_dlgLineH (Font_GetHeight of font 0)
     int bodyX = 0, bodyY = 0, bodyW = 0;   // g_dlgBodyX/Y/W
-    int titleX = 0, titleY = 0;            // g_dlgTitleX/Y (set only with a title)
-    int footerX = 0, footerY = 0;          // g_dlgFooterX/Y (footerX only with a footer)
+    int titleX = 0, titleY = 0;            // g_dlgTitleX (set only with a title), g_dlgTitleY (box-relative without one)
+    int footerX = 0, footerY = 0;          // g_dlgFooterX/Y (footerX only with a footer; footerY relative to the box without one)
     int picX = 0, picY = 0;                // g_dlgPicX/Y (set only with pictures)
     int buttonW = 0, buttonH = 0, rowW = 0;
     std::array<DlgButton, kMaxButtons> buttons{};
@@ -168,5 +170,35 @@ DialogDesc pagerPageDesc(const DialogStrings& strings, int pages, int page, text
 
 // The modal loop's answers (Dlg_RunModal): the selected button, or -1 for Esc / a footer click.
 inline constexpr int kDlgCancelled = -1;
+
+
+// ---- wave 3: the run (owner: ui agent; ui/dialog_run.cpp) -------------------------------------------
+// The modal loop and the prebuilt boxes on the game (code_ui.md §5.6-§5.8). The layout globals the
+// boxes write are GgState::ui (dlgX .. dlgInnerW); the save-under buffers are the caller's.
+
+// 3f56:0655 Dlg_RunModal(desc, saveUnder, restoreUnder): Snd_Pause, the menu hook saved and cleared,
+// play mode saved and 0, Mouse_ForceDefault(1), g_savedTicks = g_ticks; Dlg_Draw (saving the box area
+// into *saveUnder when given), Zones_Push, Dlg_AddZones, Input_Flush; the busy poll (Enter flashes the
+// focused button, Esc unless flags & 2, Left / Right move the focus, a button's key or release picks
+// it, a press moves the focus); then Dlg_RestoreUnder from *restoreUnder when given, everything
+// restored, Input_Flush, the font, and g_ticks = g_savedTicks (time stands still: GgClock::setTicks).
+// Returns the button chosen, or -1 (Esc, a footer click; kDlgCancelled).
+int dlgRunModal(GgGame& g, const DialogDesc& desc, SavedImage* saveUnder, SavedImage* restoreUnder);
+// 3f56:08ee Dlg_Show(desc): Dlg_RunModal(desc, saving and restoring the box area).
+int dlgShow(GgGame& g, const DialogDesc& desc);
+// 3f56:0b1c Dlg_MessageBox({title, body, footer}): 0 Enter, -1 Esc or a footer click.
+int dlgMessageBox(GgGame& g, std::optional<text::Bytes> title, text::Bytes body, std::optional<text::Bytes> footer);
+// 3f56:0bb6 Dlg_YesNo({title, body, defYes}): 1 Yes, 0 No, -1 Esc.
+int dlgYesNo(GgGame& g, std::optional<text::Bytes> title, text::Bytes body, bool defYes);
+// 3f56:0c5e Dlg_AskChimps(): 1 With Chimps, 0 Without (Esc disabled).
+int dlgAskChimps(GgGame& g);
+// 3f56:0d2a Dlg_MessageRes(id): the message bundle id as a message box (0x106F's footer: member 3).
+int dlgMessageRes(GgGame& g, uint16_t id);
+// 4106:006d Dlg_YesNoRes(id): MsgDesc_LoadRes (4106:0000) and Dlg_YesNo: 1 Yes, 0 No, -1 Esc.
+int dlgYesNoRes(GgGame& g, uint16_t id);
+// 3f56:0907 Dlg_RunPager(n, title, pages, pictures): one modal box per page (time frozen per page),
+// See Next Page / Go Back a Page / Done (PgDn / PgUp), the area restored at the end. 1 Done, 0 Esc.
+struct HelpTopic;
+int dlgRunPager(GgGame& g, const HelpTopic& topic);
 
 }  // namespace tmport::gg

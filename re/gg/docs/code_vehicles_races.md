@@ -183,7 +183,7 @@ catalogues].
 | +0x36 | u16 | 0 | **flags**: bit 0 upper shelf row; 0x4000 no points on pick-up (recycled once); 0x8000 installed on the vehicle |
 | +0x38 | u8 | default race colour of a body part (4 or 5), used when no paint is applied | 2dee:046d |
 | +0x3A | 14 B | 0 | HUD strip sprite `{flags, x, y, w, h, far icon}` (x = -1: not on the strip) |
-| +0x48 | 22 B | 0 | HUD strip zone (release code 5000 + index at +0x5A, tag 4 at +0x5C) |
+| +0x48 | 22 B | 0 | HUD strip zone (priority 10 at +0x52, release code 5000 + index at +0x5A, tag 4 at +0x5C) |
 | +0x5E | 14 B | 0 | workshop shelf sprite `{flags, x, y, w, h, far picture +0x68}` |
 | +0x6C | 22 B | 0 | no use seen |
 | +0x82 | far | | HUD icon picture |
@@ -336,7 +336,9 @@ DS:8792..8798.
    selection (`Hud_CancelCursorPart` 0a58, bit 1); labels and counters redrawn. (The name box replaces the
    labels; DS:5c1f = 1 is set by the race state, a HUD recycle and `Input_GetHeldKeys` whenever a
    held key is seen (198d:02cd: the player walks), so the labels come back then; it is set to 0 at
-   the entry of the workshop and of a warehouse room; only `Hud_Update` reads it.)
+   the entry of the workshop and of a warehouse room; only `Hud_Update` reads it.) The labels (7)
+   and the counters are drawn *before* the dirty test: when no bit is set afterwards, `Hud_Update`
+   returns without `Gfx_SaveToBack` (1a04:0ba1) [O wave 3].
 2. Bit 0x40, flash: every DS:8746 + 1 calls, toggle the flashed sprites (DS:8742, and DS:873e if
    set) between cleared (fill 0x16) and drawn; DS:874c counts the toggles down, the bit is cleared
    after it passes 0.
@@ -356,16 +358,21 @@ the workshop calls `Hud_Update(1)` (no strip), the race state `Hud_Update(0)`, t
 
 ### 4.3 The inventory strip [O 1a04:0348, 0588, 076b]
 
-`Hud_AddPart(i)` (076b): takes the player's list tail (the part just given), clears its HUD sprite,
-sets the icon (+0x82), x = -1, the zone code 5000 + i and tag 4, shows its name, and lays the strip
-out from that part (`Hud_LayoutStrip(p, 0)`).
+`Hud_AddPart(i)` (076b): takes the player's list tail (`List_Tail`: the part `Actor_AddPart` just
+appended), clears its HUD sprite, gives that record part i's icon (+0x82), x = -1, the zone release
+code 5000 + i and tag 4 (1a04:077d, 07a8..07b9, 07d8), shows its name, and lays the strip out from
+that part (`Hud_LayoutStrip(p, 0)`).
 
-`Hud_LayoutStrip(p, mode)` (0348): starting from the lower part of p, it walks backwards (unless
-mode 2) and forwards (unless mode 1) through the lower parts, alternating, giving each a slot while
-the accumulated icon widths + 4 stay below 153 px, and hiding (x = -1) the others and their
-partners. Then it assigns x positions from 20 in list order, step = icon width + 4, lower parts at
-y 168 and their upper partners at y 184 with the same x; DS:8758 = first shown, DS:8754 = last
-shown.
+`Hud_LayoutStrip(p, mode)` (0348..0587), the exact rule [O wave 3, verified against the RAM of
+r2/resume/08 and r2/aircraft/18]:
+
+* the anchor (the lower part of p's pair) is shown; its width counts without the 4-px gap;
+* the lower parts before it (unless mode 2) and after it (unless mode 1) are taken alternately, one
+  of each per turn; each is shown while width + sum < 153 (then sum += width + 4), otherwise it is
+  hidden with its partner (x = -1); a narrower part after a hidden wide one can still be shown;
+* then the x positions are assigned from `List_Head` through `PartList_NextColumn`, from 20, step =
+  icon width + 4, lower parts at y 168 and their upper partners at y 184 with the same x; DS:8758 =
+  first shown, DS:8754 = last shown.
 
 `Hud_DrawStrip` (0588): clears (20, 167, 157 × 33) with colour 0x16, draws every shown icon keyed,
 fixes each icon's zone rectangle (2bd4:00c1) and adds the zone, draws the recycle icon and the two
@@ -378,7 +385,7 @@ priority 10, tag 4). Installed parts are shown but cannot be selected.
 |---|---|---|
 | 6002 | `Hud_ScrollLeftArrow` 08ad | if no flash runs: lay out from the lower part after the last shown (mode 1), effect DS:9dc0+6 (0, 5), bit 1 |
 | 6003 | `Hud_ScrollRightArrow` 084c | the same from the lower part before the first shown (mode 2) |
-| 5000 + i | `Hud_SelectPart(i)` 090e | if no flash runs and part i is not installed: remove the strip zones, DS:1326 = i, the cursor becomes the icon (hot spot at its centre), the icon's place is cleared, mouse bounds (0, 165, 319, 34), add the carry zones DS:135c (6001 the whole HUD, priority 15; in rooms other than 0 also 6000 the recycle icon (191, 172, 22 × 24), priority 20), effect DS:9dc0+4 (0, 5); in all cases show the part's name |
+| 5000 + i | `Hud_SelectPart(i)` 090e | while a part flashes it does nothing at all (1a04:092e jumps to the end 0a0e: no name either); otherwise, if part i is not installed: remove the strip zones, DS:1326 = i, the cursor becomes the icon (hot spot at its centre), the icon's place is cleared, mouse bounds (0, 165, 319, 34), add the carry zones DS:135c (6001 the whole HUD, priority 15; in rooms other than 0 also 6000 the recycle icon (191, 172, 22 × 24), priority 20), effect DS:9dc0+4 (0, 5); and show the part's name, also for an installed part (09f5) [O wave 3] |
 | 6001 | `Hud_PutBackCursorPart` 0b5b | end the selection (normal cursor, full mouse range, remove the carry zones, DS:1326 = -1), full redraw |
 | 6000 | `Hud_TrashCursorPart` 0a82 | the neighbour for the new layout (`Hud_StripNeighbour` 01fa: partner, else next lower, else previous lower); required? ; `Actor_RemovePart(0, i, 1)`; normal cursor; flags \|= 0x4000; **`Item_PlaceInRandomRoom(i)` (1622:0f4e) re-places the part in a random other room (rand)**; DS:1326 = -1; carry zones removed; relayout; DS:5c1f = 1; if none of the category is left and the part is required: DS:4582 +1; full redraw; effect DS:9dc0+3 (0, 5); hint 0x1049 queued |
 
@@ -450,7 +457,7 @@ index, tag 6); +0x30 part index; +0x32 far part record.
 7. Animation set 0x1B, sequence 1 (the player arriving through the tube, effects 7, 8, 9 of the
    bank; the set also uses opcode -45, which busy-waits until an effect has ended), played
    modally, freed.
-8. `Workshop_Run` (§5.4).
+8. `Workshop_Run` (§5.4); after it returns the idle tick DS:1314 is reset (2dee:1cd6) [O wave 3].
 9. `Seq_Run(DS:219a, &DS:a088)`: DS:a088 is 0 and entry 0 of DS:219a is NULL, so **nothing
    runs** (dead code; DS:219e holds a far pointer to `Workshop_Run`, and the words after the NULL at
    DS:21a2 are the shelf zone records of §5.3, not table entries) [O].
@@ -563,7 +570,7 @@ scroll of 100 px therefore takes **26 frames** (104 ticks) and plays the stop ef
 | 0x17a3 / 0x17a2 | 0e22 / 0e36 | leave: DS:a0ca = 16, DS:455a = 2 (new player) / 3 (hub) |
 | 328 (tube, or Up) | 0e4a | actor 0 +0x36 = -1, call the player's callback (actor 0 +0x88) with 0, DS:458a = 1, DS:a0ca = 8, leave → state 8 → room DS:4580 |
 | 1009 (shelf) | 0e73 | `Workshop_DropCarried` (0c4d): if carrying, normal cursor, +0x8A &= ~3, remove zone 1006, DS:22a4 = -1, redraw shelf, HUD full redraw |
-| 1000 / 331 (Left) | 0f51 | if no scroll and not carrying and SI > 0: effect 4 (0, 1); DS:a084 = 100, DS:a086 = -1; SI −1; new current and partner; the gear sets 0x0c / 0x0d get sequence 0, all four conveyor animations are activated |
+| 1000 / 331 (Left) | 0f51 | if no scroll and not carrying and SI > 0: effect 4 (0, 1); DS:a084 = 100, DS:a086 = -1; SI −1; new current and partner; the gear sets 0x0c / 0x0d get sequence 0 (only their +0x22 sequence word is written: step and countdown are kept [O wave 3]), all four conveyor animations are activated |
 | 1001 / 333 (Right) | 100e | if no scroll and not carrying and SI < last: effect 4; DS:a084 = 100, DS:a086 = 1; SI +1; the gear sets get sequence 1 |
 | 1004 (lower part) | 0ee7 | if not unavailable (+0x8A bit 1): carry it (§5.6), DS:22a4 = 0; *may install* = partner absent or partner not installed |
 | 1005 (upper part) | 0e7a | if present and available: carry it, DS:22a4 = 1; *may install* = the lower part not installed |
@@ -729,7 +736,7 @@ Near function (`INC BP` frame); read from the disassembly (the decompiled C is w
 max = DS:3b34[race] (u32 base top speed per race index; 0 for the aircraft indices), cap = the same,
 acc = 0, acc2 = 0, gear = 0, power (**uninitialised**), A (**uninitialised**), B = the caller's DI
 (**not initialised here**: it holds the value `PicCache_LoadBundle` returned for the race's first sprite
-bundle in §9.1 step 4, the bundle's member count minus 1).
+bundle in §9.1 step 4: the bundle's picture count, 24 or 5 [O wave 3; code_runtime.md §16.4]).
 
 For each index in the list (until -1), with v = the part's variant, a switch on the category (19
 values at CS:0716, targets at CS:073c):
@@ -778,7 +785,8 @@ category 5, which is required).
   (written by `PicCache_LoadBundle` at the same frame depth when it loaded the bundle). On a real machine that
   is a heap segment, normally below 0x8000 and so larger than B as a signed number: min(A, B) = B,
   the fuel-cell variant. A segment of 0x8000 or more (a heap above 512 KB) would make the index
-  negative and read words before DS:3aa4. The engine should use B and document the choice [I].
+  negative and read words before DS:3aa4. The engine should use B and document the choice [I]; it
+  starts A at 0x7FFF, so min(A, B) = B (wave 3, `game/race.cpp`).
 * B for races 12 and 13 comes from category 7, for 11 from 56, for 14 from 58: all present.
 * In race 0 the sum of the acceleration contributions is discarded (no category of race 0 adds
   one anyway).
@@ -864,7 +872,7 @@ Land race commands (`Race_AdvancePoint` 3dd6:00e0, table CS:01b0 indexed by code
 |---|---|
 | -14 | stop effect (handle + x) |
 | -13 | start effect (handle + x) with (0, 10) |
-| -5 | lap: if laps > 0: laps −1, index = 0 (the next point read is index 1) |
+| -5 | lap: index = 0 unconditionally (3dd6:015b; the next point read is index 1); laps −1 only if any remain [O wave 3] |
 | -4 | mode = 0 |
 | -3 | mode = 1 |
 | -2 | finish line: if laps = 0: finished = 1, the result bits DS:bb22 \|= id, return 1 |
@@ -918,8 +926,9 @@ not carried over as distance [O]. The player has no control at all during the ra
 ### 9.6 Result [O 3dd6:0409..0447]
 
 DS:bb22 = 1 (only the player finished in the frame): **won (0)**; 2: lost (1); 3 (both in the
-same frame): won if player speed ≥ Morty speed (32-bit signed compare), else lost. The return
-value is stored in DS:4560 by state 11.
+same frame): won if player speed ≥ Morty speed (32-bit signed compare), else lost. The result is
+also stored back into `g_raceFinishBits` DS:bb22 [O wave 3]; the return value is stored in DS:4560
+by state 11.
 
 ---
 
@@ -989,6 +998,7 @@ The same `R` format as §9.3, with these commands (code + 14 = 0..13):
 ```
 anim = 0; first = 1; music = 1; launch = 0                   # launch frame counter (level 1)
 camera (u32 DS:3b74) = 0; camera10 (DS:3b70) = 0
+dist = path[0].x << 16 for both racers; DS:bb24 = 0             # [O wave 3]
 loop:
     Timer_Set(0, 8)
     arrangement music (1cdd:0423), every frame
@@ -1010,7 +1020,7 @@ loop:
         if 160 < player.x(screen) < DS:3daa[level].player: delta = player.speed
     if Morty.index > player.index: music = 3
         if 160 < Morty.x(screen) < DS:3daa[level].Morty: delta = Morty.speed
-    camera += delta; camera10 = Math_DivRound(camera, 10)    # 16.16 / 10, rounded
+    camera += delta; camera10 = Math_DivRound(camera, 10 << 16)   # divides by the high word 10, rounded
     if first: Screen_FadeOutIn; Delay(146); first = 0 else Dirty_Flush
     anim = (anim + 1) mod DS:3b78[level]
     198d:00d4

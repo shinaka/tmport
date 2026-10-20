@@ -284,7 +284,7 @@ capture's first key-on, and the writes made inside ticks that lie within half a 
 | `puzzle_k5` | `r2_puzzle_k5_miss` | `PzSnd` bank 0x11ce: 0, 1, 4, 7, 2 | 162 / 162 | 162 / 162 |
 | `race_automotive` | `r2_automotive_race1_won` | workshop music freed, race music 0xF7 (arrangements 1, 2), results | 1421 / 1421 | 1366 / 1366 |
 | `race_altenergy` | `r2_altenergy_race1_won` | the same with 0xF9 (1, 2, 3, 2) | 2899 / 2899 | 2831 / 2841 |
-| `race_aircraft_won` | `r2_aircraft_race1_won` | music 0x262 (1, 2, 3, 2), effects 0x260: 8, 7, 9 at priority 3; results | 2685 / 2685 | 2617 / 2617 |
+| `race_aircraft_won` | `r2_aircraft_race1_won` | music 0x262 (1, 2, 3, 2), effects 0x260 as the path's code −13 gives them (loop y >> 8, priority y & 0xFF): 8 (0, 1), 7 (1, 2), 9 (0, 3) (wave 2 wrote all three at priority 3; the writes are the same, nothing competes); results | 2685 / 2685 | 2617 / 2617 |
 | `race_aircraft_lost` | `r2_aircraft_race1_lost` | engine effect 7 looping, 9; results of a loss (music 0x108B, no count-up) | 2598 / 2598 | 2579 / 2579 |
 | `movie` | `r2_movie_race15` | race 15, results, `State_15_FinalMovie` (music 0x30CA with `Music_MovieCue`, the movie cue effects of 0x108D) | 7050 / 8320 (to the movie's end) | – |
 

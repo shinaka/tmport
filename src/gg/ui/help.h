@@ -21,6 +21,8 @@
 
 namespace tmport::gg {
 
+class GgGame;
+
 class Archive;
 
 inline constexpr uint16_t kHelpAboutGame = 0x105D;
@@ -61,5 +63,13 @@ struct HelpTopic {
     // The descriptor Dlg_RunPager shows for page p.
     DialogDesc pageDesc(const DialogStrings& strings, int page) const;
 };
+
+
+// ---- wave 3: the run (owner: ui agent; ui/commands.cpp) ---------------------------------------------
+// 411d:0000 Help_ShowTopic(id): the topic's pages through Dlg_RunPager; the pager's result (1 Done
+// reopens the Help menu, 0 Esc closes it). The six handlers 411d:01e0 Help_AboutGame, 01ec
+// Help_BuildingVehicles, 01f8 Help_FindingParts, 0204 Help_MovingAround, 0210 Help_ChallengeRaces,
+// 021c Help_SolvingPuzzles are runMenuCommand's (helpTopicOf).
+int helpShowTopic(GgGame& g, uint16_t id);
 
 }  // namespace tmport::gg

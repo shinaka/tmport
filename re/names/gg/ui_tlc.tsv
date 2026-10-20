@@ -21,8 +21,8 @@
 3d39:013a	Anim_SeekTick		skips to tick N (operand sizes per opcode) and draws that tick's cels (no caller)
 3d39:0323	Anim_DrawCel		(no caller)
 3d39:037e	Anim_EraseList		(no caller)
-3d39:03cb	Anim_Start		first free channel of 2 (DS:ba80, 0x22 bytes each); returns 0 both for "none free" and channel 0 (as TM Win)
-3d39:0468	Anim_IsRunning		
+3d39:03cb	Anim_Start	int far Anim_Start(int layer,int x,int y,int frameBase,void far *script,unsigned long user,int flags,void far *callback)	first free channel of 2 (DS:ba80, 0x22 bytes each; the pause word +4 is not reset); returns 0 both for "none free" and channel 0 (as TM Win)
+3d39:0468	Anim_IsRunning	int far Anim_IsRunning(int channel,void far *script)	the channel still runs that script (compares the script base)
 3d39:04ae	Anim_Stop		(no caller)
 3d39:04f9	Anim_SetPause		clone of Anim_Stop that sets a pause field (no caller)
 3d39:0553	Anim_EraseSprites		(no caller)

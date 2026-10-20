@@ -4,11 +4,12 @@
 // engine can start from the exact moment DOSBox-X saved (dos/game/load_state.h) and tests can compare
 // with it. Engine tooling only: the reader takes the user's own state files at run time.
 //
-// Format (DOSBox-X 2026.10.01, observed): a zip archive of deflated entries. "Machine_Type" names the
-// machine (MCH_EGA, MCH_TANDY); "Memory" is a 0x88-byte header followed by the guest's physical RAM
-// from address 0; "Vga" is the VGA/EGA state, whose video memory (4 planes interleaved, one 4-byte
-// group per address) starts where the game's latch table A000:0000..003F lies (1000:0836 fills it
-// with colour k at bits C0 of address k, k = 0..15, fmt_graphics.md §2.1).
+// Format (DOSBox-X 2026.10.01, observed): a zip archive of deflated entries, read by the shared core's
+// reader (dos/save/dosbox_state_file.h: the archive, "Machine_Type", the RAM of "Memory", the "CPU"
+// registers, the BIOS keyboard buffer). This edition's part: "Vga" is the VGA/EGA state, whose video
+// memory (4 planes interleaved, one 4-byte group per address) starts where the game's latch table
+// A000:0000..003F lies (1000:0836 fills it with colour k at bits C0 of address k, k = 0..15,
+// fmt_graphics.md §2.1).
 //
 // SST.EXE in RAM: DGROUP is found by the Turbo C copyright at DS:0004. DOS loads the program at
 // another segment than Ghidra's image base, so every Ghidra segment S runs at S + relocation()
@@ -28,6 +29,8 @@
 #include <string>
 #include <vector>
 
+#include "dos/save/dosbox_state_file.h"
+
 namespace tmport::dos {
 
 class DosboxState {
@@ -43,16 +46,18 @@ public:
     // tmport::FormatError (SST.EXE's DGROUP is not in its RAM).
     static DosboxState load(const std::filesystem::path& path);
 
-    const std::filesystem::path& path() const { return path_; }
+    const std::filesystem::path& path() const { return file_.path(); }
     Machine machine() const { return machine_; }
-    const std::string& machineName() const { return machineName_; }  // "MCH_EGA", "MCH_TANDY", ...
+    const std::string& machineName() const { return file_.machineName(); }  // "MCH_EGA", "MCH_TANDY", ...
+    // The shared reader under it (the archive's other entries).
+    const DosboxStateFile& file() const { return file_; }
 
     // Guest RAM from physical address 0 (the conventional 640 KB and the upper memory up to A0000).
-    std::span<const uint8_t> memory() const { return mem_; }
+    std::span<const uint8_t> memory() const { return file_.memory(); }
     // `n` bytes at a physical address; empty if they are not all inside memory().
-    std::span<const uint8_t> bytesAt(uint32_t linear, size_t n) const;
-    uint8_t byteAt(uint32_t linear) const;
-    uint16_t wordAt(uint32_t linear) const;
+    std::span<const uint8_t> bytesAt(uint32_t linear, size_t n) const { return file_.bytesAt(linear, n); }
+    uint8_t byteAt(uint32_t linear) const { return file_.byteAt(linear); }
+    uint16_t wordAt(uint32_t linear) const { return file_.wordAt(linear); }
 
     // DGROUP: its run-time segment, the relocation of every Ghidra segment, DS:0000..CC1F.
     uint16_t dgroupSegment() const { return dsSeg_; }
@@ -76,15 +81,12 @@ public:
 
     // The BIOS keyboard buffer (0040:001A head .. 001C tail, words from 0040:001E) in reading order,
     // and the shift flags 0040:0017.
-    std::vector<uint16_t> biosKeys() const;
-    uint8_t biosShiftFlags() const { return byteAt(0x417); }
+    std::vector<uint16_t> biosKeys() const { return file_.biosKeys(); }
+    uint8_t biosShiftFlags() const { return file_.biosShiftFlags(); }
 
     // The CPU's registers where DOSBox-X stopped it (the "CPU" entry: the general registers and IP
     // first, the segment values as 8-byte words ES, CS, SS, DS found by DS = dgroupSegment()).
-    struct Cpu {
-        uint16_t cs = 0, ss = 0;  // run-time segments
-        uint32_t ip = 0, sp = 0;
-    };
+    using Cpu = DosboxStateFile::Cpu;  // cs, ss (run-time segments), ip, sp
     const std::optional<Cpu>& cpu() const { return cpu_; }
     // The far return addresses on the live stack (SS:SP upwards, `bytes` of it) whose segment is a
     // code segment of the program, as Ghidra segment:offset pairs, innermost first.
@@ -97,10 +99,8 @@ private:
     uint32_t dsLinear() const { return static_cast<uint32_t>(dsSeg_) * 16; }
     void readScreen(std::span<const uint8_t> vga);
 
-    std::filesystem::path path_;
+    DosboxStateFile file_;
     Machine machine_ = Machine::Other;
-    std::string machineName_;
-    std::vector<uint8_t> mem_;
     uint16_t dsSeg_ = 0;
     std::optional<std::vector<uint8_t>> screen_;
     std::optional<Cpu> cpu_;

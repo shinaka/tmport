@@ -1,7 +1,8 @@
 #pragma once
-// Wave 2 preview: replaced by the game modules in wave 3.
+// Wave 2 preview: replaced by the game modules in wave 3 (ggport runs the game, gg/game/flow.h); kept
+// behind --gg-preview and for the wave 2 integration tests.
 //
-// What ggport runs until the game exists (re/gg/docs/SCOPING.md §9, the wave 2 stop/go point): the
+// What ggport ran until the game existed (re/gg/docs/SCOPING.md §9, the wave 2 stop/go point): the
 // engine foundation on the user's files, with the original's own code paths where wave 2 has them.
 //
 //   1. The attract (State_01_Attract 2c11:0913, code_ui.md §10) as the original runs it: the title

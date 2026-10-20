@@ -1,9 +1,10 @@
 #pragma once
-// A building in progress as the warehouse draws it: the part catalogue, the deck, the rooms, the
-// twelve actors with their sets and sprite bundles, and the HUD values, with the drawing steps of
-// states 4, 5 and 7 (12e0:0820, 12e0:096a, 12e0:0619; re/gg/docs/code_world.md §4, §8.2, §14, §15.1).
-// The brains, the step interpreter, the chimps' set-up and every input are wave 3's: they change the
-// fields of this object between the frames drawn here.
+// A building in progress as the warehouse draws it: the drawing steps of states 4, 5 and 7 (12e0:0820,
+// 12e0:096a, 12e0:0619; re/gg/docs/code_world.md §4, §8.2, §14, §15.1) over a GgState's building (its
+// part catalogue, deck, rooms, twelve actors and the HUD values of the player record), with the actor
+// sets and sprite bundles they draw with. The game's Building is bound to GgGame's state (wave 3); a
+// tool's or test's owns a GgState of its own. The brains, the step interpreter, the chimps' set-up and
+// every input are wave 3's: they change the state between the frames drawn here.
 
 #include <array>
 #include <cstdint>
@@ -11,7 +12,10 @@
 #include <span>
 #include <vector>
 
+#include <memory>
+
 #include "gg/game/actors.h"
+#include "gg/game/game_state.h"
 #include "gg/game/hud.h"
 #include "gg/game/parts.h"
 #include "gg/game/rooms.h"
@@ -33,11 +37,21 @@ public:
     static constexpr int kProjectile = 1;
     static constexpr int kFirstChimp = 2;
 
+    // Bound to `state` (the game's GgState: GgGame).
+    Building(const GgExe& exe, const Archive& archive, PicCache& cache, GgState& state);
+    // With a GgState of its own (tools, tests); its player record has g_withChimps = 1.
     Building(const GgExe& exe, const Archive& archive, PicCache& cache);
+    Building(const Building&) = delete;
+    Building& operator=(const Building&) = delete;
+    ~Building();
 
-    // State 4's loads (12e0:0820): g_level, g_raceIndex, Parts_LoadCatalogue (its icon bundle's
-    // palette applied), Rooms_Load (the deck and the item grids: 20 * I[0] + 20 * cells rand() calls
-    // per room with items), Hud_DrawAll(7). The actor set-up of a new visit or a resume is wave 3's.
+    GgState& state() { return *st_; }
+    const GgState& state() const { return *st_; }
+
+    // State 4's loads (12e0:0820): g_building, g_level, g_raceIndex, Parts_LoadCatalogue (its icon
+    // bundle's palette applied), Rooms_Load (the deck and the item grids: 20 * I[0] + 20 * cells rand()
+    // calls per room with items; g_roomCount), Hud_DrawAll(7), g_partsNeeded = the catalogue's count.
+    // The actor set-up of a new visit or a resume is wave 3's.
     void setup(int building, int level, BorlandRand& rng, Hud& hud, Video& video);
 
     // The actor sets of the level (Actors_LoadPlayerSets 18f5:05a3, Chimps_LoadSets 2a80:051e) and
@@ -61,21 +75,22 @@ public:
     // instead of being stepped.
     void drawSavedFrame(Video& video, Hud& hud);
 
-    const PartCatalogue& parts() const { return parts_; }
-    PartCatalogue& parts() { return parts_; }
-    PartDeck& deck() { return deck_; }
-    Rooms& rooms() { return rooms_; }
-    const Rooms& rooms() const { return rooms_; }
-    std::array<Actor, 12>& actors() { return actors_; }
+    // The state's building (GgState::world, ::actors, ::player).
+    const PartCatalogue& parts() const { return st_->world.parts; }
+    PartCatalogue& parts() { return st_->world.parts; }
+    PartDeck& deck() { return st_->world.deck; }
+    Rooms& rooms() { return st_->world.rooms; }
+    const Rooms& rooms() const { return st_->world.rooms; }
+    std::array<Actor, 12>& actors() { return st_->actors.actors; }
     const ActorSet* actorSet(uint16_t id) const;
 
-    int building = 0;     // g_building DS:4592
-    int level = 0;        // g_level DS:4594
-    int raceIndex = 0;    // g_raceIndex DS:4590
-    bool withChimps = true;  // g_withChimps DS:4578
-    int playerBlink = 0;  // g_playerBlink DS:0a9a
-    HudCounters counters; // DS:4582, 457e, 4572
-    std::vector<HudStripEntry> strip;  // the player's carried list as the strip draws it
+    int building() const { return st_->player.building; }        // g_building DS:4592
+    int level() const { return st_->player.level; }              // g_level DS:4594
+    int raceIndex() const { return st_->player.raceIndex; }      // g_raceIndex DS:4590
+    bool withChimps() const { return st_->player.withChimps != 0; }  // g_withChimps DS:4578
+    // The values the HUD counters show: g_partsNeeded DS:4582, g_projectiles DS:457e, g_score DS:4572.
+    HudCounters counters() const;
+    std::vector<HudStripEntry> strip;  // the player's carried list as the strip draws it (engine-side)
 
 private:
     void queueFrame(Video& video, bool stepAnims);
@@ -83,10 +98,8 @@ private:
     const GgExe& exe_;
     const Archive& archive_;
     PicCache& cache_;
-    PartCatalogue parts_;
-    PartDeck deck_;
-    Rooms rooms_;
-    std::array<Actor, 12> actors_{};
+    std::unique_ptr<GgState> own_;
+    GgState* st_;
     std::map<uint16_t, ActorSet> sets_;
     std::array<ActorKind, 12> kinds_{};
 };

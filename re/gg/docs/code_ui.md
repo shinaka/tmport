@@ -308,8 +308,9 @@ if n > 0: bW = max Text_Width(label i) + 20;  bH = lh + 2;  rowW = n*(bW + 10) +
           W = max(W, rowW);  H += bH + 8;  btnY += 4;  footerY += bH + 8
 W += 10
 x = desc.x == -1 ? half(320 - W) : desc.x;   y = desc.y == -1 ? half(200 - H) : desc.y
-titleX = x + half(W - 2 - tw);  bodyX = x + half(W - 2 - bodyW);  footerX = x + half(W - 2 - fw)
-titleY += y; bodyY += y; footerY += y
+bodyX = x + half(W - 2 - bodyW);  bodyY += y
+if title:  titleX = x + half(W - 2 - tw);  titleY += y      # 3f56:01c4..01e4
+if footer: footerX = x + half(W - 2 - fw); footerY += y     # 3f56:0210..0229
 button row start: align 0: x + 10;  1: x + half(W - 2 - rowW) + 10;  2: x + W - 6 - n*(bW + 10)
 button i = zone {shape 0, start + i*(bW+10), y + btnY, bW, bH, priority 5, next NULL,
                  press = release = key[i]} + label (+0x16) + enabled 1 (+0x1a)   (28 bytes)
@@ -318,6 +319,13 @@ if nPics > 0: picX = x + 4;  picY = bodyY - 2
 
 The title, footer and body widths come from `Text_Width` / `Text_Measure` in font 0, so `FF 03`
 escapes in the body change font 0's colour already during the layout (`Dlg_Draw` then sets it).
+
+The layout works on the DGROUP words themselves (3f56:0055 `g_dlgTitleY` = 6, 005b `g_dlgBodyY` = 6,
+006d `g_dlgFooterY`, the compact `- 2` at 007c..0089), so a box **without a title** leaves
+`g_dlgTitleY` at its box-relative 6 (4 compact) and a box without a footer leaves `g_dlgFooterY`
+box-relative; `g_dlgTitleX` and `g_dlgFooterX` keep the previous box's values [O wave 3: w0/06_hub
+has `g_dlgTitleY` = 6 after the title-less chimps box; r2/menus/03_help_topic1 has `g_dlgFooterY` =
+171 = 126 + 11 + 14 + 20, the unconditional add would give 185].
 
 ### 5.3 Draw recipe: `Dlg_Draw(desc, saveUnder)` 3f56:0389 [O, verified §21]
 
@@ -535,10 +543,14 @@ open(i):
         0x014D Right      i + 1, wrapping to 0: switch
         other: m = code & 0xFFF; if m >= 0xFD0:
                    pressed/held (0x4000/0x8000): row = m - 0xFD0      (highlight follows the mouse)
-                   released: choose(m - 0xFD0)
+                   released: choose(row)          # the highlighted row DI (40a4:0365..037a), not
+                                                  # m - 0xFD0: a press and its release in one poll
+                                                  # choose the row highlighted before
                (0x44F, a click outside, and everything else: ignored)
       if not leaving and row != prev: XOR row prev, XOR row, Dirty_Flush each
     choose(r): Dlg_RestoreUnder(); Menu_DrawBar(-1); Menu_RemoveItemZones
+               (Menu_RemoveItemZones runs a second time at the close, 40a4:0390 and 0445: harmless,
+               it returns at once for the freed NULL list, 40a4:01cb)
                res = handlers[r] ? handlers[r]() : 1
                res == 0: close;  res != 0: open(i) again (same menu)
     switch / close: if the box was not restored yet: Dlg_RestoreUnder(); Menu_RemoveItemZones
@@ -697,7 +709,7 @@ for visible glyphs, so wrapping can differ on lines with invisible glyphs [O wav
 | 0x51C / 0x51D | down arrow (117,149) press / release | the same downwards |
 | 0x520 | track above the thumb | line −10, thumb up 10 steps, redraw |
 | 0x522 | track below the thumb | line +10, thumb down 10 steps |
-| 0x521 | thumb | drag: while held, if the pointer is in the track below / above the thumb: one step and one line, redraw, and the pointer is warped onto the thumb (`TextView_WarpMouse(122, thumbY + 10)` / `(122, thumbY)`, INT 33h fn 4) |
+| 0x521 | thumb | drag (4140:0925..09ed): a busy spin with no `Input_GetCode`. While the button is held it tests `TextView_ZoneHit` (4140:0034) on the page-down zone, then on the page-up zone (a zone answers only while linked: its next pointer is not NULL); elsewhere it spins (09c4) until the pointer is on the thumb or the button is up. A step: `TextView_ThumbDown` / `ThumbUp`, `TextView_ScrollBy(+1 / −1)`, redraw, then `TextView_WarpMouse` (4140:0000: `g_mouseX` / `g_mouseY` written directly, INT 33h fn 4, `Mouse_SetCursorPicture(arrow)`, which flushes) onto the thumb (122, thumbY + 10) / (122, thumbY) [O wave 3] |
 
 Exit: `Zones_ClearLocal`, free the arrows, `Gfx_PutImage(0, 28, saved)`, `Dirty_Flush`,
 `Mouse_ForceDefault(0)` (not the previous value), `Zones_Pop`, hook restored. **Time is not frozen**
@@ -782,13 +794,19 @@ loop:
     for each channel: waiting and until < frame → pos += 2, ready
                       running and the instance's +8 != 0 (finished or holding) → its id slot = -1
                       (never reused), pos += 1, ready
-    if flags & 2 and Timer_Expired(1): result 0, leave
+    if flags & 2 and Timer_Expired(1): result 0, leave = 1      # (the pass goes on)
     if flags & 8: result = Input_GetCode(); Enter, Esc or Space → leave   (other codes are lost)
     if flags & 4 and script[watch][pos[watch]] == -1: leave
+until leave
 leave: ScreenAnim_Free of every loaded instance; return result
 ```
 
 A wait of t frames releases the channel after t + 1 frames.
+
+The time-out only sets the leave flag (2c11:030e / 0313 store leave and result 0): in the same pass
+`Input_GetCode` is still called when flags & 8 (2c11:0318..0336), and its code becomes the result;
+the watched-channel test also runs before the loop ends [O wave 3, disassembly 2c11:02fb..0371; the
+wave 2 preview and the game both do it so].
 
 Details [O wave 2, 2c11 disassembly; the engine's frames equal those of the AVIs
 w0_title_attract and w0_replay_title_attract]:
@@ -836,13 +854,13 @@ back to 2.
 |---|---|---|---|
 | a075 | `g_roster` | far | private copy of the file's first 0x8A0 bytes: header + 100 index entries (§12.2) |
 | a079 | `g_rosterIndex` | i16 | selected entry (later: the signed-in player's entry, written by every save) |
-| a054 | `g_typedName` | char[16] | the name being typed; 0x1F = placeholder for an empty new entry |
+| a054 | `g_typedName` | char[16] | the name being typed; 0x1F = placeholder for an empty new entry. Never cleared between sign-ins: State_02 only sets `g_typedLen` = −1 (2caa:12a4), so r2/player2/02_signin_roster still holds "Ada" from the previous sign-in [O wave 3] |
 | a071 | `g_typedLen` | i16 | typed characters; −1 right after entry |
 | 20dc | `g_rosterScrollBar` | rec | §9; +8 (DS:20e4) = first visible row |
 | 20f0 / 2110 / 2130 | `g_btnCancel` / `g_btnNewPlayer` / `g_btnStartGame` | picture buttons | +0x18 (DS:2108 / 2128 / 2148) = enabled |
 | 2150, 2166 | `g_rosterZone`, `g_rosterScrollZone` | zones | list (62, 46) 180×88 priority 4 release 0x700; bar (244, 26) 11×109 priority 5 press = release 0x701 |
 | 1f7a | `g_saveDisabled` | i16 | §11.4 |
-| a065, a067, a069, a06d, a073 | (vestiges) | | written, never read: an arrow-key throttle that never throttles, a double-click time stamp pair, a "clicked" flag |
+| a065, a067, a069, a06d, a073 | (vestiges) | | written, never read: an arrow-key throttle that never throttles (`g_signinArrowCount` / `g_signinArrowRepeat`), a double-click time stamp pair (`g_signinPrevClick` u32 DS:a069, `g_signinLastClick` u32 DS:a06d), a "clicked" flag; exactly when they are written: §11.4 and §11.5 |
 
 Index entry points: ≥ 0 a real player; **−1 (0xFFFFFFFF) = an entry being typed**; **−2 (0xFFFFFFFE)
 = an entry created by New Player** (its name sorts by the placeholder 0x1F, i.e. first) [O].
@@ -899,12 +917,15 @@ Dirty_Flush; Input_Flush; poll Input_GetCode until it returns 0
 if g_typedLen == -1: g_typedLen = 0; if count == 0: SignIn_HandleCode(0x703)   # empty roster: New Player
 pressed = 0                                            # which picture button is shown pressed (1..3)
 loop: code = Input_GetCode() (busy, copying the click time stamp while 0)
-  table CS:1210 (12 codes):
-    0x4706, 0x8706   Cancel pressed/held:     show Cancel pressed (if enabled), others normal
-    0x4707, 0x8707   New Player pressed/held
-    0x4708, 0x8708   Start Game pressed/held
-    (each release first draws any other shown-pressed button normal; a disabled button's release
-     and Enter while Start Game is disabled are ignored entirely)
+  table CS:1210 (12 codes): 8706 8707 8708 000d 001b 0702 0703 0704 0705 4706 4707 4708 →
+                           100b 108b 1113 10c9 0fb5 0fd7 1049 10c9 0fcf 100b 108b 1113
+    0x4706, 0x8706   Cancel pressed/held:     show Cancel pressed (if enabled); the *other*
+                     shown-pressed button is redrawn with PicBtn_DrawPressed, not normal
+                     (2caa:100b..102a; stub 1e88:004d is 4034:0304), so it stays drawn pressed
+    0x4707, 0x8707   New Player pressed/held (108b..10aa, the same quirk)
+    0x4708, 0x8708   Start Game pressed/held (1113..1132, the same quirk)
+    (only releases and other codes draw a shown-pressed button normal: 0fd7, 1049, 10c9, 1158; a
+     disabled button's release and Enter while Start Game is disabled are ignored entirely)
     0x0702           Cancel released:         normal picture; SignIn_HandleCode(0x702)
     0x0703           New Player released:     normal picture; SignIn_HandleCode(0x703)
     0x0704, 0x000D   Start Game released, Enter: normal picture;
@@ -918,6 +939,10 @@ loop: code = Input_GetCode() (busy, copying the click time stamp while 0)
 done: remove the zones; return code
 ```
 
+The never-read globals [O wave 3, the engine's DGROUP equals w0/03_signin, r2/player2/02 and 04]: the
+entry sets `g_signinLastClick` (u32 DS:a06d) = 0 (2caa:0f6c), and every poll that returns 0 copies it
+into `g_signinPrevClick` (u32 DS:a069) (0f86).
+
 A press shown on a button is not undone when the pointer leaves it until another code arrives;
 releasing outside every zone produces no code (the button stays drawn pressed until the next code)
 [O; I visibility].
@@ -928,12 +953,12 @@ Checked in this order:
 
 | Code | Condition | Effect |
 |---|---|---|
-| 0x148 Up / 0x150 Down | (clear DS:a065, the dead throttle) | handled below |
+| 0x148 Up / 0x150 Down | (`g_signinArrowRepeat` = 0, 0851) | handled below; before the move test `g_signinArrowCount` = 0 and `g_signinArrowRepeat` = 2 (Up, 0ac1) / 3 (Down, 0b46); any other code that reaches the arrow tests clears a 2 or 3 (0b2e, 0bb4) |
 | 0x12 Ctrl+R | index valid and entry is a real player | `SignIn_HideButtons`; `Dlg_YesNoRes(0x106A)`; Yes: entry.points = −1, g_typedLen = 0, `Roster_UpdateTyped(8)` (removes it), `ScrollBar_SetRange(count − 8)`, `SignIn_DrawList(1, index, −1)`, **`Roster_Save()`** (the index is written at once; the record stays in its slot); `SignIn_ShowButtons`; return 0 |
 | 0x702 (Cancel) | | g_typedLen = 0; `Roster_UpdateTyped(8)` (drops the in-progress entry); set range; redraw (prev −1) |
 | 0x703 (New Player) | count ≥ 99 | hide buttons, `Dlg_MessageRes(0x1069)` (list full), show buttons |
 | 0x703 | else | typed[len++] = 0x1F; if `Roster_UpdateTyped(0x1F)`: set range; scroll so that the index is visible (top = index if index < top; top = index − 6 if index ≥ top + 7); redraw |
-| 0x700 (list release) | cursor position (DS:7a88 / 7a86, not the release record's) x 58..241 and y 46..(46 + 11·min(count, 8) − 1) | if the selected entry is in progress (points < 0): ignored. Else row = (y − 46)/11 + top; if row < count: stamp the click time; if row ≠ index: len = 0, index = row, redraw rows; DS:a073 = 1 |
+| 0x700 (list release) | cursor position (DS:7a88 / 7a86, not the release record's) x 58..241 and y 46..(46 + 11·min(count, 8) − 1) | if the selected entry is in progress (points < 0): ignored. Else row = (y − 46)/11 + top; if row < count: `g_signinLastClick` = g_ticks; if row ≠ index: len = 0, index = row, both click stamps = 0 (0a61..0a87), redraw rows; DS:a073 = 1 |
 | Up | (after the above) | if 0 < index < count and the entry is a real player: len = 0, index − 1, redraw rows (the list scrolls in `SignIn_DrawList`) |
 | Down | | if 0 ≤ index < count − 1 and a real player: len = 0, index + 1, redraw |
 | 8 Backspace (and Del) | | if len > 0: len −= 1; `Roster_UpdateTyped(8)`; keep the index visible (top = index, or index − 6); set range; redraw |

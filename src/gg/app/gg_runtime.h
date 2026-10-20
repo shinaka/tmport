@@ -34,6 +34,10 @@
 //   4-tick (or 8-tick) periods. A wait that ends at once (its deadline already reached) counts as a
 //   poll, so a loop of such waits moves on too.
 //
+// Observers (the per-frame trace, the test fixture's frame stepping) see every yield point through
+// the yield hook (setYieldHook), called when the yield point is about to return; it may throw (e.g.
+// GgRunEnd or a test's stop request) to unwind the game's call tree from there.
+//
 // Scripted input (dos::ScriptedInput, --keys / --mouse) is in PIT ticks: an event of tick n happens
 // at the time of interrupt n, right before it (N.F: F of a tick after interrupt N). The run limit
 // (setRunLimit) ends a run with GgRunEnd from a yield point before interrupt limit + 1; a closed
@@ -74,6 +78,19 @@ struct GgRunEnd : std::exception {
         return reason == Reason::Limit ? "run limit reached" : "window closed";
     }
 };
+
+// The yield points, for the yield hook.
+enum class YieldPoint : uint8_t {
+    TimerWait,     // Timer_Wait(slot): slot 0 ends a paced frame
+    TimerExpired,  // Timer_Expired(slot)
+    Delay,         // Delay(n) (after its own Input_GetCode polls, which the hook sees too)
+    GetInputCode,  // Input_GetCode
+    WaitInputCode, // Input_WaitCode (after its polls)
+    Idle,          // a busy-wait's poll
+    WaitRetrace,   // a retrace wait of a palette load
+    WaitTicks,     // waitTicks (engine tools and tests)
+};
+const char* yieldPointName(YieldPoint p);
 
 struct RuntimeConfig {
     // Deterministic virtual time (headless runs, tests); false: the host clock drives it.
@@ -139,6 +156,11 @@ public:
     void waitRetrace();                      // to the start of the next vertical retrace
     // Lets n PIT ticks pass (engine tools and tests; not an original call).
     void waitTicks(uint64_t n);
+    // The yield hook (see the file comment): (the yield point, the timer slot for TimerWait and
+    // TimerExpired, else -1). Empty: none.
+    using YieldHook = std::function<void(YieldPoint, int slot)>;
+    void setYieldHook(YieldHook hook) { yieldHook_ = std::move(hook); }
+    const YieldHook& yieldHook() const { return yieldHook_; }
 
     // ---- pictures
     // A new VGA picture (kWidth x kHeight RGBA, presenter convention); other sizes are ignored.
@@ -149,6 +171,9 @@ public:
 
     // ---- scripted input and the run limit
     void setScript(dos::ScriptedInput script);
+    // Adds events to the script (tests, tools): `more`'s ticks + `offset` (e.g. the interrupts so far
+    // for a script relative to now), merged with the events not applied yet.
+    void addScript(const dos::ScriptedInput& more, uint64_t offset = 0);
     const dos::ScriptedInput& script() const { return script_; }
     bool scriptFinished() const { return scriptNext_ >= script_.events().size(); }
     // The interrupt at whose time the last event happens (0 without events).
@@ -192,6 +217,9 @@ private:
     uint64_t scriptTimeNs(const dos::ScriptEvent& e) const;
     void applyScriptEvent(const dos::ScriptEvent& e);
     void runInterrupt();
+    void yielded(YieldPoint p, int slot = -1) {
+        if (yieldHook_) yieldHook_(p, slot);
+    }
 
     RuntimeConfig config_;
     platform::Host* host_;
@@ -209,6 +237,7 @@ private:
     std::vector<uint32_t> frame_;
     uint64_t framesShown_ = 0;
     FrameSink frameSink_;
+    YieldHook yieldHook_;
 
     uint64_t pollsSinceWait_ = 0;
     uint64_t polls_ = 0, waits_ = 0;

@@ -20,6 +20,8 @@
 
 namespace tmport::gg {
 
+class GgGame;
+
 class Archive;
 class GgExe;
 
@@ -89,11 +91,23 @@ public:
     void updateBarZones(ClickZones& zones);
 
     int line() const { return line_; }
-    int scrollMax() const { return scrollMax_; }
-    int thumbStep() const { return thumbStep_; }
-    int thumbY() const { return thumbY_; }
-    bool scrollable() const { return scrollMax_ != 1; }
+    int scrollMax() const { return *scrollMax_; }
+    int thumbStep() const { return *thumbStep_; }
+    int thumbY() const { return *thumbY_; }
+    bool scrollable() const { return *scrollMax_ != 1; }
     const SavedImage& saved() const { return saved_; }
+
+    // The three globals g_viewThumbStep DS:bc74, g_viewThumbY DS:bc76, g_viewScrollMax DS:bc78: the
+    // viewer's own until bound to the game's (GgState::ui; they outlive the viewer).
+    void bind(int16_t& thumbStep, int16_t& thumbY, int16_t& scrollMax) {
+        thumbStep_ = &thumbStep;
+        thumbY_ = &thumbY;
+        scrollMax_ = &scrollMax;
+    }
+    // The bar's zones (TextView_Run's thumb drag tests them with TextView_ZoneHit 4140:0034).
+    const Zone& pageUpZone() const { return pageUpZone_; }    // DS:40b8
+    const Zone& thumbZone() const { return thumbZone_; }      // DS:40ce
+    const Zone& pageDownZone() const { return pageDownZone_; }  // DS:40e4
 
 private:
     void drawPanel(const UiCanvas& ui, bool upPressed, bool downPressed);
@@ -105,10 +119,30 @@ private:
     SavedImage saved_;
     Zone upZone_, downZone_, textZone_, closeZone_, pageUpZone_, thumbZone_, pageDownZone_;
     ClickZones* zones_ = nullptr;
-    int line_ = 0;
-    int scrollMax_ = 1;  // g_viewScrollMax DS:bc78
-    int thumbStep_ = 0;  // g_viewThumbStep DS:bc74
-    int thumbY_ = 45;    // g_viewThumbY DS:bc76
+    int line_ = 0;  // TextView_Run's local (BP-6)
+    int16_t ownScrollMax_ = 1;  // g_viewScrollMax DS:bc78
+    int16_t ownThumbStep_ = 0;  // g_viewThumbStep DS:bc74
+    int16_t ownThumbY_ = 45;    // g_viewThumbY DS:bc76
+    int16_t* scrollMax_ = &ownScrollMax_;
+    int16_t* thumbStep_ = &ownThumbStep_;
+    int16_t* thumbY_ = &ownThumbY_;
 };
+
+
+// ---- wave 3: the run (owner: ui agent; ui/text_view_run.cpp) ----------------------------------------
+// 4140:0667 TextView_Run(text): the menu hook saved and cleared, Zones_Push, Mouse_ForceDefault(1),
+// hot spot (0, 0), the viewer (TextViewer::open); the loop of code_ui.md §8.3 on Input_StripHeld(
+// Input_GetCode()) (the arrows with their auto-repeat on timer slot 6: 146 then 29 ticks, the thumb
+// drag with TextView_WarpMouse 4140:0000, page up / down, Esc or a click outside closes); the exit
+// (TextViewer::close, Zones_ClearLocal, Mouse_ForceDefault(0), Zones_Pop, the hook back). Time runs.
+// The scroll globals are GgState::ui (viewThumbStep, viewThumbY, viewScrollMax).
+void textViewRun(GgGame& g, std::span<const uint8_t> text);
+// 4140:0000 TextView_WarpMouse(x, y): g_mouseX/Y and INT 33h fn 4 (the pointer moved by the game:
+// GgMouse::warp), the default cursor picture.
+void textViewWarpMouse(GgGame& g, int x, int y);
+// 4140:056b TextView_FlashArrow(down): the pressed picture for 7 ticks (Timer_Set(6, 7), Timer_Wait(6)).
+void textViewFlashArrow(GgGame& g, TextViewer& view, bool down);
+// 4140:05b3 TextView_MouseOnArrow(down): the pointer within the arrow (x 117..127, y 29..44 / 149..164).
+bool textViewMouseOnArrow(GgGame& g, bool down);
 
 }  // namespace tmport::gg

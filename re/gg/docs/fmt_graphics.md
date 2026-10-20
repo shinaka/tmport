@@ -258,7 +258,7 @@ other word is skipped as a one-word no-op.
 | Opcode | Operands (words) | Effect |
 |---|---|---|
 | 7FF8 | index, arg (u32) | if the far function DS:ba1e[index] is set, call it (channel, arg) |
-| 7FF9 | x, y, w, h | queue an update rectangle (x + channel x, y + channel y, w, h) in the list DS:b86e (8 bytes each, count DS:398a) |
+| 7FF9 | x, y, w, h | queue an update rectangle (x + channel x, y + channel y, w, h) in the list DS:b86e (8 bytes each, count DS:398a; room for 2 records before the cels at DS:b87e) |
 | 7FFA | target, n | loop: counter = bit 15 of n; if it is -1, set it to n & 0x7FFF; decrement; at 0 set -1 and go on, else jump to **word** `target` of the script (counted from the start, header included) |
 | 7FFB | a | operand skipped |
 | 7FFC | a, b | operands skipped |
@@ -280,7 +280,8 @@ frame base 0 [I from the zero arguments]) and steps it every **19** PIT ticks (`
 0x12)` followed by a strict `Timer_Expired` loop, 3797:10ba / 01c3) while 3d39:0468 says it is
 still running; the queued cels are drawn by the puzzle's 6-tick redraw (3797:0103), not at each
 DAM step. The 0x7FF8 callback table DS:ba1e is never written (`code_puzzles_a.md` §5.5). So script 0x114b + j animates the members of
-bundle 0x1157 + j, drawn over the launch puzzle's palette 0x1134.
+bundle 0x1157 + j, drawn over the launch puzzle's palette 0x1134. The 12 scripts take 62 DAM steps
+in all (one per 0x7FFE, plus one ending at 0x7FFF) [O wave 3].
 
 ### 6.3 Channels and drawing
 
@@ -300,9 +301,17 @@ Two channels of 0x22 bytes at DS:ba66 [O offsets from 3d39:058f / 084a; names I]
 | +0x1a | far cursor (0 = channel free) |
 | +0x1e | far script base |
 
-Queued cels are 16-byte records at DS:b87e (count DS:3988): layer, x, y, flags, far picture,
-channel flags. `3d39:084a(layer)` draws the cels of a layer: opaque with 1399:0335 when the
-channel flag bit 1 is set, else keyed with 1399:02ee and mode = cel flags & 1.
+Queued cels are 16-byte records at DS:b87e (16 cels, up to DS:b97e; count DS:3988): layer, x, y,
+flags, far picture, channel flags. `Anim_DrawSprites(layer)` (3d39:084a) draws the cels of a layer:
+opaque with 1399:0335 when the channel flag bit 1 is set, else keyed with 1399:02ee and mode = cel
+flags & 1; it queues erase rectangles at DS:b980 (count DS:3986) for channels with flag bit 0 whose
+cels lack cel flag 4, and saves cels with flag 2 into the back page [O wave 3].
+
+The entry points [O wave 3]: `Anim_Start(layer, x, y, frame base, far script, u32 user, flags, far
+callback)` (3d39:03cb; 0x7FFF = no callback; it does not reset the pause word +4) returns the
+channel (0 also means "none free"); `Anim_IsRunning(channel, far script)` (3d39:0468) compares the
+script base; `Anim_PresentRect` (3d39:00ba) is called only by `Anim_FlushUpdateRects` (3d39:09b4),
+which has no caller.
 
 ### 6.4 Compared with TM Windows' DAM
 

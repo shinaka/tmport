@@ -13,11 +13,13 @@
 //                            are applied as palettes, every other member becomes the next slot
 //
 // The engine keeps each loaded resource in its own buffer, so a picture stays valid while it is
-// cached (the spans point into the cache's node, which does not move). The original's 300-entry
-// table and its slot numbers are not modelled: slot k of a bundle is simply picture k of the list
-// loadBundle returns. TODO(wave 3): if the runtime area adds the full 15df table, the world
-// code can move onto it; the interface here is what the world calls.
+// cached (the spans point into the cache's node, which does not move); slot k of a bundle is picture
+// k of the list loadBundle returns. The original's table g_picCache DS:6640 (300 records {i16 id, -1
+// free; i16 use count; far data}) is mirrored beside it with the original's slot rules (slots()):
+// what a DGROUP comparison with a DOSBox-X state sees, and what a game started from a state continues
+// with (setSlots). Nothing the player sees depends on the slot numbers.
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -49,7 +51,18 @@ public:
     // 15df:0359 PicCache_Release / 15df:03a2 PicCache_ReleaseBundle: use count - 1, freed at 0. An
     // id that is not cached is ignored, as in the original.
     void release(uint16_t id);
-    void releaseBundle(uint16_t id) { release(id); }
+    void releaseBundle(uint16_t id);
+
+    // The mirror of g_picCache DS:6640 (PicCache_Init 15df:000d: every record free, use count 0).
+    struct Slot {
+        int16_t id = -1;   // +0: -1 free
+        int16_t uses = 0;  // +2 (a bundle's member records keep theirs: only the bundle's record counts)
+        bool operator==(const Slot&) const = default;
+    };
+    static constexpr int kSlots = 300;
+    const std::array<Slot, kSlots>& slots() const { return slots_; }
+    // A state's table (ids and use counts of DS:6640): the slot rules go on from there.
+    void setSlots(const std::array<Slot, kSlots>& slots) { slots_ = slots; }
 
     bool cached(uint16_t id) const { return entries_.count(id) != 0; }
     // The slots of a cached bundle (the picture of a cached picture), nullptr when not cached; the use
@@ -73,8 +86,18 @@ private:
     const Archive& archive_;
     Palette* palette_;
     std::function<void(PaletteLoad)> onLoad_;
+    // 15df:003e PicCache_Find(id): index | 0x8000 of the first record with that id, else the first free
+    // index (id -2: the first free at once), -1 when there is none.
+    int findSlot(int16_t id) const;
+    // The slot half of PicCache_Load / PicCache_LoadBundle (with the bundle's picture count) and of the
+    // releases.
+    void slotLoad(uint16_t id);
+    void slotLoadBundle(uint16_t id, size_t pictures);
+    void slotRelease(uint16_t id, bool bundle);
+
     std::map<uint16_t, Entry> entries_;
     std::vector<uint8_t> readBuffer_;  // Pic_Read's shared buffer
+    std::array<Slot, kSlots> slots_{};
 };
 
 }  // namespace tmport::gg

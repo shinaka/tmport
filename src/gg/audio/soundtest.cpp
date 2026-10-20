@@ -49,9 +49,9 @@ constexpr Named kNamed[] = {
      "1150:f:6:0:3,1152:f:6:0:3,1276:f:4:0:1,1300:f:5:0:2,1324:f:6:0:3,1326:s:5,1326:f:6:0:3,1800:end"},
     {"puzzle_k4", "r2_puzzle_k4_success.dro", true, false,
      "balance puzzle solved (PzSnd 3924, bank 0x11c6): a weight taken and hung, five swing steps of effect 8 transposed "
-     "0..4, the solved effects",
+     "0..4, the solved effects (the jingle at priority 4, Puzzle_ShowSolved; the points at 5, Puzzle_AwardPoints)",
      "0:R:1:1,0:x,0:P:11c6,100:y:0:3,213:y:1:3,215:y:8:3,240:T:8:1,240:y:8:3,265:T:8:2,265:y:8:3,290:T:8:3,"
-     "290:y:8:3,315:T:8:4,315:y:8:3,340:y:5:3,340/6x4:y:13:3,700:end"},
+     "290:y:8:3,315:T:8:4,315:y:8:3,340:y:5:4,340/6x4:y:13:5,700:end"},
     {"puzzle_k5", "r2_puzzle_k5_miss.dro", true, false, "launch puzzle, a miss (PzSnd 3924, bank 0x11ce)",
      "0:R:1:1,0:x,0:P:11ce,100:y:0:3,260:y:1:3,371:y:4:3,382:y:7:3,406:y:2:4,700:end"},
     {"race_automotive", "r2_automotive_race1_won.dro", true, true,
@@ -64,13 +64,14 @@ constexpr Named kNamed[] = {
      "0:W,0:f:10:0:5,367:M,367:E,367:m:f9,367:a:1,367:p,367:e:f4,574:a:2,1199:a:3,1307:a:2,1682:x,1682:M,1682:E,"
      "1682:e:108f,1682:m:1089,1685:p:0,1685:g:1:0:5,1705:g:1:0:5,1706/2x48:g:1:0:5,1806:f:0:0:4,2066:f:1:0:4,3300:end"},
     {"race_aircraft_won", "r2_aircraft_race1_won.dro", true, true,
-     "aircraft race (music 0x262, effects 0x260 at priority 3: 8, 7, 9; arrangements 1, 2, 3, 2), results",
-     "0:W,0:f:10:0:5,821:M,821:E,829:m:262,829:e:260,829:a:1,829:p,921:a:2,934:f:8:0:3,938:a:3,1278:s:8,1282:f:7:0:3,"
-     "1453:a:2,1937:f:7:0:3,2135:s:7,2138:f:9:0:3,2302:x,2302:S,2305:M,2305:E,2305:e:108f,2305:m:1089,2308:g:1:0:5,"
+     "aircraft race (music 0x262, effects 0x260 as the path's code -13 gives them: 8 at priority 1, 7 at 2, 9 at 3; "
+     "arrangements 1, 2, 3, 2), results",
+     "0:W,0:f:10:0:5,821:M,821:E,829:m:262,829:e:260,829:a:1,829:p,921:a:2,934:f:8:0:1,938:a:3,1278:s:8,1282:f:7:0:2,"
+     "1453:a:2,1937:f:7:0:2,2135:s:7,2138:f:9:0:3,2302:x,2302:S,2305:M,2305:E,2305:e:108f,2305:m:1089,2308:g:1:0:5,"
      "2308:p:0,2327/2x49:g:1:0:5,2429:f:0:0:4,2689:f:1:0:4,3300:end"},
     {"race_aircraft_lost", "r2_aircraft_race1_lost.dro", true, true,
      "aircraft race lost (the engine effect 7 looping, then 9), results of a loss (music 0x108B once, no count-up)",
-     "0:W,0:f:10:0:5,542:M,542:E,551:m:262,551:e:260,551:a:1,551:p,643:a:2,656:f:8:0:3,660:a:3,1000:s:8,1004:f:7:1:3,"
+     "0:W,0:f:10:0:5,542:M,542:E,551:m:262,551:e:260,551:a:1,551:p,643:a:2,656:f:8:0:1,660:a:3,1000:s:8,1004:f:7:1:2,"
      "2064:s:7,2064:f:9:0:3,2268:x,2268:S,2270:M,2270:E,2270:e:108f,2270:m:108b,2273:p:0,2548:f:1:0:4,3300:end"},
     {"movie", "r2_movie_race15.dro", true, true,
      "the 15th race won, results and the final movie (State_15_FinalMovie 2fcb:0640: music 0x30CA with Music_MovieCue "

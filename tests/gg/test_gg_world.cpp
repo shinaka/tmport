@@ -261,7 +261,7 @@ TEST_CASE("world: Actors_Draw order and the player's blink (1834:0733)") {
     actors[5].sprite.x = 5;
     actors[6].disabled = 0;
     actors[6].room = 2;  // another room
-    int blink = 3;
+    int16_t blink = 3;
     SpriteList sprites;
     actorsDraw(actors, 3, blink, sprites);
     REQUIRE(sprites.count() == 2);

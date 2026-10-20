@@ -21,6 +21,8 @@
 
 namespace tmport::gg {
 
+class GgGame;
+
 class Archive;
 
 enum class MenuCommand : uint8_t {
@@ -70,5 +72,16 @@ struct YesNoMessage {
 
 // 4106:006d Dlg_YesNoRes(id): Dlg_YesNo of the bundle's message (gg/ui/dialog.h yesNoDesc).
 OwnedDialog yesNoResDesc(const DialogStrings& strings, const Archive& archive, uint16_t id);
+
+
+// ---- wave 3: the run (owner: ui agent; ui/commands.cpp) ---------------------------------------------
+// The handlers (code_ui.md §6.5): each returns what the original's returns (non-zero reopens the menu).
+// File > Save & Exit is flow's cmdSaveAndExit (game/flow.h).
+int cmdStartNewPlayer(GgGame& g);   // 4106:00d7 Cmd_StartNewPlayer: Yes/No 0x106C; Yes: g_menuRequest = 2; 0
+int cmdReturnToCenter(GgGame& g);   // 4106:014f Cmd_ReturnToCenter: Yes/No 0x106B; Yes: g_menuRequest = 1; 0
+int cmdToggleSound(GgGame& g);      // 4106:011e Cmd_ToggleSound: Yes/No 0x1065; g_soundOff, DS:1ad4, apply; 0
+int cmdToggleHints(GgGame& g);      // 4106:00f8 Cmd_ToggleHints: Yes/No 0x1066; g_hintsOff; 0
+// The handler table's call (MenuDef::handlers[i]): None returns 1; the Help topics run the pager.
+int runMenuCommand(GgGame& g, MenuCommand c);
 
 }  // namespace tmport::gg

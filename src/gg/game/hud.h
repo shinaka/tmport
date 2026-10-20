@@ -14,15 +14,54 @@
 #include <span>
 #include <vector>
 
+#include "gg/data/dgroup_offsets.h"
 #include "gg/gfx/sprites.h"
 
 namespace tmport::gg {
+
+class GgGame;
 
 class Archive;
 class Fonts;
 class GgExe;
 class PicCache;
 class Screen;
+
+// The HUD's run-time state (1a04, code_vehicles_races.md §4): the dirty bits and the strip selection
+// in DGROUP's initialised part, the flash and the shown counters in BSS. GgState::world.hud holds the
+// game's; a Hud draws from the one it is bound to (its own by default: tools and tests).
+struct HudState {
+    int16_t colorScheme = 0;      // DS:1318 g_hudColorScheme: digit colour scheme in effect
+    int16_t selectedPart = -1;    // DS:1326 g_hudSelectedPart: part on the cursor, -1 none
+    int16_t labelsShown = 1;      // DS:132a g_hudLabelsShown: 0 while the name box covers the labels
+    uint16_t dirty = 0;           // DS:132c g_hudDirty: Hud::Dirty bits
+    int16_t flashPeriod = 0;      // DS:8746 (unnamed): calls between flash toggles (3)
+    int16_t flashCountdown = 0;   // DS:8748 (unnamed): calls left to the next toggle
+    int16_t flashPhase = 0;       // DS:874a (unnamed): 0 clear next, 1 draw next
+    int16_t flashCount = -1;      // DS:874c (unnamed): toggles left, -1 no flash (strip commands ignored while >= 0)
+    int16_t flashPart = -1;       // engine: the part index whose sprite flashes (DS:8742 far -> its +0x3A)
+    int16_t flashPartner = -1;    // engine: its partner (DS:873e far, NULL = -1)
+    int16_t stripFirst = -1;      // engine: first shown part of the strip (DS:8758 far -> its record)
+    int16_t stripLast = -1;       // engine: last shown part (DS:8754 far)
+    int16_t shownPartsNeeded = 0; // DS:8792 (unnamed): values Hud_DrawCounters drew
+    int16_t shownProjectiles = 0; // DS:8794 (unnamed)
+    uint32_t shownScore = 0;      // DS:8796 (unnamed)
+
+    template <class Self, class V>
+    static void visit(Self& s, V&& v) {
+        v("g_hudColorScheme", dg::kHudColorScheme, s.colorScheme);
+        v("g_hudSelectedPart", dg::kHudSelectedPart, s.selectedPart);
+        v("g_hudLabelsShown", dg::kHudLabelsShown, s.labelsShown);
+        v("g_hudDirty", dg::kHudDirty, s.dirty);
+        v("DS_8746_hudFlashPeriod", uint16_t{0x8746}, s.flashPeriod);
+        v("DS_8748_hudFlashCountdown", uint16_t{0x8748}, s.flashCountdown);
+        v("DS_874a_hudFlashPhase", uint16_t{0x874A}, s.flashPhase);
+        v("DS_874c_hudFlashCount", uint16_t{0x874C}, s.flashCount);
+        v("DS_8792_hudShownPartsNeeded", uint16_t{0x8792}, s.shownPartsNeeded);
+        v("DS_8794_hudShownProjectiles", uint16_t{0x8794}, s.shownProjectiles);
+        v("DS_8796_hudShownScore", uint16_t{0x8796}, s.shownScore);
+    }
+};
 
 // The values the counters show (g_partsNeeded DS:4582, g_projectiles DS:457e, g_score DS:4572).
 struct HudCounters {
@@ -56,9 +95,20 @@ public:
         kFull = 0x8000,
     };
 
+    Hud() = default;
+    // Bound to a state that lives elsewhere: not copyable.
+    Hud(const Hud&) = delete;
+    Hud& operator=(const Hud&) = delete;
+
+    // The state the HUD draws from and updates: GgState::world.hud in the game (bind), else its own.
+    void bind(HudState& state) { st_ = &state; }
+    HudState& state() { return *st_; }
+    const HudState& state() const { return *st_; }
+
     // 1a04:025b Hud_Init: the sprite bundle into the cache (its palette member applied), the digit
     // copy and its ten pictures, the colour triples DS:131a, the scheme in effect DS:1318 and the
-    // divisors DS:1384 of the user's ssg.exe; flash state off.
+    // divisors DS:1384 of the user's ssg.exe; the dirty bits 0, the labels shown. (The flash fields are
+    // GgState's start-up values, gameInitState.)
     void init(const GgExe& exe, const Archive& archive, PicCache& cache);
 
     // 1a04:00eb Hud_DrawBar: fill (0, 165, 320, 35) colour 0x16, (0, 165, 320, 2) colour 0x17.
@@ -71,6 +121,9 @@ public:
     // 1a04:000e Hud_SetDigitColors(scheme): recolours the ten digit pictures from the triple of the
     // scheme in effect to the new one (nothing when it is already in effect).
     void setDigitColors(int scheme);
+    // After the bound state's DS:1318 was loaded from elsewhere (a DOSBox-X state's DGROUP, whose digit
+    // copy is recoloured to it): the engine's digit pictures recoloured to that scheme.
+    void syncDigitColors();
     // 1a04:0058 Hud_DrawNumber(x, y, value, digits, scheme): the digits left to right 11 px apart
     // (Lpx_Draw), value / 10^(digits-1) ... with u32 division; a value with more digits draws a
     // first "digit" >= 10, which the original takes from past the table (the engine skips it).
@@ -82,7 +135,7 @@ public:
     void drawAll(Screen& screen, unsigned bits);
     // 1a04:0588 Hud_DrawStrip: fill (20, 167, 157, 33) colour 0x16, every entry with x != -1 keyed in
     // list order, the recycle icon at (191, 172), the arrow at (2, 173) and mirrored (mode 2) at
-    // (178, 173). TODO(wave 3): the strip zones (5000 + part, DS:1330 arrows) are wave 3's.
+    // (178, 173). The zones (5000 + part, DS:1330's arrows) are the game's (hudDrawStrip).
     void drawStrip(Screen& screen, std::span<const HudStripEntry> strip) const;
     // 1a04:0a11 Hud_DrawInfoText: font 1, labels hidden (DS:132a = 0), Hud_ClearInfo, colour 0,
     // Text_DrawBox(218, 168, 102, text), the previous font back.
@@ -96,10 +149,8 @@ public:
     uint16_t update(Screen& screen, uint16_t skip, const HudCounters& c, int displayRoom,
                     std::span<const HudStripEntry> strip, Fonts* fonts = nullptr, std::span<const uint8_t> infoText = {});
 
-    uint16_t dirty = 0;       // g_hudDirty DS:132c
-    bool labelsShown = true;  // g_hudLabelsShown DS:132a
-    int scheme() const { return scheme_; }
-    const HudCounters& shown() const { return shown_; }  // DS:8792..8798
+    int scheme() const { return st_->colorScheme; }  // DS:1318
+    HudCounters shown() const;                        // DS:8792..8798
 
 private:
     std::vector<std::span<const uint8_t>> sprites_;  // DS:875c: labels 0..2, recycle 3, arrow 4
@@ -107,8 +158,55 @@ private:
     std::array<std::span<uint8_t>, 10> digits_{};     // DS:8766
     std::array<std::array<uint8_t, 4>, 3> triples_{}; // DS:131a
     std::array<uint32_t, 7> pow10_{};                 // DS:1384
-    int scheme_ = 0;                                  // DS:1318
-    HudCounters shown_;
+    int pictureScheme_ = 0;                           // the scheme the digit pictures are recoloured to
+    HudState own_;
+    HudState* st_ = &own_;
 };
+
+
+// ---- wave 3: the run (owner: world agent; game/hud_run.cpp) -----------------------------------------
+// The HUD on the game: GgState::world.hud, GgGame::hud (the pictures), the carried list and the part
+// records (the strip), the counters of the player record, the global effects (DS:9dc0) through the
+// facade, the zones (HUD strip and carry zones: widgets the world module holds).
+
+// 1a04:0b69 Hud_Update(skip): code_vehicles_races.md §4.2 entirely: the labels' return (g_keyHeldSeen),
+// the flash, the full redraw with the strip zones, the bits, the effects (global 5 bananas, 1 score),
+// Gfx_SaveToBack(0, 165, 320, 16).
+void hudUpdate(GgGame& g, uint16_t skip);
+// 1a04:02c2 Hud_DrawAll(bits).
+void hudDrawAll(GgGame& g, unsigned bits);
+// 1a04:0588 Hud_DrawStrip on the game: Hud::drawStrip of the player's list (the records' strip sprites)
+// and the zones: each shown record's (Zone_SetFromObject: its sprite's rectangle, priority 10) and the
+// arrows' DS:1330, added to the local list in that order.
+void hudDrawStrip(GgGame& g);
+// 1a04:0348 Hud_LayoutStrip(anchor part, mode): the strip's x positions around an anchor.
+void hudLayoutStrip(GgGame& g, int anchorPart, int mode);
+// 1a04:01fa Hud_StripNeighbour(part): the column to show after a part leaves (partner, next lower,
+// previous lower), -1 none.
+int hudStripNeighbour(GgGame& g, int part);
+// 1a04:0690 Hud_FlashPart(part, pair): the held part of that type made visible and flashed 6 toggles.
+void hudFlashPart(GgGame& g, int part, bool pair);
+// 1a04:0754 Hud_SetInfoText(text): the name box at the next Hud_Update (bit 0x10).
+void hudSetInfoText(GgGame& g, std::span<const uint8_t> text);
+// 1a04:076b Hud_AddPart(part): the list's new tail gets its strip sprite and zone (5000 + part), its
+// name shown, the strip laid out from it.
+void hudAddPart(GgGame& g, int part);
+int hudStripAnchorFor(GgGame& g, int part);     // 1a04:0809 Hud_StripAnchorFor: Hud_StripNeighbour of a part
+void hudRefreshStrip(GgGame& g, int anchorPart); // 1a04:0823 Hud_RefreshStrip: full redraw, a new layout
+void hudScrollRightArrow(GgGame& g);            // 1a04:084c Hud_ScrollRightArrow (code 6003)
+void hudScrollLeftArrow(GgGame& g);             // 1a04:08ad Hud_ScrollLeftArrow (code 6002)
+void hudSelectPart(GgGame& g, int part);        // 1a04:090e Hud_SelectPart (codes 5000..5100)
+void hudCancelCursorPart(GgGame& g);            // 1a04:0a58 Hud_CancelCursorPart
+void hudTrashCursorPart(GgGame& g);             // 1a04:0a82 Hud_TrashCursorPart (code 6000: rand)
+void hudPutBackCursorPart(GgGame& g);           // 1a04:0b5b Hud_PutBackCursorPart (code 6001)
+// 1a04:0d36 Hud_AddScoreNow(points): Score_Add, the score drawn at once and flushed (puzzle rewards).
+void hudAddScoreNow(GgGame& g, int points);
+// 1a04:0d65 Hud_EscHook: puts a part held on the cursor back (Hud_PutBackCursorPart, Hud_Update).
+void hudEscHook(GgGame& g);
+// Input_GetCode's HUD hooks (6000..6003, 5000..5100): the original's fetch calls the 1a04 commands in
+// every state (the codes occur only while the HUD's zones are linked); the world installs them at a
+// building's set-up and leaves them. `on` false removes them (tools, tests). The Esc hook
+// (g_escHandler = Hud_EscHook) is the warehouse loop's own, set at its entry and cleared at its exit.
+void hudInstallHooks(GgGame& g, bool on);
 
 }  // namespace tmport::gg

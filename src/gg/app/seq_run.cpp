@@ -6,9 +6,8 @@
 
 namespace tmport::gg {
 
-int16_t seqRun(std::span<const StateFn> table, int16_t& state) {
+int16_t seqRun(std::span<const StateFn> table, int16_t& state, int16_t prev) {
     // 12e0:000f Seq_Run
-    int16_t prev = -1;
     int16_t r = 0;
     while (true) {
         if (state < 0 || static_cast<size_t>(state) >= table.size()) {

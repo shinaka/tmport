@@ -8,7 +8,8 @@ user's own game folder at run time and contain no game data or text. Run the Pyt
 Three groups: the [decoders](#decoders-wave-0) of the data files, the [Ghidra project](#ghidra-project)
 (`vroomm.py`, `ghidra_import.sh`, `ghidra_export.sh`) and the
 [reference captures](#reference-captures-dosbox-x) in DOSBox-X (`mouse_tsr.py`,
-`capture_tour.py`, and for round 2 `capture_mem.py`, `capture_timing.py`, `capture_r2.py`).
+`capture_tour.py`, and for round 2 `capture_mem.py`, `capture_timing.py`, `capture_r2.py`). Besides them,
+[`gen_engine_map.py`](#the-engine-map) regenerates the function map of `re/gg/docs/ENGINE_MAP.md`.
 
 Common to all tools:
 
@@ -177,3 +178,11 @@ They drive or read DOSBox-X only; `tools/tmctl.py --profile gg` and
 `re/gg/docs/REFERENCE_CAPTURES.md` describe the profile, the mouse protocol and the captures
 (round 1 §1-§6, round 2 §7-§13). `capture_mem.py` and `capture_timing.py` only read files and need
 no emulator. Only start DOSBox-X when your task says so.
+
+## The engine map
+
+`python -P tools/gg/gen_engine_map.py OUT.md [REPO]` reads the `// SSSS:OOOO Name` comments of
+`src/gg` (and `src/rtl`, `src/dos`) and the tables of `re/names/gg`, and writes the function map of
+`re/gg/docs/ENGINE_MAP.md` §10.9 to `OUT.md` (original -> engine file and function -> owning area ->
+done, partial, stub, absorbed or not ported); it prints the counts table of §10.8. It reads source
+files only.

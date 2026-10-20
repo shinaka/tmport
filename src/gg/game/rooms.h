@@ -33,6 +33,9 @@ class BorlandRand;
 
 namespace tmport::gg {
 
+class GgGame;
+struct BuildingBlock;
+
 class Archive;
 class GgExe;
 class PartCatalogue;
@@ -157,6 +160,12 @@ public:
     // The same from parsed data (tests).
     void load(RoomSet set, std::vector<int16_t> itemCounts, const PartCatalogue& parts, PartDeck& deck,
               BorlandRand& rng);
+    // A room set and item counts as a running game holds them (a DOSBox-X state's RAM): taken as they
+    // are, no deal; the item lists, the pool and the room globals are the caller's to set.
+    void adopt(RoomSet set, std::vector<int16_t> itemCounts);
+    // 1622:02dd Rooms_Free's heap half: the room set copy, its item lists and the item counts go; the
+    // item pool and the room globals (DGROUP) stay as they are.
+    void freeSet();
 
     int count() const { return static_cast<int>(rooms_.size()); }  // g_roomCount DS:08c4
     Room& room(int r) { return rooms_.at(static_cast<size_t>(r)); }
@@ -221,5 +230,62 @@ private:
     std::vector<int16_t> itemCounts_;
     std::array<ItemNode, kItemPoolSize> pool_{};
 };
+
+
+// ---- wave 3: the run (owner: world agent; game/world_rooms.cpp) -------------------------------------
+// The rooms on the game: GgState::world.rooms (the room set copy, the item pool, g_displayRoom,
+// g_roomLoaded, the crate counts), the room music through the sound facade (GgState::sound
+// .roomMusicBank), the pictures through GgGame's cache. Indexes: objects and anims per layer / list
+// as Room::layers / anims; items as indexes into the pool.
+
+// 1622:0085 Rooms_Load: the room music bank (0x35f + 2 g_building) into GgState::sound.roomMusicBank
+// and the facade (setRoomMusic), g_roomMusicStep 0, then Rooms::load (the deck, the item grids: rand)
+// and g_roomCount.
+void roomsLoad(GgGame& g);
+// 1622:02dd Rooms_Free: the item lists, g_roomItemCounts, the room set and the music bank freed.
+void roomsFree(GgGame& g);
+// 1622:0411 Room_Enter(room): Rooms::enter with the music (room 0 stops it; rooms 1..3 their
+// arrangement, others 4; RoomMusic_SelectLayers with the room's chimp count, RoomMusic_Start).
+void roomEnter(GgGame& g, int room);
+// 1622:05f2 Room_Leave: when g_roomLoaded, every picture of the displayed room released (the animated
+// objects' bundles, the static objects' pictures, the items'), g_roomLoaded = 0.
+void roomLeave(GgGame& g);
+// 1622:06cf Room_QueueEntryLayers / 1622:0922 Room_DrawLayer(L) / 1622:0706 Room_DrawAnimLayer(L)
+// into the game's sprite list (Rooms' wave 2 drawing).
+void roomQueueEntryLayers(GgGame& g);
+void roomDrawLayer(GgGame& g, int layer);
+void roomDrawAnimLayer(GgGame& g, int list);
+// 1622:087f Room_FindLinkedDoor(room, link): the first layer-0 object of type 7..11 whose link id is
+// link's; room < 0: the displayed room. nullptr where the original returns past the last object.
+RoomObject* roomFindLinkedDoor(GgGame& g, int room, uint16_t link);
+uint16_t roomGetFlags(GgGame& g, int room);       // 1622:08fb Room_GetFlags: header word 0
+Room* roomOfActor(GgGame& g, int actorSlot);      // 1622:0f37 Room_OfActor: the room of actor +0x1a (nullptr outside)
+bool roomIsHall(GgGame& g, int room);             // 1622:090d Room_IsHall: flags & 1 (the small scale)
+RoomObject* roomGetObject(GgGame& g, int room, int index);  // 1622:11f7 Room_GetObject: layer 0; -1 nullptr
+RoomAnim* roomGetAnim(GgGame& g, int room, int index);      // 1622:1234 Room_GetAnim: list 0
+// 1622:1265 Room_GetItem(room, n): the n-th item of the room's list as a pool index (List_GetAt: past
+// the end the tail; -1 for an empty list).
+int roomGetItem(GgGame& g, int room, int n);
+// 1622:0d8f Room_RemoveItem(room, item): the node freed, the room's count -1, its picture released in
+// the displayed room, unlinked.
+void roomRemoveItem(GgGame& g, int room, int poolIndex);
+// 1622:0df0 Room_DropItemAt(room, x, floor, kind, restoring): Rooms::dropItemAt with the game's cache.
+void roomDropItemAt(GgGame& g, int room, int x, int floor, int kind, bool restoring);
+// 1622:0f4e Item_PlaceInRandomRoom(kind): r = R(g_roomCount - 1) + 1 until r is not the displayed
+// room and had items at load, then Room_PlaceItems(r, 1, kind) (a grid shuffle); the whole draw again
+// on failure (rand: code_world.md §7.4).
+void itemPlaceInRandomRoom(GgGame& g, int kind);
+// 1622:09e5 Obj_HideAt(layer, index) / 1622:0a17 Obj_ShowAt / 1622:0a4e Obj_Hide / 1622:0a42 Obj_Show
+// (the displayed room; a NULL layer, as the player's hall sequences 52 / 53 reach, is ignored).
+void objHideAt(GgGame& g, int layer, int index);
+void objShowAt(GgGame& g, int layer, int index);
+void objHide(RoomObject& obj);
+void objShow(RoomObject& obj);
+// 1622:0346 RoomMusic_Start / 1622:03b6 RoomMusic_SelectLayers(set) through the facade.
+void roomMusicStart(GgGame& g);
+void roomMusicSelectLayers(GgGame& g, int set);
+// 1622:0fb3 Rooms_SaveState / 1622:10e7 Rooms_RestoreState on a building block (code_world.md §7.5).
+void roomsSaveState(GgGame& g, BuildingBlock& block);
+void roomsRestoreState(GgGame& g, const BuildingBlock& block);
 
 }  // namespace tmport::gg

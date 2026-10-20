@@ -967,8 +967,6 @@ inline constexpr uint16_t kElecPlugShown = 0xA8C4;  // g_elecPlugShown i16: 1 wh
 inline constexpr uint16_t kElecToolCounts = 0xA8C6; // g_elecToolCounts i16[5]: toolbox counts: battery, bulb, switch,
                                                     // Y-wire, wire (§3.2)
 inline constexpr size_t kElecToolCountsCount = 5;
-inline constexpr uint16_t kElecWiresLost = 0xA8CE;  // g_elecWiresLost i16: counts dropped and detached wires; never
-                                                    // read (§3.6)
 inline constexpr uint16_t kElecHeldCursor = 0xA8D4; // g_elecHeldCursor far: cursor record of the item in hand
 inline constexpr uint16_t kElecCursor = 0xA8D8;     // g_elecCursor far: puzzle cursor (picture 0x20b4, hot x 1) (§3.1)
 inline constexpr uint16_t kElecToolZones = 0xA8DC;  // g_elecToolZones zone[5]: toolbox item zones, press 0x45b + item

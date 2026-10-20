@@ -5,6 +5,7 @@
 #include "gg/data/archive.h"
 #include "gg/data/dgroup_offsets.h"
 #include "gg/data/gg_exe.h"
+#include "gg/game/game.h"
 #include "gg/gfx/cursor.h"
 #include "gg/gfx/video.h"
 #include "gg/text/font.h"
@@ -102,16 +103,32 @@ std::vector<uint8_t> PzEnergy::formName(int f) const {
     return {s.begin(), s.end()};
 }
 
-// 33cd:0000 PzEnergy_Run, up to the loop
-void PzEnergy::setup(Video& video, Fonts& fonts, int variant) {
-    // TODO(wave 3): PzSnd_LoadBank(0x11d2) is the audio area's.
-    mode = 0;
-    variant_ = variant;
-    v_ = readVariant(exe_, variant);
-    // 33cd:1cc7 PzEnergy_LoadResources
+void PzEnergy::loadVariantIntoState() {
+    EnergyState& e = *st_;
+    e = EnergyState{};  // DS:adb8 (0x1a0 bytes) and DS:ad70 (0x120 bytes) cleared: the mode and idle frames too
+    for (auto& f : e.forms) f.form = 0;
+    for (auto& d : e.devices) d.id = 0;
+    for (int d = 0; d < 4; ++d) {
+        e.devices[static_cast<size_t>(d)].id = static_cast<int16_t>(v_.device[static_cast<size_t>(d)]);
+        for (int f = 0; f < 8; ++f)
+            e.devices[static_cast<size_t>(d)].uses[static_cast<size_t>(f)] = static_cast<int16_t>(v_.uses[static_cast<size_t>(d)][static_cast<size_t>(f)]);
+    }
+    for (int k = 0; k < 4; ++k) {
+        e.forms[static_cast<size_t>(k)].form = static_cast<int16_t>(v_.form[static_cast<size_t>(k)]);
+        for (int d = 0; d < 4; ++d) energySatisfied(e, k, d) = static_cast<int16_t>(v_.satisfied[static_cast<size_t>(k)][static_cast<size_t>(d)]);
+    }
+    e.linesLeft = static_cast<int16_t>(v_.budget);
+}
+
+// 33cd:1cc7 PzEnergy_LoadResources
+void PzEnergy::loadResources() {
     digits_ = Bundle::load(archive_, kPuzzleDigits);
     pencil_ = archive_.read(kPencil);
+    hintPressed_ = archive_.read(kHintPressed);
+    checkPressed_ = archive_.read(kCheckPressed);
+    formTexts_ = Bundle::load(archive_, kFormTexts);
     panelText_ = puzzleText(archive_, kPanelFormat);
+    hintHeader_ = puzzleText(archive_, kHintHeader);
     arrow_ = loadCursor(archive_, kPuzzleCursor);
     pencilCursor_ = loadCursor(archive_, 7);
     pencilCursor_->hotX = 0;
@@ -120,22 +137,32 @@ void PzEnergy::setup(Video& video, Fonts& fonts, int variant) {
     eraserCursor_->hotX = 0;
     eraserCursor_->hotY = 0x12;
     for (int d = 0; d < 4; ++d)
-        if (v_.device[static_cast<size_t>(d)] != 0xFFFF) {
-            devices_[static_cast<size_t>(d)] = Bundle::load(archive_, v_.device[static_cast<size_t>(d)]);
-            idleFrame[static_cast<size_t>(d)] = 0;
+        if (st_->devices[static_cast<size_t>(d)].id != -1) {
+            devices_[static_cast<size_t>(d)] = Bundle::load(archive_, static_cast<uint16_t>(st_->devices[static_cast<size_t>(d)].id));
+            st_->idleFrame[static_cast<size_t>(d)] = 0;
         }
+}
+
+// 33cd:0000 PzEnergy_Run, up to the loop (a tool's picture of it)
+void PzEnergy::setup(Video& video, Fonts& fonts, int variant) {
+    game_ = nullptr;
+    variant_ = variant;
+    v_ = readVariant(exe_, variant);
+    loadVariantIntoState();
+    st_->mode = 0;
+    loadResources();
     // 33cd:1ba1 PzEnergy_DrawScreen
     Screen& screen = video.screen();
     drawPuzzlePicture(video, archive_, puzzleKindInfo(6).picture, puzzleKindInfo(6).palette);
     drawLabels(screen, fonts);
     PuzzlePanel panel;
-    panel.init(screen, fonts, archive_, formatOneInt(panelText_, v_.budget));
+    panel.init(screen, fonts, archive_, formatOneInt(panelText_, st_->linesLeft));
     for (int k = 0; k < 4; ++k) {
-        if (v_.form[static_cast<size_t>(k)] == -1) {
+        if (st_->forms[static_cast<size_t>(k)].form == -1) {
             screen.setDrawColor(kFillColour);
             screen.fillRect(layout(11) - 4, layout(13 + k) - 4, 15, 15);
         }
-        if (v_.device[static_cast<size_t>(k)] == 0xFFFF) {
+        if (st_->devices[static_cast<size_t>(k)].id == -1) {
             screen.setDrawColor(kFillColour);
             screen.fillRect(layout(12) - 4, layout(13 + k) - 4, 15, 15);
         } else {
@@ -146,8 +173,11 @@ void PzEnergy::setup(Video& video, Fonts& fonts, int variant) {
     drawPencilCount(video);
     video.cursor().setCursorPicture(pencilCursor_.get());
     puzzleFadeIn(video);
-    // TODO(wave 3): PzEnergy_AddZones / AddConnectorZones (the runtime's zones), Hint_Show (UI);
-    // Timer_Set(7, 30) starts the idle animation.
+}
+
+void PzEnergy::flush(Video& video) {
+    if (game_) game_->display.flush();
+    else video.flush();
 }
 
 // 33cd:0735 PzEnergy_BuildHintAndLabels (the drawing; the hint text is the viewer's)
@@ -156,7 +186,7 @@ void PzEnergy::drawLabels(Screen& screen, Fonts& fonts) const {
     fonts.setColor(0);
     fonts.current().setSpacing(1);
     for (int k = 0; k < 4; ++k) {
-        const int f = v_.form[static_cast<size_t>(k)];
+        const int f = st_->forms[static_cast<size_t>(k)].form;
         if (f == -1) continue;
         const auto name = formName(f);
         const int x = layout(11) - 4 - textWidth(fonts, name);
@@ -166,14 +196,14 @@ void PzEnergy::drawLabels(Screen& screen, Fonts& fonts) const {
 }
 
 // 33cd:1135 PzEnergy_DrawPencilCount
-void PzEnergy::drawPencilCount(Video& video) const {
+void PzEnergy::drawPencilCount(Video& video) {
     Screen& screen = video.screen();
     screen.restoreRect(10, 0x38, 0x28, 0x21);
-    if (v_.budget > 0) {
+    if (st_->linesLeft > 0) {
         screen.lpxDrawKeyed(0x0E, 0x3F, pencil_, 0);
-        screen.lpxDrawKeyed(0x25, 0x46, memberOf(digits_, v_.budget), 0);
+        screen.lpxDrawKeyed(0x25, 0x46, memberOf(digits_, st_->linesLeft), 0);
     }
-    video.flush();
+    flush(video);
 }
 
 void PzEnergy::drawIdleFrame(Screen& screen, int d, int n) const {
@@ -187,12 +217,12 @@ void PzEnergy::applyScene(Video& video, const PuzzleSceneValues& scene) {
     bool any = false;
     for (int d = 0; d < 4; ++d) {
         const auto it = scene.find(std::format("device{}", d));
-        if (it == scene.end() || v_.device[static_cast<size_t>(d)] == 0xFFFF || it->second < 0) continue;
+        if (it == scene.end() || st_->devices[static_cast<size_t>(d)].id == -1 || it->second < 0) continue;
         // DS:ae20[d] is the frame the next tick draws; the one on the screen is the one before.
         const int count = static_cast<int>(devices_[static_cast<size_t>(d)].size());
         const int shown = (it->second + count - 1) % std::max(count, 1);
         drawIdleFrame(video.screen(), d, shown);
-        idleFrame[static_cast<size_t>(d)] = it->second;
+        st_->idleFrame[static_cast<size_t>(d)] = static_cast<int16_t>(it->second);
         any = true;
     }
     if (any) video.flush();
@@ -201,7 +231,7 @@ void PzEnergy::applyScene(Video& video, const PuzzleSceneValues& scene) {
 std::string PzEnergy::describe() const {
     int rows = 0;
     for (const int f : v_.form) rows += f != -1;
-    return std::format("energy forms variant {}: {} forms, {} lines, {} stores", variant_, rows, v_.budget, v_.stores);
+    return std::format("energy forms variant {}: {} forms, {} lines, {} stores", variant_, rows, st_->linesLeft, v_.stores);
 }
 
 }  // namespace tmport::gg

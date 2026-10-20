@@ -18,7 +18,7 @@ Contents: [Features](#features) · [Requirements](#requirements) ·
 [DOS edition](#dos-edition) · [Modding](#modding) ·
 [Building](#building) · [Command-line tools](#command-line-tools) ·
 [Project layout](#project-layout) · [Status and known differences](#status-and-known-differences) ·
-[Gizmos & Gadgets (in progress)](#gizmos--gadgets-in-progress) · [Credits and licences](#credits-and-licences)
+[Gizmos & Gadgets](#gizmos--gadgets) · [Credits and licences](#credits-and-licences)
 
 ## Features
 
@@ -433,24 +433,36 @@ compatibility).
 Not tried yet: the continuous-integration workflow on GitHub (it runs only when started by hand). Limits of the mod layer
 (no high-resolution art, no new rooms or questions) are listed in `docs/MODDING.md`.
 
-## Gizmos & Gadgets (in progress)
+## Gizmos & Gadgets
 
 The repository also holds a port of a second game of The Learning Company, *Super Solvers: Gizmos &
 Gadgets!* (DOS version 1.0, 1993), in the same way: an engine (`ggport`) that reads your own copy of
 the game (the folder with `ssg.exe` and `gizmo000.dat` .. `gizmo003.dat`) and contains none of its
 data. It shares the engine core with TM Port (`docs/DESIGN.md`, "Core and games").
 
-So far it is the engine's foundation, shown by a **preview**, not the game: `ggport --data <your
-G&G folder>` plays the attract sequence (the title, the story pages, the sign-in prompt) with its
-music, then Enter or Space steps through the sign-in screen (you can type a name; nothing is
-saved), the Technology Center (click the sign-in booth or a building), a warehouse room of the
-building (Left / Right walk through its rooms with the random wipe; no player or Cyber Chimps yet)
-and the eight puzzle screens. Number keys play the screen's sound effects, Ctrl+S switches the sound
-off and on, Esc quits. `--sound off|speaker|fm` (or the original's switches, `--gg-args "-SI"`),
-`--fullscreen`, `--square-pixels`, `--scale N` and `--help` work as for the game; the settings are
-kept in `ggport.ini` in its own preference folder (`GGPort`). The screens and the sound match the
-original running in DOSBox-X, the timing to a few frames (`re/gg/docs/ENGINE_MAP.md`); the game
-logic comes next.
+`ggport --data <your G&G folder>` plays **the game**: the attract sequence, the sign-in (new players,
+With or Without Chimps, the roster, Ctrl+R), the Technology Center, the three buildings with their
+blueprints, the workshop (the conveyor belt, building and painting the vehicle, the recycler), the
+warehouse rooms with the Cyber Chimps, the bananas, the parts and the doors, the eight kinds of
+puzzles, the races, the results with the rank messages, the post-race menu, the levels, the final
+movie, the menus, the help and the New Player Hints. Players are saved in `players.dat` in the
+engine's own preference folder (`GGPort`; the game folder's `PLAYERS.DAT` is imported on the first
+run and never written), byte for byte as the original writes it and at the same moments, so Save &
+Exit and a later sign-in resume a building where it was left. `--sound off|speaker|fm` (or the
+original's switches, `--gg-args "-SI"`), `--cpu 286|386` (the 286's chimp path), `--fullscreen`,
+`--square-pixels`, `--scale N` and `--help` work as for TM Port; the settings are kept in
+`ggport.ini`. The wave 2 preview of the engine's screens stays behind `--gg-preview`. For studying
+the game against the original: `--gg-trace FILE` (a row per frame: state, rooms, the player, the
+`rand()` calls), `--gg-dump-state TICK FILE` (the original's data segment at a moment) and
+`--gg-load-state FILE` (start from a DOSBox-X save state).
+
+The screens, the sound and the game's random numbers match the original running in DOSBox-X: played
+through, from a new player to the final movie, the engine's pictures equal the reference captures
+(`re/gg/docs/ENGINE_MAP.md` §11). Known differences: screen changes come a few video frames early
+(the reference machine's drawing time is not modelled, and with it the order of a few sound writes
+around effects); the puzzles' pointer moves (gears, magnets) are untried with a real mouse in a
+window; only the reference captures' puzzle variants and levels were compared with the original
+(`re/gg/docs/ENGINE_MAP.md` §8).
 Building: `docs/BUILDING.md`, "Gizmos & Gadgets".
 
 ## Credits and licences

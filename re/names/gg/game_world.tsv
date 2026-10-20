@@ -55,7 +55,7 @@
 174b:0444	ScreenAnim_Free	void far ScreenAnim_Free(void far *anim)	stops it, releases its frame bundle and frees the copy
 174b:047e	ScreenAnim_UpdateAll	void near ScreenAnim_UpdateAll(void)	ScreenAnim_Step on every list member, queues visible ones (Sprites_Add), removes finished ones (+8 & 1)
 174b:0510	ScreenAnim_Frame	void far ScreenAnim_Frame(void)	Sprites_EraseAll, ScreenAnim_UpdateAll, Sprites_DrawAll
-174b:0522	ScreenAnim_PlayModal	void far ScreenAnim_PlayModal(int far *done)	4-tick frames of ScreenAnim_Frame + Dirty_Flush until *done != 0
+174b:0522	ScreenAnim_PlayModal	void far ScreenAnim_PlayModal(int far *state)	Sprites_Reset, then 4-tick frames of ScreenAnim_Frame + Dirty_Flush until *state != 0 (the running animation + 8: 1 finished, 2 holding)
 1834:000b	AnimSeq_CountSteps	int near AnimSeq_CountSteps(void far *seq)	steps before the -1000 terminator (no caller)
 1834:003b	Actor_SetSequence	void far Actor_SetSequence(int actor,int seq)	+0x1e = +0x18, +0x18 = seq, step +0x22 = 0, delay +0x12 = header +0, direction +0x4c = header +2
 1834:0088	Actors_LoadSet		loads an actor set (S records): the player 0x1033..0x1036 (18f5:05a3), the Cyber Chimps 0x1041/0x1042 or 0x103d/0x103e (2a80:051e); fmt_data.md §7.3
@@ -65,7 +65,7 @@
 1834:07ad	Actors_EnterRoom	void far Actors_EnterRoom(void)	not in the workshop: loads player/projectile/chimp sets, sprite bundle +0x98 + scale per actor, calls +0x8c of the player, the projectile and the chimps in the displayed room
 1834:0870	Actors_LeaveRoom	void far Actors_LeaveRoom(void)	releases the actors' sprite bundles (+0x0e = -1) when DS:0a9c
 1834:08d7	Actor_AddPart	int far Actor_AddPart(int actor,int part)	adds a part to the actor's carried list unless 2 of its type are there; pairs it with the other one (+0x1c); returns 1 when it is the second of its type
-1834:0990	Actor_RemovePart	int far Actor_RemovePart(int actor,int part,int anyHolder)	unlinks a part (holder check unless anyHolder == 0), re-seats its pair; returns (number of that type before) - 1
+1834:0990	Actor_RemovePart	int far Actor_RemovePart(int actor,int part,int checkHolder)	unlinks a part (non-zero checkHolder: only when the actor holds it), moves the partner to its place when it was the first of the pair; returns (number of that type before) - 1
 1834:0ace	Actors_ResetCountdowns	void far Actors_ResetCountdowns(void)	+0x10 = 0 for all 12 actors (warehouse entry)
 1834:0ae9	Actors_Tick		per-frame actor update; non-zero = leave the room
 1834:0b5e	Actors_SaveState		saves the actors into the building record (+0x492)

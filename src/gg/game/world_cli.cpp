@@ -247,7 +247,7 @@ int cmdWarehouse(const GgFiles& files, const std::vector<std::string>& args, con
     rng.setRawSeed(static_cast<uint32_t>(num(scene, "setupRandState", 0x29CF)));
     if (const auto v = optionValue(args, "--rand-state")) rng.setRawSeed(static_cast<uint32_t>(std::stoul(*v, nullptr, 16)));
     Building b(files.exe(), files.archive(), s.cache);
-    b.withChimps = num(scene, "withChimps", 1) != 0;
+    b.state().player.withChimps = num(scene, "withChimps", 1) != 0 ? 1 : 0;
     b.setup(race / 5, race % 5, rng, s.hud, s.video);
     if (room >= b.rooms().count()) throw UsageError(std::format("race {} has {} rooms", race, b.rooms().count()));
     const std::string itemCheck = compareItems(b.rooms(), scene);
@@ -260,9 +260,9 @@ int cmdWarehouse(const GgFiles& files, const std::vector<std::string>& args, con
     b.enterRoom(room, s.video, s.hud);
     const bool hall = b.rooms().room(room).isHall();
     if (const json::Value* h = scene.find("hud"); h && h->isObject()) {
-        b.counters.partsNeeded = static_cast<int>(num(*h, "partsNeeded"));
-        b.counters.projectiles = static_cast<int>(num(*h, "projectiles"));
-        b.counters.score = static_cast<uint32_t>(num(*h, "score"));
+        b.state().player.live.partsNeeded = static_cast<int16_t>(num(*h, "partsNeeded"));
+        b.state().player.live.projectiles = static_cast<int16_t>(num(*h, "projectiles"));
+        b.state().player.points = static_cast<uint32_t>(num(*h, "score"));
     }
     if (const json::Value* list = scene.find("strip"); list && list->isArray())
         for (const json::Value& e : list->asArray()) {
@@ -322,8 +322,8 @@ int cmdWarehouse(const GgFiles& files, const std::vector<std::string>& args, con
             frames += std::format(" {}:seq {} frame {}{}", slot, a.seq, st ? st->op : -1, agrees ? "" : " (scene differs)");
         }
     }
-    b.playerBlink = static_cast<int>(num(scene, "playerBlink"));
-    s.hud.dirty |= Hud::kFull;
+    b.state().actors.playerBlink = static_cast<int16_t>(num(scene, "playerBlink"));
+    s.hud.state().dirty |= Hud::kFull;
     // --frames N: N more frames of the room's own animation (the pads and flaps step; the actors
     // stand: their logic is wave 3's), e.g. to reach the phase of a shot taken before its state.
     const int more = optionValue(args, "--frames") ? toInt(*optionValue(args, "--frames")) : 0;
@@ -359,8 +359,8 @@ int cmdBlueprint(const GgFiles& files, const std::vector<std::string>& args, con
     // State_06_Workshop: Pal_LoadRes(0x2B); Workshop_LayoutShelf: Pal_LoadRes(level descriptor +8).
     s.video.palette().store(parsePaletteRange(files.archive().read(kWorkshopPalette)));
     s.video.palette().store(parsePaletteRange(files.archive().read(b.parts().workshopPalette)));
-    // TODO(wave 3): the trophies, the tube signs, the shelf and the vehicle are the workshop's
-    // (wave 3); they are not drawn here.
+    // The trophies, the tube signs, the shelf and the vehicle are drawn by the workshop
+    // (game/workshop.cpp State_06_Workshop), not by this tool's warehouse screen.
     if (const json::Value* h = scene.find("hud"); h && h->isObject()) {
         s.hud.drawBar(s.video.screen());
         if (num(*h, "labelsShown", 1)) s.hud.drawLabels(s.video.screen(), 7);

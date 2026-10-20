@@ -101,6 +101,13 @@ void PartDeck::shuffle(int total, int partCount, BorlandRand& rng) {
     randShuffle(deck_, rng);
     for (int& e : deck_)
         if (e >= partCount) e = kCrate;
+    for (size_t i = 0; i < deck_.size() && i < image_.size(); ++i) image_[i] = static_cast<int16_t>(deck_[i]);
+}
+
+void PartDeck::restore(const std::array<int16_t, kImageWords>& image, int dealIndex) {
+    image_ = image;
+    deck_.assign(image.begin(), image.end());
+    next_ = dealIndex;
 }
 
 // 153f:0203 Parts_DealNext

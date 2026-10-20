@@ -126,6 +126,23 @@ uint32_t Archive::originalReadSize(uint16_t id) const {
     return s[1] == kMethodStored ? static_cast<uint32_t>(s.size()) : unpackedSize(id);
 }
 
+namespace {
+thread_local LzhRefillHook t_refillHook;
+}  // namespace
+
+LzhRefillHook setLzhRefillHook(LzhRefillHook hook) {
+    LzhRefillHook previous = std::move(t_refillHook);
+    t_refillHook = std::move(hook);
+    return previous;
+}
+
+int lzhReadCount(size_t usedBytes) {
+    // 1b48:02aa reads the size word itself, then every byte comes through 1b48:002e, which reads the
+    // next 4000 bytes (and drains the keyboard) whenever its count is 0, the first time included.
+    if (usedBytes <= 4) return 0;
+    return static_cast<int>((usedBytes - 4 + kLzhReadBlock - 1) / kLzhReadBlock);
+}
+
 Resource Archive::load(uint16_t id, LzhInfo* lzhInfo) const {
     const auto s = stored(id);
     Resource r;
@@ -135,11 +152,14 @@ Resource Archive::load(uint16_t id, LzhInfo* lzhInfo) const {
     if (r.method == kMethodStored) {
         r.bytes.assign(s.begin() + 2, s.end());
     } else {
+        LzhInfo local;
+        LzhInfo& info = lzhInfo ? *lzhInfo : local;
         try {
-            r.bytes = lzhDecompress(s.subspan(2), rows_, lzhInfo);
+            r.bytes = lzhDecompress(s.subspan(2), rows_, &info);
         } catch (const FormatError& e) {
             throw FormatError(idText(id) + ": " + e.what());
         }
+        if (t_refillHook) t_refillHook(lzhReadCount(info.usedBytes));
     }
     return r;
 }

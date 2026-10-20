@@ -4,7 +4,8 @@
 //
 //   load(id)       174b:0324 ScreenAnim_Load: the set (a private copy) and its frame bundle through
 //                  PicCache_LoadBundle (palette members into the shadow, the cache's DAC load hook)
-//   startAt(h, i)  174b:02ab ScreenAnim_StartAt into the running list g_screenAnims DS:7a46
+//   startAt(h, i)  174b:02ab ScreenAnim_StartAt into the running list g_screenAnims DS:7a46 (the game's
+//                  GgGame::screenAnims, or a list of the host's own)
 //   frame()        174b:0510 ScreenAnim_Frame: Sprites_EraseAll, step and queue, Sprites_DrawAll
 //   release(h)     174b:0444 ScreenAnim_Free: out of the list, the frame bundle released
 //
@@ -28,8 +29,10 @@ class Video;
 
 class AttractAnimHost final : public ScreenAnimHost {
 public:
-    // Everything is borrowed and must outlive the host.
-    AttractAnimHost(Video& video, PicCache& cache, BorlandRand& rng, ScreenAnimSound sound = {});
+    // Everything is borrowed and must outlive the host. `running`: the running list (the game's
+    // g_screenAnims); nullptr: a list of the host's own.
+    AttractAnimHost(Video& video, PicCache& cache, BorlandRand& rng, ScreenAnimSound sound = {},
+                    ScreenAnims* running = nullptr);
     ~AttractAnimHost() override;
     AttractAnimHost(const AttractAnimHost&) = delete;
     AttractAnimHost& operator=(const AttractAnimHost&) = delete;
@@ -42,7 +45,7 @@ public:
     void release(int handle) override;
     void resetSprites() override;
 
-    ScreenAnims& running() { return list_; }
+    ScreenAnims& running() { return *running_; }
 
 private:
     struct Slot {
@@ -58,6 +61,7 @@ private:
     ScreenAnimSound sound_;
     std::deque<Slot> slots_;  // stable addresses: the running list points into it
     ScreenAnims list_;
+    ScreenAnims* running_;
 };
 
 }  // namespace tmport::gg

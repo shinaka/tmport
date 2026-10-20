@@ -456,8 +456,7 @@
 1ea7:a8c0	g_elecFoundTerm	i16	terminal found by PzElec_FindFreeTerminal
 1ea7:a8c2	g_elecFoundPiece	i16	piece found by PzElec_FindFreeTerminal (99 none)
 1ea7:a8c4	g_elecPlugShown	i16	1 while the plug picture replaces the held cursor
-1ea7:a8c6	g_elecToolCounts	i16[5]	toolbox counts: battery, bulb, switch, Y-wire, wire
-1ea7:a8ce	g_elecWiresLost	i16	counts dropped and detached wires; never read
+1ea7:a8c6	g_elecToolCounts	i16[5]	toolbox counts: battery, bulb, switch, Y-wire, wire (DS:a8ce; the code that increments it gives a wire back)
 1ea7:a8d4	g_elecHeldCursor	far	cursor record of the item in hand
 1ea7:a8d8	g_elecCursor	far	puzzle cursor (picture 0x20b4, hot x 1)
 1ea7:a8dc	g_elecToolZones	zone[5]	toolbox item zones, press 0x45b + item (PzElec_InitToolZones)

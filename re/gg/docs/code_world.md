@@ -249,7 +249,9 @@ sprite bundle, +0x16 text id, +0x1A set to 0x2238 when carried (not read here), 
 (−1, or the index of the other part of the same type: the second-taken part holds the first's
 index, the first holds `second | 0x8000`), +0x36 flags (0x4000 = already scored, 0x8000 = built
 into the vehicle and cannot be stolen or trashed), +0x3A..+0x47 the HUD strip sprite entry,
-+0x48..+0x5D a click zone (release code 5000 + index, priority 4), +0x82 picture, +0x86 text copy,
++0x48..+0x5D a click zone (release code 5000 + index, priority 10, group / tag 4 at +0x5C:
+`Zone_SetFromObject` 2bd4:00c1 writes shape 0, the sprite's x / y / w / h, next NULL and +0x0A =
+0x0A; `Hud_AddPart` 1a04:07e1 the tag [O wave 3]), +0x82 picture, +0x86 text copy,
 +0x8A cleared when carried, +0x8C own index. The record is itself the list node (+0..+7) of a
 carried list. In every shipped catalogue each needed type has 4 parts [O data].
 
@@ -600,6 +602,10 @@ room: rewrites the types (9 → kind 4 and open-door art), clears the list, `+0x
 `g_cratesLeft = 0` (**per room**), then `Room_DropItemAt(r, x, floor, kind, 1)` and counts
 crates. No sizes are checked: 0x96 door bytes and 0x190 item bytes are the gaps in the block.
 
+Room 0's item list is NULL (+0xA0 is 0 in all 9 room sets): `Rooms_SaveState`'s `List_Count(NULL)`
+returns 0, but `Rooms_RestoreState`'s `List_Clear` of it (1622:10e7; 19c0:0433 has no NULL check)
+writes 8 zero bytes at 0000:0000, the INT 0 / INT 1 vectors [O wave 3; the engine skips it].
+
 ### 7.6 Crate refills [O 18f5:0895..094a, 18f5:0063, 2a80:0043..0060]
 
 Picking a crate up gives `Projectiles_Add(5)` and `g_cratesLeft −= 1`. When the player throws his
@@ -749,7 +755,11 @@ Initial values (`Actors_Init` 18f5:0721, `Chimps_SetupActors` 2a80:0635) [O]:
 | seq tables (+0x56/+0x5A) | DS:832c / DS:8440 | DS:8304 / DS:8318 | DS:9e72 / DS:9dc6 (shared) |
 | sprite base +0x98 | 0x1031 | 0x1037 | 0x103f, from level 3 0x103b |
 | slots +0x9A | DS:8214 | DS:820a | DS:9f26 (shared) |
-| other | delay 2, walls/contacts on, room 0, id 0, list `List_New` | disabled, delay 2, id 1 | id i, delay 2, walls/contacts on, list DS:a03c |
+| other | delay 2, walls/contacts on, room 0, id 0, list `List_New`; +0x20 −1, +0x0E −1, **+0x2C (pending) 0** (DS:7ab6 at 18f5:0793), +0x32 0 | disabled, delay 2, id 1; walls and contacts **on** (+0x2E = +0x30 = 1, 18f5:0824..082a), +0x20 = +0x2C = −1, +0x0E −1, +0x32 0 | id i, delay 2, walls/contacts on, list DS:a03c |
+
+`Actors_Init` then calls `Actors_LoadPlayerSets` and `Actor_SelectScale(0, 0)` [O wave 3]. (The
+engine's start-up state `gameInitState` sets only part of these; flow's `gameInit` runs `actorsInit`,
+which sets them all before the first state.)
 
 ### 9.2 Actor sets (`S` 0x1033..0x1036, 0x103d, 0x103e, 0x1041, 0x1042) — `fmt_data.md` §7.3
 
@@ -790,10 +800,17 @@ loop:
             r == 0: +0x32 = 0
             r == 2 and dir(+0x4C) < 2:  x = +0x14 = wallx + 1,      +0x32 = -1
             r != 2 and dir > -2:        x = +0x14 = wallx - w + 1,  +0x32 = 1
+            (r == 2 with dir >= 2, or r == 1 with dir <= -2: position and +0x32 unchanged,
+             1834:0658 / 066f jump to 068e)
         if +0x14 < 1: x = +0x14 = 1
         if x + w > 319: x = +0x14 = 319 - w
         picture = cache[s.d]; +0x22 += 1; return result (0)
 ```
+
+The W / H tables are chosen once, at the entry of `Actor_RunStep`, by `Room_IsHall` of the room
+at entry (locals BP−0x24 / −0x28): after op −11 moves a chimp into a room of the other scale, the
+steps come from the reloaded table +0x52 (1834:03d5 → 0200) but the next frame still uses the old
+room's W / H [O wave 3; keep].
 
 Commands (op, a, b; "→" = continue with the next step unless stated). Jump table CS:06d7,
 46 entries for ops −46..−1:
@@ -880,8 +897,9 @@ Otherwise: `Actors_LoadPlayerSets`, `Chimps_LoadSets` (both cached), `g_actorSpr
 = 1; player: +0x0E = +0x98 + scale, `PicCache_LoadBundle(+0x0E, +0x9A)`, `Player_EnterRoom(0)`;
 projectile: same, `Projectile_EnterRoom(1)`; if `g_withChimps == 1`: every chimp gets
 +0x0E = +0x98 + scale and `PicCache_LoadBundle` (shared slots), and each enabled chimp in the
-displayed room gets `Chimp_EnterRoom(i)`. `Actors_LeaveRoom` (1834:0870) releases the same bundles
-(`PicCache_ReleaseBundle`) and sets +0x0E = −1.
+displayed room gets `Chimp_EnterRoom(i)`. `Actors_LeaveRoom` (1834:0870) acts only when
+`g_displayRoom` ≠ 0 and `g_actorSpritesLoaded`: it releases the same bundles
+(`PicCache_ReleaseBundle`), sets +0x0E = −1 and clears `g_actorSpritesLoaded` [O wave 3].
 
 ### 9.7 Carried parts [O 1834:08d7, 0990]
 
@@ -889,10 +907,12 @@ displayed room gets `Chimp_EnterRoom(i)`. `Actors_LeaveRoom` (1834:0870) release
   0x4000, +0x8A = 0, +0x1C = last, holder +0x0C = a, +0x1A = 0x2238; if last ≠ −1:
   part[last].+0x1C = p | 0x8000; `actor[a].+0x70 += 1`; append p to the list. Returns
   `last ≠ −1` (p is the second of its type). With n ≥ 2 nothing happens.
-* `Actor_RemovePart(a, p, anyHolder)`: `n = PartList_CountType(...)`; finds p in a's list
-  (holder must be a unless anyHolder == 0); the holder's +0x70 −= 1, +0x0C = −1, unlink; if p was
-  paired, its partner is re-linked at p's old position (when it was the "second") and its
-  +0x1C = −1. Returns n − 1.
+* `Actor_RemovePart(a, p, checkHolder)`: `n = PartList_CountType(...)`; finds p in a's list; a
+  non-zero third argument means "only when actor a holds p", 0 any holder; the holder's +0x70 −= 1,
+  +0x0C = −1, unlink; if p was paired, the partner moves to p's list position when p was the
+  **first** of the pair (its +0x1C has bit 15 and holds `second | 0x8000`), and in both cases the
+  partner's +0x1C becomes −1; p's own +0x1C is not reset. Returns n − 1 [O wave 3, 1834:09f8..0a03,
+  0a2c..0aa4].
 
 ---
 
@@ -996,8 +1016,8 @@ exist only in halls):
 | Seq | Role |
 |---|---|
 | 0, 1 | stand / idle animation (0x40 idle bit → 1) |
-| 2, 3 | walk left / right (4 px per step) |
-| 4, 5 | run left / right (Left/Right + Ctrl) |
+| 2, 3 | walk left / right: one step every 12 PIT ticks; the hall walk (set 0x1034, seq 3) moves 2, 0, 0, 2, 3, 0, 1, 4 px (12 px per 8 steps), the small-room walk (0x1033) 1, 4, 5, 6, 2, 3, 9 (30 px per 7 steps) [O wave 3, the sets; r2_warehouse_walk.avi] |
+| 4, 5 | run left / right (Left/Right + Ctrl); the hall run (seq 5) 11, 4, 2, 4, 4, 6, 3, 1 px (35 px per 8 steps) |
 | 6, 7 | stand facing left / right |
 | 8..11 | turn around |
 | 12, 13 / 16, 17 | jump left / right (Up + Left/Right, longer with Ctrl); a jump spot record turns them into 14, 15 / 18, 19, the jumps onto a lift pad (hall set) |
@@ -1026,14 +1046,15 @@ only serves the HUD and the menus.
 
 ### 11.4 Leaving a room — `Player_SequenceEnd` (18f5:04cf, op −11) [O]
 
-`obj = Room_GetObject(g_playerRoom, +0x36)`; `g_puzzleDoorHit` DS:00bc = 0. Target room T and
-entry sequence S:
+`obj = Room_GetObject(g_playerRoom, +0x36)`; when the object exists, `g_puzzleDoorHit` DS:00bc = 0
+(with no object, +0x36 = −1, the workshop's exit, it is left as it is: 18f5:04ed..04f9, the NULL
+test jumps past the store at 0503). Target room T and entry sequence S:
 
 | Object | T | S |
 |---|---|---|
 | none (+0x36 = −1; the workshop's exit, 2dee:0e4a) | `g_tubeRoom` DS:4580 | 53 |
 | type 6 (hole) | +0x12 | 41 if dir > 0 else 40 |
-| type 7 (locked door) | the same room | 33; `g_puzzleDoorHit` = 1; DS:458c = 1 (cancels hint 0x1048) |
+| type 7 (locked door) | `g_displayRoom` DS:08c2 (18f5:0577) | 33; `g_puzzleDoorHit` = 1; DS:458c = 1 (cancels hint 0x1048) |
 | type 8 (tube) | 0 (workshop) | 0; `g_tubeRoom` = the current room |
 | type 9 (open door) | +0x12 & 0xF | 33; DS:458c = 1 |
 | type 10 / 11 (passage) | +0x12 & 0xF | 45 / 44 |
@@ -1064,7 +1085,7 @@ Hint_Queue(needed ? 0x104a : 0x1044, 0, NULL)
 Room_RemoveItem(room, item); g_hudDirty |= 1
 if !second and needed: g_partsNeeded -= 1
 if g_partsNeeded == 0: Hint_Queue(0x1050, 0, NULL)
-if !(p.+0x36 & 0x4000): Score_Add(20)                          # 12e0:0ace, u32 DS:4572
+if !(p.+0x36 & 0x4000): Score_Add(20, 0)                       # 12e0:0ace, u32 DS:4572 (PUSH 0, 18f5:014d)
 ```
 
 `g_partsNeeded` counts needed **types**: the first part of a needed type decrements it, a second
@@ -1099,16 +1120,20 @@ a start beyond the list it walks `List_GetAt`'s tail until the 16-bit index wrap
 In the warehouse loop, code 0x11F (Alt+S) arms a flag when it is clear; a following 0x111
 (Alt+W) with the flag armed resets the player: anchor x = 10; hall: y = 0x90, floor 5; small
 room: y = 0x7f, floor 5 if flag bit 1 else 2; `Actor_SetSequence(0, 0)`, step 0, contacts 0,
-contacts on, walls on. Any other non-zero code disarms the flag; code 0 leaves it. Purpose: free
-a stuck player [I].
+contacts on, walls on. The switch is CS:0808 (codes {0, 0x1B, 0x111, 0x11F, 0x17A2, 0x17A3} →
+{07c9, 0739, 0760, 0759, 0749, 0741}): code 0 and Esc (after `Cmd_SaveAndExit`) keep the flag;
+Alt+W with the flag armed resets the player and leaves the flag armed (0760..07c5 never writes DI);
+only an unlisted code (07c7) clears it [O wave 3]. Purpose: free a stuck player [I].
 
 ---
 
 ## 12. The projectile (actor 1, bananas)
 
 `Projectile_Launch(seq, dx)` (18f5:0895, player step −27) [O]: nothing if `g_projectiles == 0`.
-Else: enabled; x = +0x14 = player anchor x + dx; y = player y; floor, room = the player's; +0x20 =
-+0x2C = +0x1E = +0x34 = −1; step, countdown, contacts, blocked = 0; contacts on;
+Else: enabled; x = +0x14 = player anchor x + dx; y = the player's anchor y (+0x16, DS:7aa0 at
+18f5:08b5); floor, room = the player's; +0x20 = +0x2C = +0x34 = −1; +0x1E = −1, which
+`Actor_SetSequence` then overwrites with the projectile's previous sequence (18f5:090d); step,
+countdown, contacts (+0x48), blocked (+0x32) = 0; contacts on;
 `Actor_SelectScale(1, Room_IsHall(room))`; `Actor_SetSequence(1, seq)`; `g_projectiles −= 1`;
 `g_hudDirty |= 8`; refill rule §7.6.
 
@@ -1146,7 +1171,8 @@ for slot i = 2..11:
         big = (+0x98 == 0x103b)                      # level >= 3
         hall: floor = R(6); y = floor*26 + (big ? 14 : 15)
         else: floor = R(3); y = floor*52 + (big ? 24 : 28); if flags & 2: floor += 3
-        +0x16 = y; +0x1E = -1; seq +0x18 = 0
+        +0x16 = y; +0x1E = -1; seq +0x18 = 0             # no Actor_SetSequence: +0x12 and
+                                                         # +0x4C keep their values (w0/09: dir 0)
         if R(100) < 50: +0x14 = 10, +0x94 = 2 else +0x14 = 300, +0x94 = 1
         Actor_SelectScale(i, hall)
     else: +0x2A = 1
@@ -1169,7 +1195,8 @@ disabled; their sprites are not loaded; hint 0x1055 replaces 0x104b at the first
 Called on every set-up (both paths). `g_chimpParts` DS:a03c = `List_New()` (one carried list for
 all chimps; a part's holder says which chimp has it). For slots 2..11 the fields of §9.1
 (id = slot, delay 2, countdown 0, immune 0, walls and contacts on, tables, callbacks, +0x20 =
-+0x0E = +0x2C = +0x24 = −1, +0x90 = 0). Big chimps (level > 2): sprite base 0x103b and sets
++0x0E = +0x2C = +0x24 = −1, +0x90 = 0; +0x2A and +0x70 are not touched, 2a80:0663..075f [O wave
+3]). Big chimps (level > 2): sprite base 0x103b and sets
 0x103e (hall) / 0x103d (room); else 0x103f and 0x1042 / 0x1041. The sets are cached in DS:9f22
 (hall) / DS:9f1e (room) with their W/H tables in DS:a018/a014 (hall) and DS:a010/a00c (room), and
 freed by `Chimps_FreeSets` (state 8 before a puzzle) and `Chimps_Free` (also frees DS:a03c;
@@ -1206,7 +1233,10 @@ if next != -1 and (trans = g_chimpTransitions[next]) (DS:1f10, indexed by next):
     or match == 0 -> next = next'; list ends with match 0xFFFFFFFF
 if next == 2 and +0x32 < 0: next = 10                    # blocked left: turn
 if next == 3 and +0x32 > 0: next = 11
-+0x96 = contacts                                         # +0x94 = contacts << 16, written only
++0x96 = +0x48                                            # +0x94 = contacts << 16, written only:
+                                                         # the +0x48 at the end of the brain, after
+                                                         # Chimp_ProbeContacts may have assigned
+                                                         # 0x800 (2a80:0321), not the entry contacts
 return next
 ```
 
@@ -1318,11 +1348,15 @@ while !leave:
       0      : nothing
       0x1b   : Cmd_SaveAndExit                 # the hook has already put back a cursor part
       0x11f  : if cheat == 0: cheat = 1        # Alt+S
-      0x111  : if cheat == 1: reset the player # Alt+W, §11.8
+      0x111  : if cheat == 1: reset the player # Alt+W, §11.8 (cheat stays armed)
       0x17a2 : g_leaveRequest DS:455a = 3; next = 16; leave = 1
       0x17a3 : DS:455a = 2; next = 16; leave = 1
-      other  : cheat = 0
+      other  : cheat = 0                       # only an unlisted code (07c7); 0 and Esc keep it
 ```
+
+Confirmed in the engine [O wave 3]: entering a room through a door, the wipe's R(8) of
+r2/aircraft/12_room1_open_door selects 0x11DB (48 steps of 2 ticks) and state 13's rand() state
+follows after exactly the 2 calls.
 
 ### 14.3 Exit [O 12e0:07d0..0807]
 
@@ -1430,7 +1464,11 @@ arrows). This section keeps only the world's side.
 ### 17.1 World-side calls [O]
 
 `Hud_DrawAll(7)` at set-up; `g_hudDirty |= 0x8000` at room entry; `|= 1` and `Hud_AddPart` on a
-pick-up; `|= 8` on a throw; `Score_Add` sets the score bit (12e0:0ace); `Hud_FlashPart(p, 1)` when
+pick-up; `|= 8` on a throw; `Score_Add(points, hud)` (12e0:0ace) adds to the score and sets the
+score bit 4 **only when hud ≠ 0** (12e0:0add `CMP [BP+8], 0` / `JZ`): the pick-up (18f5:014d) and
+the workshop's vehicle bonus (2dee:12c3) pass 0, `Hud_AddScoreNow` (1a04:0d39) 1, so after a pick-up
+the score shown changes only when the labels come back or at a full redraw (r2/aircraft/18 shows
+000880 after the labels' return) [O wave 3]; `Hud_FlashPart(p, 1)` when
 a third part of a type is refused; `Hud_StripAnchorFor` / `Hud_RefreshStrip` when a chimp takes a
 part. `g_keyHeldSeen` DS:5c1f = 1 (set by `Input_GetHeldKeys` while a key is held) makes the next
 `Hud_Update` put the labels back over the part's text; the warehouse entry clears it.
@@ -1528,8 +1566,10 @@ then steps (op table CS:024d, 14 entries):
 | −1 | step = 0 |
 | other negative | re-reads the same step forever (hang) |
 
-`ScreenAnim_PlayModal(done)` (174b:0522) runs 4-tick frames of `ScreenAnim_Frame` + `Dirty_Flush`
-until `*done ≠ 0`.
+`ScreenAnim_PlayModal(done)` (174b:0522) starts with `Sprites_Reset`, then runs 4-tick frames of
+`ScreenAnim_Frame` + `Dirty_Flush` until `*done ≠ 0` (174b:0549 `CMP ES:[BX], 0`). Its argument is
+the running animation + 8, the animation's own state word (1 finished, 2 holding), not a flag a
+callback sets: the callers 2dee:0156, 1cb2 and 1d56 pass seq + 8 [O wave 3].
 
 ### 19.2 Lists (19c0) [O]
 
@@ -1556,8 +1596,11 @@ list: it is the order of `Sprites_Add` calls (§8.2).
 7. Carried counts +0x70 are not reset on a resume (§4.2): after leaving one building and resuming
    another in the same session, the player's and chimps' counts include the old values. Effects:
    a chimp with a stale count never picks up parts (§13.3); `R(+0x70)` in `Player_HitByChimp`
-   can start beyond the list, and `PartList_FindHeld` then scans up to 65 536 indexes (the tail
-   part is returned when eligible).
+   can start beyond the list. `PartList_FindHeld` with a start at or past the count: `List_GetAt`
+   compares unsigned, so every index from start to 0xFFFF yields the tail (returned when
+   eligible); the index then wraps to 0 and cycles 0..count − 1 without ever reaching start again,
+   so when no part qualifies the original **hangs** (the loop's end test is idx == start,
+   2bd4:0154..016d) [O wave 3]. The engine stops and logs.
 8. `g_roomChimpCount` grows at every room display (§13.8): the chimp music voice lingers.
 9. Room animations run in rooms 1..3 only (§8.4).
 10. Chimps use asymmetric probes (§13.3) and an asymmetric wall sweep (§9.3) — keep for identical
@@ -1567,6 +1610,8 @@ list: it is the order of `Sprites_Add` calls (§8.2).
     would erase it (none does).
 13. `Player_SequenceEnd` / `Chimp_SequenceEnd` / `Room_FindLinkedDoor` have unreachable
     uninitialised or out-of-range results (§11.4, §13.5, §6.5).
+15. `Rooms_RestoreState` clears room 0's NULL item list: 8 zero bytes at 0000:0000 (§7.5).
+    Engine: ignore.
 14. A chimp that picks up a part of a type the chimps already hold twice destroys it (§13.7):
     the part leaves the room and joins no list. Keep it (it changes which parts remain).
 
@@ -1576,15 +1621,21 @@ list: it is the order of `Sprites_Add` calls (§8.2).
 
 * Without chimps the warehouse frames call `rand()` never; with the 2 chimps of Aircraft level 1,
   11 calls came before the puzzle choice when the door was taken right after loading `w0/15_at_door`
-  (§16).
+  (§16). Wave 3 made it precise: from `r2/puzzle/kK_door` (w0/15 with Up held) the player's
+  sequence 34 ends after 10 frames with 11 chimp R(1000) calls; the choice's R(8) and R(3) then give
+  the `kK_screen` state for all 8 kinds; from `w0/14_warehouse` both chimps reach `w0/15_at_door`
+  field for field after 496 frames (190 calls).
 * The item lists match §7 in live memory: room +0x9E count, +0xA0 list, 0x2C-byte nodes (+0x0E x,
   +0x10 y, +0x1A picture 0x343 / 0x332, +0x1E part); box y = 26·floor in halls, 46 / 98 / 150 in
   small rooms.
 * Springs are type-4 objects with the landing point at +0x18 / +0x1A; those with +0x12 = 1 are not
   drawn. A door's twin is the target room's door with the same link id; a solved door is open from
   both sides.
-* Walk about 16 px/s, run (Ctrl) about 54 px/s; items are obstacles the player can stand on; Down
-  while overlapping an item picks it up; a third part of a category stays (hint 0x1047).
+* Walk 12 px per 96 PIT ticks = 18.2 px/s, run (Ctrl) 35 px per 96 ticks = 53.1 px/s (one step
+  every 12 ticks, §11.3; measured on r2_warehouse_walk.avi frames 182..275 and 327..420, the box edge
+  moving 3, 0, 1, 4, 2, 0, 0, 2 and 4, 2, 4, 4, 6, 3, 1, 11 per step: the sequences' anchor deltas
+  rotated); items are obstacles the player can stand on; Down while overlapping an item picks it up
+  (sequence 46 / 47); a third part of a category stays (hint 0x1047).
 * An Up still held when the player arrives through a door takes him back through it as soon as
   another arrow is pressed (§11).
 * A resume restores the room and position with no prompt (§4); the HUD strip's order differs after

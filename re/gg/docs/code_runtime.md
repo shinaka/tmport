@@ -355,7 +355,12 @@ a key, takes and returns it; else 0. When the ring is empty the NULL record poin
 dereferenced (it reads 0000:0000, almost never 3). Callers: the LZH input refill 1b48:002e,
 which calls it repeatedly until it returns 0 after each 4000-byte file read — **keys typed while
 a compressed resource is being decoded are thrown away**; and the races (3dd6:01ca,
-3e77:05e3).
+3e77:05e3). `Lzh_Decompress` reads the stream's 4-byte size word itself; every 4000-byte block of
+the stream, the first included, is read by the refill 1b48:002e when the block count is 0 (it is
+set to 0 before the first bit is read, 1b48:02aa), each followed by the drain loop, so one decode
+drains ⌈(stream bytes used − 4) / 4000⌉ times. The other reader 1b48:0051 (a read without the
+drain) is not used by `Lzh_Decompress` [O wave 3, 1b48:002e, 1b48:02aa; the engine's
+`lzhReadCount`].
 
 ### 6.5 Held keys and the idle bit: `Input_GetHeldKeys` 198d:02b8 [O]
 
@@ -1028,7 +1033,9 @@ rand(): two calls per wipe, pattern first, sound second, both before the first c
 Measured (REFERENCE_CAPTURES §10.3) [O]: entering a room through a door, the screen changed on
 every video frame for 45 frames (642 ms ≈ 93 ticks) with no palette change. The wave 2 engine
 identified the pattern as **0x11DB**: 48 steps of 2 ticks, every AVI frame (r2_aircraft_door_to_room5
-119-163) equal to the engine wipe's state after step k or between steps k and k + 1 [O].
+119-163) equal to the engine wipe's state after step k or between steps k and k + 1 [O]. Wave 3
+confirmed it in the game: from r2/aircraft/12_room1_open_door the wipe's R(8) selects 0x11DB, and
+state 13's rand() state follows after exactly 2 calls (the pattern and the sound).
 
 ---
 
@@ -1099,8 +1106,8 @@ Conventional far heap only; no EMS/XMS. Large blocks: screen 128 000 bytes, reso
 * `Res_LoadTo(id, dest)` (14ff:013d): `Res_Read`, `movmem` to dest.
 * `Res_CloseFiles` (14ff:0209).
 
-The LZH decoder reads the file in 4000-byte blocks (1b48:0002 into DS:9c52, count DS:9c4c) and
-drains the keyboard after each block (§6.4).
+The LZH decoder reads the file in 4000-byte blocks (1b48:002e into DS:9c52, count DS:9c4c) and
+drains the keyboard after each block, the first included (§6.4).
 
 ### 16.3 The swap file `gizmo004.dat` [O]
 
@@ -1116,15 +1123,18 @@ drains the keyboard after each block (§6.4).
 ### 16.4 Picture cache (15df) [O]
 
 300 entries of 8 bytes at `g_picCache` DS:6640 `{i16 id (−1 free), i16 use count, far data}`,
-then an end marker −3 (`PicCache_Init` 15df:000d, which also calls 174b:0009).
+then an end marker −3 (`PicCache_Init` 15df:000d, which also calls 174b:0009). The engine mirrors
+the 300 records with these slot rules (`PicCache::slots`, the DGROUP dump's `g_picCache`); after
+the door from r2/aircraft/12 the mirror equals DS:6640 of 13_room5_arrived in all 300 records [O
+wave 3].
 
 | Function | Behaviour |
 |---|---|
 | `PicCache_Find(id)` 15df:003e (near) | index \| 0x8000 of the first entry with that id; else the first free index; id −2 returns the first free index at once; −1 if the table is full |
 | `PicCache_Load(id)` 15df:00a1 | use count += 1 (also on the slot about to be filled); if not cached: `Res_Read(id)`; a bundle whose member 0 is a `P` palette applies it (`Pal_SetShadowRange`) and caches member 1, else member 0; a plain picture is cached whole; private copy with `Mem_Alloc` |
 | `Pic_Read(id)` 15df:01a5 | `Res_Read(id)` unless id == `g_resLastIndex`; applies a leading `P` member; returns the picture in the shared buffer (not cached) |
-| `PicCache_LoadBundle(id, out[])` 15df:023b | private copy of the whole bundle (`Res_LoadCopy`), applies every `P` member, gives every other member its own cache entry (id = the bundle id) and writes their indices to out[], stops at a member whose payload starts with 0 (the `L` end marker; a `P` palette whose DAC byte offset is 0 would end it too, a quirk no shipped bundle meets); when already cached, refills out[] from the following entries with that id; returns (first offset / 2) − 2 |
-| `PicCache_Release(id)` 15df:0359 | use count −= 1; at 0 frees the data and the entry |
+| `PicCache_LoadBundle(id, out[])` 15df:023b | private copy of the whole bundle (`Res_LoadCopy`), applies every `P` member, gives every other member its own cache entry (id = the bundle id) and writes their indices to out[], stops at a member whose payload starts with 0 (the `L` end marker; a `P` palette whose DAC byte offset is 0 would end it too, a quirk no shipped bundle meets); when already cached, refills out[] from the following entries with that id; returns (first offset / 2) − 2, the bundle's picture count. Only the bundle's own entry counts uses: the member entries get the id but their use counts are not incremented (15df:0277..0299, 02fe..0324: no INC of +2); on the cached path the return value reads the NULL copy at 0000:0000 (034b with [BP−8] = 0) [O wave 3] |
+| `PicCache_Release(id)` 15df:0359 | use count −= 1; at 0 frees the data and the entry; on a bundle id it frees only that entry and leaves the member entries with dangling data [O wave 3] |
 | `PicCache_ReleaseBundle(id)` 15df:03a2 | as above and clears every following entry with the same id |
 | `PicList_Find(list, id)` 15df:007d | first 8-byte record with that id before the −3 marker, else NULL |
 | `Obj_SetSizeFromPicture(obj)` 15df:0414 | obj+6 / obj+8 = width / height of the picture at obj+0Ah |

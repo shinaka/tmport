@@ -100,6 +100,10 @@ next state = 5 (enter the room); 16 (save and leave) when DS:3332 has bit 1 (DS:
              or bit 0 (DS:455a = 2, sign-in; bit 0 is tested last and wins)
 ```
 
+Resuming state 9 from a DOSBox-X state (engine): the menu bar installed at the entry belongs to the
+UI's restore; installing it again would link its global title zones twice, a list cycle
+(`code_ui.md` §6.2 `Zones_AddGlobal`), so the puzzles' restore leaves it alone [O wave 3].
+
 ### 1.3 Choice of kind and variant, and the per-player history [O]
 
 The history is the player record's solved flags **DS:45d0 + kind·0x42 + variant·2** (u16, 8
@@ -262,7 +266,11 @@ Hint_Show(0x1052)                        the puzzle New Player Hint: once per pl
 loop until leave:
     code = Input_StripHeld(Input_GetCode())
     dispatch(code)
-Pal_FadeOut(); free everything; PzSnd_FreeBank(); return solved
+the exit, in each puzzle's own order [O wave 3]:
+    electric:                    PzSnd_FreeBank, PzElec_Cleanup, Pal_FadeOut      (3083:0aca)
+    simple machines, energy:     Pal_FadeOut, Cleanup, PzSnd_FreeBank            (3938:01f8, 33cd:01cb)
+    launch:                      Pal_FadeOut, Puzzle_FreePanel, Cleanup, PzSnd_FreeBank (3797:1437)
+return solved
 ```
 
 * **No frame pacing.** None of the four main loops calls `Timer_Set(0,4)` / `Timer_Wait`: they
@@ -386,11 +394,10 @@ the path search: harmless [O].
 | a87e | i16[15] | battery i is shorted (`PzElec_CheckBatteries`) |
 | a89c | i16[15] | piece is on a closed path of the **last** bulb evaluated |
 | a8be | i16 | mode: 99 idle, 0..3 a piece of that type in the hand, 4 a wire in the hand |
-| a8c6 | i16[5] | toolbox counts |
+| a8c6 | i16[5] | toolbox counts: battery, bulb, switch, Y-wire, **wire** (a8ce) |
 | a8c0, a8c2 | i16 | terminal and piece found by `PzElec_FindFreeTerminal` (99 = none) |
 | a8bc, a8ba | i16 | x, y of the anchor where the wire being strung starts |
 | a8c4 | i16 | 1 while the plug picture replaces the held cursor |
-| a8ce | i16 | +1 for every wire lost; never read |
 | a8d4 / a8d8 | far | held cursor record / puzzle cursor |
 | a8dc + 0x16·i | zone[5] | toolbox zones (press 0x45b + i) |
 | a94a + 0x16·i | zone[15] | piece zones (press 0x4b0 + i): x, y, picture w, h |
@@ -441,8 +448,9 @@ count (`PzElec_AddToolCursorRegions` 3083:1d83).
 Main loop (3083:0902..0ac7):
 ```
 loop:
-    if mode == 4: PzElec_UpdatePlugCursor()           3083:1a94 (§3.7)
-    code = Input_StripHeld(Input_GetCode()); if code == 0: continue
+    code = Input_StripHeld(Input_GetCode())
+    if code == 0: if mode == 4: PzElec_UpdatePlugCursor()   3083:1a94 (§3.7): only after a poll
+                  continue                                  that returned 0 (3083:0902..091c) [O wave 3]
     0x4b0..0x4bf, piece p = code - 0x4b0:
         if type(p) == 2 and PzElec_ToggleSwitch(p, mouse x, mouse y):   lever click
             if PzElec_IsSolved() and not solved: solved = 1; success (§2.6)
@@ -495,8 +503,11 @@ even when it completes the circuit; the player must then toggle a switch or lay 
   y with h. Result: both axes hit. Negative heights take part in these comparisons as they are.
 * **Pick up** `PzElec_PickUpPiece(p)` 3083:13c5 (click on a placed piece that is not a switch
   lever hit): only when not fixed. Every linked terminal is unlinked on both sides (piece 99,
-  flags 0); for each such link where neither end has flag 3, DS:a8ce +1 — **the wire is gone, its
-  count is not given back** [O; keep]. Piece zones removed, `Zones_AddLocal(DS:24a4)`,
+  flags 0); for each such link where neither end has flag 3, DS:a8ce +1: DS:a8ce is the toolbox's
+  **wire count** (`g_elecToolCounts[4]`), so each real wire goes back into the toolbox (the
+  toolbox is redrawn) [O wave 3: `PzElec_LoadVariant` writes counts 0..4 to DS:a8c6..a8cf;
+  k0_screen has DS:a8ce = 1, variant 0's one wire, k0_wire_strung 0 after it was taken; the
+  replayed solve matches k0_solved's DGROUP only with this reading]. Piece zones removed, `Zones_AddLocal(DS:24a4)`,
   `MouseRegion_Clear`, slot used = 0; a switch is opened and gets the open picture; a bulb gets
   the unlit picture; held cursor = its current picture with its type's click offset;
   `PzSnd_Play(0, 3)`; mode = its type; `PzElec_DrawBoard(0)`; toolbox redrawn (flush).
@@ -506,8 +517,8 @@ even when it completes the circuit; the player must then toggle a switch or lay 
 
 ### 3.7 Wires [O]
 
-* **Taking a wire** from the toolbox gives mode 4 (item 4). In mode 4 every loop pass runs
-  `PzElec_UpdatePlugCursor` 3083:1a94: hot point = mouse + current cursor offset; the first
+* **Taking a wire** from the toolbox gives mode 4 (item 4). In mode 4 every loop pass whose poll
+  returned 0 runs `PzElec_UpdatePlugCursor` 3083:1a94: hot point = mouse + current cursor offset; the first
   terminal (pieces 0..14, terminals 0..2, used pieces only) whose hit rectangle contains it
   decides: if it is free and the plug is not shown, the current cursor's picture (DS:7a78) becomes
   0x20ba and DS:a8c4 = 1; if no terminal contains the point and the plug is shown, the held
@@ -526,13 +537,22 @@ even when it completes the circuit; the player must then toggle a switch or lay 
                   T[target] = {start piece, start term, flag 0}
                   T[start]  = {target piece, target term, flag 1}
                   PzElec_DrawBoard(0); puzzle cursor; free held cursor; mode 99
-                  piece zones and label regions back; remove DS:24a4; PzSnd_Play(4,3); done
-              else:                                      a miss: THE WIRE IS LOST
-                  DS:a8ce += 1; PzElec_DrawBoard(0); toolbox; puzzle cursor; free held cursor
-                  mode 99; zones and regions back; remove DS:24a4; done
+                  piece zones and label regions back; remove DS:24a4; PzSnd_Play(4,3)
+                  return at once                         (3083:0c91 JMP 0d08)
+              else:                                      a miss: the wire goes back
+                  DS:a8ce += 1 (the toolbox's wire count, 3083:0ca8); PzElec_DrawBoard(0);
+                  toolbox; puzzle cursor; free held cursor; mode 99; zones and regions back;
+                  remove DS:24a4
+                  then keep polling until the hot point moves (3083:0cea..0d05): a further
+                  board click with the pointer unmoved runs PzElec_FindFreeTerminal again and
+                  can string a wire with nothing in the hand
   until done
   PzElec_SetMouseRange(0)
   ```
+  The connection branch 3083:0c1c..0c92 is missing from the Ghidra export; decoded from the bytes
+  it is the sequence above (T[target], T[start], `PzElec_DrawBoard(0)`, puzzle cursor, free the
+  held cursor, mode 99, piece zones, label regions, `Zones_RemoveLocal(DS:24a4)`, done,
+  `PzSnd_Play(4, 3)`) [O wave 3].
   The branch "target = start terminal" of the code is unreachable: `PzElec_FindFreeTerminal`
   skips the piece DS:a8c2, which is the start piece during the rubber band [O]. Only the
   0x454 code is looked at while stringing; other codes (menu, keys) are swallowed.
@@ -692,8 +712,10 @@ shipped data has at most 2].
 ### 3.11 Quirks to keep [O]
 
 1. The success test runs after switch clicks and wire actions only, never after placing a piece.
-2. Wires attached to a piece that is picked up vanish; a wire whose second click misses a free
-   terminal vanishes. The toolbox count is not restored in either case.
+2. Wires attached to a piece that is picked up, and a wire whose second click misses a free
+   terminal, go back into the toolbox (DS:a8ce is its wire count, §3.6, §3.7). (Wave 1 read the
+   word as a never-read "wires lost" counter and called the wires lost: corrected in wave 3.) After
+   a miss, a second board click with the pointer unmoved can still string a wire (§3.7).
 3. Free slots keep their type. `PzElec_AllBulbsLit` tests every slot of type 1 and
    `PzElec_IsSolved` every slot of type 2, used or not. A bulb or switch picked up from a slot
    above the lowest free slot and placed again leaves a stale type in its old slot (with all
@@ -796,9 +818,10 @@ loop:
     code = Input_StripHeld(Input_GetCode())
     PzEnergy_IdleAnimate()                   every pass
     0x44c: if mode == 1: PzEnergy_EraseLines()
-    0x44e: check button (pressed picture, effect 0x2b, wait release, restore, flush),
-           PzEnergy_SendEnergy(); if not solved and PzEnergy_IsSolved(): solved = 1, success
-    0x44f: Hint (§2.2), text = the built buffer
+    0x44e: check button (PzSnd_Play(0x2b, 5), then the pressed picture (33cd:00dc), wait release,
+           restore, flush), PzEnergy_SendEnergy(); if not solved and PzEnergy_IsSolved():
+           solved = 1, success
+    0x44f: Hint (§2.2; the pressed picture first, then effect 0x26, 33cd:015f), text = the built buffer
     0x450: PzEnergy_SelectEraser()           PzSnd_Play(0x16,3), eraser cursor, pencil count, mode 1
     0x451: PzEnergy_SelectPencil()           only when lines are left: pencil cursor, 0x16, mode 0
     0x452..0x455: PzSnd_Play(0x17,3); PzEnergy_DrawFromForm(code)
@@ -813,18 +836,23 @@ loop:
   rubber line `PzEnergy_DrawLine(start, (mx, my), 0)`, flush; then on code − 0x44c (table
   CS:0acb): 0x44c (work area) or 0x452..0x455 (a form) → stop; 0x456..0x459 (device d) → if no
   line k→d yet: `PzSnd_Play(0x18,3)`, line = 1, satisfied[k][d] = 1 when device d uses form[k],
-  lines left −1, at 0: arrow cursor and mode −1; `PzEnergy_DrawPencilCount`; stop; other codes →
-  go on. At the end: `PzEnergy_DrawLines`, `PzEnergy_SetMouseRange(0)`.
+  lines left −1, at 0: arrow cursor and mode −1; `PzEnergy_DrawPencilCount`; stop; **when the line
+  k→d already exists the rubber line does not stop: the loop goes on** (33cd:0a44 `JZ 0ab6`); other
+  codes → go on. At the end: `PzEnergy_DrawLines`, `PzEnergy_SetMouseRange(0)`. The "last pointer"
+  local that decides "the mouse moved" starts uninitialised (33cd:09a3); the engine draws at the
+  first poll [O wave 3].
 * `PzEnergy_DrawFromDevice(code)` 33cd:0ae7 is the mirror (start (dx, y[d]); table CS:0c22:
-  0x452..0x455 completes with form k; 0x44c and 0x456..0x459 stop). Its rubber line ends at (mx,
-  my + 3) (the pencil's offset), the other at (mx, my) [O; keep].
+  0x452..0x455 completes with form k, and an existing line goes on as above, 33cd:0b98 `JZ 0c0b`;
+  0x44c and 0x456..0x459 stop; its "last pointer" starts uninitialised too, 0aee). Its rubber line
+  ends at (mx, my + 3) (the pencil's offset), the other at (mx, my) [O; keep].
 * A wrong line costs a line of the budget like a right one; it does not stop the success test.
 * **Erasing** `PzEnergy_EraseLines` 33cd:0c97 (0x44c in mode 1): while a button is held, on every
   mouse move: point = (mx, my + 18); for every drawn line k→d (k outer, d inner) with
   `PzEnergy_PointOnLine((fx, y[k]), (dx, y[d]), point)`: satisfied[k][d] = (device d uses
   form[k]) ? 0 : 1, line = 0, sent[d][k] = 0, lines left +1, `PzEnergy_DrawPencilCount`,
   `PzEnergy_DrawLines`, `PzSnd_Play(0xb,3)`. The eraser stays selected; the pencil must be
-  clicked again to draw.
+  clicked again to draw. It polls nothing but `g_mouseButtons`: a pure busy-wait while the button
+  is held; its "last pointer" starts uninitialised (33cd:0c97) [O wave 3].
 * `PzEnergy_DrawLine(x1,y1,x2,y2,colour)` 33cd:0e0c: if x2 < x1 swap the ends; dx = x2 − x1, dy =
   |y2 − y1|, sy = ±1, e = 2·dy − dx; dx = 0 and dy ≠ 0: `Gfx_VLine(x1, min(y), dy + 1)`; else
   x = x1 − 1, repeat dx times: x += 1, pixel (x, y); while e ≥ 0: y += sy, pixel (x, y), e −=

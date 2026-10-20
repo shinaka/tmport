@@ -80,7 +80,10 @@ puzzle was solved during this visit, else 0** (part A §1.4). Each of the four p
 4. runs an **unpaced** input loop: `code = Input_StripHeld(Input_GetCode())`, a switch on the code,
    draws only on change (explicit `Dirty_Flush`). Timed animations use timer slots 0 or 7 inside
    handlers; nothing runs between events (part A §2.3);
-5. on leaving: `Pal_FadeOut`, frees everything, `PzSnd_FreeBank`, returns the solved flag.
+5. on leaving it frees everything and returns the solved flag, in its own order [O wave 3, the asm
+   at each exit]: machine pieces `PzPieces_Free`, `PzSnd_FreeBank`, then `Pal_FadeOut` (not the
+   fade first); gears `Puzzle_FreePanel`, `Pal_FadeOut`, `PzGears_Free`; balance and magnets fade
+   out first (`Pal_FadeOut`, then the frees and `PzSnd_FreeBank`).
 
 Common codes, as in part A §1.6:
 
@@ -107,7 +110,7 @@ Common codes, as in part A §1.6:
 | `Puzzle_ShowSolved(n)`: jingle n + random(4) | 3 → 3..6 | 5 → 5..8 | 2 → 2..5 | 6 → 6..9 |
 | `Puzzle_AwardPoints(n)` | 0x16 | 0xb | 0xd | 0xb |
 | puzzle cursor | resource 3 | resource 3 | resource 3 | resource 3 |
-| cursor at exit | the saved copy of `g_cursor` (§2.4) | `g_cursorArrow` | `g_cursorArrow` | `g_cursorArrow` |
+| cursor at exit | the saved copy of `g_cursor` (§2.4: the 0x18-byte copy is put back, stale save-under fields included, and DS:7a6a itself is selected as the record; the engine selects the saved record) | `g_cursorArrow` | `g_cursorArrow` | `g_cursorArrow` |
 
 Resource 3 is a 15×17 **hand** (not an arrow), the cursor the captures show over the puzzles
 (REFERENCE_CAPTURES §4) [O picture]. The pressed Hint picture 0x1095 is 36×15: machine pieces and
@@ -1108,11 +1111,14 @@ after the 6 poles: magnet i: fx += sx, fy += sy     (i16 wrapping)
 `PzMagnets_ISqrt(n)`: 1 for n < 4 (so a distance of 0 gives 1 and no division by zero); otherwise a
 binary search with low = 2, high = n/2, first guess n/4 + 1, guess = low + (high − low)/2 (unsigned
 32-bit compares of guess² with n), stopping when the low words of high and low differ by at most 1,
-returning low (or the exact root when guess² = n). An exact emulation (`isqrt.py`) gives floor(√n)
-for every 4 ≤ n < 131 074; the first failures are at n = 131 074..131 079 (the loop test sees the
-low word of n/2 and stops at once). Poles on the table are at most about 271 px apart (n < 74 000), so
-the engine may use an exact floor square root [O]. Since dist ≥ |dx|, the 16-bit products k·dx stay
-below 11 000 and never wrap [O, arithmetic].
+returning low (or the exact root when guess² = n). **Correction (wave 3):** the routine returns 2,
+not floor(√n), for n = 65 540 and 65 541: high = n/2 = 32 770 gives a low-word difference of 0x8000,
+and the **16-bit** abs of −32 768 is ≤ 1, which ends the loop (`isqrt.py` used Python's abs and
+missed these two); the next failures are at n = 131 074..131 079 (the loop test sees the low word of
+n/2 and stops at once). Squared distances of 65 540 and 65 541 do occur on the table (poles up to
+about 271 px apart, n < 74 000), so the engine keeps the literal routine [O wave 3, unit test
+"magnets square root": the misses are exactly {65540, 65541}]. Since dist ≥ |dx|, the 16-bit
+products k·dx stay below 11 000 and never wrap [O, arithmetic].
 
 The accumulators are **not cleared between substeps**: forces add up until a move is attempted
 (below). An attached magnet receives no force for the rest of the simulation (attached is cleared
@@ -1236,7 +1242,7 @@ actors are not ticked), so a seeded run stays in step as long as the same takes 
 |---|---|
 | `w0/17_puzzle`, `18_puzzle_piece1`, `20_puzzle_solved` | kind 2 variant 2; DS:b51e table, box count, held 0x0b, groups and anchors; rand calls 1 and 5 (§2.6, §2.10) |
 | `r2/puzzle/k2_screen`, `k2_solved` | kind 2 variant 0; 3 rand calls |
-| `r2/puzzle/k3_screen`, `k3_gear_placed`, `k3_solved` | kind 3 variant 0: home positions in +2; the large gear placed at (11,5); after the solving drag the crank at frame 5 after 19 counter-clockwise steps, the gear at frame 5 (8-frame wrap), the upper toothed rack +9 units (disengaged at 36 = 3·(11+1)), the lower +4 (34 = 3·11 + 1), both buttons pressed (§3.8) |
+| `r2/puzzle/k3_screen`, `k3_gear_placed`, `k3_solved` | kind 3 variant 0: home positions in +2; the large gear placed at (11,5); after the solving drag the crank at frame 5, the gear at frame 5 (8-frame wrap), the upper toothed rack +9 units (disengaged at 36 = 3·(11+1)), the lower +4 (34 = 3·11 + 1), both buttons pressed (§3.8). Wave 3: the solved state is 19 counter-clockwise, 1 clockwise and 1 counter-clockwise steps (21 steps, net 19); the last step moves both racks back onto their limits and presses button 9. `k3_04_one_button` is the moment after 19 counter-clockwise and 1 clockwise steps (racks 35 and 33). The documented input "two turns, release", posted as capture_r2.py's 49 moves, ends one step short at the k3_04 state (crank frame 6) when no move is dropped [O wave 3, the gears solve and posted-drag tests] |
 | `r2/puzzle/k4_screen`, `k4_unbalanced`, `k4_solved` | §4.8 |
 | `r2/puzzle/k7_screen`, `k7_rotated_placed`, `k7_repelled`, `k7_solved` | §5.10 |
 | frames `w0/17..20`, `r2/puzzle/k2..k7_*` | screen layout, box and count at (5,82) / (37,130), inventory positions, hook and weight positions, buttons, hand cursor |

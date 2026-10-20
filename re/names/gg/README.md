@@ -130,3 +130,18 @@ inferred), and the puzzle entries `PzPieces_Run`, `PzGears_Run`, `PzBalance_Run`
 DGROUP labels that the code reaches only through an immediate or a computed offset (for example
 DS:1792 = DS:1712 + 0x80, the launch table DS:2c62) had no Ghidra label before; ApplyNames creates
 them.
+
+## Wave 3 integration
+
+The game logic confirmed or corrected these rows (the evidence is in the specs named):
+
+* Removed `g_elecWiresLost` 1ea7:a8ce: the word is `g_elecToolCounts[4]`, the toolbox's wire count,
+  inside the i16[5] at DS:a8c6 (`code_puzzles_a.md` §3.6): **625 DGROUP labels**.
+* Signatures: `Score_Add(int points, int hud)` (the score bit only when hud ≠ 0, `code_world.md`
+  §17.1); `Actor_RemovePart(actor, part, checkHolder)` (non-zero: only when the actor holds the
+  part; the old name `anyHolder` had the meaning inverted, §9.7); `ScreenAnim_PlayModal(state)` (the
+  running animation + 8, §19.1); `Anim_Start(layer, x, y, frameBase, script, user, flags, callback)`
+  and `Anim_IsRunning(channel, script)` (`fmt_graphics.md` §6.3).
+
+The Ghidra export carries these after `bash tools/gg/ghidra_export.sh`.
+

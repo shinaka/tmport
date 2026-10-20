@@ -177,6 +177,18 @@ void Rooms::load(RoomSet set, std::vector<int16_t> itemCounts, const PartCatalog
     roomLoaded = false;
 }
 
+void Rooms::adopt(RoomSet set, std::vector<int16_t> itemCounts) {
+    rooms_ = std::move(set.rooms);
+    itemCounts_ = std::move(itemCounts);
+    if (itemCounts_.empty()) itemCounts_.push_back(0);
+}
+
+// 1622:02dd Rooms_Free (the heap half: List_Free of the item lists, Mem_Free of the counts and the set)
+void Rooms::freeSet() {
+    rooms_.clear();
+    itemCounts_.clear();
+}
+
 // 1622:0071 ItemPool_Reset
 void Rooms::resetItemPool() {
     for (ItemNode& n : pool_) n.free = true;

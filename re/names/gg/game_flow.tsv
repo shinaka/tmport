@@ -13,7 +13,7 @@
 12e0:096a	State_05_EnterRoom	int far State_05_EnterRoom(void)	menu bar on, room DS:7aa4 (1622:0411); room 0 -> 6 (workshop), else 7
 12e0:09aa	State_08_LeaveRoom	int far State_08_LeaveRoom(void)	DS:00bc (puzzle door) -> 9; DS:00be (vehicle finished) -> save, 10; else 5
 12e0:0a24	Room_OpenPuzzleDoor	void far Room_OpenPuzzleDoor(int solved)	If solved: the door actor0+0x36 (type 7) and its linked twin become type 9 (kind 4, picture 0x33c hall / 0x30e room); DS:b144 != 0 moves the player (actor0+0x1a) to the target room; called by State_09_Puzzle 38e2:0088
-12e0:0ace	Score_Add	void far Score_Add(int points)	DS:4572 += points (u32), HUD dirty
+12e0:0ace	Score_Add	void far Score_Add(int points,int hud)	DS:4572 += points (u32); HUD score bit 4 only when hud != 0 (the pick-up and the vehicle bonus pass 0, Hud_AddScoreNow 1)
 12e0:0aea	Projectiles_Add	void far Projectiles_Add(int n)	DS:457e += n, HUD dirty bit 8
 12e0:0afb	Game_Init	void far Game_Init(void)	actors (18f5:0721), workshop (2dee:1db5), HUD (1a04:025b), SndRes_Init, hint queue (Hint_Init)
 12e0:0b19	Game_Shutdown	void far Game_Shutdown(void)	registered with atexit by main: DS:00c0 = -1, sound off (1bb4:0e15), 1473:0103, Res_CloseFiles, 303a:0250 (Input_Remove path)

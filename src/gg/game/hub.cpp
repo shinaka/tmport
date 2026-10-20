@@ -32,25 +32,32 @@ std::array<HubZone, 8> HubScreen::zones(const GgExe& exe) {
     return z;
 }
 
+HubScreen::~HubScreen() { stopAnims(); }
+
+// 174b:0444 ScreenAnim_Free of both animations: out of the running list, the frame bundles released.
+void HubScreen::stopAnims() {
+    for (ScreenAnim& a : anims_) {
+        running_->stop(a);
+        if (cache_) cache_->releaseBundle(a.frameBundle());
+    }
+    anims_.clear();
+}
+
 // 12e0:0148 State_03_Hub, the set-up
 void HubScreen::setup(Video& video, const GgExe& exe, const Archive& archive, PicCache& cache,
                       const HubProgress& progress) {
     Screen& screen = video.screen();
-    // The title music (DS:0098, bank 0x1020, arrangement 2) is State_03_Hub's (the wave 2 preview plays
-    // it in gg/app/preview.cpp; TODO(wave 3): the hub state).
+    // The title music (DS:0098, bank 0x1020, arrangement 2) is the state's (game/flow.cpp state03Hub).
     std::vector<uint8_t> picture;
     video.loadPicture(archive, kPicture, kPalette, picture);  // Screen_LoadPicture
     screen.lpxDraw(0, 0, picture);
     video.palette().store(parsePaletteRange(archive.read(kPaletteExtra)));  // Pal_LoadRes(0xf6)
     screen.saveAll();
 
-    anims_.clear();
-    anims_.reserve(kAnims.size());
-    for (const uint16_t id : kAnims) anims_.push_back(ScreenAnim::load(cache, id));  // ScreenAnim_Load
-    list_.stopAll();
-    for (ScreenAnim& a : anims_) list_.start(a);                                    // ScreenAnim_Start
+    loadObjects(video, exe, archive, cache);
 
-    // The trophies: Res_Read(0x1003) into the shared buffer (recoloured in place).
+    // The trophies: Res_Read(0x1003) into the shared buffer (recoloured in place), drawn after the
+    // back page was saved (code_world.md §20 quirk 12: an animation crossing one would erase it).
     Resource trophies = archive.load(kTrophies);
     const auto members = parseBundle(trophies.bytes);
     if (members.size() >= 2) {
@@ -68,9 +75,30 @@ void HubScreen::setup(Video& video, const GgExe& exe, const Archive& archive, Pi
                 screen.lpxDrawKeyed(s16(xs, 2 * static_cast<size_t>(t)), s16(ys, 2 * static_cast<size_t>(t)), pic, 0);
             }
     }
+    addRegions(video, exe, archive);
+    // Zones_AddLocalArray(8, DS:0132) is the state's (the runtime's zone list, gg/input/zones.h).
+    video.sprites().reset();
+    complete_ = progress.racesWonTotal == 15;
+}
 
-    // The cursor labels (Res_LoadCopy(0x101f), Mouse_LoadCursors of members 0..3) and the hover
-    // regions over the zones; MouseRegion_AddArray puts them in front of the region list.
+void HubScreen::setupResumed(Video& video, const GgExe& exe, const Archive& archive, PicCache& cache) {
+    loadObjects(video, exe, archive, cache);
+    addRegions(video, exe, archive);
+    complete_ = false;
+}
+
+// ScreenAnim_Load(0x1005), ScreenAnim_Load(0x1007), both ScreenAnim_Start (12e0:01b3..01e9).
+void HubScreen::loadObjects(Video&, const GgExe&, const Archive&, PicCache& cache) {
+    stopAnims();
+    cache_ = &cache;
+    anims_.reserve(kAnims.size());
+    for (const uint16_t id : kAnims) anims_.push_back(ScreenAnim::load(cache, id));  // ScreenAnim_Load
+    for (ScreenAnim& a : anims_) running_->start(a);                                // ScreenAnim_Start
+}
+
+// The cursor labels (Res_LoadCopy(0x101f), Mouse_LoadCursors of members 0..3) and the hover regions
+// over the zones; MouseRegion_AddArray puts them in front of the region list (12e0:02f0..0362).
+void HubScreen::addRegions(Video& video, const GgExe& exe, const Archive& archive) {
     labels_ = archive.read(kCursorLabels);
     cursors_.clear();
     const auto labels = parseBundle(labels_);
@@ -84,19 +112,17 @@ void HubScreen::setup(Video& video, const GgExe& exe, const Archive& archive, Pi
                                                                                   : nullptr};
     }
     video.cursor().addRegions(regions_);
-    // TODO(wave 3): Zones_AddLocalArray(8, DS:0132) is the runtime's zone list (gg/input/zones.h).
-    video.sprites().reset();
-    complete_ = progress.racesWonTotal == 15;
 }
 
-// 12e0:03bf..03cb: one frame of the hub's animations
-void HubScreen::frame(Video& video, BorlandRand& rng) { list_.frame(video.screen(), video.sprites(), rng); }
+// 12e0:03bf..03cb: one frame of the hub's animations (ScreenAnim_Frame over the running list)
+void HubScreen::frame(Video& video, BorlandRand& rng) { running_->frame(video.screen(), video.sprites(), rng); }
 
-// 12e0:0479..: MouseRegion_Clear, Mouse_SetCursorPicture(arrow); the labels go with this object.
+// 12e0:047c..04da: MouseRegion_Clear, Mouse_SetCursorPicture(arrow), the cursors and the 0x101f copy
+// freed (with this object), ScreenAnim_Free of both animations.
 void HubScreen::leave(Video& video) {
     video.cursor().clearRegions();
     video.cursor().setCursorPicture(video.cursor().arrow());
-    list_.stopAll();
+    stopAnims();
 }
 
 }  // namespace tmport::gg

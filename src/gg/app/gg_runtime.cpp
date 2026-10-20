@@ -11,6 +11,20 @@
 
 namespace tmport::gg {
 
+const char* yieldPointName(YieldPoint p) {
+    switch (p) {
+        case YieldPoint::TimerWait: return "timerWait";
+        case YieldPoint::TimerExpired: return "timerExpired";
+        case YieldPoint::Delay: return "delay";
+        case YieldPoint::GetInputCode: return "getInputCode";
+        case YieldPoint::WaitInputCode: return "waitInputCode";
+        case YieldPoint::Idle: return "idle";
+        case YieldPoint::WaitRetrace: return "waitRetrace";
+        case YieldPoint::WaitTicks: return "waitTicks";
+    }
+    return "?";
+}
+
 GgRuntime::GgRuntime(RuntimeConfig config, platform::Host* host)
     : config_(config),
       host_(host),
@@ -142,6 +156,17 @@ void GgRuntime::setScript(dos::ScriptedInput script) {
     scriptNext_ = 0;
 }
 
+void GgRuntime::addScript(const dos::ScriptedInput& more, uint64_t offset) {
+    dos::ScriptedInput merged;
+    for (size_t i = scriptNext_; i < script_.events().size(); ++i) merged.add(script_.events()[i]);
+    for (dos::ScriptEvent e : more.events()) {
+        e.tick += offset;
+        merged.add(e);
+    }
+    script_ = std::move(merged);
+    scriptNext_ = 0;
+}
+
 void GgRuntime::applyScriptEvent(const dos::ScriptEvent& e) {
     const uint64_t when = std::max(scriptTimeNs(e), clock_.nowNs());
     keyboard_.deliverUntil(when);  // what the keyboard sent before it
@@ -250,12 +275,14 @@ void GgRuntime::timerWait(int slot) {
         }
     }
     endWait(start);
+    yielded(YieldPoint::TimerWait, slot);
 }
 
 bool GgRuntime::timerExpired(int slot) {
     poll();
     const bool r = timers_.expired(slot);
     lastPollIdle_ = !r;
+    yielded(YieldPoint::TimerExpired, slot);
     return r;
 }
 
@@ -267,12 +294,14 @@ void GgRuntime::delay(uint16_t n) {
     const uint32_t end = clock_.ticks() + n;
     while (clock_.ticks() < end) (void)getInputCode();
     endWait(start);
+    yielded(YieldPoint::Delay);
 }
 
 uint16_t GgRuntime::getInputCode() {
     poll();
     const uint16_t c = input_.getCode();
     lastPollIdle_ = c == 0;
+    yielded(YieldPoint::GetInputCode);
     return c;
 }
 
@@ -281,12 +310,14 @@ uint16_t GgRuntime::waitInputCode() {
     uint16_t c = 0;
     while ((c = getInputCode()) == 0) {
     }
+    yielded(YieldPoint::WaitInputCode);
     return c;
 }
 
 void GgRuntime::idle() {
     poll();
     lastPollIdle_ = true;
+    yielded(YieldPoint::Idle);
 }
 
 void GgRuntime::waitRetrace() {
@@ -304,6 +335,7 @@ void GgRuntime::waitRetrace() {
         }
     }
     endWait(start);
+    yielded(YieldPoint::WaitRetrace);
 }
 
 void GgRuntime::waitTicks(uint64_t n) {
@@ -320,6 +352,7 @@ void GgRuntime::waitTicks(uint64_t n) {
         }
     }
     endWait(start);
+    yielded(YieldPoint::WaitTicks);
 }
 
 // ------------------------------------------------------------------------------------------ frames

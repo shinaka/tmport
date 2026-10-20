@@ -1,7 +1,7 @@
 #pragma once
 // The Technology Center hub, state 3 of Seq_Run (12e0:0148; re/gg/docs/code_world.md §3): its screen
-// set-up and its frame, the drawing half. The input dispatch (buildings, the sign-in booth, Esc), the
-// music and the leaving are wave 3's; they need nothing more than this object.
+// set-up and its frame, the drawing half. The state itself (the music, the zones, the input dispatch:
+// buildings, the sign-in booth, Esc; the leaving) is game/flow.cpp's state03Hub on this object.
 //
 // Set-up order (§3.1): the picture 0x1002 with palette 0x1004 at (0, 0), Pal_LoadRes(0xf6),
 // Screen_SaveAll; the screen animations 0x1005 and 0x1007 loaded and started; the trophies (bundle
@@ -43,6 +43,13 @@ struct HubZone {
 
 class HubScreen {
 public:
+    // `running`: the running list the animations join (the game's g_screenAnims DS:7a46,
+    // GgGame::screenAnims); nullptr: a list of this object's own (the tools).
+    explicit HubScreen(ScreenAnims* running = nullptr) : running_(running ? running : &list_) {}
+    ~HubScreen();
+    HubScreen(const HubScreen&) = delete;
+    HubScreen& operator=(const HubScreen&) = delete;
+
     static constexpr uint16_t kPicture = 0x1002;
     static constexpr uint16_t kPalette = 0x1004;
     static constexpr uint16_t kPaletteExtra = 0x00F6;
@@ -59,20 +66,33 @@ public:
     // loads go into video's shadow (a tool shows the shadow afterwards; the runtime fades in at the
     // first frame).
     void setup(Video& video, const GgExe& exe, const Archive& archive, PicCache& cache, const HubProgress& progress);
+    // The set-up without the drawing, for a game resumed in the hub's frame loop from a DOSBox-X state
+    // (game/load_state.h), whose screen, back page and palette already show it: the animations loaded
+    // and started (their run-time fields are the caller's to restore), the cursor labels, the hover
+    // regions and the zones. The sprite list is left as it is (the caller restored it).
+    void setupResumed(Video& video, const GgExe& exe, const Archive& archive, PicCache& cache);
     // One frame of the loop (12e0:03bf): ScreenAnim_Frame; the caller flushes or fades in.
     void frame(Video& video, BorlandRand& rng);
-    // Leaving (12e0:0479..): the hover regions cleared and the default cursor restored; the labels
-    // and animations are freed with this object. Pal_FadeOut is the caller's.
+    // Leaving (12e0:0479..): the hover regions cleared and the default cursor restored, the two
+    // animations out of the running list (ScreenAnim_Free); the labels are freed with this object.
+    // Pal_FadeOut is the caller's.
     void leave(Video& video);
 
-    ScreenAnims& anims() { return list_; }
+    ScreenAnims& anims() { return *running_; }
+    size_t animCount() const { return anims_.size(); }
     ScreenAnim& anim(size_t i) { return anims_.at(i); }
     const std::array<HubZone, 8>& hubZones() const { return zones_; }
     bool complete() const { return complete_; }
 
 private:
+    void loadObjects(Video& video, const GgExe& exe, const Archive& archive, PicCache& cache);
+    void addRegions(Video& video, const GgExe& exe, const Archive& archive);
+    void stopAnims();
+
     std::vector<ScreenAnim> anims_;
     ScreenAnims list_;
+    ScreenAnims* running_;
+    PicCache* cache_ = nullptr;  // where the animations' frame bundles were loaded
     std::vector<uint8_t> labels_;                      // the 0x101f copy (Res_LoadCopy)
     std::vector<std::unique_ptr<CursorRecord>> cursors_;  // Mouse_LoadCursors of members 0..3
     std::array<CursorRegion, 8> regions_{};

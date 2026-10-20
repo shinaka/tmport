@@ -72,7 +72,7 @@ const AnimStep* lastFrameStep(const Actor& a, const ActorSet& set) {
 }
 
 // 1834:0733 Actors_Draw
-void actorsDraw(const std::array<Actor, 12>& actors, int displayRoom, int& playerBlink, SpriteList& sprites) {
+void actorsDraw(const std::array<Actor, 12>& actors, int displayRoom, int16_t& playerBlink, SpriteList& sprites) {
     for (size_t i = 1; i < actors.size(); ++i) {
         const Actor& a = actors[i];
         if (a.disabled == 0 && a.room == displayRoom && !a.hidden()) sprites.add(a.sprite);
@@ -81,7 +81,7 @@ void actorsDraw(const std::array<Actor, 12>& actors, int displayRoom, int& playe
     if (player.immune == 0) playerBlink = 0;
     if (!player.hidden()) {
         if (playerBlink < 2) sprites.add(player.sprite);
-        if (player.immune != 0) playerBlink = (playerBlink + 1) % 4;
+        if (player.immune != 0) playerBlink = static_cast<int16_t>((playerBlink + 1) % 4);
     }
 }
 

@@ -203,7 +203,7 @@ Root: `extracted\captures\gg\`. Shots are DOSBox-X's 640x400 PNGs of mode 13h. E
 | Files | Shows | Input |
 |---|---|---|
 | 01-02 | title; story page 1 on the airship | (boot) |
-| 03-04 | sign-in: empty roster, the arrow cursor at the driver's reset position; name "Ada" typed | Space; `text:ada` |
+| 03-04 | sign-in: empty roster, the arrow cursor at the driver's reset position; name "Ada" typed | Space (during story page 3: `g_storyTextId` DS:a04e = 0x101c in 03 and 06, 0x1019 in 01; `g_ticks` 0x3343 at 03 [O wave 3]); `text:ada` |
 | 05 | the With/Without Chimps dialog | mouse click Start Game (164,180) |
 | 06-07 | Technology Center hub; hovering the left building shows the label "AIRCRAFT" | click With Chimps (93,137); move (100,50) |
 | 08-10 | Aircraft building: New Player Hint over the Level-1 BLIMP blueprint; the blueprint; the Decal part's page | click (62,85); Enter; click (53,51) |
@@ -423,6 +423,19 @@ Bob (without chimps) solved further variant-0 puzzles of kinds 1, 2, 3, 4, 5, 6 
 doors while collecting parts (§9.2); those door states are the `NN_doorNN_kK` states of
 `r2/aircraft/`.
 
+The cursors in these shots and states [O wave 3]:
+
+* `k0_01_screen` and `k1_01_screen` (and the `k0_screen` / `k1_screen` states, and the other
+  kinds' `screen` states) show the **arrow left by the New Player Hint box**, not the puzzles'
+  cursors: the electric and simple machines loops flush only on input, so the arrow the box forced
+  stays until the pointer moves. In those states DS:7a4a is the arrow DS:7a82 while the default
+  region's record DS:0a6c is already the puzzle's hand. Launch and energy redraw on their timers, so
+  their shots show their own cursors; `k5_01_screen` is in another glow phase than its state.
+* `k4_02_weight_carried` was taken with the pointer at (100, 50).
+* A MOUSEKEY click's release carries its position, so it undoes a pointer warp the game made in
+  between (magnets' +5 / +5 on a drop). Commands act about 50 ms after they start and are posted
+  about 62 ms apart; a click holds the button 120 ms (the engine's tests time their scripts so).
+
 ### 9.2 Buildings and races
 
 Player Bob (without chimps), level 1 in each building.
@@ -446,7 +459,8 @@ Player Bob (without chimps), level 1 in each building.
 **Automotive** (`r2\automotive\`, building 0, race index 0, Level-1 DOWNHILL RACER; body, wheels,
 brakes): blueprint, body page, workshop, room 1, boxes moved by the tube (§9.9), the three pick-ups,
 the build, race won (`11_vehicle_built` → `13_won_rankup` → `14_won_postrace`; AVI
-`r2_automotive_race1_won.avi` + `.dro`).
+`r2_automotive_race1_won.avi` + `.dro`). The shot `13_race_end` shows the rank-up box, not the
+bare result screen (likewise Alternative Energy's) [O wave 3].
 
 **Alternative Energy** (`r2\altenergy\`, building 2, race index 10, Level-1 PEDAL-POWERED RACER;
 body, wheels, brakes, gears): the same steps, race won (`11_vehicle_built` → `13_won_rankup` →
@@ -468,6 +482,13 @@ from the workshop (`39`), part pages (`46`-`48`, and `03_blueprint_body_page` of
 buildings), swapping the engine (`45_vehicle_other_engine`) and the envelope
 (`55_vehicle_narrow_envelope`). AVI `r2_workshop_idle.avi` + `.dro` (remove, belt both ways) and
 `r2_aircraft_tube_to_workshop.avi` (fade, the parts hint).
+
+Moments of these shots and states [O wave 3]: the state `30_workshop_with_parts` is saved inside
+the parts hint 0x1045's box (the hint seen flags of 29 and 31 differ by 0x1045 only), and
+`35_vehicle_assembled` inside the "finished" hint 0x1053's box: a resume there finds the box's zones
+pushed over the workshop's. Shot `39` was taken with the engine removed (from state 38), the
+blueprint shots `46`-`48` after state 45. All four blueprint shots carry the original's arrow: 39 at
+(270, 50), 46 at (200, 75), 47 at (165, 140), 48 at (220, 125).
 
 ### 9.4 Final movie (`r2\movie\`, states `r2/movie/`)
 
@@ -499,7 +520,11 @@ ARCHITECTURE §10 question 1 (the movie uses the results palette).
 * Resume: `SSG` typed at the DOS prompt (same DOSBox-X session, clock not reset) → title → sign-in
   (`05`, Bob shown with 1,720 points) → Start Game → hub → Aircraft: the player is back in **room 4
   at the same spot** with all parts, no question, no building hint (`08_aircraft_resumed`) [O]. The
-  HUD inventory lists the parts in another order than before the save [O, shots 01 and 08].
+  HUD inventory lists the parts in another order than before the save [O, shots 01 and 08]. The
+  player faces front in `08` because the idle bit had fired (0x111C ticks without a held key since
+  the program's start, `code_runtime.md` §6.5): the block restores his sideways pose, and a resume
+  less than 30 s after the last held key shows that pose until then [O wave 3, the engine's
+  playthrough].
 
 ### 9.6 Menus and dialogs (`r2\menus\`)
 
@@ -618,7 +643,9 @@ overlay loads; resource loading and decompression happen inside the black gaps o
 Movie frames every 18.0 ticks (§10.1); the three `Delay(1460)` cues (frames 15, 17, 19 of the cue
 table, `movie.py --cues`) show as 705-706 unchanged video frames = **10.06-10.07 s** each
 (1460 ticks = 10.02 s plus the frame period). The movie runs from frame 2942 to 7423 of
-`r2_movie_race15.avi` (64 s), then waits for a key.
+`r2_movie_race15.avi` (64 s), then waits for a key. `r2_movie_race15.dro` has a 13.68-s silence
+(27 778-41 455 ms) while the rank-up box holds the sound (`Snd_Pause`); the movie's music starts at
+the first key-on after it (41 459 ms) [O wave 3].
 
 ### 10.6 Sound [O]
 
@@ -645,7 +672,10 @@ table, `movie.py --cues`) show as 705-706 unchanged video frames = **10.06-10.07
   choice there are exactly the 2 calls of the choice (`calls`).
 * With the two chimps of Aircraft level 1 (`w0/15_at_door`), 11 calls precede the choice when the
   door is taken on the first frames after the load; the kind is the 12th call, the variant pick the
-  13th. The puzzle set-ups of variant 0 call `rand()` no further before their screen.
+  13th. The puzzle set-ups of variant 0 call `rand()` no further before their screen. Precisely
+  [O wave 3, the engine from `r2/puzzle/kK_door`, w0/15 with Up held]: the player's sequence 34 ends
+  after 10 frames, with 11 chimp `R(1000)` calls; the choice's R(8) and R(3) then give the
+  `kK_screen` state.
 * Races call `rand()` never (no caller in 3dd6/3e77) and are deterministic: replaying
   `race_automotive` from its state gave **identical** result and post-race screens (0 pixels), and
   542 of 600 race frames identical; the rest are updates caught on the other side of a retrace,
@@ -654,7 +684,13 @@ table, `movie.py --cues`) show as 705-706 unchanged video frames = **10.06-10.07
   reproduce the solved screen to the pixel. Kind 3 does not reliably: while the crank is held the
   game moves the pointer itself (INT 33h fn 4, 3b2f:09a2) and the outcome depends on where the
   posted moves fall (2 of 4 tries solved). A fast plunger pull in kind 5 gave energy 7: the plunger
-  follows the pointer with a lag.
+  follows the pointer with a lag. Why [O wave 3]: `PzGears_DragCrank` warps the pointer to the
+  handle centre of rect[frame + 1] after every step, which races the posted absolute MOUSEKEY moves,
+  and moves are dropped while the game draws; the solved state holds 21 steps (19 counter-clockwise,
+  1 back, 1 on), not "two turns", and the 49 posted moves end one step short at `k3_04_one_button`
+  when none is dropped. `k3_03_crank_wrong_way` is crank frame 20 with the racks at their left
+  limits 20 and 23 (reached after 7 steps): 22 handle events onto the next handle clockwise give 20
+  steps, because 2 of them land on the slope of the handle the game warped to.
 
 ## 11. Behaviour observed (for the specs)
 
@@ -668,7 +704,10 @@ table, `movie.py --cues`) show as 705-706 unchanged video frames = **10.06-10.07
 * **Held keys.** A held Up (DS:0218 bit 4) at the moment the player arrives through a door takes him
   back through that door as soon as another arrow is pressed [O, with the poked Up]. The real
   keyboard does the same if Up is still held.
-* **Warehouse controls** [O]: walk about 16 px/s, run (Ctrl) about 54 px/s; Up+Left/Right jumps
+* **Warehouse controls** [O]: walk 12 px per 96 PIT ticks = 18.2 px/s, run (Ctrl) 35 px per 96 ticks
+  = 53.1 px/s (measured on `r2_warehouse_walk.avi` frames 182..275 and 327..420 in wave 3: one step
+  every 12 ticks, the box edge moving 3, 0, 1, 4, 2, 0, 0, 2 and 4, 2, 4, 4, 6, 3, 1, 11 per step,
+  the sequences' anchor deltas rotated; wave 1 estimated 16 and 54 px/s); Up+Left/Right jumps
   over floor gaps (with Ctrl farther, as the help says); springs (type 4 objects; +0x18/+0x1A hold
   the landing point) throw the player one floor up; those with +0x12 = 1 are not drawn [O] (whether
   they act was not tried); floor gaps drop him a floor (in the 3-floor rooms they are type 5 objects

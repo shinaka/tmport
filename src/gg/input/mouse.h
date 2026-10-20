@@ -95,8 +95,8 @@ public:
     // lower clamp), then INT 33h AX=07h (CX = x, not doubled; DX = 2 * maxX) and AX=08h (y, maxY).
     void setBounds(int16_t x, int16_t y, int16_t w, int16_t h, int16_t cursorW, int16_t cursorH);
     // The puzzles' pointer warp (PzMagnets_WarpMouse 35bb:0103, 3b2f:098f, 4140:0000): g_mouseX/Y =
-    // (x, y), then INT 33h AX=04h with CX = 2x, DX = y. The host pointer is not moved here (the
-    // runtime's warp hook may follow it; TODO(wave 3): set onWarp to move the host pointer).
+    // (x, y), then INT 33h AX=04h with CX = 2x, DX = y. The host pointer is not moved here: onWarp
+    // follows it (game/pointer_warp.h PointerWarpHook sets it while gears and magnets run in a window).
     void warp(int16_t x, int16_t y);
     std::function<void(int16_t x, int16_t y)> onWarp;  // the runtime's host-pointer hook (optional)
 

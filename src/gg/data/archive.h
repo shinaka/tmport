@@ -15,6 +15,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <span>
 #include <string>
 #include <vector>
@@ -67,6 +68,20 @@ struct Resource {
     ResType resType() const { return static_cast<ResType>(type); }
 };
 
+// The LZH input refill 1b48:002e (code_runtime.md §6.4, §16.2): Lzh_Decompress reads a method-3
+// stream in blocks of 4000 bytes (1b48:0002, the first one too, after the 4-byte size word) and after
+// each read drains the keyboard ring (Kbd_PopQueuedKey until it returns 0), so keys typed while a
+// resource is decoded are lost. The engine decodes at once: a load on a thread with a hook calls it
+// once with the number of those reads. The game installs one for its own thread (game/flow.h
+// installLzhKeyDrain); loads on other threads (tools, tests) and stored entries never call it.
+inline constexpr size_t kLzhReadBlock = 4000;
+using LzhRefillHook = std::function<void(int reads)>;
+// For the calling thread; an empty hook removes it. Returns the previous one.
+LzhRefillHook setLzhRefillHook(LzhRefillHook hook);
+// The 4000-byte reads Lzh_Decompress makes for a stream of which it used `usedBytes` (the size word
+// included): ceil((usedBytes - 4) / 4000).
+int lzhReadCount(size_t usedBytes);
+
 class Archive {
 public:
     static constexpr int kVolumes = 4;
@@ -103,7 +118,8 @@ public:
     uint32_t originalReadSize(uint16_t id) const;
 
     // Res_Read / Res_LoadCopy: the decoded entry. Throws std::out_of_range for a missing id and
-    // tmport::FormatError for a broken one (`info`, if given, receives the method-3 details).
+    // tmport::FormatError for a broken one (`info`, if given, receives the method-3 details). A method-3
+    // entry calls the thread's LzhRefillHook (see above).
     Resource load(uint16_t id, LzhInfo* info = nullptr) const;
     // The same, checking the type: throws tmport::FormatError when the entry has another type.
     Resource load(uint16_t id, ResType expected) const;

@@ -18,17 +18,23 @@
 
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <span>
+#include <string>
 
 #include "gg/gfx/palette.h"
 #include "gg/input/zones.h"
 #include "gg/save/players_dat.h"
+#include "gg/save/players_store.h"
 #include "gg/ui/button.h"
 #include "gg/ui/rank.h"
 #include "gg/ui/scroll_bar.h"
 #include "gg/ui/ui_canvas.h"
 
 namespace tmport::gg {
+
+class GgGame;
+class GgStateFile;
 
 class Archive;
 class GgExe;
@@ -74,27 +80,55 @@ public:
     virtual int mouseY() = 0;
 };
 
+// The sign-in's variables (DGROUP globals of ovl07, code_ui.md §11.1). A SignIn keeps its own (the
+// tools, the wave 2 preview, tests) until bind() points it at the game's (GgState::ui, ui/signin_run.cpp:
+// the one home of these globals while the game runs).
+struct SignInVars {
+    Roster* roster = nullptr;        // g_roster DS:a075 -> the heap copy of the header and index
+    int16_t* index = nullptr;        // g_rosterIndex DS:a079
+    int16_t* typedLen = nullptr;     // g_typedLen DS:a071 (-1 right after entry)
+    uint8_t* typed = nullptr;        // g_typedName DS:a054 (16 bytes)
+    uint8_t* typed16 = nullptr;      // DS:a064: the byte past g_typedName a 16th 0x1F marker writes
+    int16_t* clicked = nullptr;      // g_signinClicked DS:a073 (written only)
+    uint32_t* lastClick = nullptr;   // g_signinLastClick DS:a06d (written only)
+    uint32_t* prevClick = nullptr;   // g_signinPrevClick DS:a069 (written only)
+    int16_t* arrowRepeat = nullptr;  // g_signinArrowRepeat DS:a065 (written only: a throttle that never throttles)
+    int16_t* arrowCount = nullptr;   // g_signinArrowCount DS:a067 (never incremented)
+    ScrollBar* bar = nullptr;        // g_rosterScrollBar DS:20dc
+
+    bool complete() const {
+        return roster && index && typedLen && typed && typed16 && clicked && lastClick && prevClick && arrowRepeat &&
+               arrowCount && bar;
+    }
+};
+
 class SignIn {
 public:
     // The DGROUP records (the three picture buttons DS:20f0/2110/2130, the scroll bar DS:20dc, the
     // list and bar zones DS:2150/2166, the rank tables) and SignIn_LoadButtons' PicBtn_Load of the
     // three bundles (2caa:1382: Cancel at (250, 172), New Player at (197, 170), Start Game at (146,
-    // 170)) and the scroll bar's pictures.
+    // 170)) and the scroll bar's pictures. The variables are the screen's own (see bind).
     SignIn(const GgExe& exe, const Archive& archive);
     // Its zones may be linked into a ClickZones list and its rank names point into the exe's DGROUP:
     // it stays where it is, and the GgExe outlives it.
     SignIn(const SignIn&) = delete;
     SignIn& operator=(const SignIn&) = delete;
 
-    Roster& roster() { return roster_; }
-    const Roster& roster() const { return roster_; }
-    int count() const { return roster_.count; }
+    // Works on `vars` from now on (every pointer set; they outlive the screen): the game binds the
+    // screen to GgState::ui. The own copies stay as they were.
+    void bind(const SignInVars& vars);
+    const SignInVars& vars() const { return v_; }
+
+    Roster& roster() { return *v_.roster; }
+    const Roster& roster() const { return *v_.roster; }
+    int count() const { return v_.roster->count; }
     // g_rosterIndex DS:a079 (later the signed-in player's entry).
-    int index() const { return index_; }
+    int index() const { return *v_.index; }
     // g_typedName DS:a054 / g_typedLen DS:a071 (-1 right after entry).
-    int typedLength() const { return typedLen_; }
-    std::span<const uint8_t> typedBytes() const;  // the first typedLength() bytes
-    ScrollBar& scrollBar() { return bar_; }
+    int typedLength() const { return *v_.typedLen; }
+    std::span<const uint8_t> typedBytes() const;  // the first typedLength() bytes (at most 16)
+    ScrollBar& scrollBar() { return *v_.bar; }
+    const ScrollBarPictures& barPictures() const { return barPics_; }
     PicButton& cancelButton() { return cancel_; }
     PicButton& newPlayerButton() { return newPlayer_; }
     PicButton& startGameButton() { return startGame_; }
@@ -105,14 +139,24 @@ public:
     static int32_t points(const RosterEntry& e) { return static_cast<int32_t>(e.points); }
 
     // 2caa:1240 State_02_SignIn after Roster_LoadOrCreate and SignIn_ShowScreen: Cancel enabled =
-    // (count == 0), New Player and Start Game enabled = (count > 0); index 0, typed length -1; the
-    // scroll bar max = max(0, count - 8), next = now, pos 0.
+    // (count == 0), New Player and Start Game enabled = (count > 0); g_signinClicked 0, index 0, typed
+    // length -1; the scroll bar max = max(0, count - 8), next = now, pos 0.
     void begin(const Roster& roster, uint32_t now);
-    // 2caa:0eb3 SignIn_Run's entry: Screen_SaveAll; SignIn_DrawList(0, -1, -1); PicBtn_Draw x 3;
-    // ScrollBar_Draw; the zones (list, Cancel, New Player, Start Game, bar) when `zones` is given;
-    // Dirty_Flush; then (after the input flush) typed length -1 becomes 0 and an empty roster runs
-    // SignIn_HandleCode(0x703) (New Player).
-    void enter(const UiCanvas& ui, SignInHost& host, ClickZones* zones = nullptr);
+    // 2caa:0eb3 SignIn_Run's entry, its drawing: Screen_SaveAll; SignIn_DrawList(0, -1, -1);
+    // PicBtn_Draw x 3; ScrollBar_Draw; the zones (list, Cancel, New Player, Start Game, bar) when
+    // `zones` is given; Dirty_Flush.
+    void show(const UiCanvas& ui, ClickZones* zones = nullptr);
+    // SignIn_Run's entry after its Input_Flush and the poll until Input_GetCode returns 0: typed length
+    // -1 becomes 0 and an empty roster runs SignIn_HandleCode(0x703) (New Player); the click stamp
+    // g_signinLastClick = 0.
+    void start(const UiCanvas& ui, SignInHost& host);
+    // show() and start() (the tools and tests, which have no input to flush in between).
+    void enter(const UiCanvas& ui, SignInHost& host, ClickZones* zones = nullptr) {
+        show(ui, zones);
+        start(ui, host);
+    }
+    // SignIn_Run 2caa:0f86: a poll that gave no code copies g_signinLastClick into g_signinPrevClick.
+    void idlePoll() { *v_.prevClick = *v_.lastClick; }
     // SignIn_Run's exit: the zones it added are removed.
     void leave(ClickZones& zones);
 
@@ -137,26 +181,74 @@ public:
     void drawButtonNormal(const UiCanvas& ui, PicButton& b) { picBtnDrawNormal(ui, b); }
 
 private:
-    RosterEntry& entry(int i) { return roster_.entries[static_cast<size_t>(i)]; }
-    bool indexValid() const { return index_ >= 0 && index_ < roster_.count; }
+    // The variables (SignInVars) by name.
+    Roster& R() { return *v_.roster; }
+    int16_t& idx() { return *v_.index; }
+    int16_t& tlen() { return *v_.typedLen; }
+    ScrollBar& bar() { return *v_.bar; }
+    // g_typedName[i], i = 0..16 (16: DS:a064).
+    uint8_t& typedAt(int i) { return i < 16 ? v_.typed[i] : *v_.typed16; }
+    // Text_Width(g_typedName): up to its NUL, in the 17 bytes (code_ui.md §11.5).
+    int typedWidth(Fonts& fonts) const;
+    RosterEntry& entry(int i) { return R().entries[static_cast<size_t>(i)]; }
+    bool indexValid() const { return *v_.index >= 0 && *v_.index < v_.roster->count; }
     void drawRow(const UiCanvas& ui, int k, int e);
     // SignIn_DrawScoreRank 2caa:04ae.
     void drawScoreRank(const UiCanvas& ui, uint32_t points, int x, int y);
     // The rescroll SignIn_HandleCode does after Backspace, typing and the trailing-space strip.
     void keepIndexVisible(const UiCanvas& ui, int& redrawFrom);
 
-    Roster roster_;
-    int index_ = 0;
-    int typedLen_ = -1;
-    std::array<uint8_t, 17> typed_{};  // char[16] + the byte after it that a 16th 0x1F reaches
-    int clicked_ = 0;                   // g_signinClicked DS:a073 (written only)
-    uint32_t lastClick_ = 0;            // g_signinLastClick DS:a06d (written only)
+    // The screen's own variables (until bind).
+    struct Own {
+        Roster roster;
+        int16_t index = 0;
+        int16_t typedLen = -1;
+        std::array<uint8_t, 16> typed{};
+        uint8_t typed16 = 0;
+        int16_t clicked = 0;
+        uint32_t lastClick = 0;
+        uint32_t prevClick = 0;
+        int16_t arrowRepeat = 0;
+        int16_t arrowCount = 0;
+        ScrollBar bar;
+    };
+    Own own_;
+    SignInVars v_;
 
     PicButton cancel_, newPlayer_, startGame_;
-    ScrollBar bar_;
     ScrollBarPictures barPics_;
     Zone listZone_, barZone_;
     RankTable ranks_;
 };
+
+
+// ---- wave 3: the run (owner: ui agent; ui/signin_run.cpp) -------------------------------------------
+// The sign-in's state: GgState::ui (the roster copy g_roster, g_rosterIndex, the typed name and
+// length, the vestiges, the scroll bar record): the screen (UiObjects::signIn) is bound to it
+// (signInVarsOf).
+struct UiState;
+SignInVars signInVarsOf(UiState& ui);
+
+// 2caa:1240 State_02_SignIn: play mode 0, g_inBuilding = 0, Roster_LoadOrCreate, the title music
+// (DS:0098), SignIn_LoadButtons, the screen, the buttons' states, SignIn_Run; a new player:
+// Player_InitRecord, Dlg_AskChimps -> g_withChimps, the entry into the record, Players_SaveCurrent
+// (GgSaveMoment::NewPlayer) and Roster_Save; an existing one: Players_LoadRecord, DS:1ad4 =
+// g_soundOff, SndRes_ApplySoundOption; Pal_FadeOut, SignIn_Free; 0 (-> state 3).
+int16_t state02SignIn(GgGame& g);
+// 2caa:0eb3 SignIn_Run: the busy poll of code_ui.md §11.4 (the picture buttons' pressed pictures, the
+// scroll bar with its drag, Esc's Save & Exit with g_saveDisabled = 1, Del as Backspace); returns the
+// code that signed in.
+uint16_t signInRun(GgGame& g, SignIn& screen);
+// 2caa:004f Roster_LoadOrCreate: the store's header and index into GgState::ui.roster (the file
+// created with the slot-98 anomaly when missing or of another version: PlayersStore::load).
+void rosterLoadOrCreate(GgGame& g);
+// 2caa:0145 Roster_Save: GgState::ui.roster's header and index to PLAYERS.DAT (Ctrl+R, a new player).
+void rosterSave(GgGame& g, GgSaveMoment moment);
+// SignInHost over the game (the boxes, the typing effect, the roster save, the clock and the pointer).
+std::unique_ptr<SignInHost> makeSignInHost(GgGame& g);
+// The UI's part of starting from a DOSBox-X state (game/load_state.h): the roster copy g_roster DS:a075
+// (a heap block) from the state's RAM, the installed menu bar, an open dialog or text viewer. False with
+// a reason when the moment cannot be resumed.
+bool uiRestoreFromState(GgGame& g, const GgStateFile& s, std::string& why);
 
 }  // namespace tmport::gg

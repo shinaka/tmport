@@ -6,6 +6,7 @@
 #include "gg/data/archive.h"
 #include "gg/data/dgroup_offsets.h"
 #include "gg/data/gg_exe.h"
+#include "gg/game/game.h"
 #include "gg/gfx/video.h"
 #include "util/error.h"
 #include "util/log.h"
@@ -55,13 +56,14 @@ void PzElectric::loadResources(int variant) {
     bulbLitPic_ = archive_.read(kBulbLit);
     dotUpper_ = archive_.read(kDotUpper);
     dotLower_ = archive_.read(kDotLower);
+    hintPressed_ = archive_.read(kHintPressed);
+    hintText_ = puzzleText(archive_, static_cast<uint16_t>(kHintTextFirst + variant));
     panelText_ = puzzleText(archive_, static_cast<uint16_t>(kPanelTextFirst + variant));
 }
 
 // 3083:1f35 PzElec_SetTerminalGeometry
-void PzElectric::setTerminalGeometry(int piece, int type) {
-    Piece& p = pieces_[static_cast<size_t>(piece)];
-    for (Terminal& t : p.t) t.piece = kNone;
+void PzElectric::setTerminalGeometry(int p, int type) {
+    for (int t = 0; t < 3; ++t) term(p, t).piece = kNone;
     if (type < 0 || type > 3) {
         log::debug("PzElec_SetTerminalGeometry: type {} (the original fails an assert)", type);
         return;
@@ -72,7 +74,7 @@ void PzElectric::setTerminalGeometry(int piece, int type) {
             log::debug("PzElec_SetTerminalGeometry: a store outside the terminals (DS:{:04x})", disp);
             continue;
         }
-        Terminal& t = p.t[static_cast<size_t>(off) / kTermSize];
+        ElecTerminalRec& t = term(p, static_cast<int>(static_cast<size_t>(off) / kTermSize));
         const auto v = static_cast<int16_t>(value);
         switch (static_cast<size_t>(off) % kTermSize) {
         case 0x00: t.hitX = v; break;
@@ -87,6 +89,7 @@ void PzElectric::setTerminalGeometry(int piece, int type) {
         case 0x12: t.piece = v; break;
         case 0x14: t.term = v; break;
         case 0x16: t.flag = v; break;
+        case 0x18: t.field18 = v; break;
         default: log::debug("PzElec_SetTerminalGeometry: a store into the middle of a field"); break;
         }
     }
@@ -97,21 +100,22 @@ void PzElectric::autoConnect(int p) {
     for (int t = 0; t < 3; ++t) {
         if (term(p, t).piece != kNone) continue;
         for (int q = 0; q < kSlots; ++q) {
-            if (!pieces_[static_cast<size_t>(q)].used || q == p) continue;
+            if (piece(q).used == 0 || q == p) continue;
             for (int u = 0; u < 3; ++u) {
-                const Terminal& tq = term(q, u);
+                const ElecTerminalRec& tq = term(q, u);
                 if (tq.piece != kNone) continue;
-                const Terminal& tp = term(p, t);
-                const Piece& pq = pieces_[static_cast<size_t>(q)];
-                const Piece& pp = pieces_[static_cast<size_t>(p)];
+                const ElecTerminalRec& tp = term(p, t);
+                const ElecPieceRec& pq = piece(q);
+                const ElecPieceRec& pp = piece(p);
                 if (!spansOverlap(pq.x + tq.anchorX - 2, pq.y + tq.anchorY, 3, tq.overlapH, pp.x + tp.anchorX - 2,
                                   pp.y + tp.anchorY, 3, tp.overlapH))
                     continue;
-                term(p, t).piece = q;
-                term(p, t).term = u;
+                // The loop goes on: a later overlapping terminal wins for t (keep).
+                term(p, t).piece = static_cast<int16_t>(q);
+                term(p, t).term = static_cast<int16_t>(u);
                 term(p, t).flag = 3;
-                term(q, u).piece = p;
-                term(q, u).term = t;
+                term(q, u).piece = static_cast<int16_t>(p);
+                term(q, u).term = static_cast<int16_t>(t);
                 term(q, u).flag = 0;
             }
         }
@@ -121,38 +125,45 @@ void PzElectric::autoConnect(int p) {
 // 3083:1e20 PzElec_CreatePiece
 void PzElectric::createPiece(int x, int y) {
     int slot = 0;
-    while (slot < kSlots && pieces_[static_cast<size_t>(slot)].used) ++slot;
+    while (slot < kSlots && piece(slot).used != 0) ++slot;
     if (slot == kSlots) {
         log::debug("PzElec_CreatePiece: no free slot (the original fails an assert)");
         return;
     }
-    Piece& p = pieces_[static_cast<size_t>(slot)];
-    p.type = mode;
-    p.used = true;
-    p.x = x;
-    p.y = y;
-    p.picture = mode >= 0 && mode < 5 ? tools_[static_cast<size_t>(mode)].picture : std::span<const uint8_t>{};
-    // TODO(wave 3): the piece zone (x, y, picture size, press 0x4b0 + slot) is the runtime's.
+    const int mode = st_->mode;
+    ElecPieceRec& p = piece(slot);
+    p.type = static_cast<int16_t>(mode);  // closed (+0x0c) and fixed (+0x0e) are left as the slot had them
+    p.used = 1;
+    p.x = static_cast<int16_t>(x);
+    p.y = static_cast<int16_t>(y);
+    picture_[static_cast<size_t>(slot)] = mode >= 0 && mode < 5 ? tools_[static_cast<size_t>(mode)].picture : std::span<const uint8_t>{};
+    // The piece zone DS:a94a + 0x16 slot: (x, y, picture size), press 0x4b0 + slot.
+    pieceZones_[static_cast<size_t>(slot)].init(p.x, p.y, s16(picture_[static_cast<size_t>(slot)], 6),
+                                                s16(picture_[static_cast<size_t>(slot)], 8), 0,
+                                                static_cast<uint16_t>(0x4B0 + slot), 0);
     setTerminalGeometry(slot, mode);
     autoConnect(slot);
 }
 
 // 3083:22bf PzElec_LoadVariant
 void PzElectric::loadVariant(int variant) {
-    for (Piece& p : pieces_) p = Piece{};  // the terminal and piece tables cleared, used = 0
+    // The terminal table DS:a3ec and the piece table DS:a2fc cleared (used = 0).
+    st_->pieces.fill(ElecPieceRec{});
+    for (auto& ts : st_->terminals) ts.fill(ElecTerminalRec{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
+    picture_.fill({});
     const auto data = archive_.read(static_cast<uint16_t>(kVariantFirst + variant));  // Res_Read
     if (data.size() < 280) throw FormatError(std::format("electric: F {:04x} is {} bytes", kVariantFirst + variant, data.size()));
-    auto w = [&](int i) { return static_cast<int>(s16(data, 2 * static_cast<size_t>(i))); };
-    for (int i = 0; i < 5; ++i) toolCounts[static_cast<size_t>(i)] = w(i);
+    auto w = [&](int i) { return s16(data, 2 * static_cast<size_t>(i)); };
+    for (int i = 0; i < 5; ++i) st_->toolCounts[static_cast<size_t>(i)] = w(i);
     for (int i = 0; i < kSlots; ++i) {
-        mode = w(5 + i);
-        if (mode == 5) break;
+        st_->mode = w(5 + i);
+        if (st_->mode == 5) break;
         createPiece(w(20 + i), w(35 + i));
-        pieces_[static_cast<size_t>(i)].fixed = true;
+        piece(i).fixed = 1;
     }
     for (int t = 0; t < 3; ++t)
         for (int i = 0; i < kSlots; ++i) {
-            Terminal& tt = term(i, t);
+            ElecTerminalRec& tt = term(i, t);
             tt.piece = w(50 + 30 * t + i);
             if (tt.piece != kNone) tt.flag = 1;
         }
@@ -160,22 +171,23 @@ void PzElectric::loadVariant(int variant) {
         for (int i = 0; i < kSlots; ++i) term(i, t).term = w(65 + 30 * t + i);
     for (int i = 0; i < kSlots; ++i)
         for (int t = 0; t < 3; ++t) {
-            const Terminal& tt = term(i, t);
+            const ElecTerminalRec& tt = term(i, t);
             if (tt.piece == kNone || tt.piece < 0 || tt.piece >= kSlots || tt.term < 0 || tt.term > 2) continue;
-            Terminal& other = term(tt.piece, tt.term);
-            other.piece = i;
-            other.term = t;
+            ElecTerminalRec& other = term(tt.piece, tt.term);
+            other.piece = static_cast<int16_t>(i);
+            other.term = static_cast<int16_t>(t);
         }
     variant_ = variant;
 }
 
-// 3083:08a1 PzElectric_Run, up to the loop
+// 3083:08a1 PzElectric_Run, up to the loop (a tool's picture of it)
 void PzElectric::setup(Video& video, Fonts& fonts, int variant) {
+    game_ = nullptr;
+    st_->plugShown = 0;
     loadResources(variant);
     loadVariant(variant);
     screenRegion_ = cursorRegionAt(exe_, dg::kElecScreenRegion, cursor_.get());
     video.cursor().addRegion(&screenRegion_);  // MouseRegion_Add(DS:2488)
-    // TODO(wave 3): PzElec_InitToolZones (the runtime's zones).
     // 3083:24aa PzElec_InitToolCursorRegions: a region per tool over its picture, cursor = label i.
     for (size_t i = 0; i < tools_.size(); ++i) {
         labelCursors_[i] = CursorRecord::fromPicture(memberOf(labels_, static_cast<int>(i)));
@@ -192,39 +204,50 @@ void PzElectric::setup(Video& video, Fonts& fonts, int variant) {
     drawToolbox(video);
     // 3083:1d83 PzElec_AddToolCursorRegions
     for (size_t i = 0; i < toolRegions_.size(); ++i)
-        if (toolCounts[i] != 0) video.cursor().addRegion(&toolRegions_[i]);
-    mode = kNone;
-    // TODO(wave 3): PzSnd_LoadBank(0x11cc) (audio), Hint_Show(0x1052) (UI).
+        if (st_->toolCounts[i] != 0) video.cursor().addRegion(&toolRegions_[i]);
+    st_->mode = kNone;
+}
+
+void PzElectric::flush(Video& video) {
+    if (game_) game_->display.flush();
+    else video.flush();
+}
+
+void PzElectric::pzPlay(int i, int priority) {
+    if (game_) game_->sound.pzPlay(i, priority);
 }
 
 // 3083:1c99 PzElec_DrawBoard
-void PzElectric::drawBoard(Video& video, bool flush) {
+void PzElectric::drawBoard(Video& video, bool doFlush) {
     Screen& screen = video.screen();
     screen.restoreRect(kBoardX, kBoardY, kBoardW, kBoardH);
     for (int i = 0; i < kSlots; ++i) {
-        Piece& p = pieces_[static_cast<size_t>(i)];
-        if (!p.used) continue;
-        if (p.type == Bulb) {
-            // 3083:0844 PzElec_SetBulbPicture (the lit sound is the audio area's)
-            p.picture = bulbLit(i) ? std::span<const uint8_t>(bulbLitPic_) : tools_[Bulb].picture;
+        if (piece(i).used == 0) continue;
+        if (piece(i).type == Bulb) {
+            const bool lit = bulbLit(i);
+            if (game_) {
+                setBulbPicture(*game_, i, lit);  // 3083:0844, with the lit sound
+            } else {
+                picture_[static_cast<size_t>(i)] = lit ? std::span<const uint8_t>(bulbLitPic_) : tools_[Bulb].picture;
+            }
         }
-        screen.lpxDrawKeyed(p.x, p.y, p.picture, 0);
+        screen.lpxDrawKeyed(piece(i).x, piece(i).y, picture_[static_cast<size_t>(i)], 0);
     }
     drawWires(screen);
-    if (flush) video.flush();
+    if (doFlush) flush(video);
 }
 
 // 3083:0fcf PzElec_DrawWires
 void PzElectric::drawWires(Screen& screen) const {
     screen.setDrawColor(1);
     for (int i = 0; i < kSlots; ++i) {
-        const Piece& p = pieces_[static_cast<size_t>(i)];
-        if (!p.used) continue;
+        const ElecPieceRec& p = piece(i);
+        if (p.used == 0) continue;
         for (int t = 0; t < 3; ++t) {
-            const Terminal& tt = p.t[static_cast<size_t>(t)];
+            const ElecTerminalRec& tt = term(i, t);
             if (tt.piece == kNone || tt.flag == 0 || tt.piece < 0 || tt.piece >= kSlots || tt.term < 0 || tt.term > 2) continue;
-            const Piece& q = pieces_[static_cast<size_t>(tt.piece)];
-            const Terminal& tq = q.t[static_cast<size_t>(tt.term)];
+            const ElecPieceRec& q = piece(tt.piece);
+            const ElecTerminalRec& tq = term(tt.piece, tt.term);
             if (tt.flag == 1) drawWireL(screen, p.x + tt.anchorX, p.y + tt.anchorY, q.x + tq.anchorX, q.y + tq.anchorY);
             drawTerminalDot(screen, tt.piece, tt.term);
             drawTerminalDot(screen, i, t);
@@ -248,29 +271,34 @@ void PzElectric::drawWireL(Screen& screen, int x1, int y1, int x2, int y2) const
 
 // 3083:12cc PzElec_DrawTerminalDot
 void PzElectric::drawTerminalDot(Screen& screen, int p, int t) const {
-    const Piece& pc = pieces_[static_cast<size_t>(p)];
-    const Terminal& tt = pc.t[static_cast<size_t>(t)];
+    const ElecPieceRec& pc = piece(p);
+    const ElecTerminalRec& tt = term(p, t);
     screen.lpxDrawKeyed(pc.x + tt.dotX, pc.y + tt.dotY, tt.dotY > 5 ? dotLower_ : dotUpper_, 0);
 }
 
 // 3083:163c PzElec_DrawToolbox
-void PzElectric::drawToolbox(Video& video) const {
+void PzElectric::drawToolbox(Video& video) {
     Screen& screen = video.screen();
     screen.restoreRect(7, 0x43, 0x4E, 0x5E);
     for (size_t i = 0; i < tools_.size(); ++i) {
-        const int n = toolCounts[i];
+        const int n = st_->toolCounts[i];
         if (n <= 0) continue;
         screen.lpxDrawKeyed(tools_[i].x, tools_[i].y, tools_[i].picture, 0);
         screen.lpxDrawKeyed(tools_[i].digitX, tools_[i].digitY, memberOf(digits_, n % 10), 0);
+        // The tens digit 2 pixels left, over the units digit (keep).
         if (n / 10 != 0) screen.lpxDrawKeyed(tools_[i].digitX - 2, tools_[i].digitY, memberOf(digits_, n / 10), 0);
     }
-    video.flush();
+    flush(video);
 }
 
-// The path search of 3083:0129 / 3083:04c7 (code_puzzles_a.md §3.8)
+// The path search of 3083:0129 / 3083:04c7 (code_puzzles_a.md §3.8), with its helpers PzElec_StackHas
+// 3083:0000, PzElec_SkipExit 3083:002b, PzElec_PathKnown 3083:007c and PzElec_PathAdd 3083:00d5.
 std::vector<std::vector<int>> PzElectric::findPaths(int s) {
     std::vector<std::vector<int>> rows;
-    auto link = [&](int c, int t) -> const Terminal& { return term(c, t); };
+    // The table DS:a138 = all 0xFFFF, no rows.
+    for (auto& row : st_->paths) row.fill(-1);
+    st_->pathCount = 0;
+    auto link = [&](int c, int t) -> const ElecTerminalRec& { return term(c, t); };
     auto onStack = [](const std::vector<int>& comps, int depth, int c) {
         for (int k = 0; k < depth; ++k)
             if (comps[static_cast<size_t>(k)] == c) return true;
@@ -291,6 +319,10 @@ std::vector<std::vector<int>> PzElectric::findPaths(int s) {
         for (int steps = 0; !found; ++steps) {
             if (steps > 100000) {
                 log::debug("PzElec path search: a walk without end (piece {})", s);
+                return rows;
+            }
+            if (cur < 0 || cur >= kSlots) {
+                log::debug("PzElec path search: a link to piece {} (piece {})", cur, s);
                 return rows;
             }
             bool again;
@@ -327,7 +359,11 @@ std::vector<std::vector<int>> PzElectric::findPaths(int s) {
                             } else {
                                 std::vector<int> row(comps.begin(), comps.begin() + depth);  // PzElec_PathAdd
                                 row.push_back(s);
+                                auto& table = st_->paths[rows.size()];
+                                for (size_t k = 0; k < row.size() && k < table.size(); ++k)
+                                    table[k] = static_cast<int16_t>(row[k]);
                                 rows.push_back(std::move(row));
+                                st_->pathCount = static_cast<int16_t>(rows.size());
                             }
                             found = true;
                         } else {
@@ -337,7 +373,7 @@ std::vector<std::vector<int>> PzElectric::findPaths(int s) {
                 }
             } while (again);
             // The move is made also when a path was found (no effect: the stacks are rebuilt).
-            const Terminal& next = link(cur, t);
+            const ElecTerminalRec& next = link(cur, t);
             if (depth > 0 && comps[static_cast<size_t>(depth - 1)] == cur && terms[static_cast<size_t>(depth - 1)] == t) {
                 cur = next.piece;  // backtrack
                 t = next.term;
@@ -353,10 +389,7 @@ std::vector<std::vector<int>> PzElectric::findPaths(int s) {
                     ++depth;
                 }
             }
-            if (cur < 0 || cur >= kSlots) {
-                log::debug("PzElec path search: a link to piece {} (piece {})", cur, s);
-                return rows;
-            }
+            if (found) break;
         }
     }
     return rows;
@@ -371,12 +404,12 @@ bool PzElectric::batteryShorted(int s) {
         bool load = false, open = false, other = false;
         int batteries = 0;
         for (size_t k = 0; k + 1 < row.size(); ++k) {
-            const Piece& c = pieces_[static_cast<size_t>(row[k])];
+            const ElecPieceRec& c = piece(row[k]);
             if (c.type == Bulb) load = true;
             else if (c.type == Battery) {
                 load = true;
                 ++batteries;
-            } else if (c.type == Switch && !c.closed) open = true;
+            } else if (c.type == Switch && c.closed == 0) open = true;
             if (c.type != YWire && c.type != Battery) other = true;
         }
         if (!load && !open) shortedFlag = true;
@@ -385,7 +418,7 @@ bool PzElectric::batteryShorted(int s) {
             int prev = 0;
             for (size_t k = 0; k + 1 < row.size(); ++k) {
                 const int c = row[k];
-                if (pieces_[static_cast<size_t>(c)].type != Battery) continue;
+                if (piece(c).type != Battery) continue;
                 const int before = k == 0 ? s : row[k - 1];
                 const int v = term(c, 0).piece == before ? 1 : 0;
                 if (prev != v) changed = true;
@@ -400,8 +433,8 @@ bool PzElectric::batteryShorted(int s) {
 // 3083:0492 PzElec_CheckBatteries
 void PzElectric::checkBatteries() {
     for (int i = 0; i < kSlots; ++i)
-        if (pieces_[static_cast<size_t>(i)].used && pieces_[static_cast<size_t>(i)].type == Battery)
-            shorted[static_cast<size_t>(i)] = batteryShorted(i) ? 1 : 0;
+        if (piece(i).used != 0 && piece(i).type == Battery)
+            st_->batteryShorted[static_cast<size_t>(i)] = batteryShorted(i) ? 1 : 0;
 }
 
 // 3083:04c7 PzElec_BulbLit
@@ -409,17 +442,17 @@ bool PzElectric::bulbLit(int s) {
     if (term(s, 0).piece == kNone || term(s, 1).piece == kNone) return false;
     checkBatteries();
     const auto rows = findPaths(s);
-    onPath.fill(0);
-    onPath[static_cast<size_t>(s)] = 1;
+    st_->onPath.fill(0);
+    st_->onPath[static_cast<size_t>(s)] = 1;
     bool bad = false, lit = false, first = false;
     int ref = 0;
     for (const auto& row : rows) {
         bool bat = false, bulb = false, open = false;
         for (size_t k = 0; k + 1 < row.size(); ++k) {
             const int c = row[k];
-            const Piece& p = pieces_[static_cast<size_t>(c)];
-            onPath[static_cast<size_t>(c)] = 1;
-            if (p.type == Battery && !shorted[static_cast<size_t>(c)]) {
+            const ElecPieceRec& p = piece(c);
+            st_->onPath[static_cast<size_t>(c)] = 1;
+            if (p.type == Battery && st_->batteryShorted[static_cast<size_t>(c)] == 0) {
                 bat = true;
                 const int before = k == 0 ? s : row[k - 1];
                 const int v = term(c, 0).piece != before ? 1 : 0;  // entered through terminal 1 or 2
@@ -429,7 +462,7 @@ bool PzElectric::bulbLit(int s) {
                 } else if (v != ref) {
                     bad = true;
                 }
-            } else if (p.type == Switch && !p.closed) {
+            } else if (p.type == Switch && p.closed == 0) {
                 open = true;
             } else if (p.type == Bulb) {
                 bulb = true;
@@ -443,12 +476,13 @@ bool PzElectric::bulbLit(int s) {
 }
 
 int PzElectric::usedPieces() const {
-    return static_cast<int>(std::count_if(pieces_.begin(), pieces_.end(), [](const Piece& p) { return p.used; }));
+    return static_cast<int>(std::count_if(st_->pieces.begin(), st_->pieces.end(), [](const ElecPieceRec& p) { return p.used != 0; }));
 }
 
 std::string PzElectric::describe() const {
+    const auto& c = st_->toolCounts;
     return std::format("electric circuits variant {}: {} pieces on the board, toolbox {}/{}/{}/{}/{}", variant_, usedPieces(),
-                       toolCounts[0], toolCounts[1], toolCounts[2], toolCounts[3], toolCounts[4]);
+                       c[0], c[1], c[2], c[3], c[4]);
 }
 
 }  // namespace tmport::gg
