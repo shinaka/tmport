@@ -1,0 +1,155 @@
+1ea7:0004	s_copyright	char[]	Borland C++ copyright string (identifies the compiler)
+1ea7:002f	s_divideError	char[14]	"Divide error" + CR LF (no NUL; the divide-error handler prints 14 bytes)
+1ea7:003d	s_abnormalTermination	char[]	abort's message
+1ea7:0094	g_inBuilding	i16	a building is in progress (Players_SaveCurrent saves its live state)
+1ea7:0096	g_kbdPlayMode	i16	1 = play mode: Kbd_ISR swallows the held keys instead of queueing them (State_05_EnterRoom sets it)
+1ea7:00bc	g_puzzleDoorHit	i16	set when the player touches a locked puzzle door (type 7) -> state 9
+1ea7:00be	g_vehicleDone	i16	the vehicle is finished -> race (State_08_LeaveRoom)
+1ea7:00c2	g_stateTable	far[19]	state functions run by Seq_Run from main (index = state 1..17; entry 18 is NULL)
+1ea7:01e2	g_mouseHideState	i16	0 idle; the first drawing call after a reset restores the background under the cursor
+1ea7:01e8	g_clipTop	i16	vertical clip of Lpx_BlitRawKeyed (inferred: top)
+1ea7:01ea	g_clipBottom	i16	vertical clip of Lpx_BlitRawKeyed (inferred: bottom)
+1ea7:01f4	g_drawColor	u8	colour of the line, rectangle and pixel primitives
+1ea7:01f6	g_videoModeSet	i16	1 after Video_SetMode13h (Video_RestoreMode switches back only then)
+1ea7:01f8	g_vram	far	A000:0000
+1ea7:01fc	g_lpxKeyedBlitters	near[4]	Lpx_DrawKeyed blitters by (fmt+mode)&3: 0399, 0465, 0399, 04d1
+1ea7:0204	g_lpxBlitters	near[2]	Lpx_Draw blitters by format: 036d, 0465
+1ea7:020c	g_ctrlHeld	i16	Ctrl held (Kbd_MakeCtrl / Kbd_BreakCtrl)
+1ea7:020e	g_oldInt9	far	previous INT 9 vector
+1ea7:0212	g_oldInt8	far	previous INT 8 vector
+1ea7:0216	g_biosChainCounter	i16	Timer_ISR chains the BIOS INT 8 when it is >= 0 after the increment; starts at 0 and is never set negative, so the BIOS runs on every tick (8x fast)
+1ea7:0218	g_heldKeys	u16	held-key bits: 1 Left, 2 Right, 4 Up, 8 Down, 0x10 Ctrl, 0x20 Space
+1ea7:021a	g_ticks	u32	PIT ticks at 145.652 Hz (Timer_ISR); the clock of the deadline timers
+1ea7:021e	g_ticks16	u16	second tick counter (Timer_ISR)
+1ea7:0224	g_kbdScanCodes	u8[8]	scan codes handled by Kbd_ISR: 4B 4D 48 50 39 1D 2E (Left Right Up Down Space Ctrl C), 0
+1ea7:022c	g_kbdMakeHandlers	near[7]	make handlers per scan code (1454:0187..)
+1ea7:023a	g_kbdBreakHandlers	near[7]	break handlers per scan code (1454:018f..)
+1ea7:024c	g_palFaded	i16	1 while faded to black (palette loads are deferred)
+1ea7:024e	g_palShadow	u8[768]	shadow DAC palette, 6-bit RGB
+1ea7:054e	g_menuDisabled	i16	non-zero: Input_GetCode does not open the menus
+1ea7:0550	g_resFileNames	far[4]	names of gizmo000..003.dat for Res_OpenFiles
+1ea7:0560	g_resLastIndex	i16	index of the last resource read (Res_Read)
+1ea7:0564	s_swapFile	char[]	gizmo004.dat (Screen_SaveToSwap)
+1ea7:05a5	s_badResFile0	char[]	Incorrect Resource File 0
+1ea7:05bf	s_badResFile1	char[]	Incorrect Resource File 1
+1ea7:05d9	s_badResFile2	char[]	Incorrect Resource File 2
+1ea7:08b8	g_dirtyTileCount	i16	tiles copied by the last Dirty_Flush
+1ea7:08c6	g_room	rec[0x120]	current room header (copied from the room table)
+1ea7:0a10	g_mouseLatch		mouse event latches written by Mouse_EventHandler (DS:0a10..0a2c: press, release + position + tick stamp)
+1ea7:0a1e	g_mouseNewPress	i16	1 after a left press until Input_GetCode reports it (| 0x4000)
+1ea7:0a32	g_zonesLocal	far	active click-zone list (pushed and popped by Zones_Push/Zones_Pop)
+1ea7:0a36	g_zonesGlobal	far	global click zones (menu titles, HUD)
+1ea7:0a50	g_zoneStackDepth	i16	Zones_Push depth
+1ea7:130e	g_menuRequest	i16	1/2 -> Input_GetCode returns 0x17a2 (return to the Technology Center) / 0x17a3 (start new player)
+1ea7:1310	g_kbdRingWrite	i16	write index of the key event ring DS:8556
+1ea7:1312	g_kbdRingRead	i16	read index of the key event ring
+1ea7:132c	g_hudDirty	u16	HUD redraw bits (8 projectiles, 0x10 points ...)
+1ea7:13d0	g_lzhDefaultDistLengths	u8[2][32]	default distance code lengths of the LZH codec (12- and 13-bit windows)
+1ea7:1458	g_sndSlots	far[64]	registered songs (BMF+0x10)
+1ea7:1558	g_sndActive	u8[64]	active song slots
+1ea7:1658	g_sndClassChannels	u8[5]	channels per class: 1, 16, 4, 11, 16
+1ea7:165d	g_sndBusy	u8	driver busy lock
+1ea7:1680	g_sndEnabled	u8	0 = output disabled (Snd_Silence)
+1ea7:1683	g_hasPsg	u8	PSG present (never written: the PSG path is dead)
+1ea7:1684	g_hasOpl	u8	OPL2 present (AdLib_Detect, or forced by the -s switch)
+1ea7:1685	g_hasMpu	u8	MPU-401 present (never written: the MT-32 path is dead)
+1ea7:1686	g_oplMasterVolume	u16	master volume for Opl_SetVolume
+1ea7:1688	g_oplChannelVolume		channel volumes for Opl_SetVolume
+1ea7:16ae	g_psgPort	u16	PSG port (never written)
+1ea7:16e5	g_oplVoiceOperators		voice -> operator table
+1ea7:16fb	g_oplOperatorOffsets		operator register offsets
+1ea7:1712	g_oplNoteTable		96-note tables DS:1712/1792 used by Opl_NoteOn
+1ea7:1816	g_spkDivisors		note -> PIT divisor table of the speaker class
+1ea7:1aaa	g_sndClassStep	near[5]	class interpreters: 087e, 0966, 0a1f, 0ad6, 0966
+1ea7:1bae	g_chimpCounts	u16[15]	chimps per race index DS:4590 (halved on a 286, 2a80:079a)
+1ea7:1d2e	g_chimpMoves		Cyber Chimp move lists with random chances
+1ea7:1f10	g_chimpTransitions		Cyber Chimp state transitions
+1ea7:1f6c	g_glyphColor	u8	colour of Gfx_DrawGlyph
+1ea7:1f6e	s_playersDat	char[]	players.dat
+1ea7:1f7c	g_rankNames	far[8]	Trainee .. Head Scientist
+1ea7:1f9c	g_rankThresholds	u32[7]	5000, 30000, 60000, 120000, 200000, 300000, 750000
+1ea7:20a8	g_attractSequence	far[]	attract sub-sequence run by Seq_Run (State_01_Attract)
+1ea7:20dc	g_rosterList		sign-in scroll list (8 rows of 11 px)
+1ea7:219a	g_workshopSequence	far[]	workshop sub-sequence run by Seq_Run
+1ea7:21ce	g_workshopZones		static click zones of the workshop
+1ea7:22fe	g_postRaceZones		post-race buttons (codes 2000..2004)
+1ea7:236c	g_movieCues	rec[]	final movie cues, words {type, frame, a, b}
+1ea7:243c	s_morty	char[]	race result name of the opponent
+1ea7:2450	g_cpuType	i16	Cpu_Detect result (1 8086, 2 286, 3 386, 4 486); 2 halves the chimp count
+1ea7:2452	g_soundDevice	i16	-s switch: -1 auto (default), 0 off, 1 speaker, 4 FM
+1ea7:2454	g_randSeed	u32	srand(time(NULL)) seed at start-up
+1ea7:2462	s_newPlayerHint	char[]	title of the hint box
+1ea7:3334	g_puzzleVariants	u16[8]	variants per puzzle type: 30, 20, 20, 31, 32, 30, 28, 30 (221)
+1ea7:398a	g_animRectCount	i16	entries in the DAM update-rect list DS:b86e
+1ea7:399a	g_raceBackgrounds	u16[15]	per race index: background
+1ea7:39b8	g_raceSprites1	u16[15]	per race index: sprite set
+1ea7:39d6	g_raceSprites2	u16[15]	per race index: sprite set
+1ea7:39f4	g_racePaths1	u16[15]	per race index: 'R' path
+1ea7:3a12	g_racePaths2	u16[15]	per race index: 'R' path
+1ea7:3dea	g_yesNoButtons		Yes/No button labels and keys
+1ea7:3e02	g_pagerButtons		See Next Page / Go Back a Page / Done
+1ea7:3e2c	g_chimpButtons		With Chimps / Without Chimps
+1ea7:3f2b	s_unusedFileItems	char[]	File item list of another title, never referenced
+1ea7:3fcf	g_helpHandlers	far[6]	Help menu item handlers (411d stub entries)
+1ea7:4017	g_menuHelp	MenuDef	0x14 bytes: far title, +04 title width, +06 count, far items, far handlers, +10 drop-down width, +12 title x
+1ea7:402b	g_menuFile	MenuDef	File menu
+1ea7:403f	g_menuOptions	MenuDef	Options menu
+1ea7:4053	g_menuBar	MenuBarDef	{u16 3, far DS:4017}
+1ea7:4100	g_atexitCount	i16	atexit table entries
+1ea7:442a	g_randState	u32	rand() LCG state
+1ea7:452e	g_initTable	rec[]	_INIT_ table (6-byte records, DS:452e..454c)
+1ea7:454c	g_exitTable	rec[]	_EXIT_ table (DS:454c..4552)
+1ea7:455a	g_leaveRequest	i16	-1 quit, 2 back to sign-in, 3 back to the hub
+1ea7:455c	g_state	i16	Seq_Run state of the main sequence
+1ea7:455e	g_rematch	i16	1 = rematch of the last race
+1ea7:4560	g_raceResult	i16	0 = the player won
+1ea7:4562	g_player	rec[0x16bd]	current PLAYERS.DAT record
+1ea7:4572	g_score	u32	points
+1ea7:4576	g_playerSlot	i16	record slot in players.dat
+1ea7:4578	g_withChimps	i16	With/Without Chimps
+1ea7:457c	g_buildingLive	u8[0x14]	live state of the building in progress (saved into its record block)
+1ea7:457e	g_projectiles	i16	projectile counter (10 per level)
+1ea7:4580	g_levelParam	i16	DS:00b2[level] (1,2,2,3,3); meaning not established
+1ea7:4582	g_partsNeeded	i16	parts still needed (HUD)
+1ea7:458a	g_hintCancel1046	i16	cancels hint 0x1046
+1ea7:458c	g_hintCancel1048	i16	cancels hint 0x1048
+1ea7:4590	g_raceIndex	i16	building*5 + level (0..14)
+1ea7:4592	g_building	i16	current building (0 Automotive, 1 Aircraft, 2 Alternative Energy)
+1ea7:4594	g_level	i16	current level in the building
+1ea7:4596	g_racesWon	i16[3]	races won per building (-1..4)
+1ea7:459c	g_buildingInProgress	i16[3]	building has saved live state
+1ea7:45a2	g_hintsOff	i16	New Player Hints switched off
+1ea7:45a4	g_hintSeen	u16[17]	per hint 0x1043..0x1053
+1ea7:45cc	g_soundOff	i16	sound switched off
+1ea7:45d0	g_puzzleSolved	u16[8][33]	solved flags: + type*0x42 + variant*2
+1ea7:47e0	g_buildingRecords	rec[3][0x6ba]	per-building saved state in the player record
+1ea7:5c0e	g_racesWonTotal	i16	15 = the end
+1ea7:5c22	g_palSaved	u8[768]	saved palette (Pal_FadeFromSaved)
+1ea7:5f22	g_rowTable	far[400]	row pointers: rows 0..199 screen, 200..399 back page
+1ea7:6566	g_resHandles	i16[4]	file handles of gizmo000..003.dat
+1ea7:6572	g_resType	u8	type byte of the last resource read
+1ea7:6574	g_resBuffer	far	shared 64 KB load and decompression buffer
+1ea7:6578	g_timers	u32[8]	deadline timer slots (Timer_Set)
+1ea7:6598	g_savedTicks	u32	tick counter saved by Dlg_RunModal
+1ea7:6616	g_playerVehicle	i16[]	part list of the player's vehicle (-1 terminated)
+1ea7:6634	g_mortyVehicle	rec	Morty's vehicle (after the part catalogue)
+1ea7:6640	g_picCache	rec[300]	picture cache (8 bytes: id, uses, far data)
+1ea7:7a04	g_roomTable	far[16]	rooms of the building
+1ea7:7a4e	g_zoneStack	far[]	saved zone lists (Zones_Push)
+1ea7:7a6c	g_cursorUnder	u8[]	background under the software cursor
+1ea7:7a7c	g_cursorShown	i16	the software cursor is drawn
+1ea7:7a8a	g_actors	rec[12][0xa0]	0 player, 1 projectile, 2..11 Cyber Chimps
+1ea7:7aa4	g_roomIndex	i16	current room (0 = workshop)
+1ea7:8556	g_kbdRing	rec[16][16]	key event ring {type 3, u32 tick}
+1ea7:8656	g_escHandler	far	Esc callback of Input_GetCode
+1ea7:865a	g_menuHandler	far	menu callback (Menu_RunDropDown)
+1ea7:9d48	g_sndTable	rec[60]	sound bank table (SndRes_Init)
+1ea7:a04c	g_playersFile	i16	players.dat file handle
+1ea7:a075	g_roster	far	roster buffer (players.dat header + 99 x 22-byte entries in name order)
+1ea7:a079	g_rosterIndex	i16	roster entry of the current player (written at 8 + index*22)
+1ea7:a0d8	g_fmPresent	i16	1 = FM sound banks (id+1)
+1ea7:a0da	g_hintList	far	hint list (Hint_Init)
+1ea7:a0e6	g_hintQueue	rec[5][18]	pending hints
+1ea7:b86e	g_animRects	rec[][8]	DAM update rectangles
+1ea7:ba1e	g_animCallbacks	far[]	DAM opcode 0x7FF8 callbacks
+1ea7:ba80	g_animChannels	rec[2][0x22]	DAM channels

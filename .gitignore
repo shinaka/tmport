@@ -1,11 +1,13 @@
 # User's original game files and anything derived from them stay local.
 /TM-DOS/
 /TM-WIN/
+/GadgetsAndGizmos/
 /extracted/
 # Ghidra projects and decompiler output are derived from the original binary.
 /re/ghidra_proj/
 /re/win/ghidra_export/
 /re/dos/ghidra_export/
+/re/gg/ghidra_export/
 /re/*/ghidra_headless*.log
 # Third-party tools downloaded locally.
 /tools/dl/

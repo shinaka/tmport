@@ -1,4 +1,10 @@
 // Create functions at Borland/Win16 prologues in code not yet covered by any function.
+// Usage: -postScript FindMoreFunctions.java [enter] [jmp16] [afterdata]
+//   no arguments: the rules used for the TM projects (unchanged);
+//   enter     also accept the 286 prologue ENTER n,0 (C8 lo hi 00);
+//   jmp16     also accept a prologue right after a JMP rel16 (E9 lo hi);
+//   afterdata also accept a prologue right after a defined data item (e.g. a switch table that
+//             FixSwitches.java turned into words).
 import ghidra.app.script.GhidraScript;
 import ghidra.app.cmd.function.CreateFunctionCmd;
 import ghidra.app.cmd.disassemble.DisassembleCommand;
@@ -17,8 +23,17 @@ public class FindMoreFunctions extends GhidraScript {
         {(byte)0x55, (byte)0x8b, (byte)0xec},
     };
 
+    static final byte[] ENTER = {(byte)0xc8, 0, 0, 0};  // bytes 1..2 (frame size) are not compared
+
     @Override
     public void run() throws Exception {
+        java.util.Set<String> opt = new java.util.HashSet<>(java.util.Arrays.asList(getScriptArgs()));
+        boolean useEnter = opt.contains("enter"), jmp16 = opt.contains("jmp16"), afterData = opt.contains("afterdata");
+        byte[][] pats = PATS;
+        if (useEnter) {
+            pats = java.util.Arrays.copyOf(PATS, PATS.length + 1);
+            pats[PATS.length] = ENTER;
+        }
         Memory mem = currentProgram.getMemory();
         Listing listing = currentProgram.getListing();
         int created = 0;
@@ -30,10 +45,13 @@ public class FindMoreFunctions extends GhidraScript {
                 byte[] buf = new byte[(int) size];
                 b.getBytes(b.getStart(), buf);
                 for (int i = 0; i < size; i++) {
-                    for (byte[] p : PATS) {
+                    for (byte[] p : pats) {
                         if (i + p.length > size) continue;
                         boolean m = true;
-                        for (int k = 0; k < p.length; k++) if (buf[i + k] != p[k]) { m = false; break; }
+                        for (int k = 0; k < p.length; k++) {
+                            if (p == ENTER && (k == 1 || k == 2)) continue;
+                            if (buf[i + k] != p[k]) { m = false; break; }
+                        }
                         if (!m) continue;
                         Address a = b.getStart().add(i);
                         if (getFunctionContaining(a) != null) break;
@@ -48,6 +66,11 @@ public class FindMoreFunctions extends GhidraScript {
                                 if (p3 == 0xc2 || p3 == 0xca) ok = true;  // ret n / retf n
                             }
                             if (i > 1 && (buf[i - 2] & 0xff) == 0xeb) ok = true;
+                            if (jmp16 && i > 2 && (buf[i - 3] & 0xff) == 0xe9) ok = true;
+                            if (afterData && !ok) {
+                                Data d = listing.getDefinedDataContaining(a.subtract(1));
+                                if (d != null && d.getMaxAddress().equals(a.subtract(1))) ok = true;
+                            }
                             if (!ok) break;
                         }
                         new DisassembleCommand(a, null, true).applyTo(currentProgram, monitor);

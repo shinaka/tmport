@@ -1,0 +1,52 @@
+12e0:000f	Seq_Run	int far Seq_Run(void (far *far *table)(void),int far *state)	runs a table of far state functions (main: DS:00c2, state DS:455c); a state returns -2 = back to the previous state, -1 = stop, 0 = next, n = go to state n
+12e0:012f	State_16_SaveAndLeave	int far State_16_SaveAndLeave(void)	saves (2b5a:01ea), frees the building (Building_Free), returns DS:455a (2 sign-in, 3 hub)
+12e0:0141	State_17_End	int far State_17_End(void)	returns 0 -> state 18 = NULL -> Seq_Run ends (after the final movie)
+12e0:0148	State_03_Hub	int far State_03_Hub(void)	Technology Center: buildings = zones 0xbb9..0xbbb, 0xbb8 -> state 2, Esc/0xbbc -> Cmd_SaveAndExit; 4 ticks per frame
+12e0:0506	State_10_ListVehicleParts	int far State_10_ListVehicleParts(void)	lists the vehicle's parts (records with +0xc == 0 and flag 0x8000) into DS:6616 (-1 terminated), DS:455e = 0; -> 11
+12e0:0564	State_11_Race	int far State_11_Race(void)	building 1 -> 3e77:0a23, else 3dd6:0762; won and not a rematch: DS:4596[b]++, DS:5c0e++
+12e0:05d5	Building_Free	void far Building_Free(void)	frees the building's actors, chimps, zones, menu bar, rooms, parts and lists
+12e0:0619	State_07_Warehouse	int far State_07_Warehouse(void)	warehouse room loop, 4 ticks per frame; Esc -> Save & Exit; codes 0x17a2/0x17a3 -> DS:455a = 3/2, state 16
+12e0:0820	State_04_BuildingSetup	int far State_04_BuildingSetup(void)	DS:4594 level = DS:4596[b]+1, DS:4590 = b*5+level; part catalogue, rooms, HUD; new visit or resume from DS:47e0+b*0x6ba
+12e0:096a	State_05_EnterRoom	int far State_05_EnterRoom(void)	menu bar on, room DS:7aa4 (1622:0411); room 0 -> 6 (workshop), else 7
+12e0:09aa	State_08_LeaveRoom	int far State_08_LeaveRoom(void)	DS:00bc (puzzle door) -> 9; DS:00be (vehicle finished) -> save, 10; else 5
+12e0:0a24	Room_SetDoorArt		door pictures by room word 0 bit 0 (0x30e/0x33c); a solved puzzle turns its door into type 9
+12e0:0ace	Score_Add	void far Score_Add(int points)	DS:4572 += points (u32), HUD dirty
+12e0:0aea	Projectiles_Add	void far Projectiles_Add(int n)	DS:457e += n, HUD dirty bit 8
+12e0:0afb	Game_Init	void far Game_Init(void)	actors (18f5:0721), workshop (2dee:1db5), HUD (1a04:025b), SndRes_Init, hint queue (Hint_Init)
+12e0:0b19	Game_Shutdown	void far Game_Shutdown(void)	registered with atexit by main: DS:00c0 = -1, sound off (1bb4:0e15), 1473:0103, Res_CloseFiles, 303a:0250 (Input_Remove path)
+12e0:0b38	main	int far main(int argc,char far *far *argv,char far *far *envp)	atexit(Game_Shutdown); Init_CommandLine (303a:005c); 1473:0074; 2b16:021c; 15df:000d; 12e0:0afb; Seq_Run(DS:00c2, DS:455c=1); exit(0)
+1a04:00eb	Hud_DrawBar		HUD strip y 165..199
+1a04:025b	Hud_Init		
+1a04:084c	Hud_Cmd6003		HUD inventory command (code 6003)
+1a04:08ad	Hud_Cmd6002		HUD inventory command (code 6002)
+1a04:090e	Hud_SelectPart	void far Hud_SelectPart(int n)	codes 5000..5100: picks part n of the inventory strip (it follows the cursor)
+1a04:0a82	Hud_Cmd6000		HUD inventory command (code 6000)
+1a04:0b5b	Hud_Cmd6001		HUD inventory command (code 6001)
+1a04:0b69	Hud_Update		per-frame HUD: score (6 digits DS:4572), projectiles (DS:457e), parts needed (DS:4582), inventory strip; dirty bits DS:132c
+2b5a:004c	Players_Open		opens players.dat and checks the header (USR 0x1A, version word 12 at +4); mismatch -> re-created
+2b5a:010a	Players_WriteError		a failed write: message resource 0x106f, unlink players.dat, exit
+2b5a:0156	Players_Write		writes a record (code NOTES: write players.dat)
+2b5a:01ea	Players_SaveCurrent		copies a building in progress into its record block (DS:47e0+b*0x6ba) and writes this player's slot (0x8a0 + DS:4576*0x16bd) and roster entry
+2bd4:0225	Rank_FromPoints	int far Rank_FromPoints(unsigned long points)	number of u32 thresholds DS:1f9c (7 values 5000..750000) <= points -> rank 0..7 (names DS:1f7c)
+2c11:043f	Attract_TitleAnim		title animation (sub-sequence DS:20a8)
+2c11:0630	Attract_StoryPage		one of the 6 story pages (text 0x1019..0x101e), 0x111c ticks = 30.1 s, Enter next, Space skip, Esc quit
+2c11:084c	Attract_SignInPrompt		sign-in prompt page (picture 0x1029, text 0x1025); time-out returns 1 = restart the attract loop
+2c11:0913	State_01_Attract	int far State_01_Attract(void)	runs the attract sub-sequence DS:20a8 with Seq_Run
+2caa:004f	Players_CreateFile		creates players.dat full size: header, roster, 99 blank records
+2caa:01c5	Roster_Insert		inserts a player into the roster DS:a075 in name order (F_SCOPY shifting)
+2caa:1240	State_02_SignIn	int far State_02_SignIn(void)	roster of up to 99 (8 rows), typing starts a new name (max 15, first letter upper-cased), Ctrl+R remove, chimps question for new players
+2fcb:0000	Result_DrawScreen		near: result screen (picture 0x1076, palette 0x1077), winner and points (DS:4560 = 0 won)
+2fcb:01dd	Result_RankUpMessage		rank-up message (bundle 0x1070, next threshold formatted with Str_FormatThousands); called at 2fcb:0552
+2fcb:0315	State_14_RedrawResult	int far State_14_RedrawResult(void)	Result_DrawScreen -> 13
+2fcb:0325	State_12_RaceResult	int far State_12_RaceResult(void)	1st/2nd with the player's name or Morty, winner animation, points counted up over 50 frames; won: Result_RankUpMessage; lost: hint 0x104f; -> 13, or 15 when DS:5c0e == 15
+2fcb:0573	State_13_PostRaceMenu	int far State_13_PostRaceMenu(void)	buttons (zones DS:22fe, codes 2000..2004): rematch -> 11, next race -> 4, warehouse -> 5, hub -> 3, Save & Exit
+2fcb:0640	State_15_FinalMovie	int far State_15_FinalMovie(void)	Movie_Play(0x3000, 0x30ca, 18, DS:236c, bank), waits for a key, saves -> 17
+303a:0000	Init_FatalMessage	void far Init_FatalMessage(int msg)	prints start-up message msg (0x368 usage, 0x369 no VGA, 0x36a no mouse, 0x36c not enough memory)
+303a:005c	Init_CommandLine	void far Init_CommandLine(int argc,char far *far *argv,char far *far *envp)	CPU check, Res_OpenFiles, switches -GV (video 8) and -S<x> (sparse switch over 7 sound letters, table DS:0234), VGA/mouse/memory checks, Snd_Init, Input_InstallHandlers, srand(time(NULL)) (seed DS:2454)
+303a:0250	Init_Shutdown	void far Init_Shutdown(void)	Input_RemoveHandlers (called by Game_Shutdown)
+3060:0000	Hint_CompareDue		queue order: by due tick (+10)
+3060:0013	Hint_Init	void far Hint_Init(void)	creates the hint list DS:a0da and clears the 5-entry queue DS:a0e6
+3060:0037	Hint_Queue	void far Hint_Queue(int id,unsigned long delay,int far *cancel)	queues a New Player Hint due after delay ticks unless *cancel becomes non-zero (up to 5 pending)
+3060:00bc	Hint_Update	void far Hint_Update(void)	shows the first queued hint when it is due (unless cancelled)
+3060:013b	Hint_Show	void far Hint_Show(int id)	unless hints are off (DS:45a2) or already seen (DS:45a4[id-0x1043]): message box (Dlg_MessageBox) with sound 0x1056, marks it seen
+3060:01fb	Hint_ClearQueue	void far Hint_ClearQueue(void)	

@@ -387,8 +387,8 @@ The game itself can also run headless with scripted input (`--headless --keys ".
 | `src/` | the engine: `util`, `vfs` (folders and CD images), `ne` (Windows NE executables), `data` (tables of `TMTWINCD.EXE`), `res` (resources), `gfx`, `text`, `anim`, `input`, `timing`, `audio`, `ui` (dialogs, menu bar), `save`, `game` (the game itself), `mods`, `rtl`, `platform` (SDL), `app` (start-up), `cli` (tools); `docs/DESIGN.md` describes them |
 | `tests/` | unit tests (doctest); tests that need the game read it from `TM_DATA` (`TM_DATA_DOS` for the DOS edition, `TM_DOS_CAPTURES` for the DOS reference captures) and skip themselves without it |
 | `docs/` | `BUILDING.md` (building, running, tools), `DESIGN.md` (engine conventions), `MODDING.md` |
-| `re/` | the specifications written from the study of the original: `re/docs/ARCHITECTURE.md` first, then `PORTING_NOTES.md` and the topic documents; reviews in `re/reviews/` |
-| `tools/` | Python tools used for the study (resource extraction and reference decoders); `tools/dos/` the DOS edition's decoders and its fidelity runner with the scenario files (`tools/dos/README.md`) |
+| `re/` | the specifications written from the study of the original: `re/docs/ARCHITECTURE.md` first, then `PORTING_NOTES.md` and the topic documents; reviews in `re/reviews/`; `re/gg/docs/` the study of *Gizmos & Gadgets!* (DOS, 1993), a second game whose port has started (no engine code yet; `re/gg/docs/SCOPING.md`) |
+| `tools/` | Python tools used for the study (resource extraction and reference decoders); `tools/dos/` the DOS edition's decoders and its fidelity runner with the scenario files (`tools/dos/README.md`); `tools/gg/` the decoders and Ghidra and capture tools for *Gizmos & Gadgets!* (`tools/gg/README.md`) |
 | `cmake/`, `CMakeLists.txt`, `CMakePresets.json`, `scripts/` | the build |
 | `.github/workflows/` | continuous integration (Windows, Linux, macOS) |
 

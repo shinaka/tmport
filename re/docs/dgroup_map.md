@@ -491,11 +491,12 @@ Installed by `1120:0000` (`Menu_SetMenuBar(&g_gameMenuBar)`) and removed by `112
 MenuBarDef   @13bf (6 bytes): i16 count = 3; MenuPopupDef far* popups (-> 1383)
 MenuPopupDef (0x14 bytes, 3 records at 1383, 1397, 13ab):
   +00 char far* title         ('&' marks the accelerator)
-  +04 i16       unk04         63 / 78 / 66 (not read by 1078)
+  +04 i16       unk04         63 / 78 / 66: title width [I, from G&G] (not read by 1078)
   +06 i16       itemCount
   +08 char far* items         LF-separated item texts; 1078 replaces each LF with NUL in place
   +0c FARPROC far* handlers   itemCount far function pointers
-  +10 i16       unk10, +12 i16 unk12   (0x84,0x46) / (0x81,0x88) / (0x8f,0x01), not read
+  +10 i16       unk10         0x84 / 0x81 / 0x8f = 132 / 129 / 143: drop-down width [I, from G&G] (not read)
+  +12 i16       unk12         0x46 / 0x88 / 0x01 = 70 / 136 / 1: title x [I, from G&G] (not read)
 ```
 
 | Popup | Title @ | Items @ | Handlers @ | Items → handler (command id = popup·0x100 + item) |
@@ -505,6 +506,27 @@ MenuPopupDef (0x14 bytes, 3 records at 1383, 1397, 13ab):
 | 2 | 129a "&Help" | 12a0 | 12fd | About the Game → `1180:0117`; Using the Keyboard → `1180:0128`; Using the Mouse → `1180:0139`; Educational Focus → `1180:014a`; About Treasure Mountain! → `1140:0000` |
 
 The 5th Help handler is relocated to `1140:0000` (`MenuCmd_AboutTM`; ARCHITECTURE.md §7.1 C6).
+
+**The three unread fields** (answers former open question 1) [O values, I meaning]. TM Windows
+never reads +0x04, +0x10 or +0x12: `Menu_SetMenuBar` (1078:0000) copies each record (F_SCOPY) and
+uses only +0x06 and +0x08 to build a Win16 menu. *Gizmos & Gadgets* (DOS, 1993) links the same TLC
+menu library with the identical 0x14-byte record and draws its menu bar itself, and there all three
+fields are read (G&G addresses as in `re/gg/docs/ARCHITECTURE.md` §5.5): the title's click zone is
+(x = +0x12, y 0, w = +0x04 + 2, h 9) (40a4:0035..0078), the title picture is drawn at x = +0x12
+(40a4:04db), and the drop-down box is opened at x = +0x12, y 9, width +0x10 (40a4:056c). Read the
+same way, TM Windows' values (the records at file offsets 0x24F83, 0x24F97 and 0x24FAB of
+`TMTWINCD.EXE`, re-read for this note) lay out a self-drawn bar exactly, with 3-px gaps:
+
+| Popup | Title x (+0x12) | Title width (+0x04) | Next title x | Drop-down width (+0x10) |
+|---|---|---|---|---|
+| 2 Help | 1 | 66 | 1 + 66 + 3 = 70 | 143 |
+| 0 File | 70 | 63 | 70 + 63 + 3 = 136 | 132 |
+| 1 Options | 136 | 78 | – | 129 |
+
+So the data was authored for a DOS-style menu bar drawn by the game (titles left to right Help,
+File, Options; the Win16 menu follows the record order instead). G&G's own values are title width
+54 for all three and x 0 / 54 / 108 for File / Options / Help. No TM Windows code depends on these
+fields; an engine can ignore them.
 
 ### 4.13 Music controller, hints, title narration (13c6–142b) [O]
 
@@ -1047,9 +1069,10 @@ targets].
 
 ## Open questions
 
-1. `MenuPopupDef` +0x04 (63 / 78 / 66, ASCII '?', 'N', 'B') and +0x10/+0x12 ((0x84,0x46), (0x81,0x88),
-   (0x8f,0x01)) are never read by `1078`. They may be left over from the Mac menu resources (menu ids
-   or key equivalents). The bytes are unexplained.
+1. (Answered, inferred from *Gizmos & Gadgets*) `MenuPopupDef` +0x04, +0x10 and +0x12 are never
+   read by `1078`; they are the title width, drop-down width and title x of a self-drawn menu bar,
+   the way G&G's copy of the same TLC menu library reads them. TM Windows' values fit that reading
+   exactly with 3-px gaps (§4.12).
 2. `RoomDef` +0x09 (always 0xFF), +0x0d (always 1) and +0x10 (always −100): no reader found. They
    could be an unused fourth exit (exit/type/x).
 3. Rooms 19–21, 32–34 and 45–47 cannot be entered through any static exit. Does the code ever set

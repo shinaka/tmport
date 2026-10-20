@@ -1,0 +1,33 @@
+1bb4:0045	Snd_StartSection		section start: delay = 1, tick = 0, clears the channel bends, transpose from the section entry, skips the initial delay byte (fmt_sound.md §3.2)
+1bb4:00a9	AdLib_Write	void near AdLib_Write(void)	OPL2 register AL = AH at 0x388/0x389 with status-read delays (6 and 35 reads); same idea as TM DOS AdLib_Write 491b:0875
+1bb4:0142	AdLib_Detect	void near AdLib_Detect(void)	OPL timer test at 0x388 (status & 0xE0)
+1bb4:0198	Mpu_WriteData		MPU-401 data byte (port 0x330); MT-32 path, dead in this build
+1bb4:01a9	Mpu_WriteCommand		MPU-401 command with ACK 0xFE (port 0x331); dead path
+1bb4:01c7	Mpu_WantSendData		MPU-401 command 0xD7; dead path
+1bb4:01db	Mpu_SendSysEx		0xDF + Roland SysEx F0 41 10 16 12 .. F7; dead path
+1bb4:0218	Opl_SetVolume		OPL2 operator level: scales TL by the master volume DS:1686 and the channel volume DS:1688 (operator tables DS:16e5/16fb)
+1bb4:0270	Opl_SetPatch		loads an 11-byte OPL2 instrument patch through the operator tables DS:16fb/16e5
+1bb4:0343	Opl_NoteOn		OPL2 note on with transpose and pitch bend, 96-note tables DS:1712/1792
+1bb4:04a0	Psg_StepEnvelopes		SN76496-style attenuation envelopes with FE loop marks (class 2; dead in the shipped data)
+1bb4:0541	Spk_PitchBend		pitch bend on the PC speaker (class 1)
+1bb4:06d9	Mpu_InitChannel		MT-32 per channel 1..8: program, bend, reset controllers, RPN 0 = 2 semitones; dead path
+1bb4:087e	Snd_StepSpeakerSweep		class 0 interpreter (DS:1aaa[0]): PIT divisor lists on the speaker (no class-0 songs in the data)
+1bb4:08ef	Snd_MetaEvent		BMF meta event FF len16 t v: skips len payload bytes; t = 1 with v = the current section ends it
+1bb4:0966	Snd_StepSpeaker		class 1 and 4 interpreter (DS:1aaa[1], [4]): MIDI-like events, monophonic on the speaker (divisor table DS:1816)
+1bb4:0a1f	Snd_StepPsg		class 2 interpreter (DS:1aaa[2]): PSG writes `ch<<5|0x90|vol` to port DS:16ae (never set: dead)
+1bb4:0ad6	Snd_StepOpl		class 3 interpreter (DS:1aaa[3]): OPL2, 6 melodic + 5 rhythm voices (BD = 0x20)
+1bb4:0b97	Snd_Silence		silences the output and sets DS:1680 = 0 (output disabled); called for device 0
+1bb4:0be5	Snd_SetCue		(slot, tick, callback): cue tick s+0x07 and far callback s+0x09 of a song slot
+1bb4:0db3	Snd_Tick	void far Snd_Tick(void)	called by Timer_ISR: steps up to 64 sound/music tasks (active DS:1558, far pointers DS:1458)
+1bb4:0e15	Snd_Off		stops all sound (Game_Shutdown)
+1bb4:0e71	Snd_AllocSlot		takes the first free song slot (DS:1458[64]) if the song class is available (DS:1681[class]); returns the slot, -1 no slot, -4 class not available
+1bb4:0ebc	Snd_RegisterSong		checks 'BMF' 0x1A and registers the song at BMF+0x10 in a slot
+1bb4:11a2	Mpu_SetMasterVolume		MT-32 master volume (address 10 00 16); dead path
+1bb4:1234	Snd_Init	unsigned far Snd_Init(int device)	clears the 64 tasks; device from the -s switch (DS:2452); AdLib detection; returns capability bits (bit 2 -> DS:a0d8)
+1cdd:0004	SndRes_Init	void far SndRes_Init(void)	clears the 60-entry sound table DS:9d48 and loads resource 0x105b
+1cdd:0024	SndRes_LoadMusicBank		loads sound bank id + DS:a0d8 (speaker arrangement id, FM arrangement id+1), walks the members to the BMF and registers it (Snd_RegisterSong)
+1cdd:012d	SndRes_LoadEffectBank		effect bank id + DS:a0d8: registers every member; C FF members (no speaker version) are rejected and leave an empty handle
+1cdd:01e0	SndRes_LoadSong		a single BMF entry id + DS:a0d8 (0x1056 / 0x1057, the New Player Hint chime)
+1cdd:05c8	Snd_ToggleOption		Ctrl+S: sound on/off (DS:45cc)
+1cdd:05db	Snd_Pause		pauses sound (modal dialogs)
+1cdd:05e5	Snd_Resume		resumes sound

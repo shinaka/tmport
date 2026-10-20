@@ -1,0 +1,32 @@
+153f:0002	Parts_LoadCatalogue		part catalogue of the race: resource 0x2f5 + DS:4590, 0x8e-byte part records followed by Morty's vehicle (DS:6634)
+153f:0385	Parts_SaveState		saves the object/part state into the building record (+0x14)
+1622:0085	Rooms_Load		rooms of a building/level from resources: u16 count + 0x120-byte room headers, 4 depth layers of 0x20-byte objects, animated objects; table DS:7a04
+1622:0411	Room_Enter		sets up and draws the room DS:7aa4
+1622:0706	Room_DrawAnimLayer		animated objects of one layer (x clamped to 1..319)
+1622:0922	Room_DrawLayer		static objects of one layer
+1622:0fb3	Rooms_SaveState		saves the rooms into the building record (+0x26c/+0x302)
+174b:0324	AnimSeq_Load		actor animation sequences ('S' sets of 10-byte records, resources 0x1005/0x1007)
+174b:0522	AnimSeq_PlayModal		animation player loop, Timer_Set(0,4) per frame
+1834:0088	Actors_LoadSet		loads an actor set (S records): the player 0x1033..0x1036 (18f5:05a3), the Cyber Chimps 0x1041/0x1042 or 0x103d/0x103e (2a80:051e); fmt_data.md §7.3
+1834:0733	Actors_Draw		draws the 12 actor slots DS:7a8a (0xa0 bytes: 0 player, 1 projectile, 2..11 Cyber Chimps)
+1834:0ae9	Actors_Tick		per-frame actor update; non-zero = leave the room
+1834:0b5e	Actors_SaveState		saves the actors into the building record (+0x492)
+18f5:0721	Actors_Init		sets the per-actor callbacks: player 18f5:04cf/0409/029b/0180, projectile 18f5:06fb/0401, chimps 2a80:0112
+18f5:0895	Projectile_Launch		launches actor 1 (counter DS:457e)
+18f5:094d	Building_NewVisit		set-up of a new building visit (state 4)
+1adb:0093	Collide_Mask1		(inferred) walk/collision mask test
+1adb:01ef	Collide_Mask2		(inferred) walk/collision mask test
+1adb:03b0	Collide_Mask3		(inferred) walk/collision mask test
+2a80:0000	Chimp_TakePart		(inferred from the call pattern) a chimp takes a part from the room (1834:08d7, 1622:0d8f)
+2a80:00a1	Chimp_DropPart		(inferred) gives a part back
+2a80:0112	Chimp_Brain		data-driven behaviour: move lists with random chances DS:1d2e, transitions DS:1f10
+2a80:0635	Chimps_Place		random rooms and positions for the level's chimps
+2a80:0784	Chimps_Init		chimp count DS:1bae[DS:4590], halved at 2a80:07b1 when DS:2450 == 2 (286 CPU), 50 % start states; disabled by Without Chimps (DS:4578)
+2dee:0c89	Workshop_Run		workshop loop (blueprint, part selection, assembly), 4 ticks per frame
+2dee:1a90	State_06_Workshop	int far State_06_Workshop(void)	workshop (room 0); zones 1000..1009 + part codes 4000+n
+2dee:1db5	Workshop_Init		called by Game_Init
+3dd6:0034	Race_StepSpeed		(inferred) per-frame speed from the parts
+3dd6:01ca	Race_Run		race loop, 8 ticks per frame (18.2 frames/s): player vehicle (DS:6616) against Morty's (DS:6634) along 'R' paths
+3dd6:044e	Race_StepSpeed2		(inferred) per-frame speed from the parts
+3dd6:0762	Race_LandEnergy		race of the Automotive and Alternative Energy buildings (State_11_Race); result DS:4560
+3e77:0a23	Race_Aircraft		race of the Aircraft building (State_11_Race)

@@ -7,8 +7,10 @@ Everything is done with posted window messages:
 Screenshots are DOSBox-X's internal captures: the exact emulated 640x480 frame, even if the
 window is covered or parked off-screen. (Minimised windows drop input, so we park instead.)
 
-Guest mouse input is NOT possible this way: DOSBox-X only feeds Windows 3.1's PS/2 mouse while
-it has captured the host mouse. Use the game's keyboard controls.
+Guest mouse input cannot be posted as mouse messages: DOSBox-X's SDL1 backend takes the pointer
+position from GetCursorPos (the real pointer), and Windows 3.1's PS/2 mouse is fed only while the
+host mouse is captured. Use the game's keyboard controls (win, dos). The gg profile instead types
+mouse commands to a guest-side TSR (see "Mouse" below), still with posted keys only.
 
 Usage (python -P tmctl.py <cmd> ...):
   start [--park]             launch DOSBox-X with tools/dosbox_tmwin.conf, never activated;
@@ -53,8 +55,9 @@ Usage (python -P tmctl.py <cmd> ...):
                              audio track per device). Works with [mixer] nosound=true, so
                              nothing plays on the host; the AVIs of 'rec' also carry audio.
   menu                       list DOSBox-X menu commands and ids
+  mouse VERB ...             gg profile only: guest mouse input (see "Mouse" below)
 
-Profiles (--profile win|dos, default win; the Windows profile behaves exactly as before):
+Profiles (--profile win|dos|gg, default win; the Windows profile behaves exactly as before):
   win   Windows 3.1 + Win CD edition, tools/dosbox_tmwin.conf, states in extracted/captures/savestates,
         USERS.DAT = extracted/win31_c/TLCWIN/TMTWINCD/USERS.DAT
   dos   1990 DOS edition (SST.EXE), tools/dosbox_tmdos.conf. C: = extracted/dos_c (a writable COPY of
@@ -72,6 +75,41 @@ Profiles (--profile win|dos, default win; the Windows profile behaves exactly as
     python -P tools/tmctl.py state save tandy/signin   (-> extracted/captures/dos/savestates/tandy/)
   Note: the 1990 game drops shifted keys (shift+a types nothing); type names in lower case, the
   game capitalises the first letter itself. Slots 1..9 of save/load N are shared by both profiles.
+  gg    Super Solvers Gizmos & Gadgets! (DOS 1.0, SSG.EXE), tools/dosbox_gg.conf (vgaonly, 486 at
+        fixed 26800 cycles, SB 2.0 OPL2, built-in INT 33h driver, autolock=false). C: = extracted/gg_c
+        (a writable COPY of GG_DATA, default GadgetsAndGizmos; game in C:\\GG; made on the first start),
+        states in extracted/captures/gg/savestates with PLAYERS.DAT stored as NAME.players (state load
+        puts it back unless --keep-players). Each start writes C:\\MOUSEKEY.COM (tools/gg/mouse_tsr.py)
+        and C:\\RUN.BAT: date/time (default 10/01/1993 09:00:00, the game seeds rand() from time()),
+        the guest clock into C:\\CLOCK.TXT, MOUSEKEY, cd \\GG, SSG <args>. Extra start options:
+          --args "A"     switches for SSG.EXE: -si speaker, -sa/-sb/-sm OPL2 FM, -sn no sound, -gv
+                         VGA without the display-code test (Read_1st.txt)
+          --clock "MM/DD/YYYY HH:MM:SS" | --clock host    another guest clock / keep the host's
+          --fresh        copy GG_DATA over extracted/gg_c/GG first (shipped PLAYERS.DAT, GIZMO004.DAT)
+          --no-mousekey  do not load the TSR (the mouse command then does nothing)
+          --machine M, --set K=V   as for dos
+    python -P tools/tmctl.py start --profile gg --park --fresh
+    python -P tools/tmctl.py key space text:ada                 (attract -> sign-in, type a name)
+    python -P tools/tmctl.py mouse click 164 180                (Start Game)
+    python -P tools/tmctl.py state save w0/hub                  (-> extracted/captures/gg/savestates/w0/)
+
+Mouse (gg profile; re/gg/docs/REFERENCE_CAPTURES.md section 2):
+  The MOUSEKEY TSR, loaded before SSG.EXE, owns the game's INT 33h event handler: host mouse events
+  never reach the game. A mouse command is typed to it as 5 posted keys (F5..F9 + 4 data keys, 5 ms
+  per key edge, ~60 ms per command), which it swallows before the game's keyboard handler sees them;
+  it then calls the game's handler (INT 33h fn 0Ch) with the event, as a driver would. Coordinates
+  are game pixels, x 0..319, y 0..199 (INT 33h x = 2*x); the arrow's tip lands exactly there, clamped
+  to the range the game set (fn 7/8, e.g. x <= 270 in the hub). Verbs, several per call:
+    move X Y                    move (always reported to the game, even to the same spot)
+    click X Y [left|right]      move, press, 120 ms, release
+    down [X Y] [left|right]     press (at the last position if X Y are left out)
+    up [X Y] [left|right]       release
+    drag X1 Y1 X2 Y2 MS         left press at 1, moves along the line for MS ms, release at 2
+    wait MS                     sleep
+    where                       last position and held buttons sent (extracted/captures/dosbox.mouse)
+  Example: mouse move 283 141 wait 300 down wait 300 move 297 149 wait 300 up
+  Never post real mouse messages to the window: a posted button message moves the guest pointer to
+  wherever the host pointer is and can disturb the cursor clip of the foreground application.
 """
 import ctypes
 import ctypes.wintypes as wt
@@ -96,6 +134,16 @@ CONF_DOS = os.path.join(TOOLS, 'dosbox_tmdos.conf')
 DOS_C = os.path.normpath(os.path.join(TOOLS, '..', 'extracted', 'dos_c'))
 DOS_USERS_DAT = os.path.join(DOS_C, 'TM', 'USERS.DAT')
 DOS_STATELIB = os.path.join(CAPDIR, 'dos', 'savestates')
+
+# Gizmos & Gadgets profile (see "Profiles" and "Mouse" in the docstring)
+CONF_GG = os.path.join(TOOLS, 'dosbox_gg.conf')
+GG_C = os.path.normpath(os.path.join(TOOLS, '..', 'extracted', 'gg_c'))
+GG_PLAYERS_DAT = os.path.join(GG_C, 'GG', 'PLAYERS.DAT')
+GG_STATELIB = os.path.join(CAPDIR, 'gg', 'savestates')
+GG_DATA = os.environ.get('GG_DATA') or os.path.normpath(os.path.join(TOOLS, '..', 'GadgetsAndGizmos'))
+GG_CLOCK = ('10/01/1993', '09:00:00')   # guest DOS date/time set by RUN.BAT (srand(time(NULL)) at start-up)
+MOUSEFILE = os.path.join(CAPDIR, 'dosbox.mouse')
+PROFILES = ('win', 'dos', 'gg')
 
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
@@ -403,7 +451,130 @@ def _dos_prepare(game_args):
         f.write(f'SST {game_args}'.rstrip() + '\n')
 
 
-def start(park, profile='win', machine=None, game_args='', sets=()):
+def _mouse_tsr():
+    sys.path.insert(0, os.path.join(TOOLS, 'gg'))
+    import mouse_tsr
+    return mouse_tsr
+
+
+def _gg_prepare(game_args, clock, tsr=True, fresh=False):
+    """G&G profile: make/refresh the writable game copy, write the MOUSEKEY TSR and C:\\RUN.BAT."""
+    game = os.path.join(GG_C, 'GG')
+    if fresh or not os.path.exists(os.path.join(game, 'SSG.EXE')):
+        if not os.path.exists(os.path.join(GG_DATA, 'SSG.EXE')):
+            raise SystemExit(f'{GG_DATA} has no SSG.EXE (set GG_DATA to the Gizmos & Gadgets folder)')
+        os.makedirs(game, exist_ok=True)
+        for name in os.listdir(GG_DATA):        # the originals are only read, never mounted
+            src = os.path.join(GG_DATA, name)
+            if os.path.isfile(src):
+                shutil.copy2(src, os.path.join(game, name))
+        print(f'copied {GG_DATA} -> {game}')
+    with open(os.path.join(GG_C, 'MOUSEKEY.COM'), 'wb') as f:
+        f.write(_mouse_tsr().build())
+    with open(os.path.join(GG_C, 'RUN.BAT'), 'w', newline='\r\n') as f:
+        f.write('@echo off\n')
+        if clock != 'host':
+            date, tod = GG_CLOCK if clock is None else clock.split(' ', 1)
+            f.write(f'date {date}\ntime {tod}\n')
+        f.write('date /t > C:\\CLOCK.TXT\ntime /t >> C:\\CLOCK.TXT\n')   # the guest clock, for checks
+        if tsr:
+            f.write('C:\\MOUSEKEY.COM\n')
+        f.write('cd \\GG\n')
+        f.write(f'SSG {game_args}'.rstrip() + '\n')
+
+
+# ---- guest mouse (gg profile): commands typed to the MOUSEKEY TSR as posted keys ----
+MOUSE_GAP = 0.005       # seconds between posted key edges of a mouse command (40 commands at 0 ms all arrived)
+
+
+def _mouse_load():
+    try:
+        x, y, b = open(MOUSEFILE).read().split()
+        return int(x), int(y), b
+    except (OSError, ValueError):
+        return 160, 100, ''      # the driver's reset position (320,100) in game coordinates
+
+
+def _mouse_save(x, y, buttons):
+    open(MOUSEFILE, 'w').write(f'{x} {y} {buttons or "-"}')
+
+
+def mouse_send(x, y, action):
+    """One MOUSEKEY command at game coordinates x 0..319, y 0..199 (INT 33h x = 2*x)."""
+    x, y = max(0, min(319, int(x))), max(0, min(199, int(y)))
+    _, child = find()
+    for name in _mouse_tsr().keys_for(2 * x, y, action):
+        _post_key(child, name, False, False)
+        time.sleep(MOUSE_GAP)
+        _post_key(child, name, True, False)
+        time.sleep(MOUSE_GAP)
+    _, _, held = _mouse_load()
+    held = held.strip('-')
+    if action.endswith('down'):
+        held = ''.join(sorted(set(held + action[0])))
+    elif action.endswith('up'):
+        held = held.replace(action[0], '')
+    _mouse_save(x, y, held)
+    return x, y
+
+
+def mouse(args):
+    """mouse move X Y | click X Y [left|right] | down [X Y] [left|right] | up [X Y] [left|right] |
+    drag X1 Y1 X2 Y2 MS | wait MS | where   (several may follow each other in one call)."""
+    toks = list(args)
+
+    def nums(n, need=True):
+        vals = []
+        while len(vals) < n and toks and toks[0].lstrip('-').isdigit():
+            vals.append(int(toks.pop(0)))
+        if need and len(vals) < n:
+            raise SystemExit(f'mouse {verb}: {n} numbers expected\n{mouse.__doc__}')
+        return vals
+
+    def button():
+        if toks and toks[0] in ('left', 'right'):
+            return toks.pop(0)[0]
+        return 'l'
+
+    if not toks:
+        print(mouse.__doc__)
+        return
+    while toks:
+        verb = toks.pop(0)
+        if verb == 'move':
+            x, y = nums(2)
+            mouse_send(x, y, 'move')
+        elif verb == 'click':
+            x, y = nums(2)
+            b = button()
+            mouse_send(x, y, b + 'down')
+            time.sleep(0.12)                     # several game frames between press and release
+            mouse_send(x, y, b + 'up')
+        elif verb in ('down', 'up'):
+            xy = nums(2, need=False)
+            x, y = xy if len(xy) == 2 else _mouse_load()[:2]
+            mouse_send(x, y, button() + verb)
+        elif verb == 'drag':
+            x1, y1, x2, y2, ms = nums(5)
+            mouse_send(x1, y1, 'move')
+            mouse_send(x1, y1, 'ldown')
+            t0, dur = time.time(), max(ms, 1) / 1000.0
+            while True:
+                f = min(1.0, (time.time() - t0) / dur)
+                mouse_send(round(x1 + (x2 - x1) * f), round(y1 + (y2 - y1) * f), 'move')
+                if f >= 1.0:
+                    break
+            mouse_send(x2, y2, 'lup')
+        elif verb == 'wait':
+            time.sleep(nums(1)[0] / 1000.0)
+        elif verb == 'where':
+            x, y, b = _mouse_load()
+            print(f'{x} {y} buttons={b.strip("-") or "none"}')
+        else:
+            raise SystemExit(f'mouse: unknown verb {verb!r}\n{mouse.__doc__}')
+
+
+def start(park, profile='win', machine=None, game_args='', sets=(), clock=None, tsr=True, fresh=False):
     if _windows():
         print('already running')
         return
@@ -412,9 +583,15 @@ def start(park, profile='win', machine=None, game_args='', sets=()):
     si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
     si.wShowWindow = 4  # SW_SHOWNOACTIVATE: never take focus
     log = open(os.path.join(CAPDIR, 'dosbox.log'), 'w')
-    if profile == 'dos':
-        _dos_prepare(game_args)
-        cmdline = [DOSBOX, '-conf', CONF_DOS]
+    if profile in ('dos', 'gg'):
+        if profile == 'dos':
+            _dos_prepare(game_args)
+            cmdline = [DOSBOX, '-conf', CONF_DOS]
+        else:
+            _gg_prepare(game_args, clock, tsr, fresh)
+            cmdline = [DOSBOX, '-conf', CONF_GG]
+            if os.path.exists(MOUSEFILE):
+                os.remove(MOUSEFILE)
         if machine:
             cmdline += ['-set', f'machine={machine}']
         for s in sets:
@@ -447,13 +624,15 @@ def stop():
         print('stopped (by image name)')
     if os.path.exists(PROFILEFILE):
         os.remove(PROFILEFILE)
+    if os.path.exists(MOUSEFILE):
+        os.remove(MOUSEFILE)
 
 
 def running_profile():
     """Profile of the instance started by tmctl (written by start); 'win' if unknown."""
     try:
         p = open(PROFILEFILE).read().strip()
-        return p if p in ('win', 'dos') else 'win'
+        return p if p in PROFILES else 'win'
     except OSError:
         return 'win'
 
@@ -477,6 +656,10 @@ def _select_and(cmd, slot):
 def state(args, profile='win'):
     """Named save states (see the docstring): state save NAME | load NAME [--keep-users] | list."""
     lib, users_dat = (DOS_STATELIB, DOS_USERS_DAT) if profile == 'dos' else (STATELIB, USERS_DAT)
+    ext, keep = '.users', '--keep-users' in args
+    if profile == 'gg':
+        lib, users_dat, ext = GG_STATELIB, GG_PLAYERS_DAT, '.players'
+        keep = keep or '--keep-players' in args
     action = args[0] if args else 'list'
     if action == 'list':
         root = os.path.join(lib, args[1]) if len(args) > 1 else lib
@@ -505,16 +688,16 @@ def state(args, profile='win'):
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copy2(slot, dst)
         if os.path.exists(users_dat):
-            shutil.copy2(users_dat, dst[:-4] + '.users')
+            shutil.copy2(users_dat, dst[:-4] + ext)
         print('saved', name)
     elif action == 'load':
         if not os.path.exists(dst):
             raise SystemExit(f'no such state: {dst}')
         shutil.copy2(dst, slot)
-        users = dst[:-4] + '.users'
-        if os.path.exists(users) and '--keep-users' not in args:
+        users = dst[:-4] + ext
+        if os.path.exists(users) and not keep:
             shutil.copy2(users, users_dat)
-            print('restored USERS.DAT of', name)
+            print(f'restored {os.path.basename(users_dat)} of', name)
         _select_and('load', STATE_SLOT)
         print('loaded', name)
     else:
@@ -527,7 +710,7 @@ def main(argv):
         return
     cmd, args = argv[0], argv[1:]
     # profile options (see "Profiles" in the docstring); without them nothing changes
-    opts = {'--profile': None, '--machine': None, '--args': ''}
+    opts = {'--profile': None, '--machine': None, '--args': '', '--clock': None}
     sets, rest = [], []
     i = 0
     while i < len(args):
@@ -542,12 +725,18 @@ def main(argv):
             i += 1
     args = rest
     profile = opts['--profile'] or ('win' if cmd == 'start' else running_profile())
-    if profile not in ('win', 'dos'):
-        raise SystemExit(f'unknown profile {profile!r} (win or dos)')
+    if profile not in PROFILES:
+        raise SystemExit(f'unknown profile {profile!r} (win, dos or gg)')
     if cmd not in ('start', 'stop', 'park', 'unpark'):
         ensure_parked()
     if cmd == 'start':
-        start('--park' in args, profile, opts['--machine'], opts['--args'], sets)
+        start('--park' in args, profile, opts['--machine'], opts['--args'], sets, opts['--clock'],
+              '--no-mousekey' not in args, '--fresh' in args)
+    elif cmd == 'mouse':
+        if profile != 'gg':
+            raise SystemExit('mouse: only for the gg profile (its config has autolock=false; in the '
+                             'win/dos configs a click could capture the host mouse)')
+        mouse(args)
     elif cmd == 'stop':
         stop()
     elif cmd in ('park', 'unpark'):

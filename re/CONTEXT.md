@@ -5,9 +5,13 @@ Version 1.01, (c) 1990, 1992-95 The Learning Company) and re-implement it as a m
 cross-platform C++ engine (Windows first, then Linux/macOS) that loads the **user's original
 game files at runtime**. The DOS 1990 version is available as a secondary cross-reference only.
 
+The same repository also hosts the port of *Gizmos & Gadgets!* (DOS, 1993): see the section
+"Gizmos & Gadgets (DOS)" below.
+
 ## Ground rules (apply to every agent)
 
-1. **Never modify** anything under `C:\Git\TM\TM-DOS` or `C:\Git\TM\TM-WIN` (the user's originals).
+1. **Never modify** anything under `C:\Git\TM\TM-DOS`, `C:\Git\TM\TM-WIN` or
+   `C:\Git\TM\GadgetsAndGizmos` (the user's originals).
 2. **Clean-room-style port.** The engine must contain no game assets, no game text, and no
    copied decompiled code. It reads art/sound/text/tables from the user's original files at
    runtime. Specs may describe formats, algorithms, data layouts and behaviour; refer to game
@@ -34,8 +38,9 @@ game files at runtime**. The DOS 1990 version is available as a secondary cross-
 | `re\docs\` | **Specs written by agents** (Markdown) |
 | `tools\` | Python tools; `tools\assets\` for asset decoders |
 | `tools\ghidra\ghidra_12.1.4_PUBLIC\` | Ghidra; run headless via `tools/ghidra_headless.sh` (bash) |
-| `tools\ghidra_scripts\` | Ghidra Java scripts (`ExportAll.java`, `FindMoreFunctions.java`) |
-| `re\ghidra_proj\` | Ghidra projects: `TMWin` (program `TMTWINCD.EXE`), `TMDos` (program `SST_unpacked.EXE`) |
+| `tools\ghidra_scripts\` | Ghidra Java scripts (`ExportAll.java`, `FindMoreFunctions.java`, `ApplyNames.java`; the VROOMM import scripts of the G&G project) |
+| `re\ghidra_proj\` | Ghidra projects: `TMWin` (program `TMTWINCD.EXE`), `TMDos` (program `SST_unpacked.EXE`), `GGDos` (program `ssg.exe`, G&G) |
+| `GadgetsAndGizmos\` | *Gizmos & Gadgets!* DOS original (read-only); its specs, tools and names are in `re\gg\`, `tools\gg\`, `re\names\gg\` (section "Gizmos & Gadgets (DOS)") |
 
 ## Spec documents (read in this order)
 
@@ -78,8 +83,9 @@ The REA MCP native tools are NOT usable in this session (Ghidra not wired into R
 taking focus from the user's desktop** (posted window messages only; window parked off-screen).
 Commands: `start [--park]`, `stop`, `key enter esc up "text:Name" alt+o ...`, `shot OUT.png`
 (exact 640x480 frame), `save N` / `load N` (save states), `turbo on|off`, `park`/`unpark`.
-Keyboard only — guest mouse input is impossible without grabbing the user's mouse, so use the
-game's keyboard controls. **Only one agent may drive the emulator at a time**; only use it if your
+Keyboard only in the win and dos profiles — guest mouse input cannot be posted without grabbing the
+user's mouse, so use the game's keyboard controls (the G&G profile types mouse commands to a guest
+TSR instead; section "Gizmos & Gadgets (DOS)"). **Only one agent may drive the emulator at a time**; only use it if your
 task explicitly says so. Never use `tools\wincap.py key` (that one does steal focus).
 Captures go to `extracted\captures\` (`ref\` for curated reference frames).
 
@@ -111,6 +117,124 @@ timer, input, init) and `PORTING_NOTES.md` (runtime model, options, quirks).
 - Addresses: `SSSS:OOOO` = file offset `(SSSS-0x1000)*16 + OOOO + 0x21F0` of
   `extracted\SST_unpacked.EXE`; DGROUP is segment `4d94`, `DS:XXXX` = file offset `0x3FB30 + XXXX`.
   Ghidra prints `MOV Sreg,r16` (opcode 8E) with its operands swapped.
+
+## Gizmos & Gadgets (DOS)
+
+*Super Solvers: Gizmos & Gadgets!* (DOS v1.0, 1993, The Learning Company) is a second game ported
+in this repository: its own executable `ggport`, engine code in `src\gg\`, specs in `re\gg\docs\`,
+tools in `tools\gg\`, names in `re\names\gg\`; tests find the game through the environment variable
+`GG_DATA` (default: the repository's `GadgetsAndGizmos\` folder). The decision and the plan are in
+`re\gg\docs\SCOPING.md` §9. The ground rules above apply unchanged.
+
+- **The game**: `GadgetsAndGizmos\` holds the user's original files (`ssg.exe`, `gizmo000.dat` ..
+  `gizmo004.dat`, `PLAYERS.DAT`, `ssg.bat`, `Read_1st.txt`, `ssg.ico`). **Never modify it**; tools
+  open it read-only (it is git-ignored, like `TM-DOS\` and `TM-WIN\`). Anything that must write game
+  files (DOSBox-X) uses the writable copy `extracted\gg_c\`; never mount `GadgetsAndGizmos\`.
+  `gizmo004.dat` is not game data: the game writes it at run time as a screen save-under.
+- **Read in this order**: `re\gg\docs\SCOPING.md` (decision report, overlap with TM, estimate,
+  plan), `re\gg\docs\ARCHITECTURE.md` (program, segment and overlay map, game flow, platform layer,
+  TLC UI library, saves, hints, relationship to TM), `re\gg\docs\PORTING_NOTES.md` (engine mapping;
+  wave 0 draft), then the format specs `fmt_data.md` (archives, compression, bundles, resource
+  types, text, tables, `PLAYERS.DAT`), `fmt_graphics.md` (pictures, palettes, fonts, DAM, movie)
+  and `fmt_sound.md` (BMF songs), and `REFERENCE_CAPTURES.md` (DOSBox-X profile, guest mouse,
+  the wave 0 captures), all in the same folder. `re\gg\docs\overlay_map.tsv` is the overlay table.
+- **Tools**: `tools\gg\` (`python -P`; `tools\gg\README.md` has the usage). Decoders: `ggarc.py`
+  (archives, decompressor, bundles; the module the others share), `lpx.py` (pictures and
+  palettes), `fnt.py` (fonts), `ggtext.py` (texts and hints), `dam.py` (DAM scripts), `movie.py`
+  (the final movie), `bmf.py` (songs), `players.py` (`PLAYERS.DAT`) and `extract_all.py`
+  (everything, with `index.tsv`); `python -P tools/gg/ggarc.py selftest` checks all 1897 archive
+  entries. Ghidra: `vroomm.py` (overlay layout, flattened image), `ghidra_import.sh`,
+  `ghidra_export.sh`. Captures: `mouse_tsr.py`, `capture_tour.py`. The decoders and `vroomm.py`
+  read `GadgetsAndGizmos\` (or `--data`, `GG_DATA`) read-only, refuse to write inside it, and write
+  derived output only under `extracted\` (decoders: `extracted\previews\gg\`).
+
+### Ghidra project
+
+- **Project and export.** Project `re\ghidra_proj\GGDos` (program `ssg.exe`: the flattened image
+  `extracted\gg\ssg_flat.exe` that `tools\gg\vroomm.py` writes). Export `re\gg\ghidra_export\`,
+  with the same files as `re\dos\ghidra_export\`. Both are git-ignored.
+  - Rebuild: `bash tools/gg/ghidra_import.sh` (about 2 minutes; details in `tools\gg\README.md`).
+    After editing names: `bash tools/gg/ghidra_export.sh`.
+  - The VROOMM import scripts in `tools\ghidra_scripts\`: `SetupOverlays.java` (overlay blocks,
+    stub thunks), `FixRealModeRefs.java` (64-KB boundary and `CS:` references), `FixSwitches.java`
+    (Borland switch tables), `DefineStrings.java`; `ApplyNames.java`, `FindMoreFunctions.java` and
+    `ExportAll.java` are shared with the TM projects (their new options are off by default there).
+  - The export has 1234 functions: 217 overlay stub thunks (stub:0020+5k; a thunk is named
+    thunk_<target>) and 1017 real functions, 453 of them named. DGROUP has 155 labels.
+  - The defects found by scoping are fixed: the 64-KB boundary in ovl10 and ovl27, the phantom
+    `FUN_3f56_092d` (removed), the missing 12e0:0506 and 12e0:0820 (created), and the wrong `CS:`
+    labels in the overlay manager.
+- **Names.** `re\names\gg\*.tsv`, in the `re\names\dos` format: address, name, C signature or type,
+  comment. One canonical name per address; each address is in exactly one file
+  (`re\names\gg\README.md`).
+  - Files: `rtl_bc30`, `ovrman`, `engine_lowlevel`, `engine_sound`, `ui_tlc`, `game_flow`,
+    `game_world`, `game_puzzles`, and `dgroup` (labels only, never functions).
+  - Conventions: functions are `Module_Verb`; the 17 states of `Seq_Run` (table DS:00c2) are
+    `State_NN_Role`; globals are `g_`, strings `s_`. A name that rests on inference says
+    "(inferred)" in its comment. `_Noreturn` in a signature marks a non-returning function.
+  - Docs and engine code use these names; add or change a name in the TSV first.
+- **Addresses.** All of these were checked against the bytes of `ssg.exe`; verify against the file
+  before relying on one.
+  - Ghidra segment = image segment + 0x1000 (load segment 0x1000), as for TM DOS. The numbering is
+    the scoping export's:
+
+    | Ghidra segments | What |
+    |---|---|
+    | 1000..1d42 | resident code (1d42 = overlay manager; its data is 1dd7, the segment table 1de3) |
+    | 1e0d..1e9f | overlay stubs |
+    | 1ea7 | DGROUP |
+    | 2a78 | stack |
+    | 2a80..4140 | overlays |
+
+  - Resident `SSSS:OOOO` (Ghidra 1000..2a7f): file offset in `ssg.exe` = `(SSSS-0x1000)*16 + OOOO +
+    0x1200`. For example, 1000:0000 is C0's `BA A7 0E` at 0x1200, and 1454:0046 is the PIT set-up
+    `B0 36 E6 43 B8 00 20` at 0x5786.
+  - `DS:XXXX` = `1ea7:XXXX` = file offset `0xFC70 + XXXX` (DS:0004 holds "Borland C++ - Copyright
+    1991"). Far pointers stored in DGROUP hold image segments (`0x0ea7` = DGROUP).
+  - Overlay `SSSS:OOOO` (Ghidra 2a80..4140): file offset = the overlay's `file_offset` + `OOOO`, from
+    its row in `re\gg\docs\overlay_map.tsv` (per overlay: number, stub segment, Ghidra stub and code
+    segments, file offset, code size, fix-ups, entries and role; `python -P tools/gg/vroomm.py map
+    --roles re/gg/docs/overlay_map.tsv --check` checks it against the exe). For example, 3d39:083a
+    (the DAM opcode table) = 0x2F2E0 + 0x83A = 0x2FB1A.
+  - Stub segments `1e0d`..`1e9f`: entry k of a stub is `stub:0020 + 5k` and jumps to an overlay
+    function; cite the target, not the thunk.
+  - Ghidra's bytes equal the file's except in two places: fix-up words (file: segment-table offset
+    index*8; Ghidra: segment + 0x1000) and, in the resident stubs, the entries (file `CD 3F off 00`;
+    Ghidra `EA off seg`).
+- **Decompiler caveats.** Near CALL/JMPs that cross 0x30000 in ovl10 or 0x40000 in ovl27 still
+  print Ghidra's page form in the operand (e.g. `CALL 0x3000:fe8d`); the reference comment and the
+  decompiled C carry the real target. `CS:` operands have corrected references, but the decompiled C
+  prints them with the page segment. Calls that pass a struct by value (`F_SPUSH`, all dialog calls)
+  and some switch-bearing overlay functions must be read from the disassembly.
+
+### DOSBox-X profile and mouse
+
+- **G&G profile**: `tmctl.py start --profile gg [--args "-sb"] [--fresh] --park`, using
+  `tools\dosbox_gg.conf` (vgaonly, 486 at fixed 26800 cycles, SB 2.0 OPL2, host sound muted,
+  built-in INT 33h driver, autolock=false). As for the TM profiles, only the agent whose task says
+  so may drive it.
+  - C: is the writable copy `extracted\gg_c\`, with the game in `C:\GG`. It is copied from
+    `GG_DATA` (default `GadgetsAndGizmos\`) on the first start or with `--fresh`; never mount the
+    original.
+  - `tmctl` writes `C:\RUN.BAT` on each start. It fixes the guest clock at 10/01/1993 09:00:00
+    because the game seeds rand() from time() (`--clock` changes it; DOSBox-X's DATE needs
+    slashes), and writes the guest clock to `C:\CLOCK.TXT`. It also writes `C:\MOUSEKEY.COM`, the
+    TSR from `tools\gg\mouse_tsr.py`, and loads it before `SSG`.
+- **Guest mouse**: `tmctl.py mouse move X Y | click X Y [left|right] | down/up [X Y] | drag X1 Y1 X2
+  Y2 MS | wait MS | where`, in game pixels (320x200; the arrow tip lands exactly there).
+  - Never post real mouse messages to DOSBox-X. This SDL1 build reads the host pointer
+    (GetCursorPos), so a posted click lands where the real pointer is.
+  - Instead, MOUSEKEY owns the game's INT 33h event handler (host mouse events are cut off) and
+    takes commands as posted keys: F5..F9 plus 4 data keys, swallowed before the game's INT 9 sees
+    them (`re\gg\docs\REFERENCE_CAPTURES.md` §2).
+  - The TSR moves the game 86 paragraphs up (DGROUP at segment 1721; Ghidra segment S runs at
+    S − 0x786), so state readers find DGROUP by the Borland signature at DS:0004
+    (`python -P tools/gg/mouse_tsr.py status STATE`).
+- **Captures**: states go to `extracted\captures\gg\savestates\` with `NAME.players`
+  (`PLAYERS.DAT`). Shots are 640x400 (mode 13h, 2x2). AVIs are ZMBV at 70.0863 frames/s. Raw OPL
+  `.dro` captures and the wave 0 tour (`w0\`) are in `extracted\captures\gg\`;
+  `tools\gg\capture_tour.py` replays the tour. The warehouse rooms are not reproducible from a
+  fresh boot (the Cyber Chimps call rand() every frame): start such runs from a state.
 
 ## Address conventions (Windows EXE)
 

@@ -54,10 +54,19 @@ public class ExportAll extends GhidraScript {
             while (it.hasNext() && !monitor.isCancelled()) {
                 Function f = it.next();
                 if (f.isExternal() || f.isThunk() && f.getBody().getNumAddresses() == 0) continue;
+                // sorted, so that two exports of the same program are identical
+                TreeSet<Address> callerSet = new TreeSet<>();
+                for (Function c : f.getCallingFunctions(monitor)) callerSet.add(c.getEntryPoint());
                 StringBuilder callers = new StringBuilder();
-                for (Function c : f.getCallingFunctions(monitor)) callers.append(c.getEntryPoint()).append(',');
+                for (Address c : callerSet) callers.append(c).append(',');
+                TreeSet<Address> calleeSet = new TreeSet<>();
+                TreeSet<String> externals = new TreeSet<>();
+                for (Function c : f.getCalledFunctions(monitor)) {
+                    if (c.isExternal()) externals.add(c.getName(true)); else calleeSet.add(c.getEntryPoint());
+                }
                 StringBuilder callees = new StringBuilder();
-                for (Function c : f.getCalledFunctions(monitor)) callees.append(c.isExternal() ? c.getName(true) : c.getEntryPoint().toString()).append(',');
+                for (Address c : calleeSet) callees.append(c).append(',');
+                for (String c : externals) callees.append(c).append(',');
                 idx.printf("%s\t%s\t%d\t%s\t%s%n", f.getEntryPoint(), f.getName(), f.getBody().getNumAddresses(), callers, callees);
 
                 String c;

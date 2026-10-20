@@ -1,0 +1,17 @@
+3083:08a1	PzElectric_Run		puzzle 0: electric circuits (electric.c asserts)
+32fe:0aa0	PzBalance_Run		puzzle 4: balance (inferred from the order of the dispatch table)
+33cd:0000	PzEnergy_Run		puzzle 6: energy forms (8 energy names DS:28ea..)
+33cd:0879	Str_ConcatList_ovl15		concatenates a NULL-terminated list of strings (stpcpy loop); byte-identical copy at 3938:0ce7 (TM DOS StrConcatList 1460:09f2)
+33cd:08d1	Str_CopyEnd_ovl15		strcpy returning the end; copy at 3938:0d3f (TM DOS StrCopyBounded 1460:09b7)
+35bb:1c03	PzMagnets_Run		puzzle 7: magnets (inferred from the order of the dispatch table)
+3797:1138	PzLaunch_Run		puzzle 5: launch (uses the DAM engine, Anim_PlayModal)
+38e2:0000	State_09_Puzzle	int far State_09_Puzzle(void)	type = random(8), up to 3 unsolved variants (counts DS:3334, 221 in all), any variant when fewer than 5 remain; Puzzle_Dispatch; solved flag DS:45d0 + type*0x42 + variant*2 and the door opens
+38e2:00d4	Puzzle_Dispatch		switch on the type (table CS:018e): 0 3083:08a1, 1 3938:0000, 2 3a4a:0000, 3 3b2f:1ed0, 4 32fe:0aa0, 5 3797:1138, 6 33cd:0000, 7 35bb:1c03
+38e2:019e	Puzzle_PickAny		any variant (when fewer than 5 unsolved remain overall)
+38e2:01e8	Puzzle_RandomType		random(8)
+38e2:0202	Puzzle_PickUnsolved		candidate variants: up to 3 unsolved ones
+3938:0000	PzSimple_Run		puzzle 1: simple machines (simple.c asserts)
+3938:0ce7	Str_ConcatList_ovl20		copy of Str_ConcatList_ovl15
+3938:0d3f	Str_CopyEnd_ovl20		copy of Str_CopyEnd_ovl15
+3a4a:0000	PzPieces_Run		puzzle 2: machine pieces (simple-machine examples DS:35cc..)
+3b2f:1ed0	PzGears_Run		puzzle 3: gears and buttons (inferred from the order of the dispatch table)
