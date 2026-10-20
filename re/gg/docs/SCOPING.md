@@ -189,7 +189,7 @@ evolved), **similar idea** (same role, new code), **different**.
 | **Text renderer** | **same lineage** | different | Overlay 2b89 is TM Win's 10b0 in the same function order. It has the same `FF 01/02/03/05/06` escape meanings and the same signed centring, and it still skips TAB after a wrap although it has no TAB case, a leftover of TM Win's code. Wrappers are evolved, not identical (**verifier**) [O] |
 | Text markup | same lineage | different | `FF 06 … FF` comments in the hint texts, as in TM Win [O] |
 | **DAM animation** | **same lineage** | different | Same magic and the same opcode numbering widened to 16-bit words; 2 channels instead of 16. **Verifier corrections**: the interpreter is 3d39:058f, not 3d39:013a. 11 of its 15 functions have no caller. The only user is one puzzle (ovl17 3797). The live part is about 1.5 KB. FB/FC play no sound in G&G, and 0x7FF8 (an indexed callback) is new [O] |
-| Final movie | different | different | Deluxe Paint ANM-style deltas drawn straight to VRAM at 18 PIT ticks per frame, with an 18-entry cue table (DS:236c) [O] |
+| Final movie | different | different | Deluxe Paint ANM-style deltas drawn straight to VRAM at 18 PIT ticks per frame, with a cue table of 25 cues and an end record (DS:236c; wave 0 said 18) [O] |
 | Sound driver and music | different | similar idea | New 64-slot BMF driver with speaker and OPL2 rhythm-mode classes. Its PSG and MT-32 (MPU-401) paths are dead code. Only the standard AdLib write (6 and 35 status reads, identical to TM DOS 491b:0875) and the detect sequence match. TM DOS also keeps per-device arrangements [O] |
 | **Menu bar** | **identical data format**; drawing code new | similar idea (drawn in game) | `MenuBarDef` {count, far popups} and the 0x14-byte popup record match in all six fields (DS:4053, DS:4017..). **Verifier: stronger than claimed**: G&G reads +0x04 / +0x10 / +0x12 as title width / drop-down width / title x, and TM Win's never-read values fit the same reading with 3-px gaps. This answers open question 1 of `re/docs/dgroup_map.md`, now updated [O values, I reading] |
 | Dialogs and buttons | same lineage (design) | similar idea | Same module order and draw recipe step by step as TM Win 10c0 (3f56:0389 vs 10c0:0764), but rewritten: descriptor by value, N buttons with key arrays, 2 frames. Flash button 4034:01d6 is evolved [O] |
@@ -255,6 +255,36 @@ parameters or an interface; "pattern" means the design guides new code; "no" mea
 | `src/mods` (PNG, WAV, JSON codecs, mod folders, `--check-mods` framework) | **as is** for the framework | new override formats (LPX, BMF, text) |
 | `tests/` helpers, `tools/dos/` (`savmem.py`, `imgcmp.py`, `audiocmp.py`, `oplcmp.py`, `avifit.py`, `fidelity.py`), `tools/tmctl.py` | **as is / generalise** | a G&G DOSBox-X profile (VGA, OPL, mouse driver); see §8 for the mouse gap |
 | `src/ne`, `src/data`, `gfx/pixmap` (RUND), `text/font` (FFNT), `audio/` MIDI and wave, `src/game`, `src/dos/game`, `dos/gfx`, `dos/text`, `dos/data`, `dos/autoplay` | **no** (TM-specific); game modules only as patterns (sign-in flow, hint triggers, rank table) | different game and formats |
+
+**As built in wave 2** (`cmake/portcore.cmake`, the shared core `portcore`; checked by
+`tools/check_core_deps.py`; `ENGINE_MAP.md`):
+
+* `dos/audio/opl_chip` is core as an `OplWriter` and `OplOutput`; `opl_backend` is **not** (its
+  `OplBackend` interface, playTune / noteOn / noteOff / restore, is TM's AdLib-driver API and stays
+  in tmcore). `dos_audio_device` and `dos_sound_renderer` became the core's `dos::ChipAudioDevice`
+  (`post(fn, delay)`) and `dos::ChipRenderer` (a `SoundTickSource` at `ChipRenderConfig::tickHz`),
+  plus `dos::OplWriteLog` / `OplLogTap` for `.dro` comparisons; TM's renderer and device are built on
+  them.
+* `dos/app/dos_runtime`'s `PitClock` became `timing/pit_clock.h` (`PitTimeBase(divisor)`,
+  `VirtualPit` with `onTick(every, fn, phase)` and `setTicks`, `PitTickClock`); the lockstep
+  `DosRuntime` stays TM-only and G&G does not use it: `GgClock` is built on `VirtualPit(0x2000)`,
+  `GgRuntime` on `platform::Host`.
+* `timing/deadline_timers` counts in its Clock's unit (`PitTickClock`), takes
+  `ExpiryRule::AfterDeadline` (strict >) and has `reached()` (≥) for `Timer_Wait` and `Delay`.
+* The keyboard is `dos::ScanKeyboard` (`dos/input/pc_keyboard.h`) with a `ScanByteHandler` (G&G's
+  `Kbd_ISR`; TM's `PcKeyboard` is the subclass with its `KbdIsr`); the mouse is `dos::Int33Mouse`
+  (`dos/input/int33_mouse.h`: AX=03h/04h/07h/08h/0Ch, G&G's config {0, 639, 0, 199, x × 2}; the
+  handler runs synchronously with the host input; the delivery at PIT-tick times and the hide-state
+  drop rule are G&G's runtime).
+* `text/text_renderer` became `text::TextEngine` with `TextFont` / `TextCanvas` /
+  `TextDialect::gizmos()` (`text/text_engine.h`).
+* Of `src/mods` only the JSON and PNG codecs and a new `mods/wav_file` are core; the mod-folder
+  framework depends on TM's `res/resource_types` and stays in tmcore. Of `save/settings` only
+  `save::IniFile` (`save/ini_file.h`) is core. The Windows `app/script_input`, `app/launch_options`,
+  `src/cli` and `src/edition` stay TM; the DOS `dos/app/script_input` (scripted input in ticks) is
+  core. TM's DAC expansion helper (`src/dos/gfx/palettes.h`) is not core, and G&G's DAC rule differs
+  anyway (PORTING_NOTES §3.2).
+* Not moved yet: the menu-bar data model and DAM (later waves).
 
 By volume, the reusable files are about 14.5k of tmport's 72.6k lines, and part of that is only a
 pattern. The TM DOS backend is about 26k lines without its mods and autoplay. G&G's own code is likely
@@ -423,6 +453,10 @@ generalised TLC modules (text renderer, DAM, timers, menu data) would fork. Inst
    tool like `--dos-screen`), `gg/audio`, `gg/input` and the runtime. **Stop/go point:** title,
    attract, sign-in, a warehouse room and a puzzle screen pixel exact, and BMF songs equal to DOSBox-X
    OPL captures write for write. By then the cost of the game-logic wave is known from the wave 1 specs.
+   *Done:* the shared core `portcore` (TM byte for byte unchanged), the G&G data, graphics, text,
+   sound, input, runtime, UI and world drawing layers, the tools of `ggport-cli` and the wave 2 preview
+   of `ggport`; every stop/go check passed (`ENGINE_MAP.md`: 63 screens at 0 differing pixels, the
+   attract's fades frame-exact, 12 of 13 OPL captures write for write).
 4. Waves 3 (game logic) and 4 (fidelity) as in the TM DOS plan. Mods and an autoplay bot are optional.
 
 ---

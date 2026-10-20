@@ -6,7 +6,8 @@ flows from the attract loop to the final movie, the DOS platform layer, the TLC 
 links, players and saves, hints, and how all of it relates to Treasure Mountain. It was written in
 wave 0 from the six scoping passes and re-checked against the bytes where marked; the wave 1
 integration corrected it from the topic specs below, which specify every routine and win where
-they are more detailed.
+they are more detailed. The wave 2 engine foundation and what it verified are mapped in
+`ENGINE_MAP.md` (module → source files → spec sections → status).
 
 Reading order (all in this folder):
 
@@ -23,6 +24,7 @@ Reading order (all in this folder):
 | 9 | `code_puzzles_a.md`, `code_puzzles_b.md` | the puzzle framework (state 9) and the eight puzzles |
 | 10 | `PORTING_NOTES.md` | how the original maps onto the engine, and the behaviours to keep |
 | 11 | `REFERENCE_CAPTURES.md` | the DOSBox-X reference captures (rounds 1 and 2) and their measurements |
+| 12 | `ENGINE_MAP.md` | the engine (`src/gg/`): module → source files → spec sections → status and known gaps, the wave 2 stop/go results |
 
 This document does not repeat the format or topic specs; it names a format or a routine and points
 there. The reference decoders for the formats are in `tools/gg/`.
@@ -43,7 +45,8 @@ Conventions:
     `B0 36 E6 43 B8 00 20 …`; the 2b89 character table CS:03BA is at file 0x1CB40 + 0x3BA; DS:0004
     holds the Borland copyright.
 * Names: the canonical names of `re/names/gg/` (after wave 1: 982 of the 1017 real functions and
-  617 DGROUP labels; `re/names/gg/README.md` lists the wave 1 renames). Functions without a name
+  617 DGROUP labels, 626 after the wave 2 integration; `re/names/gg/README.md` lists the wave 1
+  renames). Functions without a name
   (LZH and overlay-manager internals) are cited by address.
 * Game text is referred to by resource id (`0x1019`) or DGROUP offset, with at most a few
   identifying words.
@@ -240,7 +243,7 @@ Command-line switches (`Init_CommandLine` 303a:005c; `-S` keys in a sparse switc
 | `-GV` | DS:244e = 8: **skips** the INT 10h/1A00h test (which any BIOS supporting the function passes anyway, see above); it selects nothing, mode 13h is the only mode |
 | `-S` + `N`, `-` or nothing | sound device 0 (off): the FM banks are still loaded and played silently |
 | `-SI` | 1, PC speaker |
-| `-SA`, `-SB`, `-SM` | 4, FM: AdLib, Sound Blaster and Microsoft Sound System all mean the OPL2 at 388h; there is no digitised audio code; the OPL flag is forced, so without a card FM plays to nothing |
+| `-SA`, `-SB`, `-SM` | 4, FM: AdLib, Sound Blaster and Microsoft's sound card all mean the OPL2 at 388h; there is no digitised audio code; the OPL flag is forced, so without a card FM plays to nothing |
 | none | DS:2452 = −1: auto-detect the AdLib |
 
 `ssg.bat` (the launcher) reports exit code 5 as "no 286". `main` already executes `PUSH imm` before
@@ -530,8 +533,8 @@ increments DS:4596[b] and the total DS:5c0e. Details: `code_vehicles_races.md` �
   DS:459c[b] and saves.
 * **Final movie** 2fcb:0640: `Movie_Play(0x3000, 0x30CA, 18, cues DS:236c, sound)` from 2fcb:06a5.
   202 delta frames (volume 3), drawn straight into VRAM at **18 ticks per frame = 8.09 frames/s**
-  (the 18 is the frame period, not a cue count); the cue records `{type, frame, a, b}` do 0 =
-  `Delay(a)`, 1 / 5 = start sound a, 2 = stop. A music-synchronised callback (2fcb:0667 sets slot
+  (the 18 is the frame period, not a cue count); the cue records `{type, frame, a, b}` (25 and an
+  end record of type 6) do 0 = `Delay(a)`, 1 / 5 = start sound a, 2 = stop. A music-synchronised callback (2fcb:0667 sets slot
   tick 0x250 → `Music_MovieCue` 12e0:00ea: the music's arrangement pass by pass is 1, 2, 3, 4,
   all, all, all, 1, …; `code_sound.md` §14.3) is part of it. The movie loads no palette: it draws
   over the results screen with that screen's palette (base colours 0..31 plus 0x1077) [O: no fade
@@ -682,7 +685,7 @@ text viewer (`TextView_Run` 4140:0667) do not (`code_ui.md` §2.2).
   wipe sounds (R(2)). The `W` pattern format (period, sweep flags, 156 left and right start
   columns, per-step increments) and the eight patterns are decoded in `code_runtime.md` §14.2,
   including an original bug: pattern 0x11DA never copies column 319. A door entry measured 45
-  frames (642 ms) with no palette change. The movie (1399:0a85, 1473:07d9) also writes straight to
+  frames (642 ms) with no palette change: pattern 0x11DB, as the wave 2 engine showed frame by frame. The movie (1399:0a85, 1473:07d9) also writes straight to
   VRAM. These two paths bypass the dirty-tile map.
 * Palette save/restore around sub-screens: `Pal_Save` 1473:074e / `Pal_Restore` 0766 (shadow ↔
   DS:5c22, no DAC write).

@@ -217,27 +217,144 @@ driver (TUNES/SFX, 236.7 Hz, per-device files) is a similar idea with a differen
 
 ---
 
-## 5. Porting notes [I]
+## 5. The engine's port and its verification (wave 2)
 
-* Parse BMF exactly as in §3; keep the song block as mutable state per slot, because the driver
-  keeps its state there (a port can copy it on registration).
-* Tick the driver from the virtual PIT: one `Snd_Tick` per two PIT ticks at divisor 0x2000.
-  Sound events that happen inside long frames need the timing model TM DOS needed
-  (`re/dos/docs/fmt_sound.md` §11.8).
-* The OPL path reuses tmport's ymfm OPL2 (rhythm mode included); the speaker path the speaker
-  synth. Reference: DOSBox-X raw OPL captures (`.dro`) compared write for write with
-  `tools/dos/oplcmp.py`, as for TM DOS.
+### 5.1 Modules
+
+| Engine file (`src/gg/audio/`) | Original | What |
+|---|---|---|
+| `bmf` | §3 | the song block's offsets and a parser that reads a song as the interpreters do (running status, the note-off without a data byte, the class 1 / class 3 status ranges, meta events) |
+| `snd_driver` | 1bb4 | the driver routine by routine: 64 slots, `Snd_Tick`, sections, delays, meta events, cues, channel ownership, the speaker and OPL2 interpreters, class 0, pause, silence, `Snd_Off`; tables read from DGROUP (`SndTables`), state at the original offsets of the loaded bank copy |
+| `snd_res` | 1cdd | handles, the three loaders, play/stop, arrangements, the sound switch, pause |
+| `music_cues` | 12e0:007f / 00bd / 00ea and their callers 1622:0346, 1622:03b6, 2dee:1a90, 2dee:17eb / 185d, 2fcb:0640 | room, workshop and movie music |
+| `pz_snd` | 3924 (ovl19) | the puzzles' bank and raw-priority calls |
+| `gg_audio` | `Init_CommandLine` step 7, `SndRes_Init` | the start-up per sound mode, the core's `ChipRenderer` / `ChipAudioDevice` / `OplChip`, logs |
+| `soundtest`, `dro_compare`, `audio_cli` | – | schedules, the DOSBox-X capture model, the tools |
+
+The driver is a `dos::SoundTickSource`: the core's renderer ticks it at
+`PitTimeBase(0x2000).hz() / 2` = 72.826 Hz by sample count (the SDL callback), or the caller ticks
+it (`GgAudio::advanceTo`, for deterministic runs and when no audio device opens). Game calls run
+with the renderer locked, between two ticks.
+
+### 5.2 Write timing [O]
+
+One `AdLib_Write` (OUT, 6 status reads, OUT, 35 status reads) takes **65 µs** on the reference
+machine (DOSBox-X, 486 at 26 800 cycles): with the writes of a tick at `t0 + 0.065 ms · k` (k = the
+writes before it in its tick, logged or not), only 22 of the 4224 inside-tick writes of
+`w0_title_attract.dro` and 23 of the 3585 of the replay get another whole-ms stamp than DOSBox-X
+gave them (a grid search over the offset and 0..120 µs; 64 µs and 66 µs do slightly worse). TM DOS
+measured 70 µs at 6000 cycles, so DOSBox-X's port I/O cost dominates, not the CPU speed.
+`GgAudio::kOplWriteSeconds` and `OplChip`'s write spacing use it.
+
+### 5.3 What a DOSBox-X `.dro` records [O]
+
+`dro_compare.h` applies these rules to the engine's write log (they agree with all 13 captures):
+
+* The file opens at the first key-on after the capture was requested: a write to B0h..B8h with
+  bit 5, or to BDh with `value & 3Fh` > 20h. A capture therefore starts inside the tick of that
+  key-on.
+* First comes DOSBox-X's register cache: every non-zero register in ascending order, B0h..B8h
+  without their key bit, BDh without its five drum bits. Then the key-on, then only the writes that
+  change a register, in whole milliseconds. The timer registers 02h..04h are never cached (the
+  emulated chip consumes them).
+* So a capture made after screens the run does not reproduce shows them only in its dump: the
+  comparison can start its "does it change a register" filter from the capture's dump
+  (`--base dump`), and the driver's own memory of those screens, the B0h shadows that
+  `Opl_NoteOff` writes back, can be seeded from it (`--seed-dro`). The dump differences are
+  reported, not counted.
+
+### 5.4 The captures reproduced [O]
+
+Each capture has a named schedule (`soundtest.cpp`; `--gg-soundtest-check NAME|all`): the game's
+sound calls at sound ticks of an engine run, found by matching the capture write for write (the
+calls follow the code of `code_sound.md` §15; times, and priorities that a channel conflict
+reveals, come from the capture). Result: identical writes (register and value, in order) from the
+capture's first key-on, and the writes made inside ticks that lie within half a tick of the
+13.731-ms grid.
+
+| Schedule | Capture | Calls | Identical | On the grid |
+|---|---|---|---|---|
+| `title` | `w0_title_attract` | attract: effects 0x1022, music 0x1020; title animation effects 12 (tick 80), 13 (301); screen-animation effect 0 (789), stopped (885) | 4225 / 4225, dump 99 / 99 equal | 4224 / 4224 |
+| `title_replay` | `w0_replay_title_attract` | the same, effect 13 at 300 (the second boot) | 3586 / 3586, dump 68 / 68 | 3585 / 3585 |
+| `hub` | `r2_hub_idle` | music 0x1020, arrangement 2 | 1521 / 1521 | 1521 / 1521 |
+| `postrace` | `r2_postrace_to_hub` | the same | 549 / 549 | 549 / 549 |
+| `warehouse` | `r2_warehouse_walk` | room music 0x361 arrangement 1 with the chimp layer, effects 0x1039: 15, 17, 15 | 1186 / 1186 | 1186 / 1186 |
+| `workshop` | `r2_workshop_idle` | `State_06_Workshop`'s start, 15 belt and race-door effects | 669 / 669 | 659 / 659 |
+| `puzzle_k4` | `r2_puzzle_k4_success` | `PzSnd` bank 0x11c6: 0, 1, the swing (effect 8 transposed 0..4), 5 and 13 ×4 | 356 / 356 | 356 / 356 |
+| `puzzle_k5` | `r2_puzzle_k5_miss` | `PzSnd` bank 0x11ce: 0, 1, 4, 7, 2 | 162 / 162 | 162 / 162 |
+| `race_automotive` | `r2_automotive_race1_won` | workshop music freed, race music 0xF7 (arrangements 1, 2), results | 1421 / 1421 | 1366 / 1366 |
+| `race_altenergy` | `r2_altenergy_race1_won` | the same with 0xF9 (1, 2, 3, 2) | 2899 / 2899 | 2831 / 2841 |
+| `race_aircraft_won` | `r2_aircraft_race1_won` | music 0x262 (1, 2, 3, 2), effects 0x260: 8, 7, 9 at priority 3; results | 2685 / 2685 | 2617 / 2617 |
+| `race_aircraft_lost` | `r2_aircraft_race1_lost` | engine effect 7 looping, 9; results of a loss (music 0x108B, no count-up) | 2598 / 2598 | 2579 / 2579 |
+| `movie` | `r2_movie_race15` | race 15, results, `State_15_FinalMovie` (music 0x30CA with `Music_MovieCue`, the movie cue effects of 0x108D) | 7050 / 8320 (to the movie's end) | – |
+
+The `title` captures are compared against the engine's own registers (the run starts with the
+game); the others start from the capture's dump, and the race and movie runs also seed the B0h
+shadows (§5.3). The results screens follow one pattern in all four races: results music at P
+(0x1089 won, 0x108B lost), global effect 1 at P and, while the score counts up, every 2 ticks from
+P + 19 (49 times; on odd PIT ticks in the Alternative Energy run), effect 0 of 0x108F at P + 121 and
+effect 1 at P + 381 (the rank-up box). The writes off the grid: six in the first 90 ticks of
+`race_altenergy` (the workshop music at the capture start: some of its drum note-offs one tick
+late in the capture, not explained), and race-phase writes whose call times the order fixes only
+to a tick.
+
+### 5.5 Driver behaviour the captures confirm [O]
+
+* **Equal priority holds the channel; the release hands it over with its patch.** In the
+  warehouse effect 15 starts while effect 17 holds channel 0 at the same priority: its program
+  change is recorded but no patch is loaded; when 17 ends, `Snd_ReleaseChannels` gives the channel
+  to 15, `Snd_ApplyChannelProgram` reloads its patch (the capture shows the patch writes without a
+  note), and 15 sounds from its next note-on. The results' effect 0 under the count-up shows the
+  same.
+* **A higher priority re-takes its own channels and reloads their patches**: the race-door
+  animation 0x1d plays effects 13 and 14 with priority byte 3 (`ScreenAnim` op −36), then
+  `Workshop_UpdateRaceDoor` plays 14 again at 4: only the carrier volumes changed by the notes are
+  rewritten.
+* **A restart cuts the sounding channels** (`Snd_Play` on an active slot: B0h without the key bit
+  in the call, the notes again at the next tick: the workshop belt's effect 6).
+* `Music_MovieCue` switches the movie's arrangement at every 592-tick pass, and the ordinary loop
+  of the music goes on through four passes, write for write.
+* The `M`-list arrangements, the room music's chimp layer (channel 4 at level 1), the puzzles'
+  raw priorities and `PzSnd_SetTranspose` steps behave as specified.
+
+### 5.6 The PC speaker [O]
+
+`r2_si_boot_to_building.wav` (DOSBox-X, `-si`): notes are taken as runs of rising edges at half
+the square's 3300 level (at least 2 periods; divisor = 1 193 182 / frequency). The `title` schedule
+on the speaker (`--gg-sound speaker soundtest title ... --speaker-log`) against it: 223 of the 233
+engine onsets that last at least 2.5 periods are found within 3 ms (plus one period, the detector
+needs a rising edge) and 1 % of the divisor, over the first 42 s, once ticks 170..428 are
+silenced: there the capture holds only a few notes (this run left the attract with Space; that
+path was not reconstructed). The unmatched 10 lie where the screen animation's effect 0 plays
+(other timing in this boot). Divisors are the driver's to the unit (1140, 3044, 2280, 380, ...).
+
+### 5.7 Deviations [R]
+
+* Game calls never overlap a sound tick, so no tick is lost to `g_sndBusy` (the tools' `L`
+  command reproduces one).
+* `Snd_AllocSlot` refuses classes above 4 (the original would index past DS:1685); song-memory
+  accesses outside the bank copy are dropped; a handle beyond `g_sndTable[60]` throws; a cue with a
+  NULL callback is not called (no shipped song gets there, `code_sound.md` §5).
+* The PSG (class 2) and MPU-401 (class 4) paths, the tempo scaler and the volume setters are not
+  ported (nothing reaches them).
+* `AdLib_Detect`'s status reads are the emulated card's presence flag (the same writes).
+
+### 5.8 Porting notes [R]
+
 * Choose the arrangement exactly as the game does: id + 1 when an OPL is present, else id; an
   effect slot whose speaker member is `C FF` stays silent on the speaker.
+* The game's call order decides the slot order (and so the order of writes inside a tick): the
+  room music is loaded before the warehouse effects, the race music before the race effects.
 
 ## 6. Open questions
 
-Wave 1 (`code_sound.md`) answered the wave 0 questions: the class interpreters, tables, bend and
-volume formulas, voice allocation and slot priorities (§7..§10 there), the API calls and the `M`
-lists (§13 there), the callbacks (§14 there), the workshop cue (it never fires, §2.1 here), the dead classes 0, 2
-and 4 (no switch selects them, §9 there) and the tempo (no song or game call changes the tick
-rate; the tempo scaler 1bb4:0fb2 is dead code). Still open:
+Wave 1 (`code_sound.md`) answered the wave 0 questions; wave 2 verified the driver against every
+capture (§5.4). Still open:
 
 * Why 0x105b/0 (the silence song) has 12 bytes after its end event.
 * Whether data-driven effect priorities (screen animations, actors, races) can exceed 40h, which
-  would let an effect past the sound-off silence song (`code_sound.md` open questions).
+  would let an effect past the sound-off silence song (`code_sound.md` open questions). The race
+  door's animation uses 3.
+* The six one-tick-late drum note-offs at the start of `r2_altenergy_race1_won` and the end of the
+  movie capture (the last effect one tick late against the music; §5.4).
+* The silent stretch of the `-si` capture at 3.3..6.9 s (§5.6).

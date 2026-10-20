@@ -218,6 +218,28 @@ States `savestates\w0\`: `01_title 03_signin 06_hub 09_blueprint 12_workshop 14_
 15_at_door 17_puzzle 18_puzzle_piece1 20_puzzle_solved 21_room_behind_door 25_hub_again`,
 each with its `.players`.
 
+What the wave 2 engine found in these shots [O]:
+
+* `01_title` shows the title in phase 3 with screen animation 0x1005 at its frame step 2 and 0x1007
+  at step 1.
+* The pointer (cursor top-left, game pixels) of the shots the engine reproduces whole, cursor
+  included: 03 and 04 (160, 100), 05 (164, 180), 06 (93, 137), 08 (62, 85), 10 (53, 51), 13 and 16
+  (269, 150), 23 (14, 4), 24 (107, 27); round 2: menus/01 (80, 4), 02 (136, 4), 03 (160, 17);
+  player2/02 (60, 150), 03 and 04 (219, 180), 05 (164, 180), 02_file_menu (14, 4); resume/02 (14, 4),
+  03 (99, 36), 05 (160, 100), 06 (100, 62); sound/si_02 (100, 73); the text-viewer shots
+  puzzle/k0_02 (44, 20), k5_09 (28, 21), k3_09 (41, 31), k4_09 (24, 21), k7_09 (31, 20); the
+  blueprint part pages altenergy/03 (170, 55), automotive/03 (160, 85), aircraft/46 (200, 75), 47
+  (165, 140), 48 (220, 125).
+* The first screen of a puzzle (r2/puzzle/k*_01, w0/17) shows the **arrow left by the hint dialog**
+  at (269, 150), because nothing flushes until input; launch (5) and energy (6) redraw their own
+  cursor with their timers. Likewise a blueprint overview whose pointer is on a hot spot shows that
+  arrow, not the label cursor (r2/aircraft/02 at (50, 50), r2/altenergy/02 at (170, 60),
+  r2/aircraft/39 at (270, 50)).
+* `14_warehouse` is a **torn frame**: rows 0..95 show the room animations 1 frame after the
+  `14_warehouse` state, rows 96..199 4 frames after. In general the shots are taken before their
+  states, so pads and chimps differ; the chimps were fitted for 14 (seq 2 step 12 at (245, 120)), 15
+  (room 1, seq 3 step 13 at (103, 143)) and 21 (seq 2 step 8, anchor (12, 131)).
+
 ### 3.2 `w0_replay\`: reproducibility
 
 `tools\gg\capture_tour.py run door` (a second fresh boot) and `run puzzle` (from the state
@@ -556,7 +578,12 @@ each other back to back (one load every 2 frames). Which group comes first canno
 | fade in (1473:02a0, n 8) | **16** (8 loads; e.g. 123-138, 144-159, round 1's title 15-30 and 887-902) | 8 | step 8, **9 loads**: the 9th rewrites the final palette, invisible |
 
 Round 1's "16/19/22+16" are these: 16 = a fade-in, 22 = a fade-out, 19 = a fade-in preceded by two
-redraw frames (650, 651, 653). The code's 12/9 loads are right; 24/18 retraces in all, of which the
+redraw frames (650, 651, 653).
+
+Frame-exact in wave 2 [O]: `w0_replay_title_attract.avi` frames 15..30 equal the engine's
+`Pal_FadeIn` retrace frames 0..15 and frames 861..882 its `Pal_FadeOut` retrace frames 0..21 pixel for
+pixel, with group 0 (colours 0..127) loaded on the first retrace of each load; the wave 2 preview
+shows every one of them at the same distance from the title's fade-in (`ENGINE_MAP.md`). The code's 12/9 loads are right; 24/18 retraces in all, of which the
 last load of each is invisible. In the aircraft races only 10 of the 11 fade-out loads change many
 blocks (19 frames with `--min-blocks 600`): the race screen uses few colours of one group.
 
@@ -569,7 +596,9 @@ loaded and drawn): workshop → race 7 frames (Automotive, 100 ms), 8 (Alternati
 
 * **Random wipe** (`Screen_RandomWipe` 1473:0042 / `Screen_Wipe` 1473:0479) entering a room through
   an open door: the screen changes on every frame for **45 frames (642 ms ≈ 93 ticks)**
-  (`r2_aircraft_door_to_room5` 119-163, a diagonal pattern), no palette change.
+  (`r2_aircraft_door_to_room5` 119-163, a diagonal pattern), no palette change. The pattern is
+  **0x11DB** (48 steps of 2 ticks): every frame equals the engine wipe's state after step k or
+  between steps k and k + 1 [O wave 2].
 * **Door**: the player's door animation before the wipe (frames 0-110 of the same AVI), the arrival
   animation after it (165-208, steps about every 12 ticks), then the player stands in the doorway.
 * **Puzzle → room** after a solved puzzle and Enter takes several seconds (the puzzle's fade-out,
@@ -601,6 +630,14 @@ table, `movie.py --cues`) show as 705-706 unchanged video frames = **10.06-10.07
   writes). **Puzzle screens have no music**: no write at all for 10 s from a door into a puzzle
   (`r2_door_to_puzzle_k6`: DOSBox-X wrote no `.dro`); only effects (a pick-up, the solve, the miss).
 * `-sn`: total silence, no key-on (so no `.dro`, see §9.7). `-si`: speaker only.
+* How DOSBox-X records a `.dro` [O wave 2; all 13 G&G captures agree, `src/gg/audio/dro_compare.h`]:
+  the capture opens on a B0h-B8h write with bit 5 or on a BDh write with value & 3Fh > 20h; the dump
+  lists every non-zero cached register, with the B0h-B8h key bit and the five BDh drum bits masked;
+  registers 02h-04h are never cached or logged; after the dump only writes that change a register
+  are logged.
+* Wave 2: the engine's driver reproduces 12 of the 13 captures write for write (`ggport-cli
+  --gg-soundtest-check all`) and the final movie's up to the movie's end (7050 of 8320 writes);
+  `fmt_sound.md` §5.
 
 ### 10.7 `rand()` and determinism [O]
 

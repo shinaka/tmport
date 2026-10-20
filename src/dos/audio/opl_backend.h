@@ -13,22 +13,19 @@
 
 #include "dos/audio/adlib_driver.h"
 #include "dos/audio/opl_chip.h"
+#include "dos/audio/opl_output.h"
 
 namespace tmport::dos {
 
 struct SoundTables;
 
-class OplBackend {
+// The OPL output stage (render, skip: dos/audio/opl_output.h) with the driver calls of the sequencer.
+class OplBackend : public OplOutput {
 public:
-    virtual ~OplBackend() = default;
     virtual void init() {}                                  // 4ac9:00b7 AdLib_Init
     virtual void playTune(int tune, int variant) = 0;       // 4ac9:0002 AdLib_PlayTune (variant = rand() & 3)
     virtual void noteOn(int voice, uint8_t semitone) = 0;   // 4ac9:029e AdLib_NoteOn (semitone = note - 1 + 12 * oct)
     virtual void noteOff(int voice) = 0;                    // 4ac9:0432 AdLib_NoteOff
-    // Adds n samples at the renderer's rate.
-    virtual void render(double* out, size_t n) = 0;
-    // Advances n samples without synthesis (a run whose sound is not kept).
-    virtual void skip(size_t n) { (void)n; }
     // A DOSBox-X state's AdLib driver from its DGROUP image (DS:0000..); false if the back end has none.
     virtual bool restore(std::span<const uint8_t> /*dgroup*/) { return false; }
     // PIT ticks the last playTune() keeps the music block from starting (the AdLib driver's set-up on

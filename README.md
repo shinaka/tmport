@@ -18,7 +18,7 @@ Contents: [Features](#features) · [Requirements](#requirements) ·
 [DOS edition](#dos-edition) · [Modding](#modding) ·
 [Building](#building) · [Command-line tools](#command-line-tools) ·
 [Project layout](#project-layout) · [Status and known differences](#status-and-known-differences) ·
-[Credits and licences](#credits-and-licences)
+[Gizmos & Gadgets (in progress)](#gizmos--gadgets-in-progress) · [Credits and licences](#credits-and-licences)
 
 ## Features
 
@@ -384,10 +384,10 @@ The game itself can also run headless with scripted input (`--headless --keys ".
 
 | Path | Contents |
 |---|---|
-| `src/` | the engine: `util`, `vfs` (folders and CD images), `ne` (Windows NE executables), `data` (tables of `TMTWINCD.EXE`), `res` (resources), `gfx`, `text`, `anim`, `input`, `timing`, `audio`, `ui` (dialogs, menu bar), `save`, `game` (the game itself), `mods`, `rtl`, `platform` (SDL), `app` (start-up), `cli` (tools); `docs/DESIGN.md` describes them |
+| `src/` | the engine: `src/gg/` is *Gizmos & Gadgets!* (below); the rest is Treasure Mountain and the core both games share: `util`, `vfs` (folders and CD images), `ne` (Windows NE executables), `data` (tables of `TMTWINCD.EXE`), `res` (resources), `gfx`, `text`, `anim`, `input`, `timing`, `audio`, `ui` (dialogs, menu bar), `save`, `game` (the game itself), `mods`, `rtl`, `platform` (SDL), `app` (start-up), `cli` (tools); `docs/DESIGN.md` describes them |
 | `tests/` | unit tests (doctest); tests that need the game read it from `TM_DATA` (`TM_DATA_DOS` for the DOS edition, `TM_DOS_CAPTURES` for the DOS reference captures) and skip themselves without it |
 | `docs/` | `BUILDING.md` (building, running, tools), `DESIGN.md` (engine conventions), `MODDING.md` |
-| `re/` | the specifications written from the study of the original: `re/docs/ARCHITECTURE.md` first, then `PORTING_NOTES.md` and the topic documents; reviews in `re/reviews/`; `re/gg/docs/` the study of *Gizmos & Gadgets!* (DOS, 1993), a second game whose port has started (no engine code yet; `re/gg/docs/SCOPING.md`) |
+| `re/` | the specifications written from the study of the original: `re/docs/ARCHITECTURE.md` first, then `PORTING_NOTES.md` and the topic documents; reviews in `re/reviews/`; `re/gg/docs/` the study of *Gizmos & Gadgets!* (DOS, 1993), the second game (its engine map: `re/gg/docs/ENGINE_MAP.md`) |
 | `tools/` | Python tools used for the study (resource extraction and reference decoders); `tools/dos/` the DOS edition's decoders and its fidelity runner with the scenario files (`tools/dos/README.md`); `tools/gg/` the decoders and Ghidra and capture tools for *Gizmos & Gadgets!* (`tools/gg/README.md`) |
 | `cmake/`, `CMakeLists.txt`, `CMakePresets.json`, `scripts/` | the build |
 | `.github/workflows/` | continuous integration (Windows, Linux, macOS) |
@@ -432,6 +432,26 @@ compatibility).
 
 Not tried yet: the continuous-integration workflow on GitHub (it runs only when started by hand). Limits of the mod layer
 (no high-resolution art, no new rooms or questions) are listed in `docs/MODDING.md`.
+
+## Gizmos & Gadgets (in progress)
+
+The repository also holds a port of a second game of The Learning Company, *Super Solvers: Gizmos &
+Gadgets!* (DOS version 1.0, 1993), in the same way: an engine (`ggport`) that reads your own copy of
+the game (the folder with `ssg.exe` and `gizmo000.dat` .. `gizmo003.dat`) and contains none of its
+data. It shares the engine core with TM Port (`docs/DESIGN.md`, "Core and games").
+
+So far it is the engine's foundation, shown by a **preview**, not the game: `ggport --data <your
+G&G folder>` plays the attract sequence (the title, the story pages, the sign-in prompt) with its
+music, then Enter or Space steps through the sign-in screen (you can type a name; nothing is
+saved), the Technology Center (click the sign-in booth or a building), a warehouse room of the
+building (Left / Right walk through its rooms with the random wipe; no player or Cyber Chimps yet)
+and the eight puzzle screens. Number keys play the screen's sound effects, Ctrl+S switches the sound
+off and on, Esc quits. `--sound off|speaker|fm` (or the original's switches, `--gg-args "-SI"`),
+`--fullscreen`, `--square-pixels`, `--scale N` and `--help` work as for the game; the settings are
+kept in `ggport.ini` in its own preference folder (`GGPort`). The screens and the sound match the
+original running in DOSBox-X, the timing to a few frames (`re/gg/docs/ENGINE_MAP.md`); the game
+logic comes next.
+Building: `docs/BUILDING.md`, "Gizmos & Gadgets".
 
 ## Credits and licences
 

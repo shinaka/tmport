@@ -58,25 +58,28 @@
 #include "dos/input/keyboard.h"
 #include "dos/input/mouse.h"
 #include "edition/dos_options.h"
+#include "timing/pit_clock.h"
 
 namespace tmport::dos {
 
 // ------------------------------------------------------------------------------- the time base
 
-inline constexpr uint32_t kPitDivisor = 0x13B1;      // 5041, written to port 40h by Timer_Install
+inline constexpr uint32_t kPitDivisor = kPitDivisorTmDos;  // 0x13B1 = 5041, written to port 40h by Timer_Install
 inline constexpr uint32_t kPitTicksPerGameTick = 5;  // DS:3D34 counts 4..0: Game_Tick on interrupt 5, 10, ...
 inline constexpr uint32_t kPitTicksPerBiosTick = 13; // DS:3D33 counts 12..0 (the BIOS clock chain; dropped)
 
 // The PIT input clock is 14.31818 MHz / 12 = 1193181.67 Hz = 3579545 / 3 Hz exactly; one PIT tick
 // lasts 3 * 5041 / 3579545 s = 4.22484 ms (236.69543 Hz), one game tick 21.1242 ms (47.33909 Hz).
+// The time base is the shared core's (timing/pit_clock.h) at SST.EXE's divisor.
 struct PitClock {
     static constexpr double kPitHz = 3579545.0 / 3.0 / kPitDivisor;
     static constexpr double kGameTickHz = kPitHz / kPitTicksPerGameTick;
+    static const PitTimeBase& timeBase();
     // Virtual time (ns) of PIT tick k (k = 1 is the first interrupt after Timer_Install):
     // ceil(k * 15123e9 / 3579545), exact for any k below 10^12.
-    static uint64_t timeOfPitTick(uint64_t k);
+    static uint64_t timeOfPitTick(uint64_t k) { return timeBase().timeOfTick(k); }
     // The number of PIT ticks whose time is <= t.
-    static uint64_t pitTicksAt(uint64_t tNs);
+    static uint64_t pitTicksAt(uint64_t tNs) { return timeBase().ticksAt(tNs); }
     static uint64_t timeOfGameTick(uint64_t n) { return timeOfPitTick(n * kPitTicksPerGameTick); }
 };
 

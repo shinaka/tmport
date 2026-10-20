@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "data/dgroup_offsets.h"
-#include "platform/exe_icon.h"
+#include "platform/exe_icon_ne.h"
 #include "util/log.h"
 
 namespace tmport {

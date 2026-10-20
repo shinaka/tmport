@@ -21,7 +21,9 @@ tables from the user's own copy of the game at runtime. Behaviour is specified i
 * CMake ≥ 3.24, C++20, warnings high (`/W4` MSVC, `-Wall -Wextra` others), warnings not fatal.
 * SDL **3.4.18** via `FetchContent` (static), pinned by URL. Other third-party code only if pinned
   and license-compatible (MIT/zlib/BSD/public domain), fetched by CMake, never vendored blindly.
-* Targets: `tmport` (the game), `tmtests` (unit tests, doctest), optional tools.
+* Targets: `portcore` (the engine core shared by both games, below), `tmcore` (Treasure Mountain's
+  engine, links `portcore`), `tmport` / `tmport-cli` (the game), `tmtests` (unit tests, doctest);
+  with `TM_BUILD_GG` the second game's `ggcore`, `ggport` and `ggtests` (`cmake/gg.cmake`).
 * Windows first (MSVC 2026 + Ninja; `scripts/build.bat`), code kept portable for Linux/macOS (no
   Win32 outside `src/platform/` and the WinMM MIDI back end).
 
@@ -35,10 +37,10 @@ tables from the user's own copy of the game at runtime. Behaviour is specified i
 | `data/` | `ExeTables`: DGROUP of `TMTWINCD.EXE` with relocation fix-ups; typed accessors for every table (offsets in one header) |
 | `res/` | `ResourceManager`: id → type/DLL routing, PMAP/BNDL/FFNT/OTHR/RRGB/SSND access, BNDL trees, mod overrides |
 | `gfx/` | `PixMap` (+RUND), `Palette`, `FrameBuffer` (512×1055 indexed, clip, dirty rects), blit primitives, `Presenter`, screen effects |
-| `text/` | FFNT font, `TextRenderer` (byte-exact port of `Text_Render`) |
+| `text/` | FFNT font, `TextRenderer` (byte-exact port of `Text_Render`, on the shared `text_engine`) |
 | `anim/` | DAM engine (16 channels, frame table), modal animation player |
 | `input/` | input-code queue, hot-spot table (50 slots), held keys, mouse, cursors |
-| `timing/` | deadline timers (8 slots), clock |
+| `timing/` | deadline timers (8 slots), clock, the virtual PIT of the DOS games (`pit_clock`) |
 | `audio/` | wave voice (single stream), speech wait, SFX, SMF sequencer + MIDI back ends, music manager |
 | `ui/` | game dialogs (DlgDesc), pager, in-engine menu bar |
 | `save/` | `users.dat` (byte-exact), settings, paths |
@@ -53,7 +55,84 @@ Namespace `tmport` (a global namespace `tm` is impossible: it collides with the 
 `struct tm`, which `<ctime>` declares globally and `<format>`/`<chrono>` pull in). Files
 `snake_case.cpp/.h`, types `PascalCase`, functions/members `camelCase`,
 constants `kName`. One original module ≈ one engine file; cite the original address in a short
-comment at each ported routine (e.g. `// 1110:00aa CoinPile_Update`).
+comment at each ported routine (e.g. `// 1110:00aa CoinPile_Update`). The second game's code is in
+`tmport::gg` (`src/gg/<module>/`).
+
+## Core and games
+
+The repository holds two games: *Treasure Mountain!* (both editions, `tmcore`, `tmport`) and
+*Gizmos & Gadgets!* (DOS 1993, `src/gg/`, `ggcore`, `ggport`; `re/gg/docs/SCOPING.md` §9). What
+they share is the static library **`portcore`** (`cmake/portcore.cmake`), a library over the
+existing directories, not a separate tree. `tmcore` links it publicly, so TM code sees it as
+before; G&G links only `portcore` and never includes TM's game code.
+
+| Part | Files (`src/`) |
+|---|---|
+| utilities | `util/` (log, files, byte reader, errors, hashes, PNG writer, inflate) |
+| data sources | `vfs/` (directory, CD image) |
+| Borland RTL | `rtl/borland_rand` |
+| time | `timing/clock.h`, `timing/deadline_timers`, `timing/pit_clock` |
+| host | `platform/host` (window, events, focus pause, fullscreen, screenshots, frame dumps), `platform/console`, `platform/exe_icon` (icon decoding; TM's NE loader is `exe_icon_ne`) |
+| pictures | `gfx/presenter` (layouts `windowsCd()` and `dos1990()`), `gfx/palette`, `gfx/rect.h`, `gfx/image_export` |
+| text | `text/text_engine` (the TLC `Text_Render` of TM Windows and G&G) |
+| DOS sound | `dos/audio/` speaker, SN76496 and OPL2 (ymfm) chips, `opl_writer.h`, `opl_output.h`, `opl_log`, `chip_renderer`, `chip_audio_device` |
+| DOS input | `dos/input/` `bios_keyboard`, `pc_keyboard` (SDL to set-1 scan codes, typematic repeats), `int33_mouse`; `dos/app/script_input` (scripted input in ticks) |
+| settings, mods | `save/ini_file`, `mods/json`, `mods/png_codec`, `mods/wav_file` |
+| test helpers | `tests/app_test_util.h` (header-only) |
+
+Rules:
+
+* A core file includes only core files (plus the standard library, SDL and ymfm).
+  `python -P tools/check_core_deps.py` follows every `#include "..."` of the files listed in
+  `cmake/portcore.cmake` and fails on anything else; `--gg` also checks that `src/gg/` and
+  `tests/gg/` include only core and G&G files. Run it after changing the core.
+* Where the games differ, the core takes a parameter whose default is TM's behaviour, so TM's
+  output stays byte for byte the same (checked against frame dumps, WAVs, OPL logs, the DOS
+  fidelity suite and `tmtests` when the core was extracted):
+  * `PitTimeBase(divisor)` / `VirtualPit(divisor)`: the PIT rate (TM DOS 0x13B1, G&G 0x2000),
+    callbacks on every n-th counter value (G&G's sound tick on even ticks) and a writable counter
+    (G&G's dialog time freeze); `dos::PitClock` is TM's time base on it.
+  * `DeadlineTimers(clock, ExpiryRule)`: the unit is the clock's (`PitTickClock` counts PIT
+    ticks), `expired()` is `>=` (TM) or `>` (`AfterDeadline`, G&G's `Timer_Expired`); `reached()`
+    is the end of a wait in both games.
+  * `dos::Int33Mouse(Int33MouseConfig)`: ranges (AX=07h/08h), the logical-to-driver x scale (TM
+    x / 2, mode 13h x * 2) and an AX=0Ch event handler besides polling; TM's `dos::MouseDriver` is
+    a subclass with its start positions.
+  * `dos::ScanKeyboard`: the game's INT 09h handler is an interface (`ScanByteHandler`); TM's
+    `PcKeyboard` overrides it with `KbdIsr`.
+  * `dos::ChipRenderer(ChipRenderConfig, OplOutput*)` with a `SoundTickSource`: the chips ticked
+    by any driver at `tickHz` (TM: every PIT tick; G&G: 72.83 Hz) with the OPL mix level;
+    `ChipAudioDevice` plays it through SDL or offline and queues the game's calls (`post`).
+    `OplWriteLog` / `OplLogTap` record OPL writes as `tick reg value` for `tools/dos/oplcmp.py`.
+    TM's `DosSoundRenderer` (the sequencer as tick source) and `DosAudioDevice` are built on them.
+  * `text::TextEngine(TextFont, TextCanvas*, TextDialect)`: `TextDialect::treasureMountain()`
+    (TAB, FE and `FF 04` tab stops, '_' as an underlined blank, width from the left-most glyph)
+    or `gizmos()` (none of these, width from x0, the centred start counts, the measure rule of
+    `TextFont::runWidth`); TM's `TextRenderer` is the FFNT font and the frame buffer behind it.
+* A file that mixes core and game parts is split, keeping the game part where it was (for
+  example `platform/exe_icon` and `exe_icon_ne`, `save/settings` and `save/ini_file`,
+  `mods/wav_codec` and `mods/wav_file`).
+
+*Gizmos & Gadgets!* (`src/gg/`, namespace `tmport::gg`; `cmake/gg.cmake` with one source list per
+area, `cmake/gg_sources_<area>.cmake`, and one test list, `cmake/gg_tests_<area>.cmake`; the map of
+original modules to files is `re/gg/docs/ENGINE_MAP.md`):
+
+| Dir | Contents |
+|---|---|
+| `gg/data/` | `GgExe` (`ssg.exe` with its overlays and DGROUP, `dgroup_offsets.h`), `GgFiles` (the game folder), the archives and LZH, resource parsers, the tools' shared argument helpers |
+| `gg/save/` | `PLAYERS.DAT` byte for byte, `PlayersStore` (the engine's copy in the preference folder) |
+| `gg/gfx/` | the 320×400 screen buffer and primitives, dirty tiles, sprites, the software cursor, VRAM, palette, DAC and fades, wipes, the movie, `Video` |
+| `gg/text/` | the two fonts and the text renderer on the core's `TextEngine` |
+| `gg/audio/` | BMF songs, the sound driver, the bank layer, music cues, the puzzles' sounds, `GgAudio` on the core's chips, the `.dro` comparison |
+| `gg/input/` | the keyboard ISR and key ring, the INT 33h mouse handler, click zones, `Input_GetCode` |
+| `gg/app/` | the clock and timers, `GgRuntime` (the yield points), `Seq_Run`, options and `ggport.ini`, the display on the runtime, the wave 2 preview, the tool dispatcher |
+| `gg/ui/` | the TLC UI library: dialogs, buttons, scroll bar, menu bar, help, hints, text viewer, attract, sign-in |
+| `gg/game/` | the world: picture cache, screen animations, actors, parts, rooms, HUD, building, hub, blueprint, puzzles |
+
+Its runtime is TM Windows' model (nested blocking loops whose waits pump the engine) with PIT
+ticks instead of milliseconds (`re/gg/docs/PORTING_NOTES.md` §2.2), not the DOS edition's lockstep.
+`ggtests` find the game through `GG_DATA` (default: the repository's `GadgetsAndGizmos` folder) and
+the DOSBox-X reference material through `GG_CAPTURES`, and skip what needs them otherwise.
 
 ## Runtime model
 

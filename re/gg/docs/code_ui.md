@@ -129,7 +129,7 @@ Font record (0x24 bytes, `Font_Load` 2b16:0000):
 | +0x04 | u16 | height (file +8) |
 | +0x06 | u16 | spacing added to every glyph advance (file +10); 2 for font 9, 1 for font 10 |
 | +0x08 | u16 | set to 0, never read |
-| +0x0A | u16 | **colour of this font** (`Font_SetColor`) |
+| +0x0A | u16 | **colour of this font** (`Font_SetColor`); `Font_Load` never initialises it (the record is `Mem_Alloc`'d), so a font's colour is unset until the first `Font_SetColor` (the story page sets it first, 2c11:066d); the engine starts at 0 |
 | +0x0C | far | private copy of the resource |
 | +0x10 | far | u16 width per code |
 | +0x14 | far | u16 y offset per code |
@@ -278,7 +278,7 @@ NULL pointer; none does.
 | +0x0E | far (far char*)* | button labels | |
 | +0x12 | far u16* | button keys | key i is both the press and the release code of button i's zone |
 | +0x16 | i16 | focus | initially focused (inverted) button |
-| +0x18 | i16 | alignment | 0 left, 1 centred, 2 right (other values: undefined x) |
+| +0x18 | i16 | alignment | 0 left, 1 centred, 2 right (other values: an unset x) |
 | +0x1A, +0x1C | i16 | x, y | −1 = centred on 320×200 |
 | +0x1E | i16 | body width | −1 = measured |
 | +0x20 | i16 | body height | −1 = measured; else **value + 6** |
@@ -504,7 +504,12 @@ are never referenced.
 
 `Res_Read(1)` (bundle of 6 pictures 53 × 9); colour 0 `FillRect(0, 0, 320, 9)`; for i = count−1 down
 to 0: `Lpx_DrawKeyed(record[i].x, 0, member (i == sel ? i + 3 : i), 0)`; `Dirty_Flush`. Members 0..2 are
-the normal titles in record order (Help, File, Options), 3..5 the highlighted ones.
+the normal titles in record order (Help, File, Options), 3..5 the highlighted ones. The titles use
+colours 17 (red, the highlighted title) and 28 (grey) of the HUD bundle's palette member 0x1058/5
+(colours 16..63), which `Hud_Init` (1a04:025b, from `Game_Init`) applies to the shadow through
+`PicCache_LoadBundle` before the attract; it stays in every screen. The base palette's 17 and 28 are
+near-white (59, 59, 59) and dark grey (13, 13, 13) [O wave 2: bar pixels (182, 182, 182) = 6-bit 45
+= colour 28 of 0x1058/5 in w0/23 and r2/menus].
 
 ### 6.4 Drop-down: `Menu_RunDropDown(i)` 40a4:020b [O, verified]
 
@@ -675,8 +680,10 @@ per byte c:
 ```
 
 `TextView_GlyphVisible`: x ≥ 3, y ≥ 31, x + width < 116, y + lh − 1 < 163 (13 visible lines, y 31..151).
-Lines before `first` are laid out at y 31 without drawing. `TextView_CountLines` runs the same layout
-and returns the number of line breaks (lines − 1).
+Lines before `first` are laid out at y 31 without drawing. `TextView_CountLines` runs nearly the same
+layout and returns the number of line breaks (lines − 1); it does **not** call `TextView_GlyphVisible`
+(4140:0497..04be) but adds `Font_CharWidth` for every glyph, while `TextView_DrawText` advances x only
+for visible glyphs, so wrapping can differ on lines with invisible glyphs [O wave 2].
 
 ### 8.3 Input loop [O, switch CS:0a8c on `Input_StripHeld(Input_GetCode())`]
 
@@ -721,6 +728,13 @@ Thumb drag: offset = pointerY − thumbY; loop `Input_GetCode` while the code ha
 zone): when the pointer moved (and is within the bar's x range) the thumb is drawn at pointerY − offset
 clamped to [y + 9, y + h − 19] after `Gfx_RestoreRect` of the whole bar from the back page. At the end
 pos = ((thumbY − (y + 10))·max + half(h − 31)) / (h − 31), via `ScrollBar_SetPos` (forced redraw).
+
+Details [O wave 2]: `ScrollBar_Draw` leaves `g_drawColor` = 15; thumb y = y + (low word of the
+16-bit IMUL (h − 31)·pos, CWD) / max + 10. During the drag the thumb is redrawn only when its new y
+differs from the thumb y the drag started with, and +0x12 is not updated until the end. A release
+without any pointer move ends with DI never set, so DI still holds the caller's value: `SignIn_Run`
+passes the input code there, so pos = ((code − (y + 10))·max + 39) / 78, clamped to max: clicking the
+thumb without moving scrolls to the end.
 
 ---
 
@@ -774,7 +788,22 @@ loop:
 leave: ScreenAnim_Free of every loaded instance; return result
 ```
 
-A wait of t frames releases the channel after t + 1 frames. The four descriptors: DS:2090 (title,
+A wait of t frames releases the channel after t + 1 frames.
+
+Details [O wave 2, 2c11 disassembly; the engine's frames equal those of the AVIs
+w0_title_attract and w0_replay_title_attract]:
+
+* The frame counter increments right after `Dirty_Flush` (2c11:021c), before `Timer_Wait`, the
+  first-frame fade and the channel advance.
+* A channel whose last animation stopped keeps its state, so when the next op is −1 it advances again
+  on every frame and reads past its −1 into the following DGROUP words (the scripts are contiguous
+  at DS:2008..205b). In the shipped data channels 3 and 4 of DS:209c (scripts DS:2038 and DS:2048)
+  can end before the watched channel 2 and then read DS:2048 [−2, 564, ...] and DS:2054 [−2, 200,
+  0x100D, −1].
+* The search for a free instance of id n has no upper bound (the engine bounds it).
+* Each PlayAnim call reloads its animations, so they restart at step 0 in each title phase.
+* Phase lengths with zero-cost 4-tick frames: 37 / 110 / 183 frames (floor(n·146/4) + 1); the first
+  frame's fade-in shortens phase 1. The four descriptors: DS:2090 (title,
 2 channels: 0x1005, 0x1007 — both loop forever), DS:2096 (3: wait 50, 0x1015 / 0x1005 / 0x1007),
 DS:209c (5 channels with waits of 20..577 frames, 0x100B..0x1013), DS:20a2 (3: wait 20, 0x1017 /
 0x1005 / 0x1007) [O bytes]. The attract animations use no random step (ops −34/−35), only play/stop
@@ -789,7 +818,7 @@ effect steps (−36/−37) on bank 0x1022 [O data, `seqattract.py`].
 | 3..8 | `Attract_StoryPage` 2c11:0630 | first page only: `Screen_LoadPicture(0x1009, 0x100A)`, `Lpx_Draw(0, 0)`, `Screen_SaveAll`, the line 0x1024 in font 0, colour 15, **spacing patched to 1** (record +6 via `Font_GetCurrent`), at (160 − half(Text_Width), 190), spacing back to 2. Every page: colour 0xA3 `FillRect(57, 38, 177, 53)`; font 1 colour 0 `Text_DrawBox(57, 38, 177, text DS:a04e)`; first page `Screen_FadeOutIn`, others `Dirty_Flush` | `Timer_Set(1, 0x111C)`; busy poll until a key or `Timer_Expired(1)`; then DS:a04e += 1 | Enter → next; Space → −1; Esc → −1 + quit; time-out → next (it also overrides a key read in the same poll: the result becomes 0, an Esc's DS:455a = −1 stays) |
 | 9 | `Attract_AfterStory` 2c11:077f | `Gfx_RestoreRect(57, 38, 177, 53)` and `(0, 190, 320, 10)` (erase box and line) | `PlayAnim(DS:209c, fade 1 (no effect: not faded), 12, channel 2)`; `Pal_FadeOut` | Enter / Space / Esc as step 2 |
 | 10 | `Attract_BeforePrompt` 2c11:07e5 | `Screen_LoadPicture(0x1002, 0x1004)`, draw, `Screen_SaveAll` | `PlayAnim(DS:20a2, fade 1, 12, channel 0)`; `Pal_FadeOut` | same |
-| 11 | `Attract_SignInPrompt` 2c11:084c | `Screen_LoadPicture(0x1029, 0x102A)` (the sign-in background), picture 0x1026 keyed at (93, 33), text 0x1025 in font 0 colour 15 at (74, 121); `Screen_FadeOutIn` | `Timer_Set(1, 0x111C)`; busy poll; time-out returns **1 → restart at step 1** (also over a key read in the same poll); `Pal_FadeOut` | Enter or Space → 0 → step 12 NULL → sign-in; Esc → quit |
+| 11 | `Attract_SignInPrompt` 2c11:084c | `Screen_LoadPicture(0x1029, 0x102A)` (the sign-in background), picture 0x1026 keyed at (93, 33), text 0x1025 in font 0 colour 15 at (74, 121); `Screen_FadeOutIn`; no `Screen_SaveAll` (the back page stays the before-prompt picture) | `Timer_Set(1, 0x111C)`; busy poll; time-out returns **1 → restart at step 1** (also over a key read in the same poll); `Pal_FadeOut` | Enter or Space → 0 → step 12 NULL → sign-in; Esc → quit |
 
 Font state left behind [O]: `Font_SetColor` acts on the selected font. Story page 1 sets font 0's
 colour to 15 (font 0 is selected since start-up) and then selects font 1 with colour 0; step 11's
@@ -830,7 +859,9 @@ Rows (`SignIn_DrawList`, §11.7): 8 visible, row k at y 46 + 11k, cell (62, y, 1
 (64, y + 1); points right-aligned at x 164 (`Str_FormatThousands`, thousands commas) and the rank
 name at x 169 (`Rank_FromPoints`, names DS:1f7c), in the name's colour; nothing for negative points.
 Selected row: black bar (colour 0 fill); name colour 11, or, while typing, the typed part in colour 14
-followed by the rest of the stored name in colour 11. Other rows: background restored from the back
+followed by the rest of the stored name in colour 11. The yellow typed part is the **stored entry
+name cut at `g_typedLen`** (a trailing 0x1F removed), not `g_typedName`; the rest of the name is
+drawn at x 64 + `Text_Width(part)` (2caa:0604..0699) [O wave 2]. Other rows: background restored from the back
 page, colour 15.
 
 ### 11.3 `State_02_SignIn` 2caa:1240 [O]
@@ -913,6 +944,13 @@ Checked in this order:
 | 0x704 → 0x0D, or 0x0D | entry is a real player | **return 0x0D** (sign in) |
 | | entry in progress | if the typed name ends in spaces: strip them one by one with `Roster_UpdateTyped(8)`, rescroll, set range, redraw; if index < count − 1 and typed[0..len] (NUL included) equals entry[index + 1].name: hide buttons, `Dlg_MessageRes(0x1068)` (duplicate), show buttons, return 0; else return 0x0D |
 | anything else | | ignored (returns 0) |
+
+Details [O wave 2]: the rescroll after a typed character, Backspace and the trailing-space strip is
+"index ≥ top + 6 → top = index − 6" (0bfd, 0d33, 0dfb); New Player uses "index ≥ top + 7" (0998).
+The typed path sets the redraw's b = −1 only when index < top. `Text_Width(g_typedName)` measures up
+to the 16-byte buffer's NUL, not `g_typedLen`, so bytes left after a prefix match count. The
+duplicate check compares typed[0..len] (NUL included) with entry index + 1 only. A 16th 0x1F marker
+writes typed[16] = 0 at DS:a064.
 
 So a name has 1..15 characters, starts with an upper-case letter, may then contain any byte
 0x20..0x7F (Ctrl+Backspace gives 0x7F, which font 10 draws out of range, §3.2), must be narrower than
@@ -1125,7 +1163,7 @@ also linked, in due order, in `g_hintList` DS:a0da (`List_InsertSorted` with `Hi
 |---|---|
 | `Hint_Init()` 3060:0013 | `List_New` → DS:a0da; all ids −1 (from `Game_Init`) |
 | `Hint_Queue(id, u16 delay, far *cancel)` 3060:0037 | ignored if hints are off or the hint was shown; first free slot (none free: **slot 5, past the array**, overwriting DS:a138..); due = `g_ticks` + delay; inserted before the first pending hint due strictly later (equal due times keep queue order) |
-| `Hint_CompareDue(a, b)` 3060:0000 | b.due − a.due on the **low words** only |
+| `Hint_CompareDue(a, b)` 3060:0000 | b.due − a.due on the **low words** only: `List_InsertSorted` (19c0:00a6) walks on while new.due − cur.due (signed 16-bit) ≥ 0, so a hint due 32 768 or more ticks after a queued one sorts before it and blocks it (`Hint_Update` looks only at the head); shipped delays (8 760 at most) do not reach this [O wave 2] |
 | `Hint_Update()` 3060:00bc | head = first pending; if head.due < `g_ticks` (strict): if cancel is NULL or *cancel == 0: `Hint_Show(id)`; remove it, id = −1. At most one per call |
 | `Hint_ClearQueue()` 3060:01fb | `List_Clear`; all ids −1 |
 | `Hint_Show(id)` 3060:013b | below |
@@ -1287,7 +1325,7 @@ Del 0x153, F1..F10 0x13B..0x144, Alt+H/F/O 0x123 / 0x121 / 0x118.
 
 | tmport module | TM Windows original | G&G | Verdict |
 |---|---|---|---|
-| `src/text/text_renderer` | `Text_Render` 10b0:00b5 | `Text_Render` 2b89:007a, same structure (§4) | **generalise** behind a dialect: control set (TM: TAB, FE, `FF 04` tab stops; G&G: none, `FF 04` = 2-byte no-op); `MeasureRun` advance (TM: `charWidth`; G&G: raw width + 1, space included); extent (TM: maxX − minX, `Text_Width("")` = 0 special case; G&G: maxX − x0); underline (TM: `_` becomes a blank; G&G: none, line in `g_drawColor`); per-glyph flush (TM only); the substitution delimiter quirk (G&G: delimiter ignored inside a substitution reached from the main run); colour sink (TM: frame-buffer pen; G&G: the font's own colour); the unused Timer_Wait(6) (TM only). Font behind an interface: `charWidth(c)` (G&G: 3 for space, width + spacing, spacing for glyph-less codes), `rawWidth(c)`, `drawChar` returning the advance (G&G: 0 for glyph-less codes), `lineHeight` (G&G: height + 1) |
+| `src/text/text_renderer` | `Text_Render` 10b0:00b5 | `Text_Render` 2b89:007a, same structure (§4) | **generalised in wave 2** as the core's `text::TextEngine` with `TextFont` / `TextCanvas` and `TextDialect::gizmos()` (src/text/text_engine.h; G&G's `FontMetrics` / `FontCanvas` in gg/text/text.h: lineHeight = height + 1, charWidth, runWidth = width[c] + 1, `Font_DrawChar`, `Gfx_HLine` in `g_drawColor`, `Font_SetColor`); the substitution delimiter quirk is the flag `substRunStopsAtDelimiter` (G&G false); open: inside such a substitution LF/CR still end the run (unused by G&G, whose wrappers pass NULL). The plan was to **generalise** behind a dialect: control set (TM: TAB, FE, `FF 04` tab stops; G&G: none, `FF 04` = 2-byte no-op); `MeasureRun` advance (TM: `charWidth`; G&G: raw width + 1, space included); extent (TM: maxX − minX, `Text_Width("")` = 0 special case; G&G: maxX − x0); underline (TM: `_` becomes a blank; G&G: none, line in `g_drawColor`); per-glyph flush (TM only); the substitution delimiter quirk (G&G: delimiter ignored inside a substitution reached from the main run); colour sink (TM: frame-buffer pen; G&G: the font's own colour); the unused Timer_Wait(6) (TM only). Font behind an interface: `charWidth(c)` (G&G: 3 for space, width + spacing, spacing for glyph-less codes), `rawWidth(c)`, `drawChar` returning the advance (G&G: 0 for glyph-less codes), `lineHeight` (G&G: height + 1) |
 | `src/text/font` | FFNT, MSB-first, spacing built in | `fnt` 0x1A, LSB-first, y offsets, spacing field, per-font colour | **new** G&G font class implementing the interface |
 | `src/ui/menu_bar` | Win16 menu replaced by an engine-drawn bar | self-drawn bar with picture titles, dialog-drawn drop-downs | **split**: the data model (`MenuBarModel::fromExe`) is the same 0x14-byte record — generalise it to keep +0x04 title width, +0x10 drop-down width, +0x12 title x, and to map handlers by far pointer to a game-specific command enum (G&G: stub entries 1e97:0025..0039, 1e9b:0020..0039). The interaction and drawing (Win3.1 look, mnemonics, command posting, `Menu_EnableAll`) stay TM-only; G&G gets a new `MenuBar` following §6 (keys, zones, highlight XOR, handler return value reopens the menu, no click-outside close, sound pause, no time freeze) |
 | `src/ui/game_dialog` | 10c0: `DlgDesc` by type, 2 buttons, 3 frames, `Delay_ms(62)` flash, nested music pause, 512×384 centring | 3f56/4034: 0x32 descriptor, 0..3 buttons with key arrays and alignment, 2 frames + 2-px shadow, `Delay(4)` ticks flash, time freeze, non-nested sound pause, 320×200 centring, wrap 280, pictures | **pattern only**: write `gg::ui::Dialogs` from §5; share the text renderer, a save-under helper and the modal-loop host (engine pump, input source, delay) |
@@ -1312,8 +1350,14 @@ pixel (6-bit RGB, base palette DS:024e for colours 0..15, the capture's own colo
 | `r2/puzzle/k0_02_hint_text`, `k5_09_hint_text` | text viewer: panel, arrows, wrapped text (texts 0x20DD, 0x1163), scroll bar | cursor only (1 and 4 px) |
 | `w0/02_story1` | story page 1: wrapped box text in font 1, the font-0 line drawn with spacing 1 | 0 of 1 592 glyph pixels |
 
-Not checked against a capture: the help pager (no capture), the scroll bar of a long roster, the
-Ctrl+R and duplicate boxes, the attract timing beyond `REFERENCE_CAPTURES.md` §4.
+Wave 2 engine results [O]: `ggport-cli --gg-screen` composes 32 UI shots with 0 differing pixels
+(15 whole frames: title, story pages 1 and 2, every sign-in state with the name entry and the chimps
+question; 17 inside the UI rectangles: hints, menus, dialogs, the help pager page 0 (r2/menus/03),
+the menu bar, 5 text-viewer pages), the cursor drawn at the shot's pointer. The attract's
+animation frames (phases 1-3, after the title, story page 2) equal frames of both attract AVIs, and
+the wave 2 preview reproduces the attract's timing (`ENGINE_MAP.md`). Not checked against a
+capture: the help pager's later pages, the scroll bar of a long roster, the Ctrl+R, duplicate and
+list-full boxes, a pressed picture button, after-story, before-prompt and the prompt.
 
 ---
 
@@ -1346,12 +1390,13 @@ Ctrl+R and duplicate boxes, the attract timing beyond `REFERENCE_CAPTURES.md` §
 
 1. The hint chime: is any of it audible before the box pauses the sound (§13.1)? An OPL capture of a
    hint (e.g. the first warehouse room) answers it.
-2. The help pager and Ctrl+R / duplicate / full-list boxes have no capture yet; a capture of each would
-   confirm §5.8 and §11.5 geometry (the code is the verified dialog code).
+2. *Partly answered in wave 2:* the help pager's page 0 matches r2/menus/03 exactly; its later pages
+   and the Ctrl+R / duplicate / full-list boxes have no capture yet.
 3. `Dlg_MessageRes(0x106F)`'s footer pointer is stack garbage: what the original shows (or whether it
    crashes) depends on the stack contents; only a disk-full run in DOSBox-X can tell.
 4. Whether the 2-pixel title-zone overlaps (§6.2) are reachable in practice in the way inferred from
    the hit-test tie rule.
-5. Picture order inside the picture-button bundles (normal, pressed, disabled) is inferred from how
-   the sign-in uses them; the bundles' third picture was not compared with a disabled-button capture
-   beyond the r2 frames (which match).
+5. *Partly answered in wave 2:* the disabled picture (member 2) of the picture buttons is confirmed by
+   w0/03, w0/04 and r2/resume/05 (Start Game, New Player and Cancel disabled, whole frames 0 px);
+   `PicCache_LoadBundle` stops at the `L` member, so only 3 pictures are cached. The pressed picture
+   is still uncaptured.

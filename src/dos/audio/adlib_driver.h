@@ -25,16 +25,11 @@
 #include <cstdint>
 #include <span>
 
+#include "dos/audio/opl_writer.h"
+
 namespace tmport::dos {
 
 struct SoundTables;
-
-// One write to the OPL2 (register, value), in the driver's order.
-class OplWriter {
-public:
-    virtual ~OplWriter() = default;
-    virtual void oplWrite(uint8_t reg, uint8_t value) = 0;
-};
 
 class AdLibDriver {
 public:

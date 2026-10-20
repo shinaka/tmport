@@ -33,7 +33,8 @@ CLI (python -P tools/gg/lpx.py ...)::
 
 PNG output is RGBA: pixels an RLE row skips are transparent; raw pictures are drawn keyed
 (colour = key low byte transparent) unless --opaque. Colours: 6-bit DAC values v shown as
-(v * 255 + 31) // 63 (the rounding DOSBox-X uses), values masked to 6 bits like the DAC.
+(v << 2) | (v >> 4) (the bit replication DOSBox-X shows for G&G, fmt_graphics.md 3.2), values
+masked to 6 bits like the DAC.
 """
 import argparse
 import os
@@ -80,7 +81,7 @@ class LpxError(ValueError):
 
 def expand6(v):
     v &= 0x3F
-    return (v * 255 + 31) // 63
+    return (v << 2) | (v >> 4)
 
 
 def parse_palette(p):

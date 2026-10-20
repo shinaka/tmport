@@ -1,8 +1,9 @@
 #pragma once
-// Scripted input for the DOS edition, expressed in game ticks (PORTING_NOTES.md §4: "--keys should
-// express key down/up in game ticks"). DosRuntime applies the events of tick n right before game
-// tick n, so a script reproduces the per-tick key facts of the reference logs exactly (typematic
-// repeats are synthesised by the PcKeyboard as for a player's keyboard).
+// Scripted input for the DOS games, expressed in game ticks (re/dos/docs/PORTING_NOTES.md §4:
+// "--keys should express key down/up in game ticks"). The runtime applies the events of tick n right
+// before game tick n (TM DOS: DosRuntime, whose game tick is 5 PIT ticks; G&G: its own tick unit), so
+// a script reproduces the per-tick key facts of the reference logs exactly (typematic repeats are
+// synthesised by the keyboard, dos/input/pc_keyboard.h, as for a player's keyboard). Shared core.
 //
 // Text form: items separated by commas and/or white space, each TICK:ACTION[:ARGS]
 //   TICK            a game tick (decimal): the event happens at the time of game tick TICK and is
@@ -28,7 +29,7 @@
 #include <string_view>
 #include <vector>
 
-#include "dos/input/keyboard.h"
+#include "dos/input/pc_keyboard.h"
 
 namespace tmport::dos {
 

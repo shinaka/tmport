@@ -157,7 +157,9 @@ window is the output itself, W only limits the distance.
 
 Observed over all 1490 entries [O, `ggarc.py selftest`]: W = 13 in all; 1313 use the default
 distance lengths and 177 explicit ones; no match reaches before the start of the output or past
-the stated size; no stream reads past its entry.
+the stated size; no stream reads past its entry. The engine's decoder (`src/gg/data/lzh.cpp`,
+`ggport-cli --gg-selftest`) gives the same counts, and its output equals `ggarc.py`'s for every
+entry and bundle member (§10) [O, wave 2].
 
 ### 3.4 Default distance lengths (DS:13D0) [O]
 
@@ -172,7 +174,12 @@ the zero words that fill a row never match because the scan is past code 0 by th
 | (W = 14, unreachable) | 3, 1, 4, 12, 24, 48 | a 1-bit flag cannot select it |
 
 Both reachable rows form complete codes. The values are those of the user's `ssg.exe`
-(`ggarc.py selftest --exe` re-reads them and checks).
+(`ggarc.py selftest --exe` re-reads them and checks; the engine reads them from the exe too,
+`LzhDistanceRows::fromExe`). The scan of 1b48:021f has no bound: it compares word after word,
+running on into the next row, and stops at the first word that is not the current code; the
+zero words that end each row stop it [O 1b48:021f]. The table is 3 rows of 16 **u16** words
+(DS:13D0..142F); the type `u8[2][32]` of `g_lzhDefaultDistLengths` in `re/names/gg/dgroup.tsv`
+describes it wrongly [O].
 
 ### 3.5 Example
 
@@ -418,7 +425,9 @@ writes the record to its slot and the 22 bytes to entry DS:a079 (`g_rosterIndex`
 index position).
 
 The shipped file has count 0, but entry 0 holds slot 98 and slot 0 appears nowhere, so slot 98
-is listed twice [O]. This is the creation loop: `Players_SaveCurrent` writes the index entry at
+is listed twice [O]. Replaying the creation loop (`PlayersDat::create`, `src/gg/save`) gives the
+shipped file byte for byte except index entry 99 (22 uninitialised heap bytes in the original,
+zeros in the engine) [O, wave 2 test]. This is the creation loop: `Players_SaveCurrent` writes the index entry at
 `g_rosterIndex`, which is 0 while the 99 blank records are saved, so entry 0 is rewritten 99 times
 and ends as {"", 0, 98} [O 2caa:010d..011a, 2b5a:02bc..02e5]. The first new player therefore gets
 slot 98 (seen in the wave 0 captures, `REFERENCE_CAPTURES.md` §3.4), slot 0 is never used, and if
@@ -495,6 +504,14 @@ showing a warehouse screen. A port can keep this area in memory.
 `index.tsv` with one row per entry and member (id, volume, file offset, type, method, sizes,
 kind, details, the palette used for pictures, outputs). See `tools/gg/README.md`.
 
+The engine's data layer (`src/gg/data`, wave 2) has the same views as headless tools of
+`ggport-cli`: `--gg-info` (folder and per-volume statistics, the table of §2.1), `--gg-list
+[--leaves]` (the columns of `ggarc.py list [--leaves]` plus the CRC-32 of every decoded payload),
+`--gg-selftest` (the checks of `ggarc.py selftest`) and `--gg-extract ID OUT` (one decoded entry or
+member `id/m`; never into the game folder). Checked in wave 2 [O]: the first nine columns of
+`--gg-list --leaves` equal `ggarc.py list --leaves` line for line (5843 lines), and the CRC-32s of
+all 1897 entries and 3945 bundle members equal those of `ggarc.py`'s payloads.
+
 ---
 
 ## 11. Porting notes [I]
@@ -509,6 +526,14 @@ kind, details, the palette used for pictures, outputs). See `tools/gg/README.md`
 * PLAYERS.DAT: write the header, index and 99 slots exactly as 2caa:004f does when creating
   (including the entry-0 result of §8.2; entry 99 may be zeros), and only the player's slot and
   index entry on save, so files stay byte-compatible with the original (`PORTING_NOTES.md` §9).
+  Done in wave 2 (`src/gg/save/players_store.h`): replaying `Players_SaveCurrent` (and
+  `Roster_Save` for a new player) on the captured before/after pairs (w0 new player and Return to
+  Technology Center, r2 new player Bob and Save & Exit) reproduces the after files byte for byte,
+  and all 148 reference copies (the shipped file and the `.players` copies) parse and re-serialise
+  unchanged [O].
+* Decode a match's distance code before its 6 low bits: in C++ an expression such as
+  `decode() * 64 + bits(6)` leaves the order of the two reads unspecified (MSVC reads the 6 bits
+  first).
 
 ## 12. Open questions
 

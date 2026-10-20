@@ -6,9 +6,6 @@ namespace tmport::dos {
 
 namespace {
 
-// One PIT tick = 3 * 5041 / 3579545 s = kPeriodNum / kPeriodDen ns (reduced: gcd = 1).
-constexpr uint64_t kPeriodNum = 3'024'600'000'000ull;  // 15123e9 / 5
-constexpr uint64_t kPeriodDen = 715'909ull;            // 3579545 / 5
 // The PIT input clock in units of 1/3 Hz, for the frame clock: one PIT tick = 15123 / 3579545 s.
 constexpr uint64_t kPitClockTimes3 = 3'579'545ull;
 constexpr uint64_t kPitTickUnits = 3ull * kPitDivisor;  // 15123
@@ -17,17 +14,10 @@ constexpr uint64_t kPitTickUnits = 3ull * kPitDivisor;  // 15123
 
 // ------------------------------------------------------------------------------------- PitClock
 
-uint64_t PitClock::timeOfPitTick(uint64_t k) {
-    // ceil(k * N / D) without overflow (k = q * D + r): the first whole nanosecond at or after the
-    // exact tick time, so "tick k is due at t" is exactly k * period <= t.
-    const uint64_t q = k / kPeriodDen, r = k % kPeriodDen;
-    return q * kPeriodNum + (r * kPeriodNum + kPeriodDen - 1) / kPeriodDen;
-}
-
-uint64_t PitClock::pitTicksAt(uint64_t tNs) {
-    // floor(t * D / N), exact: k * N / D <= t  <=>  k <= t * D / N.
-    const uint64_t q = tNs / kPeriodNum, r = tNs % kPeriodNum;
-    return q * kPeriodDen + (r * kPeriodDen) / kPeriodNum;
+const PitTimeBase& PitClock::timeBase() {
+    // One PIT tick = 3 * 5041 / 3579545 s = 3024600000000 / 715909 ns (reduced by 5).
+    static const PitTimeBase base(kPitDivisor);
+    return base;
 }
 
 // ---------------------------------------------------------------------------------- TickCounters

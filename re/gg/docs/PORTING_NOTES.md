@@ -1,7 +1,8 @@
 # Porting notes: Gizmos & Gadgets in the tmport engine
 
-**Status: wave 1.** Written in wave 0 and extended at the wave 1 integration from the topic specs
-and the round 2 reference captures. It records what matters for the engine (`ggport`, `src/gg/`):
+**Status: wave 2.** Written in wave 0, extended at the wave 1 integration from the topic specs and
+the round 2 reference captures, and corrected at the wave 2 integration from the engine foundation
+(what was built and verified: [ENGINE_MAP.md](ENGINE_MAP.md)). It records what matters for the engine (`ggport`, `src/gg/`):
 the runtime model, the screen, the clocks, the order of `rand()` calls, the CPU-dependent path, why
 the overlays do not matter, the original's switches as options, input, saves, the UI library, and
 which quirks to keep.
@@ -110,8 +111,19 @@ game code: nested functions on the main thread, as the original
   clock to its deadline, and the work inside a frame costs 0 ticks unless a cost model says
   otherwise (§2.4). Cost models are expressed in PIT ticks, never in host time. An unpaced poll
   with no input advances the clock by a small fixed step so that busy-waits on sound end.
-* Sound reuses the DOS edition's sample-count ticking (`dos_audio_device`, `dos_sound_renderer`,
-  generalised): one driver tick per 2 PIT ticks, on even ticks (`code_sound.md` §17).
+* Sound reuses the DOS edition's sample-count ticking, generalised in wave 2 as the core's
+  `dos::ChipRenderer` and `dos::ChipAudioDevice` (`src/dos/audio/chip_renderer.h`,
+  `chip_audio_device.h`; TM's `DosSoundRenderer` / `DosAudioDevice` are built on them): one driver
+  tick per 2 PIT ticks, on even ticks (`code_sound.md` §17).
+* As built in wave 2 [O]: the virtual PIT is the core's `timing/pit_clock.h` (`PitTimeBase(0x2000)`,
+  `VirtualPit` with `onTick(every, fn, phase)` on the counter value and `setTicks` for the dialog
+  freeze, `PitTickClock`) under `GgClock`; the runtime is `GgRuntime` (`gg/app/gg_runtime.h`) on
+  `platform::Host`, not TM DOS's lockstep `dos::DosRuntime`. Its yield points are `timerWait`,
+  `timerExpired`, `delay`, `getInputCode`, `waitInputCode`, `idle` and `waitRetrace`. In deterministic
+  runs the first poll after a wait is free, every later poll moves 1/16 tick (capped at the tick
+  edge), a wait that ends at once counts as a poll, and a script event of tick n comes right before
+  interrupt n; every busy-wait loop must call `GgRuntime::idle()`. The display (`gg/app/display.h`)
+  presents VRAM after every flush, wipe step and DAC write.
 * Mouse events from the host are delivered as INT 33h events at PIT-tick times; in a 0-cost frame
   model every event during a wait sees the hide state 0, which matches the original except for
   events that fall inside a long frame's drawing (`code_runtime.md` §20).
@@ -122,7 +134,9 @@ game code: nested functions on the main thread, as the original
   are exactly 4 (or 8) ticks long. The first frame after a long operation starts wherever that
   operation ended [O].
 * Keep the one-tick difference between `Timer_Expired` and `Timer_Wait` (TM Windows' `Timer_Expired`
-  uses ≥; the shared `timing/deadline_timers` needs the boundary as a parameter) [R].
+  uses ≥). Done in wave 2: the core's `timing/deadline_timers` counts in its Clock's unit
+  (`PitTickClock`: PIT ticks), takes `ExpiryRule::AfterDeadline` (`expired` strict >) and has
+  `reached()` (≥) for `Timer_Wait` and `Delay` (`GgTimers`, `gg/app/timers.h`).
 * Per-loop order of operations, which decides what a frame shows and when input is read, is in the
   specs: the warehouse (`code_world.md` §14.2: `Hint_Update`, `Timer_Set`, `Actors_Tick` — which may
   leave at once with no drawing, wait or input —, erase, layers, actors, items, draw, HUD, flush,
@@ -175,7 +189,12 @@ entry) as PIT ticks, which a resident-code frame logger would give (as `re/dos/d
   right/bottom of `Gfx_ClipX/Y` and the wrong sign for a negative y, the unclipped `Gfx_HLine`
   draw, the keyed raw blit's unsigned y test and 8-bit height, the unclipped RLE blits (no dirty
   mark at negative x). Where the original would write outside the buffer, clip in the engine and
-  log in debug builds [R].
+  log in debug builds [R]. Zero counts also run away in the original [O wave 2]: `Gfx_FillRect`,
+  `PutImage`, `RestoreRect`, `SaveToBack` and `GetImage` with h = 0 (DEC DX; JNZ: 65 536 rows),
+  `Gfx_VLine`, `XorRect` and the keyed raw blit with a length or width of 0 (LOOP: 65 536),
+  `Dirty_Mark` with (y & 7) + h ≤ 0 and cols > 0, `Movie_DecodeFrame`'s long literal or run of length
+  0 at an odd address (DEC CX before SHR: 65 535 bytes): the engine draws nothing there and logs in
+  debug builds.
 
 ### 3.2 What reaches the screen [O, R]
 
@@ -196,8 +215,10 @@ entry) as PIT ticks, which a resident-code frame logger would give (as `re/dos/d
   tiles. The movie runs with the cursor hidden (`Mouse_Hide` from 2fcb:0000) and never touches it
   [O, `code_runtime.md` §12.3, §14.2, §15]. The engine draws the cursor into the buffer at the
   flush as the original does; it composites nothing else [R].
-* DAC colours are 6-bit. Expand to 8 bits as `(v*255 + 31) / 63`, the rule that matched DOSBox-X for
-  the TM DOS MCGA look (`src/dos/gfx/palettes.h`); check it against a G&G capture [I].
+* DAC colours are 6-bit. DOSBox-X shows them in 8 bits as `(v << 2) | (v >> 4)` (bit replication),
+  **not** `(v*255 + 31) / 63` (the rule TM DOS's MCGA look uses, in TM's `src/dos/gfx/palettes.h`,
+  which is not part of the core): they differ for v = 11..15 and 49..52 [O wave 2: per-pixel scoring
+  of w0/01_title, w0/03_signin and four r2 puzzle screens; `gg/gfx/palette.h` `dacTo8`].
 
 ### 3.3 Palette loads and fades [O, R]
 
@@ -313,7 +334,13 @@ input per frame.
   flags (`code_ui.md` §7). Keep it for fidelity; offer a fix as an option [R].
 
 The engine may accept the original switches for familiarity (for example `--gg-args "-SI"`), as
-the DOS edition accepts `--dos-args`.
+the DOS edition accepts `--dos-args`. Done in wave 2 (`gg/app/options.h`): the original's `-?` prints
+message 0x368 and exits 1, and its parse stops at the first switch that asks for the usage
+(303a:0147); the engine's `-?` prints the help and exits 0, a bad switch exits 1.
+
+With `-SN` the speaker gate-off writes still happen (`Snd_HwChannelOff` 1bb4:0648 and
+`Snd_HwSilenceAll` 1bb4:0674 write port 61h &= FEh without checking `g_sndEnabled`); every key-on,
+frequency, BD write and speaker gate-on stops (`code_sound.md` §12.3) [O wave 2].
 
 ---
 
@@ -324,7 +351,10 @@ the DOS edition accepts `--dos-args`.
   by state 5, i.e. in the warehouse rooms) the arrows and Space are swallowed instead of queued;
   Ctrl+C is swallowed. **E0/E1 prefixes are swallowed**, so the BIOS never sees them: feed the grey
   arrow keys as the keypad scan codes. Reuse `PcKeyboard` and `bios_keyboard` with DOSBox-X
-  typematic (500 ms, then 33 ms, as measured for TM DOS) [R, I].
+  typematic (500 ms, then 33 ms, as measured for TM DOS) [R, I]. Done in wave 2 on the core's
+  `dos::ScanKeyboard`: the engine feeds the E0/E1 bytes to `Kbd_ISR` (`prefixBytesToHandler`, lead 0),
+  which swallows them. Open: G&G never clears Num Lock (unlike TM DOS 1460:0003); the engine's BIOS
+  model starts with Num Lock off, DOSBox-X's initial state is unchecked.
 * **The key ring** (16 records, written for make codes that reach the BIOS): `Input_GetCode` pops
   one record per call and takes a BIOS key only with a record, and a popped record **replaces** a
   mouse code of the same poll (a Shift or Ctrl make, or a repeat whose key was already taken,
@@ -359,7 +389,10 @@ the DOS edition accepts `--dos-args`.
 
 * Keep `PLAYERS.DAT` byte for byte: header, the 100-entry roster index, 99 pre-allocated
   5821-byte records, in the engine's preference directory (separate from TM's files); offer import
-  from the game folder's `PLAYERS.DAT` and an export back.
+  from the game folder's `PLAYERS.DAT` and an export back. Done in wave 2 (`gg/save/players_store.h`):
+  the file is `<G&G pref dir>/players.dat` (`playersPathIn`); every write is atomic and keeps the
+  previous file as `.bak`; a wrong-version or wrong-size file is re-created with the old one kept as
+  `.bak`; a write failure is reported and never deletes the file; entry 99 is zeros on creation.
 * Write exactly what the original writes: only the current player's record and index entry
   (`Players_SaveCurrent` 2b5a:01ea), at the same moments: a new player, Save & Exit, before a race
   (state 8), state 16, leaving the post-race menu after a win, after the final movie; Ctrl+R writes
@@ -530,7 +563,7 @@ Drop:
    DOSBox-X references.
 2. *Answered:* the help pager freezes time (each page is a dialog); the puzzle screens are
    unpaced loops that run with the clock, and their Hint viewer does not freeze it.
-3. The DAC expansion rule for a G&G capture (§3.2).
+3. *Answered in wave 2:* the DAC expansion is `(v << 2) | (v >> 4)` (§3.2).
 4. *Answered:* the key ring is read by `Input_GetCode` (one record per call), `Kbd_PopQueuedKey`
    (the LZH refill drains it, the races pop one per frame) (§8).
 5. *Answered:* the wipe hides the cursor before copying; the movie runs with it hidden (§3.2).

@@ -209,14 +209,19 @@ void Presenter::clearOverlay() {
     composeCanvasRect(0, 0, cw_, ch_);
 }
 
-void Presenter::blitToWindow(const FrameBuffer& fb, int x, int y, int w, int h) {
+bool Presenter::clipToGame(int& x, int& y, int& w, int& h) const {
     if (x < 0) { w += x; x = 0; }
     if (y < 0) { h += y; y = 0; }
     if (x + w > gw_) w = gw_ - x;
     if (y + h > gh_) h = gh_ - y;
-    if (w <= 0 || h <= 0) return;
-    for (int r = 0; r < h; ++r)
-        std::memcpy(window_.data() + static_cast<size_t>(y + r) * gw_ + x, fb.row(y + r) + x, static_cast<size_t>(w));
+    return w > 0 && h > 0;
+}
+
+void Presenter::storeWindowRow(int y, int x, const uint8_t* src, int w) {
+    std::memcpy(window_.data() + static_cast<size_t>(y) * gw_ + x, src, static_cast<size_t>(w));
+}
+
+void Presenter::windowRowsStored(int x, int y, int w, int h) {
     if (!frame_.empty()) {
         // Back from an RGBA frame to the window picture: the whole game area shows indices again.
         frame_.clear();
@@ -224,11 +229,6 @@ void Presenter::blitToWindow(const FrameBuffer& fb, int x, int y, int w, int h) 
         return;
     }
     renderRect(x, y, w, h);
-}
-
-void Presenter::flushDirtyRects(FrameBuffer& fb) {
-    for (const Rect& r : fb.dirtyRects()) blitToWindow(fb, r.x, r.y, r.w, r.h);
-    fb.clearDirtyRects();
 }
 
 void Presenter::presentFrame(std::span<const uint32_t> rgba) {

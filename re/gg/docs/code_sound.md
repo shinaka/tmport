@@ -242,7 +242,7 @@ Per event (status & F0h):
 
 | Status | Data | Action (when the channel's flags & 3 = 0) |
 |---|---|---|
-| 8n | none | `g_spkChannelNote[n]` = the status byte (≥ 80h); if enabled: port 61h &= ~01h (timer-2 gate off; the speaker data bit 1 stays set) |
+| 8n | none | `g_spkChannelNote[n]` = status & F0h, i.e. always 80h (1bb4:096d + 0985; the OPL note-off stores the full status, 1bb4:0af1); if enabled: port 61h &= ~01h (timer-2 gate off; the speaker data bit 1 stays set) |
 | 9n..Dn | key | `g_spkChannelNote[n]` = key; divisor d(key + transpose, bend[n]) below; if enabled: `OUT 42h` low, high; port 61h \|= 03h |
 | En | lo, hi | bend word = hi:lo; if it equals the stored bend → nothing; else store it (**also when muted or stopped**); then, if flags & 3 = 0 and the channel has a sounding key (< 80h): re-pitch (divisor with the new bend, `OUT 42h`, port 61h \|= 03h) |
 | Fn | meta | §6.4 |
@@ -390,7 +390,10 @@ else:
     g_sndPriority[slot] = priority; active[slot] = 1
 ```
 
-Equal priority does not steal: the earlier song keeps the channel.
+Equal priority does not steal: the earlier song keeps the channel. Confirmed by the
+r2_warehouse_walk capture [O wave 2]: an effect started while another effect holds the channel at
+the same priority records its program without loading the patch; when the holder ends, the patch
+is loaded and the new effect sounds from its next note-on.
 
 ### 10.2 `Snd_SetPriority(slot, p)` 1bb4:102c
 
@@ -417,6 +420,10 @@ inactive slot).
 
 The song being released is still marked active during step 2 when called from
 `Snd_SetPriority`, so it can win its own channels back.
+
+The search compares priorities as signed bytes against a starting owner priority of 0, so a song
+playing at priority 80h or higher never gets a channel back through a release (1bb4:07cf JL); the
+candidate test checks only flag bit 7, not the stopped bit [O wave 2].
 
 ### 10.5 Hardware off and silence [O]
 
@@ -502,8 +509,10 @@ and `Snd_HwSilenceAll`. `Snd_Resume` (1cdd:05e5) → `Snd_ResumeUnlock` (1bb4:0b
 
 * `Snd_Silence` (1bb4:0b97, device 0 at start-up): if enabled: lock, `Snd_HwSilenceAll`,
   `g_sndEnabled` = 0, unlock. Afterwards the interpreters keep running, `Opl_SetPatch` and
-  `Opl_SetVolume` still write their registers, but no frequency, key, BD or speaker write
-  happens: the OPL is configured but never keyed (visible in an OPL capture).
+  `Opl_SetVolume` still write their registers, but no key-on, frequency, BD or speaker gate-on
+  write happens: the OPL is configured but never keyed (visible in an OPL capture). The speaker
+  gate-off writes still happen: `Snd_HwChannelOff` 1bb4:0648 and `Snd_HwSilenceAll` 1bb4:0674 write
+  port 61h &= FEh without checking `g_sndEnabled` [O wave 2].
 * `Snd_Off` (1bb4:0e15, `Game_Shutdown`): lock; every active slot: inactive and every channel
   record flags |= 2; `Snd_HwSilenceAll`; all 64 owner words = 00FFh; unlock.
 
@@ -644,6 +653,11 @@ DS:4554 = 0 (no change). So pass by pass: 1, 2, 3, 4, all, all, all, 1, 2, … O
 switch to arrangement 4 triggers §13.4 (a silent pass, 256 ticks longer). The movie lasts about
 202 × 0.124 s + 4 × 10 s ≈ 65 s, about 8 passes of 8.13 s [I].
 
+Verified by r2_movie_race15 [O wave 2]: `Music_MovieCue` switches the arrangement at every 592-tick
+pass, write for write, over four passes; the cue table's effects play as listed (effect 1 looping
+(type 5), effect 9 every 4 frames, 5 and 2). Two calls not in the table follow at the movie's end:
+effect 1 stopped and effect 6 played.
+
 ---
 
 ## 15. Who plays what [O call sites; I for the "when" of game-logic functions]
@@ -694,6 +708,17 @@ the driver priorities (effects: argument + 3Fh).
 | `Hint_Show` 3060:018c..01c7 | single song 0x1056, then the hint box, then freed | 0 | 71h | a New Player Hint; the dialog pauses the driver before drawing (§12.1), so the chime probably sounds at most for an instant [I] |
 | puzzle helpers ovl19 3924 | own bank table DS:b146 (load from an id + DS:a0d8, register every member), `Snd_Play` directly with section 0, loop 0 or 1 and the **raw** priority, stop, stop all, set transpose, busy-wait until a song ends (3924:005b: no input polling) | | raw | puzzles |
 
+Data-driven priorities, an example [O wave 2]: the workshop race-door screen animation 0x1d plays
+effects 13 and 14 with b = 3 (loop 0, priority 3 = 42h; words 94 and 109 of the resource);
+`Workshop_UpdateRaceDoor` then plays 14 again at priority 4, which reloads its patches.
+
+Race results (State_12), seen in all four race captures [O wave 2]: the results music at tick P
+(0x1089 won, 0x108B lost); global effect 1 at P, then every 2 sound ticks from P + 19 for 49 plays
+during the count-up (on odd PIT ticks in the Alternative Energy run); effect 0 of 0x108F at P + 121
+and effect 1 at P + 381 (the rank-up / post-race box). A loss has no count-up. Race arrangements
+seen: Aircraft 1, then 2 at +92, 3 at +109, 2 at +624; Alternative Energy 1, 2 at +207, 3 at +832, 2
+at +940; Automotive 1, 2 at +312.
+
 ---
 
 Round 2 (REFERENCE_CAPTURES §10.6): the puzzle screens play no music (the room music is stopped by
@@ -707,16 +732,16 @@ emulator's register dump when the capture opens, at the first key-on) [O].
 
 | tmport part | G&G use | Notes |
 |---|---|---|
-| `opl_chip` (ymfm OPL2, `OplWriter`) | **as is** | rhythm mode is a chip feature (BDh); the per-write time model (`kWriteSeconds`, 70 µs measured for TM DOS at `cycles=fixed 6000`) must be re-measured from G&G `.dro` captures (same `AdLib_Write`: 6 + 35 status reads; different CPU setting, 26800 cycles) |
+| `opl_chip` (ymfm OPL2, `OplWriter`) | **as is** | rhythm mode is a chip feature (BDh); the per-write time model (70 µs measured for TM DOS at `cycles=fixed 6000`) was re-measured for G&G in wave 2: **65 µs** per `AdLib_Write` at 26800 cycles (port I/O dominates), fitted over 7809 title-capture writes with only 45 whole-ms stamps off (`GgAudio::kOplWriteSeconds`) |
 | `speaker_synth` (PIT channel 2 mode 3, gate) | **as is** | G&G writes `OUT 42h` low/high and port 61h \|= 3 / &= ~1, exactly the model's inputs |
-| `synth_common`, `opl_backend` | as is | |
+| `synth_common`, `opl_backend` | `synth_common` as is; `opl_backend` **no** | `OplBackend` (playTune, noteOn, noteOff, restore) is TM's AdLib-driver API and stays in tmcore; G&G writes registers to `OplChip` (an `OplWriter` and `OplOutput`) |
 | `adlib_driver` (TM's 4ac9 melodic driver) | **no**, except the F-number table | G&G has no orchestrations, timbre records or key-off-then-on; but `setFNumRow` produces G&G's DS:1852 table exactly (or read it from `ssg.exe`) |
 | `sequencer` (TM's 491b: one music + one effect block, TUNES/SFX formats, effect-freezes-music rule) | **no** | G&G's driver is slot based with per-channel ownership and priorities; write a new `BmfDriver` from §4-§12 |
 | `sound_data` | no | BMF and banks: new parser (`tools/gg/bmf.py` is the reference) |
-| `dos_sound_renderer` | **generalise** | it ticks a `Sequencer` at 1 193 182 / 5041 Hz; G&G needs any driver behind an interface, ticked at 1 193 181.67 / 16 384 Hz (one sound tick per 2 PIT ticks at divisor 2000h), with the same fractional sample accumulator and tick hook |
-| `dos_audio_device` (SDL stream, command queue, offline render) | **generalise** | same threading model; the queue carries G&G's API calls; no `rand()` coupling (the G&G driver draws no random numbers) |
+| `dos_sound_renderer` | **generalised in wave 2** | the core's `dos::ChipRenderer` (`dos/audio/chip_renderer.h`): any `SoundTickSource` ticked at `ChipRenderConfig::tickHz` = `PitTimeBase(kPitDivisorGg).hz() / 2` = 72.8260295 Hz (not `synth_common`'s rounded 1 193 182 / 16 384 = 72.8260498 Hz), the same fractional sample accumulator and tick hook; TM's `DosSoundRenderer` is built on it |
+| `dos_audio_device` (SDL stream, command queue, offline render) | **generalised in wave 2** | the core's `dos::ChipAudioDevice` (`post(fn, delay)`, offline render) and `dos::OplWriteLog` / `OplLogTap` for `.dro` comparisons; TM's `DosAudioDevice` is built on it. G&G's `GgAudio` (gg/audio/gg_audio.h) runs its calls synchronously under the render lock instead of queueing them |
 | `psg_synth` | no | class 2 is dead |
-| `dos_sound_cli` | pattern | a G&G CLI to render a song or a bank to WAV / OPL log for comparison with `.dro` captures (`tools/dos/oplcmp.py`) |
+| `dos_sound_cli` | pattern | done as `gg/audio/audio_cli.h` (`--gg-sound`, `--gg-oplog`, `--gg-dro-compare`, `--gg-songs`, `--gg-soundtest-check`); `tools/dos/oplcmp.py` is TM-specific (TICK_MS, the AdLib_PlayTune start detection): for G&G use `--gg-dro-compare` |
 
 Differences that matter for fidelity [O]:
 
@@ -753,13 +778,13 @@ Differences that matter for fidelity [O]:
 ## Open questions
 
 1. Data-driven effect priorities (animation sequences 174b, actors 1834, race tables): do any
-   exceed 40h (driver priority ≥ 80h), which would get past the silence song?
+   exceed 40h (driver priority ≥ 80h), which would get past the silence song? (Partly answered: the
+   workshop race door's are 3, §15.)
 2. Whether the hint chime (0x1056) is audible: compare a DOSBox-X capture of a hint with the
    expected few ticks (§12.1, §15).
 3. The movie's speaker music (§13.4): confirm the silent 4th pass and the 3.5-s delay in a
    `-si` capture of the ending.
 4. The Aircraft room music on the speaker (§14.1): confirm that it never changes key.
-5. `AdLib_Write` timing in the G&G DOSBox-X profile (writes per sound tick and their spacing in
-   the `.dro` captures) for the `OplChip` write model.
+5. *Answered in wave 2:* `AdLib_Write` takes 65 µs in the G&G DOSBox-X profile (§16).
 6. The race arrangement logic (3dd6:02a4, 3e77:0680) and what `Snd_GetTick` of the race music is
    used for (3dd6:0225): race spec.

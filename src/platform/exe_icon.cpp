@@ -6,16 +6,12 @@
 #include <algorithm>
 #include <format>
 
-#include "ne/ne_image.h"
 #include "util/byte_reader.h"
 #include "util/error.h"
 
 namespace tmport {
 
 namespace {
-
-constexpr uint16_t kRtIcon = 3;
-constexpr uint16_t kRtGroupIcon = 14;
 
 int rowStride(int width, int bpp) { return ((width * bpp + 31) / 32) * 4; }
 
@@ -140,11 +136,8 @@ IconImage decodeIconResource(std::span<const uint8_t> data) {
     return img;
 }
 
-IconImage loadGroupIcon(const ne::NeImage& image, uint16_t groupId) {
-    const ne::Resource* g = image.findResource(kRtGroupIcon, groupId);
-    if (!g) throw Error(std::format("{}: RT_GROUP_ICON {} not found", image.name(), groupId));
-    const auto entries = parseIconDirectory(image.readResource(*g));
-    if (entries.empty()) throw FormatError(std::format("RT_GROUP_ICON {}: empty", groupId));
+const IconDirEntry* bestIconEntry(std::span<const IconDirEntry> entries) {
+    if (entries.empty()) return nullptr;
     // Best entry: the largest, then the deepest colour (bitCount may be 0 in Win16 directories:
     // fall back to the colour count).
     auto depth = [](const IconDirEntry& e) {
@@ -156,11 +149,7 @@ IconImage loadGroupIcon(const ne::NeImage& image, uint16_t groupId) {
         const long a = static_cast<long>(e.width) * e.height, b = static_cast<long>(best->width) * best->height;
         if (a > b || (a == b && depth(e) > depth(*best))) best = &e;
     }
-    const ne::Resource* res = image.findResource(kRtIcon, best->iconId);
-    if (!res) throw Error(std::format("{}: RT_ICON {} (group {}) not found", image.name(), best->iconId, groupId));
-    auto data = image.readResource(*res);
-    if (best->bytesInRes != 0 && best->bytesInRes <= data.size()) data.resize(best->bytesInRes);  // NE padding
-    return decodeIconResource(data);
+    return best;
 }
 
 bool setWindowIcon(SDL_Window* window, const IconImage& icon) {

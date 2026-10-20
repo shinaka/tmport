@@ -5,7 +5,8 @@
 
 namespace tmport::gfx {
 
-std::vector<uint8_t> pixmapToPng(const PixMap& pm, const Palette& palette, bool transparentKey) {
+std::vector<uint8_t> indexedToPng(int width, int height, std::span<const uint8_t> pixels, const Palette& palette,
+                                  bool transparentKey) {
     const int n = palette.size();
     std::vector<Rgb8> pal(palette.colours().begin(), palette.colours().begin() + n);
     std::vector<uint8_t> alpha;
@@ -14,17 +15,18 @@ std::vector<uint8_t> pixmapToPng(const PixMap& pm, const Palette& palette, bool 
         for (int i = 0; i < n; ++i)
             if (palette.keyTable()[static_cast<size_t>(i)]) alpha[static_cast<size_t>(i)] = 0;
     }
-    return png::encodeIndexed(pm.width, pm.height, pm.pixels, pal, alpha);
+    return png::encodeIndexed(width, height, pixels, pal, alpha);
 }
 
-bool writePixmapPng(const std::filesystem::path& path, const PixMap& pm, const Palette& palette, bool transparentKey) {
-    return writeWholeFile(path, pixmapToPng(pm, palette, transparentKey));
+bool writeIndexedPng(const std::filesystem::path& path, int width, int height, std::span<const uint8_t> pixels,
+                     const Palette& palette, bool transparentKey) {
+    return writeWholeFile(path, indexedToPng(width, height, pixels, palette, transparentKey));
 }
 
-std::vector<uint8_t> pixmapToRgba(const PixMap& pm, const Palette& palette, bool transparentKey) {
-    std::vector<uint8_t> out(pm.pixels.size() * 4);
-    for (size_t i = 0; i < pm.pixels.size(); ++i) {
-        const uint8_t v = pm.pixels[i];
+std::vector<uint8_t> indexedToRgba(std::span<const uint8_t> pixels, const Palette& palette, bool transparentKey) {
+    std::vector<uint8_t> out(pixels.size() * 4);
+    for (size_t i = 0; i < pixels.size(); ++i) {
+        const uint8_t v = pixels[i];
         const Rgb8& c = palette.colour(v);
         out[i * 4 + 0] = c.r;
         out[i * 4 + 1] = c.g;

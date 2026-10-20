@@ -211,7 +211,7 @@ new kind and variant (§1.3).
 | 0..8 | the menu bar (File, Options, Help), installed by state 9 |
 | 9 | a black line (`Puzzle_Dispatch`) |
 | 10.. | the puzzle picture, drawn with `Lpx_Draw(0, 10, picture)` after `Screen_LoadPicture(picture, palette)` 1473:0399 (each puzzle has a full 0..255 palette, `fmt_graphics.md` §3.1) |
-| 165..199 | the **panel** 0x1091 (320×35) at (0, 165): message area and Go Back button; the score is drawn into it at (253, 188) |
+| 165..199 | the **panel** 0x1091 (320×35) at (0, 165): message area and Go Back button; the score is drawn into it at (253, 188). The panel is drawn keyed with a transparent hole: the warehouse HUD's SCORE label and 6 digits (label at (218, 188), digits at (253, 188), scheme 2) stay visible on every puzzle screen, because State_08 only fades and the screen keeps the HUD [O wave 2: r2/puzzle/k0..k7_01_screen and w0/17 match at 0 px only with the HUD drawn first] |
 
 ### 2.2 Panel and buttons (ovl18) [O]
 
@@ -1062,6 +1062,10 @@ surface = newSurface; PzLaunch_Redraw(); free f and s
   `fmt_graphics.md` §6.1 describes, with an empty callback table, and needs nothing else for this
   puzzle [O].
 * Channel use: one channel (0), position (0,0), frame base 0, keyed cels (channel flags 0).
+
+A save state holds the glow counter DS:3304 after the frame on screen: the frame shown is DS:3304 − 1
+(likewise the energy puzzle's idle frame, DS:ae20 − 1). Glow frames 1..7 are identical, frame 0 is
+distinct [O wave 2].
 
 **Animation tick** `PzLaunch_Animate(force, sprites)` 3797:0103: when `Timer_Expired(6)` or
 force: glow frame DS:3304 of the target (DS:afac) at (DS:32cc, DS:32dc)[target] when DS:af90;

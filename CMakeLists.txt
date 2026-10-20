@@ -52,15 +52,15 @@ function(tm_configure_target target)
     endif()
 endfunction()
 
-# --- Engine core library ------------------------------------------------------------------------
+# --- Shared engine core (both games) -------------------------------------------------------------
+
+# portcore: the parts of the engine that are not Treasure Mountain's (cmake/portcore.cmake; the
+# Gizmos & Gadgets port at the end of this file links only this library).
+include(cmake/portcore.cmake)
+
+# --- Treasure Mountain engine library -----------------------------------------------------------
 
 add_library(tmcore STATIC
-    src/util/log.cpp
-    src/util/file_util.cpp
-    src/util/png_writer.cpp
-    src/vfs/data_source.cpp
-    src/vfs/directory_source.cpp
-    src/vfs/cd_image_source.cpp
     src/ne/ne_image.cpp
     src/data/exe_tables.cpp
     src/res/resource_types.cpp
@@ -68,14 +68,9 @@ add_library(tmcore STATIC
     src/res/ssnd.cpp
     src/res/resource_manager.cpp
     src/res/game_files.cpp
-    src/gfx/palette.cpp
     src/gfx/pixmap.cpp
     src/gfx/frame_buffer.cpp
-    src/gfx/presenter.cpp
-    src/gfx/image_export.cpp
     src/input/input_queue.cpp
-    src/timing/deadline_timers.cpp
-    src/rtl/borland_rand.cpp
     src/platform/engine.cpp
     src/cli/options.cpp
     src/cli/contact_sheet.cpp
@@ -103,7 +98,7 @@ include(cmake/sources_dos_runtime.cmake)
 include(cmake/sources_dos_game.cmake)
 include(cmake/sources_dos_autoplay.cmake)
 target_include_directories(tmcore PUBLIC src)
-target_link_libraries(tmcore PUBLIC SDL3::SDL3-static)
+target_link_libraries(tmcore PUBLIC portcore SDL3::SDL3-static)
 tm_configure_target(tmcore)
 
 # --- The game executable ------------------------------------------------------------------------
@@ -135,6 +130,7 @@ if(TM_BUILD_TESTS)
         tests/test_pmap.cpp
         tests/test_exe_tables.cpp
         tests/test_cli.cpp
+        tests/test_portcore.cpp
     )
     # Per-area test lists (each owns one file: target_sources(tmtests PRIVATE ...)).
     include(cmake/tests_text_ui.cmake)
@@ -162,4 +158,18 @@ if(TM_BUILD_TESTS)
     tm_configure_target(tmtests)
     enable_testing()
     add_test(NAME tmtests COMMAND tmtests)
+endif()
+
+# --- Gizmos & Gadgets (second game: src/gg, cmake/gg.cmake) --------------------------------------
+
+option(TM_BUILD_GG "Build the Gizmos & Gadgets port (ggport, ggtests)" ON)
+if(TM_BUILD_GG AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/gg.cmake")
+    # G&G links only the shared engine core, never Treasure Mountain's game code. Until the core
+    # library target exists it builds against tmcore.
+    if(TARGET portcore)
+        set(GG_CORE_LIB portcore)
+    else()
+        set(GG_CORE_LIB tmcore)
+    endif()
+    include(cmake/gg.cmake)
 endif()

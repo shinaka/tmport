@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "dos/audio/dos_sound_renderer.h"
+#include "dos/audio/opl_log.h"
 #include "dos/data/dos_exe.h"
 #include "dos/save/dosbox_state.h"
 #include "util/error.h"
@@ -132,25 +133,8 @@ private:
 
 // The OPL register writes, one line per write: 'tick reg value' (hex), tick = the PIT tick the write
 // belongs to; a command's writes (Music_Play, Music_Stop between two interrupts) carry a fourth
-// column 'c' and the tick they run before. tools/dos/oplcmp.py reads it.
-class OplLog {
-public:
-    explicit OplLog(bool on) : on_(on) {}
-    void write(uint64_t tick, uint8_t reg, uint8_t value) {
-        if (on_) text_ += std::format("{} {:02x} {:02x}{}\n", tick, reg, value, command_ ? " c" : "");
-    }
-    void setCommand(bool on) { command_ = on; }
-    bool enabled() const { return on_; }
-    void clear() { text_.clear(); }
-    bool save(const std::string& path) const {
-        return !on_ || writeWholeFile(pathFromUtf8(path), {reinterpret_cast<const uint8_t*>(text_.data()), text_.size()});
-    }
-
-private:
-    bool on_;
-    bool command_ = false;
-    std::string text_;
-};
+// column 'c' and the tick they run before. tools/dos/oplcmp.py reads it (dos/audio/opl_log.h).
+using OplLog = OplWriteLog;
 
 // The AdLib driver with its calls written to the state log ('tick opl tune|on|off ...') and its
 // register writes to the OPL log.

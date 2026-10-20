@@ -126,6 +126,21 @@ tools in `tools\gg\`, names in `re\names\gg\`; tests find the game through the e
 `GG_DATA` (default: the repository's `GadgetsAndGizmos\` folder). The decision and the plan are in
 `re\gg\docs\SCOPING.md` §9. The ground rules above apply unchanged.
 
+- **Engine (after wave 2)**: `src\gg\<module>\` in namespace `tmport::gg`: `data` (`GgExe`, `GgFiles`,
+  archives, `dgroup_offsets.h`), `save`, `gfx`, `text`, `audio`, `input`, `app` (clock, timers,
+  `GgRuntime`, options, the display, the wave 2 preview, the tool dispatcher), `ui`, `game` (the
+  world's drawing halves). `re\gg\docs\ENGINE_MAP.md` maps every original module to its files, specs
+  and status, with the wave 2 stop/go results. Model for everything: the TM DOS engine in `src\dos\`.
+- **Build**: `cmake\gg.cmake` (included when `TM_BUILD_GG` is ON, the default) makes `ggcore`
+  (linking only the shared core `portcore`, `cmake\portcore.cmake`), `ggport`, `ggport-cli` and
+  `ggtests`; each area lists its sources in `cmake\gg_sources_<area>.cmake` and its tests in
+  `cmake\gg_tests_<area>.cmake`. `python -P tools\check_core_deps.py --gg` fails when G&G code (or
+  the core) includes a TM header. Tests: `ggtests` with `GG_DATA` and `GG_CAPTURES`
+  (`extracted\captures\gg`); every run that could write preferences takes a scratch `--pref-dir`.
+- **Tools**: `ggport-cli` runs every area's tool (`--gg-info`, `--gg-screen`, `--gg-sound`,
+  `--gg-soundtest-check`, ...; `docs\BUILDING.md`, "Gizmos & Gadgets"); `ggport --headless` runs the
+  preview with `--frame-dump`, `--wav-dump`, `--opl-log` and scripted `--keys` / `--mouse`.
+
 - **The game**: `GadgetsAndGizmos\` holds the user's original files (`ssg.exe`, `gizmo000.dat` ..
   `gizmo004.dat`, `PLAYERS.DAT`, `ssg.bat`, `Read_1st.txt`, `ssg.ico`). **Never modify it**; tools
   open it read-only (it is git-ignored, like `TM-DOS\` and `TM-WIN\`). Anything that must write game
@@ -172,7 +187,8 @@ tools in `tools\gg\`, names in `re\names\gg\`; tests find the game through the e
     `ExportAll.java` are shared with the TM projects (their new options are off by default there).
   - The export has 1234 functions: 217 overlay stub thunks (stub:0020+5k; a thunk carries its
     target's name) and 1017 real functions, 982 of them named after wave 1 (all but the LZH and
-    overlay-manager internals and one RTL helper). DGROUP has 617 labels.
+    overlay-manager internals and one RTL helper). DGROUP has 626 labels (617 after wave 1; the wave 2
+    integration added 9 and moved `g_animChannels`, `re\names\gg\README.md`).
   - The defects found by scoping are fixed: the 64-KB boundary in ovl10 and ovl27, the phantom
     `FUN_3f56_092d` (removed), the missing 12e0:0506 and 12e0:0820 (created), and the wrong `CS:`
     labels in the overlay manager.

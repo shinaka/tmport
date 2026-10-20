@@ -48,8 +48,9 @@ FIRST, END = ggarc.MOVIE_FIRST, ggarc.MOVIE_END
 W, H = 320, 200
 FRAME_TICKS = 18                     # PIT ticks per frame (2fcb:069d pushes 0x12)
 PIT_HZ = 1193181.6667 / 0x2000       # 145.652 Hz (PIT divisor 0x2000, 1454:0046)
-EXE_DS_CUES = 0x236C                 # 18 cues of 4 words: type, frame, a, b
-N_CUES = 18
+EXE_DS_CUES = 0x236C                 # cues of 4 words: type, frame, a, b, ended by a type-6 record
+CUE_END = 6                          # (25 cues and the end record in v1.0, fmt_graphics.md 7.2)
+MAX_CUES = 64                        # a guard for a table without its end record
 DEFAULT_PALETTES = (0x1077,)         # stated default (see the docstring)
 RESULTS_PICTURE = 0x1076             # drawn by 2fcb:0000 before the movie
 
@@ -127,7 +128,13 @@ def read_cues(data):
     with open(path, 'rb') as f:
         d = f.read()
     o = ggarc.EXE_DS_FILE_OFFSET + EXE_DS_CUES
-    return [struct.unpack_from('<4h', d, o + 8 * k) for k in range(N_CUES)]
+    cues = []
+    for k in range(MAX_CUES):  # Movie_Play reads records with no count and stops at the end record
+        c = struct.unpack_from('<4h', d, o + 8 * k)
+        cues.append(c)
+        if c[0] == CUE_END:
+            break
+    return cues
 
 
 def parse_frames(s, n):

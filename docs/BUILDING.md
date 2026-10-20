@@ -38,6 +38,13 @@ This runs `vcvars64.bat`, configures a Release build with Ninja into `build\` an
   for it and sees its exit code;
 * `build\tmtests.exe`, the unit tests (a console program).
 
+The engine itself is two static libraries: `portcore` (the core both games share: utilities, data
+sources, clocks, the SDL host and presenter, the DOS sound chips and input models, the text engine;
+`cmake/portcore.cmake`) and `tmcore` (Treasure Mountain, linking `portcore`). With
+`-DTM_BUILD_GG=ON` (the default once `cmake/gg.cmake` exists) the build also makes the second game,
+*Gizmos & Gadgets!*: `ggcore` (linking only `portcore`), `ggport.exe`, `ggport-cli.exe` and
+`ggtests.exe`; `-DTM_BUILD_GG=OFF` builds Treasure Mountain alone.
+
 If Visual Studio is not installed in the default place, set `VSROOT` first, e.g.
 `set VSROOT=C:\Program Files\Microsoft Visual Studio\18\Community`. Extra arguments are passed on
 to the CMake configure step: `scripts\build.bat -DTM_BUILD_TESTS=OFF` skips the tests. Set
@@ -77,6 +84,41 @@ There `tmport` is an ordinary terminal program (no `tmport-cli`).
 `ubuntu-latest` and `macos-latest` (presets `ci`). CI has no game data: the tests that need
 `TM_DATA` skip themselves, the data-free tests run. (The workflow has not run on GitHub yet; the
 Linux part of it was tried locally under WSL 2.)
+
+## Gizmos & Gadgets
+
+The same build makes the second game (`-DTM_BUILD_GG=ON`, the default): `ggport` (a windowed
+program on Windows), `ggport-cli` (Windows: the console version, for the tools and scripts) and
+`ggtests`. They link only the shared core: `python -P tools/check_core_deps.py --gg` checks that
+`src/gg/` and `tests/gg/` include nothing of Treasure Mountain. On Linux (WSL 2, GCC 15) `portcore`,
+`ggcore`, `ggport` and `ggtests` build without a warning in the project's code and the tests pass.
+
+* **Game data:** `--data <dir>` (the folder with `ssg.exe` and `gizmo000.dat` .. `gizmo003.dat`; the
+  game's `gizmo004.dat` is ignored), else `data =` in `ggport.ini`, else `GG_DATA`, else a folder
+  next to the program (or its parents, or a `GadgetsAndGizmos` folder there). The engine opens the
+  game files read-only and refuses other versions with a message naming the file.
+* **Preference folder:** `--pref-dir <dir>`, default SDL's `GGPort/GGPort` (`ggport.ini`,
+  `players.dat`, screenshots).
+* **Running:** `ggport` shows the wave 2 preview (the attract with its music, then the sign-in, the
+  hub, a warehouse room and the eight puzzle screens; README "Gizmos & Gadgets (in progress)").
+  Options: `ggport --help` (`--sound off|speaker|fm`, `--gg-args "<the original's switches>"`,
+  `--cpu 286|386`, `--seed N`, `--fullscreen`, `--windowed`, `--square-pixels`, `--scale N`,
+  `--integer-scale`, `--no-pause`, `--screenshot-dir`, `--verbose`). Headless and scripted runs:
+  `--headless` (deterministic virtual time; the run ends after `--ticks N` PIT ticks or the script),
+  `--keys` / `--mouse` (input in PIT ticks: `TICK:tap:KEY`, `TICK:click:X:Y`, ...), `--frame-dump
+  DIR|FILE.png`, `--wav-dump FILE.wav` (the sound rendered offline), `--opl-log FILE`.
+* **Tools** (`ggport-cli`, each with `--data <dir>`; they never write into the game folder):
+  data `--gg-info`, `--gg-list [--leaves]`, `--gg-selftest`, `--gg-extract ID OUT`; graphics
+  `--gg-pic`, `--gg-pal`, `--gg-font`, `--gg-movie`, `--gg-title`, `--gg-fade`, `--gg-wipe`,
+  `--gg-lpx-list`, `--gg-font-list`, `--gg-movie-list`; sound `--gg-sound fm|speaker|off WHAT
+  OUT.wav` (WHAT: `song ID`, `music ID`, `effect ID K`, `soundtest NAME|SCRIPT`), `--gg-oplog`,
+  `--gg-dro-compare LOG REF.dro`, `--gg-songs`, `--gg-soundtest-check NAME|all`; runtime
+  `--gg-clock`, `--gg-input-trace`; screens `--gg-screen NAME OUT.png` (the attract, sign-in and UI
+  screens; `hub`, `warehouse`, `blueprint`, `puzzle KIND VARIANT` from the world), `--gg-ui-info`,
+  `--gg-rooms RACE`.
+* **Tests:** `ggtests` with `GG_DATA` (the game folder) and `GG_CAPTURES`
+  (`extracted\captures\gg`, the DOSBox-X reference material); without them the tests that need
+  them skip themselves.
 
 ## Pointing the engine at the game data
 
@@ -451,6 +493,12 @@ build\tmtests.exe
   frame logs and USERS.DAT snapshots: the play-field redraws, the frame-log replays, the state
   loader, the save round trips) read it from `TM_DOS_CAPTURES` (`extracted\captures\dos`, see
   `re/dos/docs/REFERENCE_CAPTURES.md`) and skip themselves without it.
+* The core's parameters for the second game (PIT rates, deadline timers in ticks, the INT 33h
+  event handler, a game's own keyboard handler, the chip renderer and audio device with any driver,
+  the OPL write log, the text dialects) have data-free tests (`tests/test_portcore.cpp`).
+* `python -P tools/check_core_deps.py` checks that every file of `portcore` includes only core
+  files (`--gg`: and that `src/gg/` and `tests/gg/` include only core and G&G files); exit code 1
+  on a violation (docs/DESIGN.md "Core and games").
 
 ### The DOS fidelity runner
 

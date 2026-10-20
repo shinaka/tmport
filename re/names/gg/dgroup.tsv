@@ -82,11 +82,13 @@
 1ea7:0a9a	g_playerBlink	i16	0..3 blink phase while the player is immune (drawn when < 2)
 1ea7:0a9c	g_actorSpritesLoaded	i16	Actors_EnterRoom loaded the sprite bundles
 1ea7:0a9e	g_playerSets	far[4]	cached actor sets 0x1034, 0x1033, 0x1036, 0x1035
+1ea7:1276	g_projectileTransitions		the projectile's transition table (near targets; actor +0x90 is written only; code_world.md 9.1)
 1ea7:127e	g_playerTransitions	near[68]	per player sequence: 12-byte transition list {u32 match, u32 mask, next, unused}, end {-1,-1} (accessed only through an index or an immediate: no DAT label in the export yet)
-1ea7:130e	g_menuRequest	i16	1/2 -> Input_GetCode returns 0x17a2 (return to the Technology Center) / 0x17a3 (start new player)
+1ea7:130e	g_menuRequest	i16	1/2 -> Input_GetCode returns 0x17a2 (the menu item Return to Technology Center) / 0x17a3 (start new player)
 1ea7:1310	g_kbdRingWrite	i16	write index of the key event ring DS:8556
 1ea7:1312	g_kbdRingRead	i16	read index of the key event ring
 1ea7:1314	g_lastKeyHeldTick	u32	tick of the last held key (Input_GetHeldKeys), reset at room / workshop start
+1ea7:1318	g_hudColorScheme	i16	the HUD digit colour scheme in effect; the schemes are triples of g_hudDigitColors DS:131a (code_vehicles_races.md 4)
 1ea7:131a	g_hudDigitColors	u8[3][4]	HUD digit colour triples (3 colours + FF) for Hud_SetDigitColors
 1ea7:1326	g_hudSelectedPart	i16	part selected in the HUD strip (-1 none)
 1ea7:132a	g_hudLabelsShown	i16	0 while the part name box covers the HUD labels
@@ -97,7 +99,7 @@
 1ea7:13a0	g_contactsPlayer	i16[]	actors the player touches (chimps 2..11), -1 terminated
 1ea7:13b6	g_contactsProjectile	i16[]	actors the projectile touches (chimps 2..11)
 1ea7:13cc	g_contactsChimp	i16[]	actors a chimp touches (the projectile only)
-1ea7:13d0	g_lzhDefaultDistLengths	u8[2][32]	default distance code lengths of the LZH codec (12- and 13-bit windows)
+1ea7:13d0	g_lzhDefaultDistLengths	u16[3][16]	default distance code lengths of the LZH codec: 3 rows of 16 words for windows of 12, 13 and 14 bits (1b48:021f reads row W-12 with a 0x20-byte stride as words; fmt_data.md 3.4)
 1ea7:1458	g_sndSlots	far[64]	registered songs (BMF+0x10)
 1ea7:1558	g_sndActive	u8[64]	active song slots
 1ea7:1598	g_sndPriority	u8[64]	priority of each slot's song
@@ -132,6 +134,7 @@
 1ea7:1ad4	g_soundMuted	i16	sound switch: 1 = the silence song holds every channel (Snd_ToggleOption, SndRes_ApplySoundOption)
 1ea7:1ad6	g_sndLastEffectSlot	i16	slot of the last effect started (-1 after a stop); no reader
 1ea7:1ad8	g_sndLastMusicSlot	i16	slot of the last music started (-1 after a stop); no reader
+1ea7:1adc	g_chimpListData	u16[]	the chimp lists g_chimpLists DS:1bae points into: per race the chimp count, then per chimp its room; the 286 path halves the first room word (code_world.md 13.1, PORTING_NOTES.md 5)
 1ea7:1bae	g_chimpLists	far[15]	far pointers, per race index, to {u16 count, u16 room per chimp} (DS:1adc..); the 286 path halves the first room word
 1ea7:1d2e	g_chimpMoves		Cyber Chimp move lists with random chances
 1ea7:1f10	g_chimpTransitions		Cyber Chimp state transitions
@@ -142,6 +145,9 @@
 1ea7:1f7a	g_saveDisabled	i16	1 while the sign-in's Esc runs Cmd_SaveAndExit: Players_SaveCurrent then writes nothing (no player is loaded)
 1ea7:1f7c	g_rankNames	far[8]	Trainee .. Head Scientist
 1ea7:1f9c	g_rankThresholds	u32[7]	5000, 30000, 60000, 120000, 200000, 300000, 750000
+1ea7:2008	g_attractScripts	u16[]	attract channel scripts: n > 0 start screen animation n, -2 t wait t frames, -1 end (code_ui.md 10.2)
+1ea7:205c	g_attractChannels	far[]	the far tables of far channel scripts of the attract animations (code_ui.md 10.2)
+1ea7:2090	g_attractAnims	rec[4][6]	{u16 channel count, far channel table}: the four attract animations DS:2090, 2096, 209c, 20a2 (code_ui.md 10.3)
 1ea7:20a8	g_attractSequence	far[]	attract sub-sequence run by Seq_Run (State_01_Attract)
 1ea7:20dc	g_rosterScrollBar	rec[20]	the scroll bar record of the sign-in list {x 244, y 26, w 11, h 109, pos (top row), max, page 8, u32 next repeat tick, thumb y} (406a)
 1ea7:20f0	g_btnCancel	rec[0x20]	sign-in picture button Cancel: zone (250,172) 49x20 press 0x706 release 0x702, +0x16 bundle 0x102d, +0x18 enabled, +0x1a/1c/1e picture cache indices (normal, pressed, disabled)
@@ -258,6 +264,7 @@
 1ea7:38e8	g_gearsFrames	i16[2]	rotation frames per gear type (6, 8)
 1ea7:38ec	g_gearsHintZone	zone	(23,24) 36x15, press 0x3e8
 1ea7:3902	g_gearsDriveTable	near[6][11]	propagation handler per source type 0..5 and target type 0..10 (0 = none); rows 6..10 are other data and never used
+1ea7:3988	g_animCelCount	i16	queued DAM cels in g_animCels (fmt_graphics.md 6.3)
 1ea7:398a	g_animRectCount	i16	entries in the DAM update-rect list DS:b86e
 1ea7:3994	g_raceMusicBanks	u16[3]	race music bank per building (0xf7, unused, 0xf9)
 1ea7:399a	g_raceBackgrounds	u16[15]	per race index: background
@@ -576,8 +583,10 @@
 1ea7:b7e8	g_gearsGearZones	far	zone[100] (Mem_Alloc 0x898): circle zone per placed gear, press 0x4b0 + i
 1ea7:b818	g_gearsCrankZone	zone	crank handle rectangle of the current frame, priority 99, press 0x44c
 1ea7:b86e	g_animRects	rec[][8]	DAM update rectangles
+1ea7:b87e	g_animCels	rec[][16]	queued DAM cels {layer, x, y, flags, far picture, channel flags} (fmt_graphics.md 6.3)
 1ea7:ba1e	g_animCallbacks	far[]	DAM opcode 0x7FF8 callbacks
-1ea7:ba80	g_animChannels	rec[2][0x22]	DAM channels
+1ea7:ba26	g_animFrames	far[]	the DAM frame table built from a frame bundle by 3797:100e (fmt_graphics.md 6.2)
+1ea7:ba66	g_animChannels	rec[2][0x22]	DAM channels: two 0x22-byte records (3d39:03f9 writes field +0 at DS:ba66; DS:ba80 is channel 0's +0x1A far cursor, which 3d39:03d6 tests)
 1ea7:baaa	g_raceEffects	i16	land race effect bank handle (0xf4)
 1ea7:baac	g_raceMusic	i16	land race music bank handle
 1ea7:baae	g_raceMorty	rec[0x3a]	land race racer record of Morty

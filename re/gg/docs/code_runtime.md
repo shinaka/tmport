@@ -388,7 +388,9 @@ room (12e0:0683) or the workshop (2dee:1cd6) starts. Its only caller is the play
   into DS:7a82; INT 33h AX=03h: `g_mouseX` DS:7a88 = CX/2, `g_mouseY` DS:7a86 = DX; the cursor
   region list DS:0a8c = `List_New()` with the default region DS:0a54 added (§12.1); the default
   regions' record pointers DS:0a6c and DS:0a88 = the arrow; hot spot of the arrow = (0, 0).
-* The driver's x range is 0..639 in mode 13h; the game halves it everywhere.
+* The driver's x range is 0..639 in mode 13h; the game halves it everywhere. After the driver
+  reset the pointer is at (320, 100), so `Mouse_Init`'s AX=03h gives g_mouseX/Y = (160, 100)
+  [O 17ab:002a; REFERENCE_CAPTURES §2.2].
 
 ### 7.2 `Mouse_EventHandler` 17a0:0004 [O]
 
@@ -411,7 +413,10 @@ elif AX & 4 (left released):
 right-button bits: ignored
 ```
 
-hotX / hotY are the current cursor's hot spot DS:7a74 / DS:7a76 (§12.1). Round 2 saw it [O]: with
+hotX / hotY are the current cursor's hot spot DS:7a74 / DS:7a76 (§12.1). Each latch adds the hot spot
+to CX/DX **in place** (17a0:0037/003d, 004e/0054, 0073/0079), so one driver call that both moves
+(with BX == 1) and presses or releases latches pointer + 2 × hot spot; DOSBox-X and MOUSEKEY can
+report "moved" together with a press (REFERENCE_CAPTURES §2.2) [O]. Round 2 saw the hot spot [O]: with
 the wire-spool cursor of the electric puzzle (hot spot 36, 8) a press at pointer (138, 120) was
 latched at (174, 128), and the zones were hit there (REFERENCE_CAPTURES §11).
 
@@ -508,7 +513,9 @@ for zone in list (following +0Ch):
 return best
 ```
 
-Ties keep the zone found first, i.e. the one added last.
+Ties keep the zone found first, i.e. the one added last. A circle of radius 182 or more never hits
+(r² is the low word of the IMUL, sign-extended: 17ab:0581/05c1); the rectangle sums zx + w and zy
++ h are 16-bit signed (17ab:0546) [O].
 
 `Input_HitZones(record)` (198d:0008, near): tests the local list, then (only if nothing was
 hit there) the global list, at the record's x/y (+0Ah/+0Ch); returns the hit zone's press code
@@ -561,7 +568,10 @@ global keys (§9.3) on the exact code (flags included); return code
 
 ### 9.3 Global keys (12-entry table CS:0275, handlers CS:028d) [O]
 
-Matched against the full code (a press code with 0x4000 does not match):
+Matched against the full code (a press code with 0x4000 does not match). The table CS:0275 is in
+the order 0x13, 0x1B, 0x118, 0x121, 0x123, 0x13B, 0x13C, 0x13D, 6000..6003; its handlers are
+01c2, 022b, 01cd, 01ca, 01d6, then 01df three times, then 023a, 0241, 0248, 024f [O; checked
+against the exe by tests/gg/test_gg_input.cpp]:
 
 | Code | Action | Returned code |
 |---|---|---|
@@ -652,7 +662,7 @@ Every primitive except the near blitters, `Gfx_RemapPicture` and the movie decod
 | `Gfx_RestoreRect(x, y, w, h)` 1399:0233 | rows y+200.. (back page) → rows y.. | x < 0: w += x, x = 0, nothing if w < 0 | (x, y, w, h) after the x clip |
 | `Gfx_SaveToBack(x, y, w, h)` 1399:02a2 | rows y.. (screen) → rows y+200.. (back page) | none | none |
 | `Gfx_PutPixel(x, y, c)` 1399:0b45 | one pixel | none | (x, y, 1, 1) after drawing |
-| `Gfx_DrawGlyph(x, y, glyph, –)` 1399:0541 | 1-bpp glyph in `g_glyphColor` DS:1f6c | none | **none** (the font code marks) |
+| `Gfx_DrawGlyph(x, y, glyph, –)` 1399:0541 | 1-bpp glyph in `g_glyphColor` DS:1f6c | none | **none**, and neither does the font or text code (below) |
 | `Gfx_RemapPicture(pic, lut)` 1399:0b71 | raw LPX pictures only: every pixel = lut[pixel], **in place in the picture**; RLE pictures (format bit 0) untouched | – | – |
 | `Gfx_FrameRect(x, y, w, h)` 1473:010d | HLine(x, y, w), VLine(x, y, h), HLine(x, y+h−1, w), VLine(x+w−1, y, h) | as those | as those |
 
@@ -668,6 +678,11 @@ to)` (077e): identity LUT, then lut[from[i]] = to[i] for i = 0.. until to[i] == 
 `Gfx_RemapPicture`; `Obj_DrawKeyed(rec)` (03df): `Lpx_DrawKeyed(rec+2 x, rec+4 y − (rec+70h if
 rec+0 & 0x1000), rec+0Ah picture, mode = rec+0)` for the large object records (parts) [I which
 records].
+
+No font or text routine marks dirty tiles either: `Font_DrawChar` 2b16:0368, `Font_DrawString`
+2b16:029c and `Text_Render` 2b89 contain no `Dirty_Mark` call (only `Text_DrawChar`'s underline
+through `Gfx_HLine` marks); text reaches VRAM through the marks of what was drawn under it [O 2b16
+disassembly, the CALL list of 2b89].
 
 Glyph data (`Gfx_DrawGlyph`): u8 full bytes per row, u8 bits in a last partial byte, u16 rows,
 then the rows; bit 0 of each byte is the leftmost pixel; set bits are drawn, clear bits left
@@ -759,7 +774,7 @@ overflow check; the 51st record would overwrite the write pointer):
 |---|---|
 | `Sprites_Reset` 1581:0484 | count = 0, write pointer = DS:05f6 |
 | `Sprites_Add(rec)` 1581:0496 | copies 14 bytes, count += 1 |
-| `Sprites_EraseAll` 1581:04b6 | for each record without bit 7: `Gfx_RestoreRect(x, y, w, h)`; then `Sprites_Reset` |
+| `Sprites_EraseAll` 1581:04b6 | for each record without bit 7: `Gfx_RestoreRect(x, y, w, h)`; then `Sprites_Reset`. **Quirk [O]:** a record with bit 7 skips the erase without advancing to the next record (1581:04c8 JNZ 04e5 jumps past ADD SI,0Eh), so that record and every record after it stay unerased in that frame (kept by the engine's `SpriteList::eraseAll`) |
 | `Sprites_DrawAll` 1581:04fc | for each record without bit 4, in insertion order: `Lpx_DrawKeyed(x, y, picture, flags)` |
 
 Typical frame (warehouse, 12e0:06a7..0714): `Timer_Set(0, 4)`, `Actors_Tick`, `Sprites_EraseAll`,
@@ -821,7 +836,8 @@ if g_cursorHidden DS:0a30: return                   (Mouse_Hide 17ab:0890 sets i
 item = DS:0a52 ? DS:0a70 : first region of DS:0a8c whose zone contains (g_mouseX, g_mouseY)
        (the walk has no end test: the default region always matches)
 if item.record != DS:7a4a:
-    copy the 24-byte record to DS:7a6a; Mouse_SetBounds(0, 0, 319, 199) (§7.3); DS:7a4a = item.record
+    copy the 24-byte record to DS:7a6a (which also copies the record's +12h shown flag, 0 in every
+    record, into g_cursorShown DS:7a7c); Mouse_SetBounds(0, 0, 319, 199) (§7.3); DS:7a4a = item.record
 Gfx_GetImage(g_mouseX, g_mouseY, w, h, save buffer)  (removes nothing: the screen rows hold no cursor here)
 g_cursorShown = 1; save-under position = (g_mouseX, g_mouseY)
 Lpx_DrawKeyed(g_mouseX, g_mouseY, picture, 0)       (marks the cursor's tiles)
@@ -929,8 +945,11 @@ results 7-11, post-race → hub 8, warehouse tube → workshop 18 [O].
 
 * `Screen_FadeOutIn` (1473:0325): `Pal_FadeOut`, `Dirty_Flush`, `Pal_FadeIn`.
 * `Pal_Blackout` (1473:000c): §10.1.
-* 6-bit to 8-bit: not done by the game. [R] Expand as `(v·255 + 31) / 63` (DOSBox-X's VGA
-  rounding as used by the TM DOS port) until a G&G capture confirms it.
+* 6-bit to 8-bit: not done by the game. DOSBox-X shows a G&G DAC value v as `(v << 2) | (v >> 4)`
+  (bit replication), **not** `(v·255 + 31) / 63` (they differ for v = 11..15 and 49..52) [O wave 2:
+  per-pixel scoring of w0/01_title, w0/03_signin and r2/puzzle k0, k1, k3, k4 against the decoded
+  pictures and palettes; engine screens with it are 0 px against the captures; `fmt_graphics.md`
+  §3.2]. The engine uses it (`gg/gfx/palette.h` `dacTo8`).
 
 ---
 
@@ -1007,8 +1026,9 @@ followed by `Dirty_Clear`).
 rand(): two calls per wipe, pattern first, sound second, both before the first copy.
 
 Measured (REFERENCE_CAPTURES §10.3) [O]: entering a room through a door, the screen changed on
-every video frame for 45 frames (642 ms ≈ 93 ticks) with no palette change; the diagonal look and
-the length fit a staggered pattern of 48 iterations (0x11DA or 0x11DB, 96 ticks) [I].
+every video frame for 45 frames (642 ms ≈ 93 ticks) with no palette change. The wave 2 engine
+identified the pattern as **0x11DB**: 48 steps of 2 ticks, every AVI frame (r2_aircraft_door_to_room5
+119-163) equal to the engine wipe's state after step k or between steps k and k + 1 [O].
 
 ---
 
@@ -1030,6 +1050,10 @@ for frame = first .. end−1, counter = 0, 1, ...:
 * The caller (`State_15_FinalMovie` 2fcb:0640) passes (0x3000, 0x30CA, 18, DS:236c, effect bank
   0x108D): 202 frames at 18 ticks = 123.6 ms per frame (8.09 frames/s) when the decode and the
   next read fit.
+* The cue table DS:236c holds **25 cues and an end record** {6, 0, 0, 0} (DS:236c..2434), not 18:
+  pauses at frames 15, 17, 19 and 116, a stop of effect 1 at 135, 20 sound starts at 25..176; the
+  player reads records with no count and stops advancing at the end record (type 6) [O;
+  `fmt_graphics.md` §7.2].
 * A `Delay` cue runs **after** the frame's decode and read, so that frame lasts (decode + read +
   Delay) and the following `Timer_Wait` returns at once: the shipped 1460-tick pauses make four
   frames last about 10.0 s plus their work.
@@ -1099,7 +1123,7 @@ then an end marker −3 (`PicCache_Init` 15df:000d, which also calls 174b:0009).
 | `PicCache_Find(id)` 15df:003e (near) | index \| 0x8000 of the first entry with that id; else the first free index; id −2 returns the first free index at once; −1 if the table is full |
 | `PicCache_Load(id)` 15df:00a1 | use count += 1 (also on the slot about to be filled); if not cached: `Res_Read(id)`; a bundle whose member 0 is a `P` palette applies it (`Pal_SetShadowRange`) and caches member 1, else member 0; a plain picture is cached whole; private copy with `Mem_Alloc` |
 | `Pic_Read(id)` 15df:01a5 | `Res_Read(id)` unless id == `g_resLastIndex`; applies a leading `P` member; returns the picture in the shared buffer (not cached) |
-| `PicCache_LoadBundle(id, out[])` 15df:023b | private copy of the whole bundle (`Res_LoadCopy`), applies every `P` member, gives every other member its own cache entry (id = the bundle id) and writes their indices to out[], stops at a member whose payload starts with 0; when already cached, refills out[] from the following entries with that id; returns (first offset / 2) − 2 |
+| `PicCache_LoadBundle(id, out[])` 15df:023b | private copy of the whole bundle (`Res_LoadCopy`), applies every `P` member, gives every other member its own cache entry (id = the bundle id) and writes their indices to out[], stops at a member whose payload starts with 0 (the `L` end marker; a `P` palette whose DAC byte offset is 0 would end it too, a quirk no shipped bundle meets); when already cached, refills out[] from the following entries with that id; returns (first offset / 2) − 2 |
 | `PicCache_Release(id)` 15df:0359 | use count −= 1; at 0 frees the data and the entry |
 | `PicCache_ReleaseBundle(id)` 15df:03a2 | as above and clears every following entry with the same id |
 | `PicList_Find(list, id)` 15df:007d | first 8-byte record with that id before the −3 marker, else NULL |
@@ -1164,6 +1188,19 @@ drawing function calls `rand`. All other call sites belong to the game logic (AR
 
 ## 20. Engine notes [R]
 
+As built in wave 2 (`re/gg/docs/ENGINE_MAP.md`): the shared core's `timing/pit_clock.h`
+(`PitTimeBase(kPitDivisorGg)`, `VirtualPit` with `onTick(every, fn, phase)` on the counter value and
+`setTicks`, `PitTickClock`) under `GgClock`; `timing/deadline_timers.h` with
+`ExpiryRule::AfterDeadline` (`expired` strict >, `reached` ≥ for `Timer_Wait` and `Delay`) under
+`GgTimers`; `dos/input/pc_keyboard.h` `ScanKeyboard` with `Kbd_ISR` as its `ScanByteHandler`
+(`KbdIsr` / `GgKeyboard`; E0/E1 bytes are fed to it and swallowed); `dos/input/int33_mouse.h`
+`Int33Mouse` with `{0, 639, 0, 199, x × 2}` (AX=03h/04h/07h/08h/0Ch; the handler runs synchronously
+with the host input) under `GgMouse`, whose `MouseScreen` is `gg/app/display.h`; `ClickZones`,
+`InputCodes`, and `GgRuntime`, whose yield points pump the host. In deterministic runs the first poll
+after a wait is free, every later poll moves 1/16 tick (capped at the tick edge), a wait that ends at
+once counts as a poll, a script event of tick n comes right before interrupt n, and every
+busy-wait loop must call `GgRuntime::idle()`. The lockstep `dos::DosRuntime` of TM DOS is not used.
+
 1. **Clock.** A virtual PIT at 1 193 181.67 / 8192 Hz drives a u32 tick (DS:021a semantics);
    every second tick runs the sound driver (code_sound.md). Keep `Timer_Set` u16 counts,
    `Timer_Wait` ≥, `Timer_Expired` >, `Delay` polling `Input_GetCode` with its global keys. Drop
@@ -1214,7 +1251,7 @@ drawing function calls `rand`. All other call sites belong to the game logic (AR
 4. Whether a `Pic_Read` sequence ever hits the index-only "last read" test (§16.4).
 5. Whether the hint chime is audible at all (code_sound.md §15 note; the dialog pauses the
    driver before the chime's first note).
-6. DOSBox-X's 6-bit to 8-bit DAC rounding for a G&G capture (§13.5).
+6. *Answered in wave 2:* DOSBox-X's 6-bit to 8-bit DAC expansion is `(v << 2) | (v >> 4)` (§13.5).
 7. Whether a real VGA BIOS of 1993 left AH = 1Ah after INT 10h AX=1A00h (then the game needed
    `-GV`, §18).
 8. The VROOMM discard policy in detail, if overlay reloads ever must be predicted for a slower

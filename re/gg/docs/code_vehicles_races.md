@@ -674,6 +674,12 @@ DS:22c4[race]: 0x2C..0x30, 0xFB..0xFF, 0x269..0x26D) [O 2dee:13eb]:
 
 The blueprint picture is DS:22a6[race] (0x31..0x33, 0x100..0x104, 0x26E..0x272).
 
+Confirmed for all 15 bundles [O wave 2]: member count = 4 + 3n + z; each `M` hover record's cursor is
+the label of the record's page index, and its zone priority is 5. The workshop palette under the
+blueprint is room 0's bundle palette (0x0B member 0, colours 192..255), then `Pal_LoadRes(0x2B)`
+(32..63), then `Pal_LoadRes`(catalogue +8 = 0x105..0x109, 128..191) from `Workshop_LayoutShelf`
+2dee:028f; this matched DS:024e of the three r2 blueprint states and w0/09.
+
 ### 6.3 The loop
 
 `Blueprint_Run` (1894) has **no frame pacing**: it redraws only when needed and otherwise
@@ -1086,6 +1092,10 @@ not, the rest of the reward would be lost (the count-up runs only inside the loo
 
 Effects: W1 0x1074 starts effect 0 of bank 0x108F at about frame 52; A starts effect 1 at about
 frame 33 of its run (opcode -36) [O data, I frame numbers].
+
+Sound, seen in all four race captures [O wave 2, `code_sound.md` §15]: the results music at tick P
+(0x1089 won, 0x108B lost); global effect 1 at P, then every 2 sound ticks from P + 19 for 49 plays
+during the count-up; effect 0 of 0x108F at P + 121 and effect 1 at P + 381; a loss has no count-up.
 
 ### 11.3 Rank message `Result_RankUpMessage` (2fcb:01dd) [O]
 

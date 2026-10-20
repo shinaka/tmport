@@ -389,7 +389,7 @@ end) [O counts and kinds; the "What" column is I, from the pictures and the sequ
 | +0x12 | frame countdown; +0x14 its reload |
 | +0x16 | script position |
 | +0x1A | picture slots, one u16 per bundle picture (`PicCache_LoadBundle`) |
-| +0x26 | script: u16 entries, ≥ 0 = frame, < 0 = command (§8.4) |
+| +0x26 | script: 12 u16 words, ≥ 0 = frame, < 0 = command (§8.4); `Room_DrawAnimLayer` steps them in place, ScreenAnim_Step-style [O wave 2] |
 | +0x3E..+0x47 | hit record `{kind, x, y, w, h}` |
 
 Kinds in the data: 0x80 (bundle 0x340, 45 lift pads), 0x100 (0x345, 25 launch pads, paused),

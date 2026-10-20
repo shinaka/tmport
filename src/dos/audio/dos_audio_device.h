@@ -1,7 +1,8 @@
 #pragma once
 // DOS edition sound output: the driver (DosSoundRenderer) run inside an SDL3 audio stream's pull
-// callback, so the sequencer advances by sample count at the PIT rate whatever the frame rate is
-// (fmt_sound.md §9, PORTING_NOTES.md §2.3). The game calls the driver's entry points from its
+// callback (the shared core's ChipAudioDevice, dos/audio/chip_audio_device.h), so the sequencer
+// advances by sample count at the PIT rate whatever the frame rate is (fmt_sound.md §9,
+// PORTING_NOTES.md §2.3). The game calls the driver's entry points from its
 // own thread; they are queued and take effect right before the next PIT tick of the audio thread,
 // as the original's calls from the main loop take effect at the next timer interrupt. A call can
 // carry a delay in PIT ticks after that one (wave 5): the game makes a long frame's calls when the
@@ -26,18 +27,14 @@
 #include <string>
 #include <vector>
 
+#include "dos/audio/chip_audio_device.h"
 #include "dos/audio/dos_sound_renderer.h"
-
-struct SDL_AudioStream;
 
 namespace tmport::dos {
 
-struct DosAudioConfig {
-    DosRenderConfig render;
-    // SDL audio driver to force ("dummy" in tests: never audible); empty = SDL's choice.
-    std::string sdlDriver;
-    float volume = 0.7f;  // master gain on the synth levels (speaker square +-0.5)
-};
+// render (DosRenderConfig), sdlDriver ("dummy" in tests: never audible; empty = SDL's choice) and
+// volume (master gain on the synth levels, speaker square +-0.5; 0.7).
+using DosAudioConfig = ChipAudioConfig;
 
 class DosAudioDevice {
 public:
@@ -52,9 +49,9 @@ public:
     // Returns false (and logs) when there is no device; the commands still work and renderOffline()
     // can be used.
     bool open(uint32_t sdlDevice = 0);
-    void close();
-    bool isOpen() const { return stream_ != nullptr; }
-    std::string driverName() const;
+    void close() { output_->close(); }
+    bool isOpen() const { return output_->isOpen(); }
+    std::string driverName() const { return output_->driverName(); }
 
     // ---- the driver's entry points (thread safe; applied before the next PIT tick, or `delay` PIT
     // ticks after it)
@@ -81,10 +78,10 @@ public:
     void restoreOplDriver(std::span<const uint8_t> dgroup);
 
     // ---- engine-side controls (no effect on the driver state)
-    void setVolume(float v) { volume_.store(v); }
-    float volume() const { return volume_.load(); }
+    void setVolume(float v) { output_->setVolume(v); }
+    float volume() const { return output_->volume(); }
     // Off: the output is silent but the sequencer keeps running (timing is unchanged).
-    void setOutputEnabled(bool on) { outputEnabled_.store(on); }
+    void setOutputEnabled(bool on) { output_->setOutputEnabled(on); }
     // Off: the OPL2 is not synthesised (the AdLib driver still writes its registers): for headless
     // runs whose samples are thrown away (the emulated chip is the costly part). Speaker and Tandy
     // output are not affected.
@@ -92,14 +89,14 @@ public:
 
     // ---- headless (only while no SDL stream is open)
     // Renders n float samples.
-    size_t renderOffline(float* out, size_t n);
+    size_t renderOffline(float* out, size_t n) { return output_->renderOffline(out, n); }
     // Appends the rest of the current PIT tick's samples (if renderOffline stopped inside one) and
     // those of the next `ticks` ticks (about 202.8 each at 48 kHz); returns their number. Lockstep
     // capture for a runtime that drives its virtual PIT itself. Commands
     // queued before the call take effect at the first of these ticks (a delayed one that many ticks
     // later), as a call made in a game tick reaches the sound tick of the next interrupt in the
     // original (code_runtime.md §2.3).
-    size_t renderOfflineTicks(uint32_t ticks, std::vector<float>& out);
+    size_t renderOfflineTicks(uint32_t ticks, std::vector<float>& out) { return output_->renderOfflineTicks(ticks, out); }
 
     struct Status {
         uint16_t sfxStatus = 0, sfxId = Sequencer::kIdle;
@@ -122,19 +119,15 @@ private:
     };
     void push(Command c);
     void applyPending();  // audio side, before a tick: the commands due, the others one tick closer
-    void renderFloat(float* out, size_t n);
     void publishStatus();
-    static void callback(void* user, SDL_AudioStream* stream, int additional, int total);
 
     std::shared_ptr<const SoundBank> bank_;
     DosAudioConfig cfg_;
     std::function<int()> rand_;
     bool musicOnMirror_ = true;  // the caller's copy of g_musicOn (for the AdLib rand() draw)
 
-    std::mutex renderMutex_;  // the renderer: audio thread, or the offline caller
     std::unique_ptr<DosSoundRenderer> renderer_;
-    std::vector<double> scratch_;
-    std::vector<float> floatBuf_;  // the callback's output block
+    std::unique_ptr<ChipAudioDevice> output_;  // after the renderer it plays (destroyed first)
 
     std::mutex queueMutex_;
     std::vector<Command> queue_;
@@ -147,14 +140,8 @@ private:
     bool oplRestored_ = false;  // audio side: an OplRestore was applied, the next Restore sends no notes
     std::atomic<bool> pending_{false};
 
-    std::atomic<float> volume_;
-    std::atomic<bool> outputEnabled_{true};
     std::atomic<uint64_t> statusWord_{0};  // sfx status/id, music status/id packed
     std::atomic<uint64_t> statusTicks_{0};
-
-    SDL_AudioStream* stream_ = nullptr;
-    bool ownsDevice_ = false;
-    bool sdlInit_ = false;
 };
 
 }  // namespace tmport::dos

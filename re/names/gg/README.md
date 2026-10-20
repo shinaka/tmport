@@ -73,6 +73,11 @@ deleted the proposal files; ApplyNames re-applied everything. **Result: 1599 row
 and 617 DGROUP labels** (wave 0: 453 and 155). Every real function of the program is named except
 the LZH internals (1b48, 11 functions), the overlay manager internals (1d42, 23) and one RTL
 helper (1000:2dd7); the export's function count is unchanged (1234: no name created a function).
+The wave 2 integration added 9 DGROUP labels for tables the specs and the engine use
+(`g_projectileTransitions`, `g_hudColorScheme`, `g_chimpListData`, `g_attractScripts`,
+`g_attractChannels`, `g_attractAnims`, `g_animCelCount`, `g_animCels`, `g_animFrames`), moved
+`g_animChannels` to DS:ba66 (the start of the two channel records; DS:ba80 is channel 0's cursor)
+and retyped `g_lzhDefaultDistLengths` as `u16[3][16]`: 626 DGROUP labels.
 Where an agent renamed an older name, the spec that owns the module won; the name must describe
 what the code does. Corrections of wave 0 names (old → canonical):
 

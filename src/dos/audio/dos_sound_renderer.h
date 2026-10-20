@@ -3,10 +3,11 @@
 // PIT rate 1193182 / 5041 Hz, and the device models it writes to (fmt_sound.md §9). Single
 // threaded; DosAudioDevice adds the SDL stream and the command queue around it.
 //
-// Clock: the sequencer ticks at the start of each tick's block of samples; block lengths come from
-// a running fractional accumulator (samples per tick = rate * 5041 / 1193182, about 202.8 at
-// 48 kHz), the same arithmetic as tools/dos/dos_sound.py, so timing never depends on the video
-// frame rate and Raw renders match the oracle sample for sample.
+// The chips, the clock and the mix are the shared core's ChipRenderer (dos/audio/chip_renderer.h),
+// with the sequencer as its tick source: the sequencer ticks at the start of each tick's block of
+// samples; block lengths come from a running fractional accumulator (samples per tick = rate * 5041
+// / 1193182, about 202.8 at 48 kHz), the same arithmetic as tools/dos/dos_sound.py, so timing never
+// depends on the video frame rate and Raw renders match the oracle sample for sample.
 
 #include <cstddef>
 #include <cstdint>
@@ -15,6 +16,7 @@
 #include <span>
 #include <vector>
 
+#include "dos/audio/chip_renderer.h"
 #include "dos/audio/opl_backend.h"
 #include "dos/audio/psg_synth.h"
 #include "dos/audio/sequencer.h"
@@ -28,15 +30,12 @@ namespace tmport::dos {
 // default volume. The speaker and the Tandy devices are not affected.
 inline constexpr double kAdLibMixLevel = 0.75;
 
-struct DosRenderConfig {
-    int sampleRate = 48000;  // 44100 and 49716 (the OPL2's native rate) work as well
-    SynthMode mode = SynthMode::Smooth;
-    NoiseType noise = NoiseType::Ncr8496;  // Raw + Ti15 = tools/dos/dos_sound.py exactly
-    double lowPassHz = 7000.0;             // Smooth mode: 2-pole low-pass (0 = off)
-    double dcBlockHz = 12.0;               // Smooth mode: 1-pole high-pass (0 = off)
-};
+// The render settings: the core's (sample rate, synth mode, noise, filters; the tick rate and the
+// OPL mix level keep their defaults, kPitTickHz and kAdLibMixLevel).
+using DosRenderConfig = ChipRenderConfig;
+static_assert(ChipRenderConfig{}.oplMixLevel == kAdLibMixLevel && ChipRenderConfig{}.tickHz == kPitTickHz);
 
-class DosSoundRenderer final : private SoundPorts {
+class DosSoundRenderer final : private SoundPorts, private SoundTickSource {
 public:
     // `bank` must outlive the renderer. With the AdLib device and no back end given, the tunes play
     // on the original's AdLib driver and an emulated OPL2 (AdLibOpl, opl_backend.h). The OPL's output
@@ -45,27 +44,29 @@ public:
 
     Sequencer& sequencer() { return seq_; }
     const Sequencer& sequencer() const { return seq_; }
-    const DosRenderConfig& config() const { return cfg_; }
-    double samplesPerTick() const { return samplesPerTick_; }
+    const DosRenderConfig& config() const { return chips_.config(); }
+    double samplesPerTick() const { return chips_.samplesPerTick(); }
+    // The chips and the clock (the shared core's renderer; ChipAudioDevice plays it).
+    ChipRenderer& chips() { return chips_; }
 
     // Called right before each PIT tick: the moment commands from the game take effect (between two
     // interrupts, like the original's calls from the main loop).
-    void setTickHook(std::function<void()> hook) { tickHook_ = std::move(hook); }
+    void setTickHook(std::function<void()> hook) { chips_.setTickHook(std::move(hook)); }
 
     // Writes n mono samples (synth levels: the speaker square is +-0.5, a PSG voice +-0.25; in
     // Smooth mode after the filters). Ticks happen at block boundaries inside the call.
-    void render(double* out, size_t n);
+    void render(double* out, size_t n) { chips_.render(out, n); }
     // Runs the next PIT tick and appends exactly its block of samples to out (Raw-mode tools: this
     // keeps the arithmetic identical to dos_sound.py, which renders one block per tick). Returns
     // the number of samples appended.
-    size_t renderTick(std::vector<double>& out);
+    size_t renderTick(std::vector<double>& out) { return chips_.renderTick(out); }
 
-    uint64_t ticks() const { return ticks_; }
+    uint64_t ticks() const { return chips_.ticks(); }
     // Samples left in the current tick's block (0 = the next render starts with a tick).
-    size_t samplesToNextTick() const { return left_; }
+    size_t samplesToNextTick() const { return chips_.samplesToNextTick(); }
 
-    SpeakerSynth& speaker() { return speaker_; }
-    PsgSynth& psg() { return psg_; }
+    SpeakerSynth& speaker() { return chips_.speaker(); }
+    PsgSynth& psg() { return chips_.psg(); }
     // The AdLib back end (nullptr on the speaker and the Tandy).
     OplBackend* opl() { return opl_.get(); }
     // A DOSBox-X state's AdLib driver from its DGROUP image (before Sequencer::restore with
@@ -73,18 +74,16 @@ public:
     bool restoreOpl(std::span<const uint8_t> dgroup) { return opl_ && opl_->restore(dgroup); }
     // Off: the OPL is not synthesised (its registers are still written): for runs whose samples are
     // thrown away. The speaker and the PSG are not affected.
-    void setOplSynthesis(bool on) { oplSynthesis_ = on; }
+    void setOplSynthesis(bool on) { chips_.setOplSynthesis(on); }
 
 private:
-    void beginTick();
-    void synthesize(double* out, size_t n);
-    void synthesizeOpl(double* out, size_t n);
-    void filter(double* out, size_t n);
+    // SoundTickSource: Timer_ISR's Sound_Tick (491b:0004), every PIT tick.
+    void soundTick() override { seq_.timerTick(); }
 
     // SoundPorts
-    void speakerDivisor(uint16_t divisor) override { speaker_.setDivisor(divisor); }
-    void speakerEnable(bool on) override { speaker_.setEnabled(on); }
-    void psgWrite(uint8_t value) override { psg_.write(value); }
+    void speakerDivisor(uint16_t divisor) override { chips_.speaker().setDivisor(divisor); }
+    void speakerEnable(bool on) override { chips_.speaker().setEnabled(on); }
+    void psgWrite(uint8_t value) override { chips_.psg().write(value); }
     void oplInit() override {
         if (opl_) opl_->init();
     }
@@ -99,24 +98,9 @@ private:
     }
     int oplPlayTuneTicks() const override { return opl_ ? opl_->playTuneTicks() : 0; }
 
-    DosRenderConfig cfg_;
-    SpeakerSynth speaker_;
-    PsgSynth psg_;
     std::unique_ptr<OplBackend> opl_;
-    Sequencer seq_;  // after the synths and the OPL back end: its constructor calls oplInit()
-    std::function<void()> tickHook_;
-    bool oplSynthesis_ = true;
-    std::vector<double> oplBuf_;  // the OPL's samples of the current render call
-
-    double samplesPerTick_;
-    double acc_ = 0.0;
-    size_t left_ = 0;
-    uint64_t ticks_ = 0;
-
-    // Smooth-mode filters (RBJ biquad low-pass, one-pole DC blocker).
-    double b0_ = 1, b1_ = 0, b2_ = 0, a1_ = 0, a2_ = 0;
-    double z1_ = 0, z2_ = 0;
-    double dcR_ = 0, dcX_ = 0, dcY_ = 0;
+    ChipRenderer chips_;  // after the OPL back end (its output stage)
+    Sequencer seq_;       // after the synths and the OPL back end: its constructor calls oplInit()
 };
 
 // ---- offline helpers (tools and tests)

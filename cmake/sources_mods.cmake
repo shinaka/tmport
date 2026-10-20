@@ -2,8 +2,6 @@
 # target_sources(tmcore PRIVATE path/to/file.cpp ...)
 # Mod layer (docs/MODDING.md): override formats, table overrides, mod-kit exporter.
 target_sources(tmcore PRIVATE
-    src/mods/json.cpp
-    src/mods/png_codec.cpp
     src/mods/text_codec.cpp
     src/mods/dam_asm.cpp
     src/mods/wav_codec.cpp

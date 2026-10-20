@@ -120,7 +120,7 @@ public:
     // Borderless desktop fullscreen; the picture keeps the presenter's letterbox / integer scaling.
     // Alt+Enter and F11 toggle it. Those keys are taken before the event filter, so neither the menu
     // bar nor the game sees them (nor the Alt release that follows Alt+Enter). The window icon is the
-    // EXE's RT_GROUP_ICON 15000 (platform/exe_icon.h). Headless: only the flag changes.
+    // EXE's RT_GROUP_ICON 15000 (platform/exe_icon_ne.h). Headless: only the flag changes.
     bool fullscreen() const { return host_.fullscreen(); }
     void setFullscreen(bool on) { host_.setFullscreen(on); }
     void toggleFullscreen() { host_.toggleFullscreen(); }

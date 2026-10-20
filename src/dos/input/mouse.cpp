@@ -13,11 +13,6 @@ void MouseDriver::startPosition(Look look, uint16_t& x, uint16_t& y) {
     }
 }
 
-void MouseDriver::setLogicalPosition(int x, int y) {
-    x_ = static_cast<uint16_t>(std::clamp(x / 2, 0, kMaxX));  // driver x unit = 2 logical pixels
-    y_ = static_cast<uint16_t>(std::clamp(y, 0, kMaxY));
-}
-
 // 130f:0D94 Mouse_Poll.
 MousePointer::Result MousePointer::poll(const MouseDriver& driver, uint8_t uiMode, int16_t slot0Script) {
     Result r;

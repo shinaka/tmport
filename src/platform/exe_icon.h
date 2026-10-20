@@ -1,9 +1,6 @@
 #pragma once
-// The game's window icon, read from the user's TMTWINCD.EXE at run time.
-//
-// RegisterMainWindowClass (1018:00a8) gives the window class LoadIcon(hInst, MAKEINTRESOURCE(15000))
-// (re/docs/code_1008-1030.md §2.2). The EXE holds RT_GROUP_ICON 15000 with a single 32x32
-// 16-colour entry (RT_ICON 1).
+// Win16 / ICO icon decoding and the SDL window icon (both games: TM reads its icon from
+// TMTWINCD.EXE's NE resources, platform/exe_icon_ne.h; an .ico file has the same entries).
 //
 // Win16 formats (same DIB family as the cursors in input/cursors.h) [O: TMTWINCD.EXE resources]:
 //  * RT_GROUP_ICON (type 14): u16 reserved = 0, u16 type = 1, u16 count, then count entries of
@@ -22,13 +19,6 @@
 struct SDL_Window;
 
 namespace tmport {
-
-namespace ne {
-class NeImage;
-}
-
-// 1018:00a8 RegisterMainWindowClass: the class icon id.
-inline constexpr uint16_t kWindowIconGroupId = 15000;
 
 struct IconImage {
     int width = 0, height = 0;
@@ -51,9 +41,8 @@ struct IconDirEntry {
 std::vector<IconDirEntry> parseIconDirectory(std::span<const uint8_t> data);
 // Decodes one RT_ICON resource (1, 4, 8, 24 or 32 bpp, uncompressed). Throws FormatError.
 IconImage decodeIconResource(std::span<const uint8_t> data);
-// Loads RT_GROUP_ICON groupId from an NE image and decodes its best entry (largest, then the most
-// colours). Throws FormatError / Error when missing.
-IconImage loadGroupIcon(const ne::NeImage& image, uint16_t groupId);
+// The entry to show: the largest, then the most colours (the first of equals); nullptr if empty.
+const IconDirEntry* bestIconEntry(std::span<const IconDirEntry> entries);
 
 // Sets the window icon from an IconImage (SDL copies it). Needs SDL video. False on SDL errors.
 bool setWindowIcon(SDL_Window* window, const IconImage& icon);

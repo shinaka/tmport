@@ -8,6 +8,5 @@ target_sources(tmcore PRIVATE
     src/app/launch_options.cpp
     src/app/script_input.cpp
     src/app/bootstrap.cpp
-    src/platform/console.cpp
-    src/platform/exe_icon.cpp
+    src/platform/exe_icon_ne.cpp
 )

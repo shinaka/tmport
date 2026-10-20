@@ -128,7 +128,7 @@ count bytes: 6-bit R, G, B
 | 192..255 | 576 / 192 | 0x000b/0, 0x00e0, 0x00e2, 0x00e4 | race backgrounds 0xdf/0xe1/0xe3 |
 | 64..127 | 192 / 192 | 0x1031/94, 0x1032/116 | members of two large bundles |
 | 32..63 | 96 / 96 | 0x002b, 0x00f6; the palette members of the level sprite bundles (0x00ed/5 ...) | workshop, races, the parts of a level |
-| 16..63 | 48 / 144 | 0x1058/5 | |
+| 16..63 | 48 / 144 | 0x1058/5 | `Hud_Init` at start-up (1a04:025b, from `Game_Init`): the HUD and the menu bar (its title colours 17 and 28), in every screen [O wave 2] |
 
 Three of the full palettes (0x11a0, 0x20b3, 0x211a) are 782 bytes: 10 bytes follow the 768
 colour bytes. No loader reads them (1473:02f0 and 1473:041c copy exactly `count` bytes), and
@@ -158,9 +158,14 @@ leftovers of the tool that wrote the files [I].
   restore the shadow [O, platform pass]. The last load of each fade repeats the target, so 11 and
   8 loads change colours: **22 and 16 visible frames** at 2 frames per load, as measured
   (`code_runtime.md` §13.4, REFERENCE_CAPTURES §10.2).
-* The DAC holds 6 bits per channel. The tools show a value v as `(v * 255 + 31) / 63`, the
-  rounding DOSBox-X uses (`re/dos/docs/fmt_graphics.md` §2.2) [I for G&G until checked against a
-  capture].
+* The DAC holds 6 bits per channel. **DOSBox-X shows a value v as `(v << 2) | (v >> 4)`** (bit
+  replication) in every G&G capture [O, wave 2: the title, the sign-in and four puzzle screens of
+  `w0\` and `r2\`, every 6-bit value seen; the round rule `(v * 255 + 31) / 63` of the TM DOS MCGA look
+  gives one more for v = 11..15 (45..61 instead of 44..60) and one less for v = 49..52 (198..210
+  instead of 199..211)]. The engine converts with this rule (`gg/gfx/palette.h` `dacTo8`), and with it
+  the title, story page 1, the movie frames and the fades match the captures pixel for pixel (§11).
+  The Python tools (`lpx.py`, `movie.py`) still use the round rule, so their PNGs differ from the
+  captures in those values; their decoded indices are unaffected.
 
 ---
 
@@ -224,6 +229,13 @@ clear bits are left alone. A glyph is drawn at (x, y + y offset).
   the spacing as its width, so measuring and drawing disagree by the spacing for such codes
   (0x0C and 0x12 occur 5 times in the texts) [O code; effect on centring I].
 * Characters are indexed as signed bytes; codes of 0x80 and more do not occur.
+* No font or text routine marks dirty tiles: `Font_DrawChar` 2b16:0368, `Font_DrawString`
+  2b16:029c and `Text_Render` 2b89 call no `Dirty_Mark`, and the glyph blit marks nothing. Text
+  reaches VRAM through the marks of what is drawn under it (a box fill, a background) [O
+  disassembly, wave 2].
+* `Font_Load` 2b16:0000 does not initialise the font's colour word +0x0A (a fresh `Mem_Alloc`
+  block), so the glyph colour after `Font_Init` is unset until a `Font_SetColor`; the first text
+  of a run (story page 1, 2c11:066d) sets one first [O code; the engine starts at 0].
 
 TM Windows' FFNT and TM DOS's font are MSB-first bitmaps with width tables; the G&G format is
 new, the API shape (load, select, width, height, draw) is TM Windows' (scoping §4).
@@ -340,8 +352,8 @@ fit in the frame; a slower machine runs the movie slower. There are 202 frames (
 
 ### 7.2 Cue table DS:236c
 
-18 records of four words {type, frame, a, b}, at most one per frame (the player checks one cue
-per frame):
+Records of four words {type, frame, a, b}, at most one per frame (the player checks one cue per
+frame and moves on only when it matches; the table has no count):
 
 | Type | Effect (1473:084c switch, table CS:08bf) |
 |---|---|
@@ -351,8 +363,12 @@ per frame):
 | 5 | start effect a with the second argument 1 (1cdd:03c9(bank + a, 1, b)) |
 | 3, 4, 6 | nothing |
 
-The shipped table holds 4 pauses of 1460 ticks (10.0 s) at frames 15, 17, 19 and 116, and 14
-sound starts at frames 25..134 [O, `movie.py --cues`].
+The shipped table holds **25 cues and an end record**: 4 pauses of 1460 ticks (10.0 s) at frames
+15, 17, 19 and 116, a stop of effect 1 at frame 135 and 20 sound starts at frames 25..176 (type 5
+at 39, type 1 elsewhere); record 25 is {6, 0, 0, 0}, a no-op at frame 0 that never matches again,
+so the player stops there [O bytes DS:236c..2434; wave 2: the engine's `MoviePlayer` runs exactly
+these 25]. Wave 1 counted 18 records (`movie.py --cues` reads a fixed 18): the 7 cues at frames
+135..176 were missed.
 
 ### 7.3 Frame coding (1399:0a85)
 
@@ -400,10 +416,26 @@ screen (0x1093), the level-0 parts (bundle 0x00ed with level palette 0x34 and it
 member), the launch-puzzle frames (0x1157 with 0x1134), DAM 0x1154 tick by tick, font 9 with
 its key caps, and movie frames 0..201.
 
+The engine's own tools (wave 2, `src/gg/gfx/gfx_cli.h`; the ggport-cli dispatcher runs them) write
+the same kinds of output from the engine code, with the DAC rule of §3.2:
+
+| Command | Output |
+|---|---|
+| `--gg-pic ID OUT.png` | a picture or a bundle sheet with its palette as §4 pairs them (RGBA, transparent as `lpx.py`) |
+| `--gg-pal ID\|base OUT.png` | a palette swatch (as `lpx.py --palettes`) |
+| `--gg-font ID OUT.png` | the glyph sheet, each glyph drawn by the engine's `Gfx_DrawGlyph` |
+| `--gg-movie FIRST END DIR` | movie frames from the results picture, through base + 0x1077 |
+| `--gg-title OUT.png [--anim-step N,M] [--fade-dir DIR]` | the title as `Attract_TitleAnim` draws it, optionally its fade-in frame by frame |
+| `--gg-fade in\|out PIC PAL DIR` | a picture faded in or out, one PNG per video frame |
+| `--gg-wipe ID DIR` | a wipe pattern step by step |
+| `--gg-lpx-list`, `--gg-font-list ID`, `--gg-movie-list` | TSV listings with CRC-32s, for the comparisons of §11 |
+
 ## 9. Porting notes [I]
 
-* Implement the RLE row counter in 8 bits only if bit-exactness for widths of 256 or more ever
-  matters; for the shipped data `x == width` is the same.
+* The engine (`src/gg/gfx/screen.h`) keeps the RLE row counter in 8 bits, the 8-bit height of the
+  keyed raw blit and the literal-run carry of 1399:0465 (a literal longer than the remaining row
+  copies 256 more bytes), so widths of 256 or more would behave as in the original; for the shipped
+  data `x == width` is the same.
 * The mirror mode exists for RLE pictures only; reproduce the (fmt + mode) & 3 table rather than
   a "mirror" flag so that the unused combinations behave as in the original if a caller ever
   passes them.
@@ -425,5 +457,26 @@ its key caps, and movie frames 0..201.
 * The 10 bytes after three of the full palettes (§3.1).
 * *Answered:* the wipe patterns `W` 0x11d6..0x11dd (636 bytes each: period, sweep flags, 156 left
   and right start columns, per-step increments) are decoded in `code_runtime.md` §14.2.
-* DOSBox-X's 6-bit to 8-bit rounding for VGA mode 13h (assumed equal to its MCGA rounding).
+* *Answered (wave 2):* DOSBox-X shows the 6-bit DAC as `(v << 2) | (v >> 4)`, not with its MCGA
+  rounding (§3.2).
 * Whether the DAM interpreter checks a "DOP" tag as TM Windows' does.
+
+## 11. Wave 2: the engine against the oracles and the captures [O]
+
+The engine's graphics code (`src/gg/gfx`, `src/gg/text`; `tests/gg/test_gg_gfx.cpp`,
+`test_gg_text.cpp`) was compared with the reference decoders and the DOSBox-X captures; the
+comparison scripts are in `extracted/scratch/gg/wave2/gfx/` (not in the repository).
+
+| Check | Result |
+|---|---|
+| every LPX picture (`--gg-lpx-list` vs `lpx.py decode_lpx`): format, size, key, data offset, bytes used, CRC-32 of the pixels and of the opacity mask | 2959 of 2959 identical (904 raw, 2055 RLE) |
+| every picture drawn by the engine's keyed blitter at (0, 0) over a sentinel | equal to its decoded pixels and keyed mask, all 2959 |
+| both fonts (`--gg-font-list` vs `fnt.py`): every glyph record's y offset, width, rows, size, CRC-32, advance | 103 + 96 glyphs identical |
+| the movie (`--gg-movie-list` vs `movie.py`): bytes used, end offset and VRAM CRC-32 after each frame | 202 of 202 identical; all end at their end code |
+| the title, composed as 2c11:043f draws it (phase 3, screen animations 0x1005 / 0x1007 at frame steps 2 / 1), vs `w0\01_title.png` | 0 of 64 000 pixels differ |
+| story page 1 (picture 0x1009 + 0x100A, the line 0x1024 by `Font_DrawString` with the spacing patch, the box 0x1019 by `Text_DrawBox` in font 10), vs `w0\02_story1.png` | 0 of 64 000 |
+| movie frames 14, 16, 18, 115, 146 through base + 0x1077 vs `r2\movie\02..06` | 0 differing pixels each |
+| the title's fade-in (9 loads) vs frames 15..30 of `w0_replay_title_attract.avi` | each AVI frame equals the engine's frame after retrace k = 0..15 (only the windmill's box masked); the 9th load is invisible |
+| the fade to black (12 loads, palette 0x1004) vs frames 861..882 of the same AVI | equal after retrace k = 0..21 (the two screen animations masked); the 12th load is invisible |
+| the door wipe of `r2_aircraft_door_to_room5.avi` frames 119..163 | pattern **0x11DB**: every frame shows the engine's wipe after step k, or a state between steps k and k + 1 (a frame caught inside a step); 48 steps of 2 ticks |
+| the eight wipe patterns simulated | 33, 33, 24, 40, 48, 48, 18, 33 steps (as `code_runtime.md` §14.2); 0x11DA leaves column 319 of rows 9..164 uncopied (156 pixels) |

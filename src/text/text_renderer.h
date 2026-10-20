@@ -2,6 +2,8 @@
 // Text_Render (10b0:00b5) and its wrappers: the game's word-wrapping proportional text engine
 // (re/docs/code_1098-10d8.md §7, fmt_bndl_ffnt.md §4-5). Measuring and drawing share one
 // routine, exactly as in the original, so box sizes, centring and line breaks agree everywhere.
+// The routine is the shared core's TextEngine (text/text_engine.h, TextDialect::treasureMountain())
+// with the FFNT font and the frame buffer behind its interfaces.
 //
 // Strings are raw bytes (never transcoded), NUL-terminated in the original. Here a string is a
 // span; the end of the span acts as the terminating NUL. Control bytes:
@@ -20,7 +22,6 @@
 // There is no clipping (pixels outside the frame buffer are skipped for memory safety only) and
 // no typewriter delay (timer slot 6 is never armed).
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -28,6 +29,7 @@
 #include <string_view>
 
 #include "text/font.h"
+#include "text/text_engine.h"
 
 namespace tmport::gfx {
 class FrameBuffer;
@@ -36,20 +38,6 @@ class Presenter;
 
 namespace tmport::text {
 
-using Bytes = std::span<const uint8_t>;
-// The caller-supplied substitution table of FF 01 n FF (char far* far*; empty = NULL).
-using SubstTable = std::span<const Bytes>;
-
-inline Bytes asBytes(std::string_view s) { return {reinterpret_cast<const uint8_t*>(s.data()), s.size()}; }
-// The part of b before its first NUL (the whole span if it has none).
-Bytes untilNul(Bytes b);
-
-struct TextExtent {
-    int width = 0;   // maxX - minX over the glyphs placed (1 - w if none was placed)
-    int height = 0;  // last line y - y0 + line height
-    friend bool operator==(const TextExtent&, const TextExtent&) = default;
-};
-
 class TextRenderer {
 public:
     static constexpr int kScreenWidth = 512;  // box width of Text_Draw / Text_Width
@@ -57,10 +45,12 @@ public:
     // fb: drawing target and owner of the current pen colour (nullptr: measure only).
     // presenter: target of the per-glyph present when `flush` is set (nullptr: none).
     explicit TextRenderer(const Font& font, gfx::FrameBuffer* fb = nullptr, gfx::Presenter* presenter = nullptr)
-        : font_(font), fb_(fb), presenter_(presenter) {}
+        : metrics_(font), canvas_(font, fb, presenter), engine_(metrics_, fb ? &canvas_ : nullptr) {}
+    TextRenderer(const TextRenderer&) = delete;
+    TextRenderer& operator=(const TextRenderer&) = delete;
 
-    const Font& font() const { return font_; }
-    gfx::FrameBuffer* frameBuffer() const { return fb_; }
+    const Font& font() const { return metrics_.font; }
+    gfx::FrameBuffer* frameBuffer() const { return canvas_.fb; }
 
     // 10b0:0000 Text_Draw: box width 512, no substitution, no flush.
     void draw(int x, int y, Bytes s) { render(x, y, kScreenWidth, s, {}, false, true); }
@@ -76,14 +66,18 @@ public:
     int width(Bytes s);
 
     // 10b0:00b5 Text_Render: the core. Returns the extent the original writes to outW/outH.
-    TextExtent render(int x0, int y0, int wrapW, Bytes s, SubstTable subst, bool flush, bool draw);
+    TextExtent render(int x0, int y0, int wrapW, Bytes s, SubstTable subst, bool flush, bool draw) {
+        return engine_.render(x0, y0, wrapW, s, subst, flush, draw);
+    }
 
     // 10b0:053c Text_MeasureRun: width of the bytes from s[pos] up to `stop`, NUL, LF or CR,
     // following FF 01 substitutions (other escapes add nothing; TAB and FE add their glyph
     // widths). With inSubst the scan starts inside substStr at substPos and resumes in s at pos
     // when the substitution ends.
     int measureRun(uint8_t stop, Bytes s, size_t pos, SubstTable subst, bool inSubst = false, Bytes substStr = {},
-                   size_t substPos = 0) const;
+                   size_t substPos = 0) const {
+        return engine_.measureRun(stop, s, pos, subst, inSubst, substStr, substPos);
+    }
 
     // 10b0:0662 Text_DrawChar: glyph (or an underlined blank for '_' while underlining), the
     // underline on the cell's last row, the optional present. Returns the advance.
@@ -91,14 +85,33 @@ public:
 
     // Debug/test hook: called for every glyph placed (drawn or measured) with its byte, cell
     // position and advance.
-    using GlyphObserver = std::function<void(uint8_t c, int x, int y, int advance)>;
-    void setGlyphObserver(GlyphObserver f) { observer_ = std::move(f); }
+    using GlyphObserver = TextEngine::GlyphObserver;
+    void setGlyphObserver(GlyphObserver f) { engine_.setGlyphObserver(std::move(f)); }
 
 private:
-    const Font& font_;
-    gfx::FrameBuffer* fb_;
-    gfx::Presenter* presenter_;
-    GlyphObserver observer_;
+    // The FFNT font's metrics (1068:00d9 Font_GetHeight, 1068:00dd Font_CharWidth).
+    struct Metrics final : TextFont {
+        explicit Metrics(const Font& f) : font(f) {}
+        int lineHeight() const override { return font.height(); }
+        int charWidth(uint8_t c) const override { return font.charWidth(c); }
+        const Font& font;
+    };
+    // The frame buffer's pen and the presenter (Font_DrawChar 1068:00f6, Gfx_DrawHLine 1058:090f,
+    // Pal_SetForeColor 1048:02fd, Gfx_BlitToWindow 1058:05bc).
+    struct Canvas final : TextCanvas {
+        Canvas(const Font& f, gfx::FrameBuffer* b, gfx::Presenter* p) : font(f), fb(b), presenter(p) {}
+        int drawGlyph(int x, int y, uint8_t c) override;
+        void underline(int x, int y, int w) override;
+        void setColour(int colour) override;
+        void flushGlyph(int x, int y, int w, int h) override;
+        const Font& font;
+        gfx::FrameBuffer* fb;
+        gfx::Presenter* presenter;
+    };
+
+    Metrics metrics_;
+    Canvas canvas_;
+    TextEngine engine_;
 };
 
 }  // namespace tmport::text

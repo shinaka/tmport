@@ -16,11 +16,12 @@
 #include <cstdint>
 #include <memory>
 
-#include "dos/audio/adlib_driver.h"
+#include "dos/audio/opl_output.h"
+#include "dos/audio/opl_writer.h"
 
 namespace tmport::dos {
 
-class OplChip final : public OplWriter {
+class OplChip final : public OplWriter, public OplOutput {
 public:
     static constexpr double kClockHz = 3579545.0;            // 14.31818 MHz / 4 on the AdLib card
     static constexpr double kChipRate = kClockHz / 72.0;    // samples per second
@@ -39,11 +40,11 @@ public:
     // OplWriter: queued at the current time (after the previous write has finished).
     void oplWrite(uint8_t reg, uint8_t value) override;
 
-    // Adds n samples at the output rate.
-    void render(double* out, size_t n);
+    // OplOutput: adds n samples at the output rate.
+    void render(double* out, size_t n) override;
     // Advances n output samples without synthesis (the queued writes are applied): for runs whose
     // sound is not kept. The chip's envelopes stand still meanwhile.
-    void skip(size_t n);
+    void skip(size_t n) override;
 
 private:
     struct Impl;

@@ -18,7 +18,7 @@
 #include "ne/ne_image.h"
 #include "platform/engine.h"
 #include "platform/engine_setup.h"
-#include "platform/exe_icon.h"
+#include "platform/exe_icon_ne.h"
 #include "platform/host.h"
 #include "save/settings.h"
 #include "test_data.h"

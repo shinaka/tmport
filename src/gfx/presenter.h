@@ -9,7 +9,7 @@
 // Layouts (PresenterLayout):
 //   Windows CD edition: 640x480 canvas, black, game area 512x384 at (64,48), square pixels, with
 //     the overlay layer of the in-engine menu bar. The game area is a 512x384 picture of palette
-//     indices (blitToWindow from the FrameBuffer).
+//     indices (blitToWindow from the FrameBuffer, or from any indexed surface with the same rows).
 //   1990 DOS edition: 320x200 canvas = game area, pixels 1.2 times as tall as wide (the picture is
 //     4:3, as on a period monitor) or square on request, no overlay (the DOS game draws its own
 //     menu bar). The game area is a ready RGBA frame (presentFrame) from the DOS palette code.
@@ -23,8 +23,8 @@
 #include <span>
 #include <vector>
 
-#include "gfx/frame_buffer.h"
 #include "gfx/palette.h"
+#include "gfx/rect.h"
 
 struct SDL_Renderer;
 struct SDL_Texture;
@@ -108,11 +108,23 @@ public:
     const Palette& palette() const { return palette_; }
 
     // 1058:05bc Gfx_BlitToWindow: copies a rectangle of screen rows of the frame buffer into the
-    // window picture (clipped to the game area, 512x384 for Windows).
-    void blitToWindow(const FrameBuffer& fb, int x, int y, int w, int h);
-    void blitAll(const FrameBuffer& fb) { blitToWindow(fb, 0, 0, layout_.gameRect.w, layout_.gameRect.h); }
-    // 1058:0731 Gfx_FlushDirtyRects: presents every dirty rectangle, then clears the list.
-    void flushDirtyRects(FrameBuffer& fb);
+    // window picture (clipped to the game area, 512x384 for Windows). `Surface` is any indexed
+    // picture whose `const uint8_t* row(int y) const` gives screen row y (gfx::FrameBuffer).
+    template <class Surface>
+    void blitToWindow(const Surface& fb, int x, int y, int w, int h) {
+        if (!clipToGame(x, y, w, h)) return;
+        for (int r = 0; r < h; ++r) storeWindowRow(y + r, x, fb.row(y + r) + x, w);
+        windowRowsStored(x, y, w, h);
+    }
+    template <class Surface>
+    void blitAll(const Surface& fb) { blitToWindow(fb, 0, 0, layout_.gameRect.w, layout_.gameRect.h); }
+    // 1058:0731 Gfx_FlushDirtyRects: presents every dirty rectangle, then clears the list
+    // (`Surface` also has dirtyRects() and clearDirtyRects(), like gfx::FrameBuffer).
+    template <class Surface>
+    void flushDirtyRects(Surface& fb) {
+        for (const Rect& r : fb.dirtyRects()) blitToWindow(fb, r.x, r.y, r.w, r.h);
+        fb.clearDirtyRects();
+    }
 
     // The game area as a ready RGBA frame (gameRect.w x gameRect.h pixels, the convention above;
     // the DOS edition's 320x200 frame after its palette conversion). From then on the game area
@@ -169,6 +181,11 @@ public:
     bool windowToCanvas(float wx, float wy, float& cx, float& cy) const;
 
 private:
+    // blitToWindow: clips the rectangle to the game area (false: nothing left), copies one row of
+    // indices into the window picture, and presents the rows copied.
+    bool clipToGame(int& x, int& y, int& w, int& h) const;
+    void storeWindowRow(int y, int x, const uint8_t* src, int w);
+    void windowRowsStored(int x, int y, int w, int h);
     void renderRect(int x, int y, int w, int h);         // game-area coordinates
     void composeCanvasRect(int x, int y, int w, int h);  // canvas coordinates, with the overlay
     void paintDebugMarks(int x, int y, int w, int h);    // canvas coordinates, under the overlay

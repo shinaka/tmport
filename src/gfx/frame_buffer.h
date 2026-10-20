@@ -15,13 +15,9 @@
 
 #include "gfx/palette.h"
 #include "gfx/pixmap.h"
+#include "gfx/rect.h"
 
 namespace tmport::gfx {
-
-struct Rect {
-    int x = 0, y = 0, w = 0, h = 0;
-    friend bool operator==(const Rect&, const Rect&) = default;
-};
 
 // Inclusive clip rectangle (DGROUP 0864 top, 0866 bottom, 0868 left, 086a right).
 struct ClipRect {
