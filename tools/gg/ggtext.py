@@ -6,7 +6,8 @@ draws; character switch CS:03ba, escape switch CS:03ae):
     00          end of the text (every text is NUL-terminated)
     0D, 0A      line break (CR in almost all texts)
     20          space, the wrap point
-    FF 01 n     insert substitution string n-1 (set by the caller)
+    FF 01 n .. FF   insert substitution string n-1 (set by the caller); the bytes after n up to
+                and including the next FF are skipped (2b89:01df; unused in the data)
     FF 02 .. FF underline on/off
     FF 03 c .. FF   text colour c - 1 until the next colour escape
     FF 04       ignored
@@ -65,7 +66,8 @@ def decode(p, stats=None):
             if k == 1 and i + 2 < n:
                 out.append('{subst %d}' % (p[i + 2] - 1))
                 count('FF01_subst')
-                i += 3
+                j1 = p.find(b'\xff', i + 3)
+                i = (j1 + 1) if j1 >= 0 else n
                 continue
             if k in (2, 5):
                 out.append('{underline}' if k == 2 else '{centre}')

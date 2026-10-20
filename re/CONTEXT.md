@@ -131,20 +131,31 @@ tools in `tools\gg\`, names in `re\names\gg\`; tests find the game through the e
   open it read-only (it is git-ignored, like `TM-DOS\` and `TM-WIN\`). Anything that must write game
   files (DOSBox-X) uses the writable copy `extracted\gg_c\`; never mount `GadgetsAndGizmos\`.
   `gizmo004.dat` is not game data: the game writes it at run time as a screen save-under.
-- **Read in this order**: `re\gg\docs\SCOPING.md` (decision report, overlap with TM, estimate,
-  plan), `re\gg\docs\ARCHITECTURE.md` (program, segment and overlay map, game flow, platform layer,
-  TLC UI library, saves, hints, relationship to TM), `re\gg\docs\PORTING_NOTES.md` (engine mapping;
-  wave 0 draft), then the format specs `fmt_data.md` (archives, compression, bundles, resource
-  types, text, tables, `PLAYERS.DAT`), `fmt_graphics.md` (pictures, palettes, fonts, DAM, movie)
-  and `fmt_sound.md` (BMF songs), and `REFERENCE_CAPTURES.md` (DOSBox-X profile, guest mouse,
-  the wave 0 captures), all in the same folder. `re\gg\docs\overlay_map.tsv` is the overlay table.
+- **Read in this order** (all in `re\gg\docs\`; ARCHITECTURE's first table repeats it):
+  `SCOPING.md` (decision report, overlap with TM, estimate, plan), `ARCHITECTURE.md` (program,
+  segment and overlay map, game flow, platform layer, TLC UI library, saves, hints, relationship
+  to TM), the format specs `fmt_data.md` (archives, compression, bundles, resource types, text,
+  game tables, `PLAYERS.DAT`), `fmt_graphics.md` (pictures, palettes, fonts, DAM, movie) and
+  `fmt_sound.md` (BMF songs), then the wave 1 logic specs: `code_runtime.md` (clock, start-up,
+  timers, keyboard, mouse, zones, input codes, graphics, palette, fades, wipes, movie, memory,
+  resources), `code_sound.md` (the BMF driver and bank layer), `code_ui.md` (fonts, text, dialogs,
+  menus, help, text viewer, attract, sign-in, `PLAYERS.DAT` I/O, hints), `code_world.md` (states,
+  hub, set-up, rooms, actors, player, chimps, the warehouse loop), `code_vehicles_races.md` (parts,
+  HUD, workshop, races, results, movie), `code_puzzles_a.md` and `code_puzzles_b.md` (the puzzle
+  framework and the eight puzzles); `PORTING_NOTES.md` (engine mapping, `rand()` order, timing,
+  quirks to keep) and `REFERENCE_CAPTURES.md` (DOSBox-X profile, guest mouse, the round 1 and
+  round 2 captures and their measurements). `overlay_map.tsv` is the overlay table.
 - **Tools**: `tools\gg\` (`python -P`; `tools\gg\README.md` has the usage). Decoders: `ggarc.py`
   (archives, decompressor, bundles; the module the others share), `lpx.py` (pictures and
   palettes), `fnt.py` (fonts), `ggtext.py` (texts and hints), `dam.py` (DAM scripts), `movie.py`
   (the final movie), `bmf.py` (songs), `players.py` (`PLAYERS.DAT`) and `extract_all.py`
   (everything, with `index.tsv`); `python -P tools/gg/ggarc.py selftest` checks all 1897 archive
   entries. Ghidra: `vroomm.py` (overlay layout, flattened image), `ghidra_import.sh`,
-  `ghidra_export.sh`. Captures: `mouse_tsr.py`, `capture_tour.py`. The decoders and `vroomm.py`
+  `ghidra_export.sh`. Captures: `mouse_tsr.py`, `capture_tour.py` (round 1), `capture_mem.py`
+  (reads and patches game RAM in save states: variables, the `rand()` state and call counts, the
+  puzzle kind at a door, part boxes), `capture_timing.py` (palette loads, fades, frame periods and
+  gaps in AVIs; `.dro` grids) and `capture_r2.py` (replays the round 2 segments). The decoders and
+  `vroomm.py`
   read `GadgetsAndGizmos\` (or `--data`, `GG_DATA`) read-only, refuse to write inside it, and write
   derived output only under `extracted\` (decoders: `extracted\previews\gg\`).
 
@@ -159,8 +170,9 @@ tools in `tools\gg\`, names in `re\names\gg\`; tests find the game through the e
     stub thunks), `FixRealModeRefs.java` (64-KB boundary and `CS:` references), `FixSwitches.java`
     (Borland switch tables), `DefineStrings.java`; `ApplyNames.java`, `FindMoreFunctions.java` and
     `ExportAll.java` are shared with the TM projects (their new options are off by default there).
-  - The export has 1234 functions: 217 overlay stub thunks (stub:0020+5k; a thunk is named
-    thunk_<target>) and 1017 real functions, 453 of them named. DGROUP has 155 labels.
+  - The export has 1234 functions: 217 overlay stub thunks (stub:0020+5k; a thunk carries its
+    target's name) and 1017 real functions, 982 of them named after wave 1 (all but the LZH and
+    overlay-manager internals and one RTL helper). DGROUP has 617 labels.
   - The defects found by scoping are fixed: the 64-KB boundary in ovl10 and ovl27, the phantom
     `FUN_3f56_092d` (removed), the missing 12e0:0506 and 12e0:0820 (created), and the wrong `CS:`
     labels in the overlay manager.
@@ -168,7 +180,9 @@ tools in `tools\gg\`, names in `re\names\gg\`; tests find the game through the e
   comment. One canonical name per address; each address is in exactly one file
   (`re\names\gg\README.md`).
   - Files: `rtl_bc30`, `ovrman`, `engine_lowlevel`, `engine_sound`, `ui_tlc`, `game_flow`,
-    `game_world`, `game_puzzles`, and `dgroup` (labels only, never functions).
+    `game_world`, `game_puzzles`, and `dgroup` (labels only, never functions). The wave 1
+    proposals were merged into them; the README records the renames (for example
+    `Gfx_CopyFromBack` → `Gfx_SaveToBack`: it copies the screen **into** the back page).
   - Conventions: functions are `Module_Verb`; the 17 states of `Seq_Run` (table DS:00c2) are
     `State_NN_Role`; globals are `g_`, strings `s_`. A name that rests on inference says
     "(inferred)" in its comment. `_Noreturn` in a signature marks a non-returning function.
@@ -232,9 +246,20 @@ tools in `tools\gg\`, names in `re\names\gg\`; tests find the game through the e
     (`python -P tools/gg/mouse_tsr.py status STATE`).
 - **Captures**: states go to `extracted\captures\gg\savestates\` with `NAME.players`
   (`PLAYERS.DAT`). Shots are 640x400 (mode 13h, 2x2). AVIs are ZMBV at 70.0863 frames/s. Raw OPL
-  `.dro` captures and the wave 0 tour (`w0\`) are in `extracted\captures\gg\`;
-  `tools\gg\capture_tour.py` replays the tour. The warehouse rooms are not reproducible from a
-  fresh boot (the Cyber Chimps call rand() every frame): start such runs from a state.
+  `.dro` captures (DOSBox-X opens one at the first key-on and starts it with a register dump) and
+  the wave 0 tour (`w0\`) are in `extracted\captures\gg\`; `tools\gg\capture_tour.py` replays
+  the tour.
+  - Round 2 (wave 1): states under `savestates\r2\`, shots under `r2\`, AVIs `avi\r2_*`, audio
+    `audio\r2_*` (REFERENCE_CAPTURES §7-§13): all 8 puzzle kinds (the kind chosen by patching the
+    `rand()` state at a door with `capture_mem.py door`), a race per building, the workshop, the
+    final movie (reached by poking `g_racesWonTotal`), `-si` and `-sn` sound runs, menus, and a
+    second player "Bob" (Without Chimps) with save and resume. The few state edits (door pokes,
+    box moves and swaps, the races-won poke) are all listed in REFERENCE_CAPTURES §9.9.
+  - `extracted\gg_c\GG\PLAYERS.DAT` now holds the players Ada and Bob; `tmctl.py start --fresh`
+    restores the shipped file.
+  - The warehouse rooms are not reproducible from a fresh boot: a walking chimp calls rand()
+    whenever one of its probes touches an edge, pad, door or item, so runs depend on the pace.
+    Start such runs from a state (without chimps the warehouse calls rand() never).
 
 ## Address conventions (Windows EXE)
 

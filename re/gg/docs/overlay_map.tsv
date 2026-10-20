@@ -1,10 +1,10 @@
 ovl	stub_seg	ghidra_stub	ghidra_seg	file_offset	code_size	fixups	entries	role
-0	0e0d	1e0d	2a80	0x1ba10	2390	45	10	Cyber Chimps: placement, start states, behaviour tables, taking and dropping parts (Chimps_Init, Chimp_Brain)
+0	0e0d	1e0d	2a80	0x1ba10	2390	45	10	Cyber Chimps: actor set-up, spawn (Chimps_Spawn, rand), brain and behaviour tables (Chimp_Brain), taking and dropping parts
 1	0e13	1e13	2b16	0x1c3c0	1074	11	8	fonts: load, select, colour, draw string/char, metrics (TLC UI library)
 2	0e18	1e18	2b5a	0x1c810	750	27	7	PLAYERS.DAT: open, read, write, save the current player (Players_SaveCurrent)
 3	0e1d	1e1d	2b89	0x1cb40	1189	7	3	text renderer: word wrap and FF escapes (Text_Render; TLC library, same lineage as TM Win segment 10b0)
-4	0e20	1e20	2bd4	0x1d000	830	12	7	helpers: Rand_Shuffle, Rank_FromPoints, Str_FormatThousands
-5	0e25	1e25	2c08	0x1d360	131	0	3	hardware checks: Video_GetDisplayCode, Mouse_DriverPresent, Cpu_Detect
+4	0e20	1e20	2bd4	0x1d000	830	12	7	helpers: Rand_Shuffle, Zone_SetFromObject, PartList_FindHeld, screen-animation picture binding, Rank_FromPoints, Str_FormatThousands
+5	0e25	1e25	2c08	0x1d360	131	0	3	hardware checks: Video_DccSupported, Mouse_DriverPresent, Cpu_Detect
 6	0e28	1e28	2c11	0x1d3f0	2448	85	8	attract sequence: title animation, story pages, sign-in prompt (State_01_Attract)
 7	0e2d	1e2d	2caa	0x1de30	5173	136	1	sign-in and roster (State_02_SignIn), creating PLAYERS.DAT
 8	0e30	1e30	2dee	0x1f380	7622	236	6	workshop and vehicle assembly (State_06_Workshop)
@@ -13,15 +13,15 @@ ovl	stub_seg	ghidra_stub	ghidra_seg	file_offset	code_size	fixups	entries	role
 11	0e3a	1e3a	303a	0x21ad0	602	21	2	start-up: command line, start-up checks, fatal messages (Init_CommandLine)
 12	0e3d	1e3d	3060	0x21d60	547	18	6	New Player Hints queue (Hint_Queue, Hint_Show)
 13	0e41	1e41	3083	0x21fb0	10148	146	9	puzzle 0: electric circuits (electric.c)
-14	0e46	1e46	32fe	0x24880	3301	87	18	puzzle 4: balance [inferred from the dispatch order]
+14	0e46	1e46	32fe	0x24880	3301	87	18	puzzle 4: balance
 15	0e4e	1e4e	33cd	0x25620	7892	145	1	puzzle 6: forms of energy
-16	0e51	1e51	35bb	0x27620	7604	84	29	puzzle 7: magnets [inferred from the dispatch order]
+16	0e51	1e51	35bb	0x27620	7604	84	29	puzzle 7: magnets
 17	0e5d	1e5d	3797	0x29480	5287	141	3	puzzle 5: launch; uses the DAM engine (Anim_PlayModal)
 18	0e60	1e60	38e2	0x2aa50	1050	55	7	puzzle choice and dispatch (State_09_Puzzle)
-19	0e65	1e65	3924	0x2aee0	320	10	8	small helpers called by the puzzle overlays (sound) [roles of the 8 entries not established]
+19	0e65	1e65	3924	0x2aee0	320	10	8	puzzle effect-bank helpers: load, play, play looped, stop, stop all, wait, free, transpose (PzSnd_*)
 20	0e6a	1e6a	3938	0x2b040	4376	127	1	puzzle 1: simple machines (simple.c)
-21	0e6d	1e6d	3a4a	0x2c260	3664	103	1	puzzle 2: machine pieces (simple-machine examples)
-22	0e70	1e70	3b2f	0x2d180	8346	98	1	puzzle 3: gears and buttons [inferred from the dispatch order]
+21	0e6d	1e6d	3a4a	0x2c260	3664	103	1	puzzle 2: machine pieces
+22	0e70	1e70	3b2f	0x2d180	8346	98	1	puzzle 3: gears and buttons
 23	0e73	1e73	3d39	0x2f2e0	2506	7	15	DAM animation engine (TLC library; same lineage as TM Win 10b8); 11 of 15 functions have no caller
 24	0e7a	1e7a	3dd6	0x2fcc0	2575	49	2	race of the Automotive and Alternative Energy buildings
 25	0e7d	1e7d	3e77	0x30740	3459	65	1	race of the Aircraft building
@@ -29,7 +29,7 @@ ovl	stub_seg	ghidra_stub	ghidra_seg	file_offset	code_size	fixups	entries	role
 27	0e83	1e83	3f56	0x315b0	3548	73	8	dialogs: layout, draw, modal loop, pager, message, Yes/No, chimps question (TLC library); straddles linear 0x40000
 28	0e88	1e88	4034	0x32420	858	30	11	buttons: draw, focus, flash, zones (TLC library)
 29	0e8e	1e8e	-	0x327c0	0	0	0	empty (no code)
-30	0e90	1e90	406a	0x327d0	914	12	4	list box (sign-in roster list)
+30	0e90	1e90	406a	0x327d0	914	12	4	vertical scroll bar of the sign-in list (ScrollBar_Draw, ScrollBar_HandleClick)
 31	0e94	1e94	40a4	0x32b80	1563	37	2	menu bar and drop-downs (Menu_SetMenuBar; TM Win MenuBarDef layout)
 32	0e97	1e97	4106	0x331f0	368	7	6	menu commands (File, Options) and resource message boxes
 33	0e9b	1e9b	411d	0x33370	552	4	6	Help menu topics (Help_ShowTopic)

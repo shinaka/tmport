@@ -1,17 +1,253 @@
+3083:0000	PzElec_StackHas	int far PzElec_StackHas(int comp,int far *stack,int depth)	1 when comp is one of stack[0..depth-1]
+3083:002b	PzElec_SkipExit	int far PzElec_SkipExit(int comp,int far *comps,int depth,int term,int far *terms)	path search: 1 = do not take this exit (unlinked, or back onto the stack through a terminal other than the top's entry terminal)
+3083:007c	PzElec_PathKnown	int far PzElec_PathKnown(int far *comps,int depth)	1 when a row of the path table DS:a138 starts with comps[0..depth-1]
+3083:00d5	PzElec_PathAdd	void far PzElec_PathAdd(int far *comps,int depth,int start)	appends comps[0..depth-1] + start as a new row of DS:a138, DS:a2c8 += 1
+3083:0129	PzElec_BatteryShorted	int far PzElec_BatteryShorted(int battery)	enumerates the closed paths from a battery and returns 1 when one is a short (no load) or a same-direction battery loop
+3083:0492	PzElec_CheckBatteries	void far PzElec_CheckBatteries(void)	DS:a87e[i] = PzElec_BatteryShorted(i) for every placed battery
+3083:04c7	PzElec_BulbLit	int far PzElec_BulbLit(int bulb)	enumerates the closed paths through a bulb; 1 when powered by unshorted batteries of one direction and not shorted; marks DS:a89c
+3083:0844	PzElec_SetBulbPicture	void far PzElec_SetBulbPicture(int bulb,int lit)	lit: picture 0x20bb (effect 1 when it changes); unlit: the bulb's tool picture
 3083:08a1	PzElectric_Run		puzzle 0: electric circuits (electric.c asserts)
-32fe:0aa0	PzBalance_Run		puzzle 4: balance (inferred from the order of the dispatch table)
+3083:0b15	PzElec_LayWire	void near PzElec_LayWire(void)	wire mode click: rubber band from a free terminal to a free terminal of another piece; a miss loses the wire
+3083:0d1a	PzElec_SetMouseRange	void near PzElec_SetMouseRange(int board)	INT 33h fn 7/8: the board while a wire is strung, else the screen (minus the cursor size)
+3083:0d97	PzElec_CutWire	void near PzElec_CutWire(void)	idle click on a drawn connection: unlinks it and puts a wire in the hand (mode 4)
+3083:0f18	PzElec_OnWire	int near PzElec_OnWire(int px,int py,int x1,int y1,int x2,int y2)	1 when the point is on the L-shaped wire (horizontal at y1, then vertical at x2), 3 pixels thick; Ghidra cut the function to 2 bytes, it is 0xb7 bytes (3083:0f18..0fce)
+3083:0fcf	PzElec_DrawWires	void near PzElec_DrawWires(void)	draws every owned wire (flag 1) in colour 1 and the terminal dots of every connection
+3083:10ac	PzElec_DrawWireL	void near PzElec_DrawWireL(int x1,int y1,int x2,int y2)	3-pixel L: horizontal along y1 to x2, then vertical along x2 to y2
+3083:11a8	PzElec_DrawRubberBand	void near PzElec_DrawRubberBand(int x,int y)	the L from the wire's start anchor DS:a8bc/a8ba to (x,y), then the start dot
+3083:12cc	PzElec_DrawTerminalDot	void near PzElec_DrawTerminalDot(int comp,int term)	dot picture 0x20b8 (dot y offset <= 5) or 0x20b9 at the terminal's dot position
+3083:1327	PzElec_ToggleSwitch	int near PzElec_ToggleSwitch(int comp,int mx,int my)	click inside the lever (x+7,y+20,9,16) flips the switch picture and state; 1 when toggled
+3083:13c5	PzElec_PickUpPiece	void near PzElec_PickUpPiece(int comp)	takes a non-fixed piece off the board: unlinks (wires are lost), frees the slot, piece cursor in the hand
+3083:156a	PzElec_ReturnToToolbox	void near PzElec_ReturnToToolbox(void)	held piece or wire back into the toolbox (count + 1), idle mode
+3083:15ad	PzElec_TakeFromToolbox	void near PzElec_TakeFromToolbox(int code)	toolbox item code-0x45b (count > 0): count - 1, its picture as the cursor, held mode = type
+3083:163c	PzElec_DrawToolbox	void near PzElec_DrawToolbox(void)	toolbox pictures with counts (units digit, tens digit 2 px to the left)
+3083:172a	PzElec_PlacePiece	void near PzElec_PlacePiece(void)	board click with a piece in hand: placed at the mouse when inside the board and not overlapping a piece body
+3083:1850	PzElec_AutoConnect	void near PzElec_AutoConnect(int comp)	links each free terminal of a new piece to an overlapping free terminal of another piece (flags 3 / 0)
+3083:19a9	PzElec_StripsOverlap	int near PzElec_StripsOverlap(int x1,int y1,int w1,int h1,int x2,int y2,int w2,int h2)	interval overlap test on both axes (signed, the smaller interval's ends inside the larger)
+3083:1a94	PzElec_UpdatePlugCursor	void near PzElec_UpdatePlugCursor(void)	wire mode: plug picture 0x20ba as the cursor over a free terminal, the held picture elsewhere
+3083:1b75	PzElec_FindFreeTerminal	int near PzElec_FindFreeTerminal(void)	first free terminal (of a piece other than DS:a8c2) whose hit rectangle holds the hot point; sets DS:a8c2/a8c0/a8bc/a8ba
+3083:1c63	PzElec_PointInRect	int near PzElec_PointInRect(int px,int py,int x,int y,int w,int h)	half-open rectangle test
+3083:1c99	PzElec_DrawBoard	void near PzElec_DrawBoard(int flush)	restores the board, updates bulb pictures, draws the pieces, wires and dots
+3083:1d1d	PzElec_AddPieceZones	void near PzElec_AddPieceZones(void)	pushes the zone of every placed piece (codes 0x4b0 + slot)
+3083:1d43	PzElec_RemovePieceZones	void near PzElec_RemovePieceZones(void)	removes them
+3083:1d69	PzElec_AddToolZones	void near PzElec_AddToolZones(void)	pushes the 5 toolbox zones (0x45b..0x45f)
+3083:1d83	PzElec_AddToolCursorRegions	void near PzElec_AddToolCursorRegions(void)	label cursors over the toolbox items with a count
+3083:1dab	PzElec_InitToolZones	void near PzElec_InitToolZones(void)	fills the toolbox zone records DS:a8dc from the tool table DS:24e6
+3083:1e20	PzElec_CreatePiece	void near PzElec_CreatePiece(int x,int y)	first free slot (assert), type DS:a8be, picture, zone, terminal geometry, auto-connect
+3083:1f22	PzElec_AddBoardZones	void near PzElec_AddBoardZones(void)	pushes the board zone DS:24ba (0x454) and the hint button zone DS:24d0 (0x458)
+3083:1f35	PzElec_SetTerminalGeometry	void near PzElec_SetTerminalGeometry(int comp,int type)	terminal hit rectangles, anchors, dot offsets and overlap heights per type 0..3 (constants in code, switch CS:2166)
+3083:216e	PzElec_AllBulbsLit	int near PzElec_AllBulbsLit(void)	1 when every slot of type 1 (placed or not) passes PzElec_BulbLit
+3083:2196	PzElec_IsSolved	int near PzElec_IsSolved(void)	the circuit puzzle's success test (toolbox counts, lit bulbs, batteries and switches on the path, switches control the light)
+3083:22bf	PzElec_LoadVariant	void near PzElec_LoadVariant(int variant)	reads F 0x20bf + variant: toolbox counts, pieces, links
+3083:24aa	PzElec_InitToolCursorRegions	void near PzElec_InitToolCursorRegions(void)	cursor regions DS:aa94 over the toolbox with the label pictures of 0x20b6
+3083:250e	PzElec_DrawScreen	void near PzElec_DrawScreen(void)	screen 0x20b2/0x20b3, panel text, board, fade in, puzzle cursor
+3083:256b	PzElec_LoadResources	void near PzElec_LoadResources(int variant)	tool pictures, cursors, digits, labels, plug, switch, bulb, dots, texts 0x20dd/0x20fb + variant
+3083:2695	PzElec_Cleanup	void near PzElec_Cleanup(void)	frees everything, clears zones and cursor regions, default cursor
+32fe:0000	PzBalance_LoadVariant	void far PzBalance_LoadVariant(int v)	inventory counts and right hooks from D 0x211b record v; left hooks emptied
+32fe:0079	PzBalance_SelectHookZones	void far PzBalance_SelectHookZones(int set,int removeOld)	swaps the 5 left hook zones to the given resting tilt
+32fe:00d4	PzBalance_InitZones	void far PzBalance_InitZones(void)	inventory zones (added) and the three hook zone sets; set 0 added
+32fe:0235	PzBalance_DrawInventory	void far PzBalance_DrawInventory(void)	restores (8,67,38,93), draws each weight type in stock with its count, flush
+32fe:02c8	PzBalance_DrawHook	void far PzBalance_DrawHook(int x,int y,int far *list,int right)	ring and weight picture per hanging weight, 15 px apart; stack hook under 1..2 left weights
+32fe:0375	PzBalance_DrawBeam	void far PzBalance_DrawBeam(void)	beam picture 0x211e + tilt + 5 at (53,14), all hooks, flush; selects the hook zones at -5, 0, +5
+32fe:043b	PzBalance_LeftTorque	int far PzBalance_LeftTorque(void)	sum of mass * (5 - hook) over hooks 0..4
+32fe:0494	PzBalance_RightTorque	int far PzBalance_RightTorque(void)	sum of mass * (hook - 4) over hooks 5..9
+32fe:04f0	PzBalance_Compare	int far PzBalance_Compare(void)	0 no motion, -1 come to level, else 100*lighter/heavier + 1 (swing speed)
+32fe:0566	PzBalance_SwingLevel	void far PzBalance_SwingLevel(void)	tilt one step toward 0 every 50 ticks, rising or falling effect
+32fe:05eb	PzBalance_Swing	void far PzBalance_Swing(int ratio)	tilt to the other end (or from level) at ratio/2 ticks per step, then effect 10
+32fe:06b9	PzBalance_Settle	int far PzBalance_Settle(void)	PzBalance_Compare and the motion; 1 when the beam came to level
+32fe:06de	PzBalance_HoldWeight	void far PzBalance_HoldWeight(int type)	carried-weight cursor (hot spot w/2, 0), effect 0
+32fe:0750	PzBalance_DropCursor	void far PzBalance_DropCursor(void)	puzzle cursor back, carried cursor freed
+32fe:0775	PzBalance_Hang	void far PzBalance_Hang(int hook)	carried weight to the first free slot of the hook (3 at most), effect 1
+32fe:07c9	PzBalance_Unhang	void far PzBalance_Unhang(int hook)	takes the last weight of the hook into the hand
+32fe:081a	PzBalance_Loop	int far PzBalance_Loop(void)	input loop (switch CS:0a2c, 29 codes); returns solved
+32fe:0aa0	PzBalance_Run	int far PzBalance_Run(int v)	puzzle 4: balance (confirmed by code, data and captures)
 33cd:0000	PzEnergy_Run		puzzle 6: energy forms (8 energy names DS:28ea..)
+33cd:022a	PzEnergy_SetMouseRange	void near PzEnergy_SetMouseRange(int drawing)	INT 33h fn 7/8: x 0x3d..0x13f-w, y 0x12..0x97 while a line is drawn, else the screen
+33cd:02a0	PzEnergy_SendEnergy	void near PzEnergy_SendEnergy(void)	check button: a pulse along every unsent line; right ones animate their device, wrong ones are erased and returned
+33cd:03c8	PzEnergy_AnimateDevice	void near PzEnergy_AnimateDevice(int dev)	finishes the idle loop, plays the working animation (resources R+1..R+3) and leaves its last frame
+33cd:064d	PzEnergy_IdleAnimate	void near PzEnergy_IdleAnimate(void)	steps the idle animation of every device when timer slot 7 expired (period 31 ticks)
+33cd:0735	PzEnergy_BuildHintAndLabels	void near PzEnergy_BuildHintAndLabels(int variant)	hint text (header 0x1131 for variants 0..2, then the text of each energy form) and the form names on the screen
 33cd:0879	Str_ConcatList_ovl15		concatenates a NULL-terminated list of strings (stpcpy loop); byte-identical copy at 3938:0ce7 (TM DOS StrConcatList 1460:09f2)
 33cd:08d1	Str_CopyEnd_ovl15		strcpy returning the end; copy at 3938:0d3f (TM DOS StrCopyBounded 1460:09b7)
-35bb:1c03	PzMagnets_Run		puzzle 7: magnets (inferred from the order of the dispatch table)
+33cd:08f5	PzEnergy_DrawLines	void near PzEnergy_DrawLines(void)	restores the work area and draws every line in colour 0
+33cd:099c	PzEnergy_DrawFromForm	void near PzEnergy_DrawFromForm(int code)	pencil started at a form connector: rubber line until a device connector or a cancel click
+33cd:0ae7	PzEnergy_DrawFromDevice	void near PzEnergy_DrawFromDevice(int code)	pencil started at a device connector: rubber line until a form connector or a cancel click
+33cd:0c3e	PzEnergy_IsSolved	int near PzEnergy_IsSolved(void)	1 when every needed form-device line is drawn
+33cd:0c71	PzEnergy_SelectEraser	void near PzEnergy_SelectEraser(void)	eraser cursor, mode 1
+33cd:0c97	PzEnergy_EraseLines	void near PzEnergy_EraseLines(void)	while a button is held: erases every line whose pixel is under the eraser's hot point
+33cd:0db4	PzEnergy_SelectPencil	void near PzEnergy_SelectPencil(void)	pencil cursor, mode 0, when lines are left
+33cd:0dde	PzEnergy_AddZones	void near PzEnergy_AddZones(void)	eraser, pencil, hint, check and work-area zones
+33cd:0e0c	PzEnergy_DrawLine	void near PzEnergy_DrawLine(int x1,int y1,int x2,int y2,int colour)	stepped line drawn pixel by pixel (vertical lines as a VLine)
+33cd:0ee7	PzEnergy_AnimatePulse	void near PzEnergy_AnimatePulse(int x1,int y1,int x2,int y2,int erase)	moves the diamond along a line, a frame every 4 x steps and 5 ticks; erase retracts the line behind it
+33cd:0ff7	PzEnergy_DrawPulse	void near PzEnergy_DrawPulse(int x,int y)	5x5 diamond outline in colour 0x83, flushed
+33cd:10a9	PzEnergy_PointOnLine	int near PzEnergy_PointOnLine(int x1,int y1,int x2,int y2,int px,int py)	1 when (px,py) is one of the pixels PzEnergy_DrawLine would draw (lines with x1 != x2)
+33cd:1135	PzEnergy_DrawPencilCount	void near PzEnergy_DrawPencilCount(void)	pencil picture 0x1097 and the lines-left digit, or nothing when none are left
+33cd:1189	PzEnergy_AddConnectorZones	void near PzEnergy_AddConnectorZones(void)	circular zones (radius 7) on the used form and device connectors (0x452.., 0x456..)
+33cd:1274	PzEnergy_LoadVariant	void near PzEnergy_LoadVariant(int variant)	variant parameters as immediate stores in a 28-way switch (CS:1b69), then the needed-line matrix
+33cd:1ba1	PzEnergy_DrawScreen	void near PzEnergy_DrawScreen(int variant)	screen 0x1093/0x1094, labels, panel text formatted with the line count, devices, fade in
+33cd:1cc7	PzEnergy_LoadResources	void near PzEnergy_LoadResources(void)	digits, pencil, buttons, texts, cursors 3/7/8, device idle bundles
+33cd:1dd9	PzEnergy_Cleanup	void near PzEnergy_Cleanup(void)	frees everything, clears zones and cursor regions, default cursor
+35bb:0000	PzMagnets_RectsOverlap	int near PzMagnets_RectsOverlap(int x1,int y1,int w1,int h1,int x2,int y2,int w2,int h2)	positive-area overlap of two rectangles
+35bb:0103	PzMagnets_WarpMouse	void near PzMagnets_WarpMouse(int x,int y)	g_mouseX/Y and INT 33h function 4
+35bb:0127	PzMagnets_DrawNumber	void far PzMagnets_DrawNumber(int x,int y,int n)	one or two digits of 0x11a3, 1 px apart
+35bb:01ac	PzMagnets_DrawInventory	void far PzMagnets_DrawInventory(void)	restores (8,47,58,75), each kind in stock with its count, flush
+35bb:0236	PzMagnets_AllDrawn	int far PzMagnets_AllDrawn(void)	every used slot has its drawn flag
+35bb:0271	PzMagnets_Overlap	int far PzMagnets_Overlap(int i,int j,int strict)	strict: shrunk rectangles overlap; else i with its shadow covers j
+35bb:0401	PzMagnets_CanDraw	int far PzMagnets_CanDraw(int i)	no undrawn magnet's shadow covers magnet i
+35bb:0456	PzMagnets_DrawTable	void far PzMagnets_DrawTable(void)	restores the table, draws shadows and magnets back to front, flush
+35bb:05be	PzMagnets_ISqrt	int far PzMagnets_ISqrt(unsigned long n)	binary-search square root; 1 for n < 4
+35bb:06aa	PzMagnets_Cube	int far PzMagnets_Cube(int x)	x*x*x (16 bits)
+35bb:06ba	PzMagnets_PoleForce	void far PzMagnets_PoleForce(int north,int px,int py,int i,int j)	force of magnet j's poles on a pole of magnet i, or attach
+35bb:08ae	PzMagnets_Forces	void far PzMagnets_Forces(int i)	accumulates the forces of all other magnets on magnet i
+35bb:09a5	PzMagnets_Blocked	int far PzMagnets_Blocked(int i)	off the table or overlapping another magnet
+35bb:0aa4	PzMagnets_TouchesOpposite	int far PzMagnets_TouchesOpposite(int i)	a pole of i is 1 px from an opposite pole
+35bb:0c78	PzMagnets_TouchesSame	int far PzMagnets_TouchesSame(int i,int vertical)	a pole of i is 1 px from a like pole: sets the cross-axis nudge
+35bb:0efc	PzMagnets_Step	int far PzMagnets_Step(int substep)	moves magnets one pixel by their forces; returns moved
+35bb:113c	PzMagnets_Simulate	void far PzMagnets_Simulate(void)	up to 16 rounds of 4 substeps of 4 ticks, looping effect 1
+35bb:1208	PzMagnets_HoldMagnet	void far PzMagnets_HoldMagnet(int kind,int orient,int x,int y)	carried-magnet cursor (hot spot 0,0), mouse moved to (x, y)
+35bb:126f	PzMagnets_DropCursor	void far PzMagnets_DropCursor(int offset)	mouse moved (+5,+5 when offset), puzzle cursor back, effect 3
+35bb:12c4	PzMagnets_TakeFromInventory	void far PzMagnets_TakeFromInventory(void)	magnet of the kind under the mouse into the hand, effect 2
+35bb:1387	PzMagnets_PutBack	void far PzMagnets_PutBack(void)	carried magnet back to the inventory
+35bb:13a7	PzMagnets_PickUp	void far PzMagnets_PickUp(void)	first magnet under the mouse into the hand, then simulate
+35bb:14f5	PzMagnets_Drop	void far PzMagnets_Drop(void)	carried magnet to the table at the mouse when it fits, then simulate
+35bb:16b6	PzMagnets_Rotate	void far PzMagnets_Rotate(void)	next orientation of the carried magnet, effect 5
+35bb:16f7	PzMagnets_CheckSolved	int far PzMagnets_CheckSolved(int level)	every target has its own matching magnet within 4 px
+35bb:1898	PzMagnets_Loop	int far PzMagnets_Loop(int level)	input loop (switch CS:1a1f, 10 codes); returns solved
+35bb:1a47	PzMagnets_Init	void far PzMagnets_Init(void)	nothing carried, all 64 slots free
+35bb:1a8f	PzMagnets_LoadResources	void far PzMagnets_LoadResources(void)	0x11a2..0x11a6 and 0x1095
+35bb:1af4	PzMagnets_FreeResources	void far PzMagnets_FreeResources(void)	frees what PzMagnets_LoadResources loaded
+35bb:1b59	PzMagnets_DrawTargets	void far PzMagnets_DrawTargets(int level)	inventory counts of the level; target outlines on the screen
+35bb:1c03	PzMagnets_Run	int far PzMagnets_Run(int v)	puzzle 7: magnets (confirmed by code, data and captures)
+3797:0000	PzLaunch_DrawObject	void near PzLaunch_DrawObject(void)	draws the object sprite DS:af8c at (DS:af9e, DS:af9c) with its saved clip rectangle, when DS:af9a is set
+3797:0070	PzLaunch_DrawRamp	void near PzLaunch_DrawRamp(void)	member DS:b124 of the current ramp set at (DS:32ec, DS:32f8)[DS:b124]
+3797:009f	PzLaunch_DrawPlunger	void near PzLaunch_DrawPlunger(void)	plunger picture of the energy level and its digit
+3797:0103	PzLaunch_Animate	void near PzLaunch_Animate(int force,int sprites)	every 6 ticks (timer slot 6) or when forced: target glow, ramp, DAM cels, object, plunger
+3797:018e	PzLaunch_GetCode	unsigned near PzLaunch_GetCode(void)	PzLaunch_Animate(0,0), then Input_StripFlags(Input_GetCode())
+3797:01a5	PzLaunch_WaitTimer	void near PzLaunch_WaitTimer(int slot)	animates until Timer_Expired(slot)
+3797:01c3	PzLaunch_WaitTimerAnim	void near PzLaunch_WaitTimerAnim(int slot)	the same with the DAM cels drawn
+3797:01e1	PzLaunch_SetObjectSprite	void far PzLaunch_SetObjectSprite(int x,int y,void far *picture)	object sprite position and picture; copies the current clip rectangle
+3797:0217	PzLaunch_PutObjectOnLauncher	void near PzLaunch_PutObjectOnLauncher(void)	selected object, frame 0, at (239,111)
+3797:023c	PzLaunch_IsSolved	int near PzLaunch_IsSolved(void)	compares surface, object, gravity, landing hole and ramp with the variant's requirements
+3797:02c3	PzLaunch_AddZones	void near PzLaunch_AddZones(void)	hint, ramp, gravity and plunger zones
+3797:030c	PzLaunch_LoadVariant	void near PzLaunch_LoadVariant(int variant)	applies the 30-byte record DS:2c62 + variant*0x1e
+3797:040d	PzLaunch_DrawScreen	void near PzLaunch_DrawScreen(void)	screen 0x1133/0x1134, panel text, fade in
+3797:0464	PzLaunch_LoadResources	void near PzLaunch_LoadResources(int variant)	picture sets 0x1141..0x1148, 0x114a, buttons, texts 0x1163/0x1181 + variant, cursor 3
+3797:0725	PzLaunch_Cleanup	void near PzLaunch_Cleanup(void)	frees everything, clears zones and cursor regions, default cursor
+3797:0870	PzLaunch_SetEnergy	void near PzLaunch_SetEnergy(int e)	DS:b12a
+3797:087d	PzLaunch_SetGravity	void near PzLaunch_SetGravity(int g)	DS:b11e and its picture index DS:b128, ignored while gravity is locked (-1)
+3797:08b6	PzLaunch_DrawGravity	void near PzLaunch_DrawGravity(void)	gravity picture (0x114a member DS:b128, or 0 when locked) at (4,135)
+3797:08e2	PzLaunch_StepRamp	void near PzLaunch_StepRamp(int delta)	ramp choice DS:b124 + delta wrapping 0..2, forced to the variant's fixed ramp 3..5
+3797:0942	PzLaunch_SetOfferObject0	void near PzLaunch_SetOfferObject0(int on)	DS:b112
+3797:094f	PzLaunch_SetOfferTool456	void near PzLaunch_SetOfferTool456(int on)	DS:b10a (button 0x456)
+3797:095c	PzLaunch_SetOfferTool457	void near PzLaunch_SetOfferTool457(int on)	DS:b108 (button 0x457)
+3797:0969	PzLaunch_SetSurface	void near PzLaunch_SetSurface(int s)	DS:b11a
+3797:0976	PzLaunch_SetOfferObject3	void near PzLaunch_SetOfferObject3(int on)	DS:b110
+3797:0983	PzLaunch_SetOfferObject2	void near PzLaunch_SetOfferObject2(int on)	DS:b10e
+3797:0990	PzLaunch_SetOfferObject1	void near PzLaunch_SetOfferObject1(int on)	DS:b10c
+3797:099d	PzLaunch_SetOfferTool452	void near PzLaunch_SetOfferTool452(int on)	DS:b116 (button 0x452)
+3797:09aa	PzLaunch_SetOfferTool453	void near PzLaunch_SetOfferTool453(int on)	DS:b114 (button 0x453)
+3797:09b7	PzLaunch_DrawBox	void near PzLaunch_DrawBox(void)	offered objects and surface tools in the box, with their zones (tag 1000)
+3797:0ae9	PzLaunch_Redraw	void near PzLaunch_Redraw(void)	ramp set by surface, play area restored and redrawn, forced animation frame, flush
+3797:0b4b	PzLaunch_SetTarget	void near PzLaunch_SetTarget(int hole)	DS:b126
+3797:0b58	PzLaunch_ComputeLanding	void near PzLaunch_ComputeLanding(void)	DS:b11c = DS:3000[object + surface + gravity + ramp terms + energy - 1]
+3797:0bd9	PzLaunch_SelectObject	void near PzLaunch_SelectObject(int obj)	DS:b118, its frame set DS:b120, object onto the launcher
+3797:0c33	PzLaunch_Fly	void near PzLaunch_Fly(void)	animates the launch: roll back below 4, else climb and flight along the path tables into the hole
+3797:0f33	PzLaunch_PullPlunger	int near PzLaunch_PullPlunger(void)	drag sets the energy (dx/3, 0..7); release launches; returns the judgement
+3797:0fca	PzLaunch_DragGravity	void near PzLaunch_DragGravity(void)	gravity slider drag: y < 0x92 low, < 0x9d normal, else high
 3797:1138	PzLaunch_Run		puzzle 5: launch (uses the DAM engine, Anim_PlayModal)
 38e2:0000	State_09_Puzzle	int far State_09_Puzzle(void)	type = random(8), up to 3 unsolved variants (counts DS:3334, 221 in all), any variant when fewer than 5 remain; Puzzle_Dispatch; solved flag DS:45d0 + type*0x42 + variant*2 and the door opens
 38e2:00d4	Puzzle_Dispatch		switch on the type (table CS:018e): 0 3083:08a1, 1 3938:0000, 2 3a4a:0000, 3 3b2f:1ed0, 4 32fe:0aa0, 5 3797:1138, 6 33cd:0000, 7 35bb:1c03
-38e2:019e	Puzzle_PickAny		any variant (when fewer than 5 unsolved remain overall)
+38e2:019e	Puzzle_FewUnsolvedLeft	int near Puzzle_FewUnsolvedLeft(void)	returns 1 when at most 4 variants of all 8 kinds are unsolved (it picks nothing)
 38e2:01e8	Puzzle_RandomType		random(8)
 38e2:0202	Puzzle_PickUnsolved		candidate variants: up to 3 unsolved ones
+38e2:0286	Puzzle_ShowHintText	void far Puzzle_ShowHintText(char far *text)	TextView_Run(text): the Hint button of every puzzle
+38e2:0299	Puzzle_ShowSolved	void far Puzzle_ShowSolved(int jingle)	effect jingle + random(4), panel zone DS:331c, message 0x2000 in the panel; the only rand() call inside a puzzle
+38e2:031a	Puzzle_PressGoBack	void far Puzzle_PressGoBack(void)	pressed Go Back picture 0x1092 at (249,168) until the button is released
+38e2:0357	Puzzle_InitPanel	void far Puzzle_InitPanel(char far *text)	loads 0x1091/0x1092, Go Back zone DS:3306, draws the panel at (0,165) and the text at (4,170) width 208
+38e2:03bf	Puzzle_AwardPoints	void far Puzzle_AwardPoints(int sound)	4 times: effect sound, +100 points shown, wait for the effect to end
+38e2:03ed	Puzzle_FreePanel	void far Puzzle_FreePanel(void)	font 0, frees the panel pictures
+3924:0000	PzSnd_LoadBank	void far PzSnd_LoadBank(unsigned id)	effect bank id + DS:a0d8 copied and every member registered: slots DS:b146[], count DS:338c
+3924:005b	PzSnd_WaitEnd	void far PzSnd_WaitEnd(int i)	busy-waits while effect i plays
+3924:0074	PzSnd_FreeBank	void far PzSnd_FreeBank(void)	releases the slots and the bank copy
+3924:00ae	PzSnd_Play	void far PzSnd_Play(int i,int priority)	starts (or restarts) effect i once
+3924:00cb	PzSnd_PlayLoop	void far PzSnd_PlayLoop(int i,int priority)	starts effect i looping
+3924:00e8	PzSnd_Stop	void far PzSnd_Stop(int i)	stops effect i
+3924:00fc	PzSnd_StopAll	void far PzSnd_StopAll(void)	stops every effect of the bank
+3924:0124	PzSnd_SetTranspose	void far PzSnd_SetTranspose(int i,int semitones)	transpose of effect i's current section (used by the balance puzzle)
 3938:0000	PzSimple_Run		puzzle 1: simple machines (simple.c asserts)
+3938:0233	PzSimple_DropPart	void near PzSimple_DropPart(int x,int y)	held part placed at the mouse when it fits inside the work area
+3938:0345	PzSimple_PickUpPlaced	void near PzSimple_PickUpPlaced(int x,int y)	topmost placed part under the mouse back into the hand
+3938:040f	PzSimple_DrawPlaced	void near PzSimple_DrawPlaced(int flush)	restores the work area and draws the placed parts
+3938:046b	PzSimple_PointInRect	int near PzSimple_PointInRect(int px,int py,int x,int y,int w,int h)	half-open rectangle test x <= px < x+w, y <= py < y+h
+3938:04a1	PzSimple_InitCursorRegions	void near PzSimple_InitCursorRegions(void)	label cursors (0x204e) over the 8 inventory slots
+3938:0524	PzSimple_AddCursorRegions	void near PzSimple_AddCursorRegions(void)	pushes the label cursor regions of the slots with a count
+3938:054d	PzSimple_CheckParts	void near PzSimple_CheckParts(void)	check button: each placed part either fits a record of its type (fit animation) or bounces back
+3938:0671	PzSimple_BounceBack	void near PzSimple_BounceBack(int slot)	part flies toward its inventory slot in 5 steps of 5 ticks
+3938:0750	PzSimple_JudgeAndReveal	int near PzSimple_JudgeAndReveal(void)	all 10 records filled: 100-tick pause, expanding reveal of the finished machine, 1
+3938:0886	PzSimple_AnimateFit	void near PzSimple_AnimateFit(int type,int x,int y)	part animation frames 1..n-1 at 40 ticks each with its looped sound
+3938:099f	PzSimple_ReturnHeld	void near PzSimple_ReturnHeld(void)	held part back into the inventory
+3938:09df	PzSimple_TakeFromInventory	void near PzSimple_TakeFromInventory(int type)	takes a part of the type (count > 0) into the hand
+3938:0a64	PzSimple_FindRecord	int near PzSimple_FindRecord(int slot)	first record of the part's type with an acceptance rectangle holding its test point, or -1
+3938:0af7	PzSimple_RemoveRecordZones	void near PzSimple_RemoveRecordZones(void)	removes the acceptance rectangles of the held type from the zone list (they are never added: no effect)
+3938:0b59	PzSimple_BuildHintText	void near PzSimple_BuildHintText(int variant)	hint text (header 0x2083 for variants 0..2, then the text of each part type present) and the zones
 3938:0ce7	Str_ConcatList_ovl20		copy of Str_ConcatList_ovl15
 3938:0d3f	Str_CopyEnd_ovl20		copy of Str_CopyEnd_ovl15
-3a4a:0000	PzPieces_Run		puzzle 2: machine pieces (simple-machine examples DS:35cc..)
-3b2f:1ed0	PzGears_Run		puzzle 3: gears and buttons (inferred from the order of the dispatch table)
+3938:0d63	PzSimple_DrawInventory	void near PzSimple_DrawInventory(void)	inventory icons and counts
+3938:0dfe	PzSimple_LoadVariant	void near PzSimple_LoadVariant(int variant)	F 0x206d + variant into a 0x570-byte buffer, empty placed slots
+3938:0e76	PzSimple_DrawScreen	void near PzSimple_DrawScreen(void)	screen 0x204a/0x204b, machine picture, panel text, fade in
+3938:0ed8	PzSimple_LoadResources	void near PzSimple_LoadResources(int variant)	labels, digits, machine bundle 0x2059 + variant, part pictures and animations, buttons, texts
+3938:1004	PzSimple_Cleanup	void near PzSimple_Cleanup(void)	frees everything, clears zones and cursor regions, default cursor
+3a4a:0000	PzPieces_Run	int far PzPieces_Run(int v)	puzzle 2: machine pieces (F 0x209c + v, bundle 0x2088 + v, names DS:357c)
+3a4a:01ef	PzPieces_SetMouseBounds	void near PzPieces_SetMouseBounds(int work)	INT 33h 7/8: the work area less the cursor size, or the whole screen less the cursor size
+3a4a:0265	PzPieces_PickUp	void near PzPieces_PickUp(int code)	piece code - 0x45b into the hand, effect 0
+3a4a:037d	PzPieces_Drop	void near PzPieces_Drop(void)	carried piece to the mouse, snap within 10 px, group move, effect 1
+3a4a:053f	PzPieces_RedrawWork	void near PzPieces_RedrawWork(void)	restores the work area, draws the placed pieces inside it, flush
+3a4a:05b8	PzPieces_MoveGroup	void near PzPieces_MoveGroup(int ax,int ay)	group to anchor (ax, ay), kept inside the work area, 5-step slides
+3a4a:071d	PzPieces_MergeGroups	void near PzPieces_MergeGroups(int j)	the carried piece's group and piece j's group become the smaller group number
+3a4a:0780	PzPieces_TakeFromBox	void near PzPieces_TakeFromBox(void)	box animation, random piece still in the box (rand), waits for the mouse in the work area
+3a4a:089c	PzPieces_AddZones	void near PzPieces_AddZones(void)	zones of the placed pieces
+3a4a:08c9	PzPieces_RemoveZones	void near PzPieces_RemoveZones(void)	removes the zones of the placed pieces
+3a4a:08f6	PzPieces_CheckSolved	int near PzPieces_CheckSolved(void)	all pieces placed on one anchor: machine picture revealed, returns 1
+3a4a:0a88	PzPieces_OpenBox	void near PzPieces_OpenBox(void)	effect 12, lid frames 1, 2 at (5,82), 10 ticks each
+3a4a:0ade	PzPieces_CloseBox	void near PzPieces_CloseBox(void)	effect 13, lid frames 1, 0, 10 ticks each
+3a4a:0b33	PzPieces_InitZones	void near PzPieces_InitZones(void)	piece zone records: size, priority, press 0x45b + i
+3a4a:0baf	PzPieces_AddStaticZones	void near PzPieces_AddStaticZones(void)	work area, box and Hint zones
+3a4a:0bcb	PzPieces_LoadVariant	void near PzPieces_LoadVariant(int v)	F 0x209c + v into g_pieces
+3a4a:0be5	PzPieces_DrawScreen	void near PzPieces_DrawScreen(void)	cursors, screen 0x2084, panel, back page, box count, fade
+3a4a:0ca8	PzPieces_LoadResources	void near PzPieces_LoadResources(int v)	bundle 0x2088 + v, piece table fill-in, 0x1095, 0x2087, 0x204f, 0x20b1, 0x20b0
+3a4a:0d95	PzPieces_Free	void near PzPieces_Free(void)	zones, cursor restored, everything freed
+3b2f:0000	PzGears_AllButtonsPressed	int near PzGears_AllButtonsPressed(void)	every button object (type >= 7) has state != 0
+3b2f:0033	PzGears_CountStock	void near PzGears_CountStock(void)	gears per type with column -99
+3b2f:0070	PzGears_AddZones	void near PzGears_AddZones(void)	gear zone array; board, inventory circles and Hint zones
+3b2f:00a9	PzGears_DrawInventory	void near PzGears_DrawInventory(void)	two-digit counts and the inventory gear pictures, flush
+3b2f:01e4	PzGears_DrawPeg	void near PzGears_DrawPeg(int col,int row,int color)	small 4x3 dot of a grid cell
+3b2f:024f	PzGears_Draw	void near PzGears_Draw(int sounds)	board: gears, crank, racks back to front, then buttons; button effects
+3b2f:071c	PzGears_DrawScreen	void near PzGears_DrawScreen(void)	screen 0x2021, pegs, back page, board, inventory, fade
+3b2f:079b	PzGears_InitCrankRects	void near PzGears_InitCrankRects(void)	crank centre and the 26 handle rectangles on screen
+3b2f:081e	PzGears_SetCrankZone	void near PzGears_SetCrankZone(void)	crank handle zone for the current crank frame
+3b2f:0892	PzGears_AddGearZone	void near PzGears_AddGearZone(int i)	circle zone of placed gear i, press 0x4b0 + i
+3b2f:0972	PzGears_RemoveGearZone	void near PzGears_RemoveGearZone(int i)	removes the zone of gear i
+3b2f:098f	PzGears_WarpMouse	void near PzGears_WarpMouse(int x,int y)	g_mouseX/Y and INT 33h function 4
+3b2f:09b3	PzGears_PutBack	void near PzGears_PutBack(void)	carried gear back to the inventory, effect 1
+3b2f:0a22	PzGears_TakeFromStock	void near PzGears_TakeFromStock(int type)	gear of that type into the hand (or put the carried one back)
+3b2f:0b18	PzGears_PickUp	void near PzGears_PickUp(int i)	placed gear i back into the hand
+3b2f:0c2b	PzGears_Place	void near PzGears_Place(int mx,int my)	carried gear onto the peg under its centre when allowed, effect 1
+3b2f:0ecc	PzGears_GearToGear	int near PzGears_GearToGear(int i,int j)	mesh test and opposite turn of gear j
+3b2f:0ff9	PzGears_HRackToHRack	int near PzGears_HRackToHRack(int i,int j)	horizontal rack segment pushes or pulls segment j
+3b2f:111d	PzGears_HRackToButton	int near PzGears_HRackToButton(int i,int j)	presses or releases button j (types 7, 8); returns 0
+3b2f:11dc	PzGears_VRackToButton	int near PzGears_VRackToButton(int i,int j)	presses or releases button j (types 9, 10); returns 0
+3b2f:129b	PzGears_VRackToVRack	int near PzGears_VRackToVRack(int i,int j)	vertical rack segment pushes or pulls segment j
+3b2f:13bf	PzGears_GearToHRack	int near PzGears_GearToHRack(int i,int j)	gear i moves toothed horizontal rack j by one unit
+3b2f:14ae	PzGears_HRackToGear	int near PzGears_HRackToGear(int i,int j)	toothed horizontal rack i turns gear j
+3b2f:15c3	PzGears_GearToVRack	int near PzGears_GearToVRack(int i,int j)	gear i moves toothed vertical rack j by one unit
+3b2f:16b2	PzGears_VRackToGear	int near PzGears_VRackToGear(int i,int j)	toothed vertical rack i turns gear j
+3b2f:17c7	PzGears_Propagate	void near PzGears_Propagate(int i)	depth-first drive from object i through g_gearsDriveTable
+3b2f:185c	PzGears_TurnCrank	void near PzGears_TurnCrank(int dir)	one crank step (-1 clockwise, +1 counter-clockwise), propagation, undo on a jam
+3b2f:1991	PzGears_RectContains	int near PzGears_RectContains(int far *rect,int x,int y)	point in rectangle; no caller
+3b2f:19bf	PzGears_DragCrank	void near PzGears_DragCrank(void)	turns the crank by mouse motion while the button is held
+3b2f:1b83	PzGears_LoadVariant	void near PzGears_LoadVariant(int v)	F 0x2002 + v; crank rectangles and zone
+3b2f:1bd5	PzGears_LoadResources	void near PzGears_LoadResources(int v)	pictures, cursors 4 and 3, 0x1095, texts 0x202b + v and 0x202a
+3b2f:1cad	PzGears_Free	void near PzGears_Free(void)	frees everything, arrow cursor, zones cleared, bank freed
+3b2f:1da8	PzGears_SaveHome	void near PzGears_SaveHome(void)	gear frames and rack home positions into their spare fields
+3b2f:1e0a	PzGears_SaveFrames	void near PzGears_SaveFrames(void)	gear and crank frames at the start of a crank drag
+3b2f:1e46	PzGears_Reset	void near PzGears_Reset(void)	after an unsuccessful drag: frames, racks home, buttons up, crank zone, redraw
+3b2f:1ed0	PzGears_Run	int far PzGears_Run(int v)	puzzle 3: gears and buttons (confirmed by code, data and captures)

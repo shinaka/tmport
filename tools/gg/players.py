@@ -4,13 +4,16 @@ Spec: re/gg/docs/fmt_data.md §8. Code (Ghidra SSSS:OOOO): overlay 2b5a (open 2b
 the version word, read slot 2b5a:0198, save 2b5a:01ea, blank record 2b5a:0000), sign-in
 overlay 2caa (create 2caa:004f, roster insert/remove 2caa:01c5).
 
-    file = header (8) + index (100 x 22 = 2200; entry 99 is never written) = 0x8A0 bytes,
+    file = header (8) + index (100 x 22 = 2200; entry 99 is written only when the file is
+           created, with uninitialised bytes, and never read) = 0x8A0 bytes,
            then 99 player records of 0x16BD (5821) bytes at 0x8A0 + slot * 0x16BD
     header: 'USR' 0x1A, u16 version (12; any other value: the file is created anew),
             u16 player count
     index entry (22 bytes) = a copy of the first 22 bytes of a record:
             char name[16], u32 points, u16 slot; entries 0..count-1 are the players in name
-            order, the rest are free slots in the order they will be taken
+            order, the rest are free slots in the order they will be taken. The creation loop
+            rewrites entry 0 for each of the 99 blank records, so a new file lists slot 98 twice
+            and slot 0 never (2caa:010d, 2b5a:02bc; code_ui.md §12.3)
     record: the memory image DS:4562..5C1E (offsets in RECORD_FIELDS below), with three
             per-building blocks of 0x6BA (1722) bytes at +0x27E
 
@@ -47,23 +50,24 @@ RECORD_FIELDS = [
     (0x010, 4, 'points', 'u32 score, DS:4572 [O]'),
     (0x014, 2, 'slot', 'u16 own slot number, DS:4576; the save seeks to 0x8A0 + slot * 0x16BD [O 2b5a:01ea]'),
     (0x016, 2, 'chimps', 'DS:4578: "With/Without Chimps" choice of a new player [O 2caa]'),
-    (0x01A, 20, 'live_state', 'DS:457c..458f: projectile count DS:457e, DS:4580, parts needed DS:4582, '
-                              'hint conditions DS:458a/458c; copied to block +0 on save [O 2b5a:01ea]'),
+    (0x01A, 20, 'live_state', 'DS:457c..458f: blueprint seen, bananas DS:457e, tube room DS:4580, parts '
+                              'needed DS:4582, installed, bonus given, paint colour, hint cancels '
+                              'DS:458a/458c, set-up coin; copied to block +0 on save [O 2b5a:01ea]'),
     (0x02E, 2, 'race_index', 'DS:4590 = building * 5 + level [O 12e0:0820]'),
     (0x030, 2, 'building', 'DS:4592: current building, -1 none (new record: 0xFFFF) [O 2b5a:0000]'),
     (0x032, 2, 'level', 'DS:4594 [O 12e0:0820]'),
     (0x034, 6, 'races_won', '3 x s16 DS:4596: races won per building, -1..4 (new record: -1) [O]'),
     (0x03A, 6, 'in_progress', '3 x u16 DS:459c: building has a saved block [O 2b5a:01ea]'),
     (0x040, 2, 'hints_off', 'DS:45a2 [O]'),
-    (0x042, 0x26, 'hints_seen', 'u16 per hint, DS:45a4 + 2 * (id - 0x1043): New Player Hint shown '
-                                '[O 3060:013b]; 19 H resources 0x1043..0x1055 [size I]'),
-    (0x068, 2, 'unknown_68', 'not identified'),
-    (0x06A, 2, 'sound_off', 'DS:45cc (new record: copy of DS:1ad4) [O 2b5a:0000]'),
-    (0x06C, 2, 'unknown_6c', 'not identified'),
+    (0x042, 0x26, 'hints_seen', 'u16 per hint, DS:45a4 + 2 * (id - 0x1043), hints 0x1043..0x1055: New '
+                                'Player Hint shown (set also when hints are off) [O 3060:013b]'),
+    (0x068, 2, 'unused_68', 'never referenced [O]'),
+    (0x06A, 2, 'sound_off', 'DS:45cc; 0 in a new record (the copy of DS:1ad4 is overwritten) [O 2b5a:0000]'),
+    (0x06C, 2, 'unused_6c', 'never referenced [O]'),
     (0x06E, 0x210, 'puzzle_flags', '8 types x 33 u16, DS:45d0 + type * 0x42 + variant * 2 [O 38e2]'),
     (0x27E, 3 * 0x6BA, 'buildings', '3 x 0x6BA: Automotive, Aircraft, Alternative Energy (§8.4)'),
     (0x16AC, 2, 'races_total', 'DS:5c0e: races won in all; 15 = the end [O 12e0:0564]'),
-    (0x16AE, 15, 'tail', 'not identified'),
+    (0x16AE, 15, 'vehicle_colors', 'DS:5c10: vehicle colour per race index (races, hub trophies) [O 2dee:11fa]'),
 ]
 # Per-building block (0x6BA bytes, DS:47e0 + building * 0x6BA), filled by 2b5a:01ea:
 BLOCK_FIELDS = [

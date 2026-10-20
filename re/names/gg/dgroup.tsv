@@ -3,12 +3,23 @@
 1ea7:003d	s_abnormalTermination	char[]	abort's message
 1ea7:0094	g_inBuilding	i16	a building is in progress (Players_SaveCurrent saves its live state)
 1ea7:0096	g_kbdPlayMode	i16	1 = play mode: Kbd_ISR swallows the held keys instead of queueing them (State_05_EnterRoom sets it)
+1ea7:0098	g_titleMusicBank	i16	sound handle of the title music 0x1020 loaded by the sign-in and the hub (-1 = not loaded; freed by State_04_BuildingSetup)
+1ea7:00b2	g_tubeRoomByLevel	u16[5]	hall the workshop tube leads to at a new visit, per level (-> DS:4580) (accessed only through an index or an immediate: no DAT label in the export yet)
 1ea7:00bc	g_puzzleDoorHit	i16	set when the player touches a locked puzzle door (type 7) -> state 9
 1ea7:00be	g_vehicleDone	i16	the vehicle is finished -> race (State_08_LeaveRoom)
+1ea7:00c0	g_shutdownFlag	i16	set to -1 by Game_Shutdown; no reader
 1ea7:00c2	g_stateTable	far[19]	state functions run by Seq_Run from main (index = state 1..17; entry 18 is NULL)
+1ea7:010e	g_roomMusicTransposes	u8[36]	room music transposes: 3 buildings x 6 steps x 2 bytes (low byte used); Music_RoomCue reads with stride 12, 1622:0346 with stride 6 (bug)
+1ea7:0132	g_hubZones	rec[8][0x16]	hub click zones (release codes 0xbb8..0xbbb); hover cursor = code - 0xbb8 (accessed only through an index or an immediate: no DAT label in the export yet)
 1ea7:01e2	g_mouseHideState	i16	0 idle; the first drawing call after a reset restores the background under the cursor
+1ea7:01e4	g_clipLeft	i16	clip rectangle left (0); with DS:01e6 right (319), DS:01e8 top (0), DS:01ea bottom (199)
+1ea7:01e6	g_clipRight	i16	clip rectangle right (319, inclusive in the keyed blit, exclusive in Gfx_ClipX)
 1ea7:01e8	g_clipTop	i16	vertical clip of Lpx_BlitRawKeyed (inferred: top)
 1ea7:01ea	g_clipBottom	i16	vertical clip of Lpx_BlitRawKeyed (inferred: bottom)
+1ea7:01ec	g_blitX	i16	x of the last blit's rectangle (-1 = nothing drawn: no dirty mark); with DS:01ee y, DS:01f0 w, DS:01f2 h
+1ea7:01ee	g_blitY	i16	y of the last blit's rectangle
+1ea7:01f0	g_blitW	i16	width of the last blit's rectangle
+1ea7:01f2	g_blitH	i16	height of the last blit's rectangle
 1ea7:01f4	g_drawColor	u8	colour of the line, rectangle and pixel primitives
 1ea7:01f6	g_videoModeSet	i16	1 after Video_SetMode13h (Video_RestoreMode switches back only then)
 1ea7:01f8	g_vram	far	A000:0000
@@ -24,81 +35,284 @@
 1ea7:0224	g_kbdScanCodes	u8[8]	scan codes handled by Kbd_ISR: 4B 4D 48 50 39 1D 2E (Left Right Up Down Space Ctrl C), 0
 1ea7:022c	g_kbdMakeHandlers	near[7]	make handlers per scan code (1454:0187..)
 1ea7:023a	g_kbdBreakHandlers	near[7]	break handlers per scan code (1454:018f..)
+1ea7:0248	g_screenBuffer	far	the 128 000-byte screen + back page (Gfx_Init)
 1ea7:024c	g_palFaded	i16	1 while faded to black (palette loads are deferred)
 1ea7:024e	g_palShadow	u8[768]	shadow DAC palette, 6-bit RGB
 1ea7:054e	g_menuDisabled	i16	non-zero: Input_GetCode does not open the menus
 1ea7:0550	g_resFileNames	far[4]	names of gizmo000..003.dat for Res_OpenFiles
 1ea7:0560	g_resLastIndex	i16	index of the last resource read (Res_Read)
+1ea7:0562	g_swapHandle	i16	gizmo004.dat handle (Screen_SaveToSwap; -1 after the restore)
 1ea7:0564	s_swapFile	char[]	gizmo004.dat (Screen_SaveToSwap)
 1ea7:05a5	s_badResFile0	char[]	Incorrect Resource File 0
 1ea7:05bf	s_badResFile1	char[]	Incorrect Resource File 1
 1ea7:05d9	s_badResFile2	char[]	Incorrect Resource File 2
-1ea7:08b8	g_dirtyTileCount	i16	tiles copied by the last Dirty_Flush
+1ea7:05f4	g_spriteCount	i16	records in the sprite list DS:05f6
+1ea7:05f6	g_sprites	rec[50][14]	sprite list {u16 flags, x, y, w, h, far picture}
+1ea7:08b2	g_spriteWritePtr	far	next free record of the sprite list
+1ea7:08b6	g_dirtyPending	i16	Dirty_Mark calls since the last flush or clear; Dirty_Flush does nothing while it is 0
+1ea7:08b8	g_dirtyTileCount	u32	running total of tiles copied by Dirty_Flush (statistics, no reader)
+1ea7:08bc	g_flushCount	i16	Dirty_Flush calls that copied (statistics, no reader)
+1ea7:08be	g_roomMusicStep	i16	room music transpose step 0..5 (Music_RoomCue)
+1ea7:08c0	g_roomLoaded	i16	the displayed room's pictures are loaded (Room_Leave releases them)
+1ea7:08c2	g_displayRoom	i16	room shown on the screen (Room_Enter)
+1ea7:08c4	g_roomCount	i16	rooms in the building's room set
 1ea7:08c6	g_room	rec[0x120]	current room header (copied from the room table)
+1ea7:09e6	g_roomMusicBank	i16	sound handle of the building's room music (0x35f + 2*building)
+1ea7:09e8	g_roomSetIds	u16[15]	room set resource ('A' 0x347..0x34f) per race index (accessed only through an index or an immediate: no DAT label in the export yet)
+1ea7:0a06	g_roomMusicCueTicks	u16[3]	room music cue tick per building (1260, 3555, 2119)
+1ea7:0a0c	g_mouseButtons	u16	BX of the last mouse event (bit 0 left, bit 1 right); read by puzzles
 1ea7:0a10	g_mouseLatch		mouse event latches written by Mouse_EventHandler (DS:0a10..0a2c: press, release + position + tick stamp)
+1ea7:0a1a	g_mousePressX	i16	press record x (event x/2 + hot spot)
+1ea7:0a1c	g_mousePressY	i16	press record y
 1ea7:0a1e	g_mouseNewPress	i16	1 after a left press until Input_GetCode reports it (| 0x4000)
+1ea7:0a20	g_mouseRelease	rec[16]	release record: +0 = 2 when pending, +6 u32 tick, +0xa x, +0xc y
+1ea7:0a26	g_mouseReleaseTick	u32	tick of the last left release
+1ea7:0a2a	g_mouseReleaseX	i16	release x (event x/2 + hot spot)
+1ea7:0a2c	g_mouseReleaseY	i16	release y
+1ea7:0a30	g_cursorHidden	i16	1 = Mouse_DrawCursor draws nothing (Mouse_Hide / Mouse_Show)
 1ea7:0a32	g_zonesLocal	far	active click-zone list (pushed and popped by Zones_Push/Zones_Pop)
 1ea7:0a36	g_zonesGlobal	far	global click zones (menu titles, HUD)
+1ea7:0a3a	g_zoneClickEnter	rec[22]	full-screen zone (0,0,320,200, priority 5, release code 0x0d): a click anywhere = Enter (attract loop)
 1ea7:0a50	g_zoneStackDepth	i16	Zones_Push depth
+1ea7:0a52	g_cursorForceDefault	i16	Mouse_ForceDefault: use the region DS:0a70 instead of the region list
+1ea7:0a54	g_cursorRegionDefault	rec[28]	default cursor region: full screen, priority 0, record pointer DS:0a6c (Mouse_SetCursorPicture)
+1ea7:0a70	g_cursorRegionForced	rec[28]	cursor region used while DS:0a52 is set (record pointer DS:0a88)
+1ea7:0a8c	g_cursorRegions	far	list of cursor regions (19c0 list)
+1ea7:0a90	g_chimpStunLoops	u16[5]	per level: loop count of the stunned chimp (step op -31) (accessed only through an index or an immediate: no DAT label in the export yet)
+1ea7:0a9a	g_playerBlink	i16	0..3 blink phase while the player is immune (drawn when < 2)
+1ea7:0a9c	g_actorSpritesLoaded	i16	Actors_EnterRoom loaded the sprite bundles
+1ea7:0a9e	g_playerSets	far[4]	cached actor sets 0x1034, 0x1033, 0x1036, 0x1035
+1ea7:127e	g_playerTransitions	near[68]	per player sequence: 12-byte transition list {u32 match, u32 mask, next, unused}, end {-1,-1} (accessed only through an index or an immediate: no DAT label in the export yet)
 1ea7:130e	g_menuRequest	i16	1/2 -> Input_GetCode returns 0x17a2 (return to the Technology Center) / 0x17a3 (start new player)
 1ea7:1310	g_kbdRingWrite	i16	write index of the key event ring DS:8556
 1ea7:1312	g_kbdRingRead	i16	read index of the key event ring
-1ea7:132c	g_hudDirty	u16	HUD redraw bits (8 projectiles, 0x10 points ...)
+1ea7:1314	g_lastKeyHeldTick	u32	tick of the last held key (Input_GetHeldKeys), reset at room / workshop start
+1ea7:131a	g_hudDigitColors	u8[3][4]	HUD digit colour triples (3 colours + FF) for Hud_SetDigitColors
+1ea7:1326	g_hudSelectedPart	i16	part selected in the HUD strip (-1 none)
+1ea7:132a	g_hudLabelsShown	i16	0 while the part name box covers the HUD labels
+1ea7:132c	g_hudDirty	u16	HUD redraw bits: 1 strip, 2 parts needed, 4 score (and global effect 1), 8 bananas (and global effect 5), 0x10 name box, 0x40 flash, 0x4000 bar and score label, 0x8000 full redraw (Hud_Update)
+1ea7:1330	g_hudStripZones	rec[2][22]	strip arrow zones, release 6002 / 6003, tag 4
+1ea7:135c	g_hudCarryZones	rec[2][22]	while a strip part is selected: 6001 whole HUD, 6000 recycle icon
+1ea7:1384	g_pow10	u32[7]	HUD digit divisors: [n] = 10^(n-1) for n = 1..6 (entry 0 unused)
+1ea7:13a0	g_contactsPlayer	i16[]	actors the player touches (chimps 2..11), -1 terminated
+1ea7:13b6	g_contactsProjectile	i16[]	actors the projectile touches (chimps 2..11)
+1ea7:13cc	g_contactsChimp	i16[]	actors a chimp touches (the projectile only)
 1ea7:13d0	g_lzhDefaultDistLengths	u8[2][32]	default distance code lengths of the LZH codec (12- and 13-bit windows)
 1ea7:1458	g_sndSlots	far[64]	registered songs (BMF+0x10)
 1ea7:1558	g_sndActive	u8[64]	active song slots
+1ea7:1598	g_sndPriority	u8[64]	priority of each slot's song
+1ea7:15d8	g_sndChannelOwner	u16[4][16]	channel owner per class 1..4: low byte slot, high byte priority; 0x00ff free, 0x00fe released
 1ea7:1658	g_sndClassChannels	u8[5]	channels per class: 1, 16, 4, 11, 16
 1ea7:165d	g_sndBusy	u8	driver busy lock
+1ea7:165f	g_spkChannelNote	u8[16]	class 1: last key per channel (>= 0x80 = none)
+1ea7:166f	g_psgChannelNote	u8[4]	class 2 (dead): last key per channel
+1ea7:1673	g_oplVoiceKey	u8[11]	class 3: last key per voice (>= 0x80 = none)
+1ea7:167e	g_sndCurrentSlot	u16	slot being stepped by Snd_Tick
 1ea7:1680	g_sndEnabled	u8	0 = output disabled (Snd_Silence)
+1ea7:1681	g_sndClassAvailable	u8[5]	song class available (1, 1, 0, 0, 0; [3] = DS:1684 set by the OPL detection)
 1ea7:1683	g_hasPsg	u8	PSG present (never written: the PSG path is dead)
 1ea7:1684	g_hasOpl	u8	OPL2 present (AdLib_Detect, or forced by the -s switch)
 1ea7:1685	g_hasMpu	u8	MPU-401 present (never written: the MT-32 path is dead)
 1ea7:1686	g_oplMasterVolume	u16	master volume for Opl_SetVolume
 1ea7:1688	g_oplChannelVolume		channel volumes for Opl_SetVolume
 1ea7:16ae	g_psgPort	u16	PSG port (never written)
+1ea7:16b0	g_sndScaleRemainder	u16	remainder of the dead tempo scaler
+1ea7:16de	g_oplB0Shadow	u8[6]	last B0 value of melodic channels 0..5
+1ea7:16e4	g_oplBdShadow	u8	OPL register BD (0x20 after init)
 1ea7:16e5	g_oplVoiceOperators		voice -> operator table
 1ea7:16fb	g_oplOperatorOffsets		operator register offsets
-1ea7:1712	g_oplNoteTable		96-note tables DS:1712/1792 used by Opl_NoteOn
-1ea7:1816	g_spkDivisors		note -> PIT divisor table of the speaker class
+1ea7:170d	g_oplPatchRegs	u8[5]	operator registers of a patch: 20 40 60 80 e0
+1ea7:1712	g_noteOctave	u8[128]	n / 12 (block / octave)
+1ea7:1792	g_noteInOctave	u8[128]	n % 12 (reached as DS:1712 + 0x80 in Opl_NoteOn and Spk_PitchBend)
+1ea7:1816	g_spkDivisors	u16[12]	base of the speaker divisor table for semitones 0..11 of octave 0 (C1 = 0x8e88); Spk_PitchBend also reads the two entries before (DS:1812, 1814) and after (DS:182e, 1830) for bends; divisor = T[n % 12] >> (n / 12)
+1ea7:1836	g_psgPeriods	u16[12]	base of the PSG period table (same layout as g_spkDivisors, entries DS:1832..1851; dead class 2)
+1ea7:1852	g_oplFNumbers	u16[25][12]	OPL F-numbers, row r detuned by r/25 semitone (identical to the AdLib driver's InitFNums table)
 1ea7:1aaa	g_sndClassStep	near[5]	class interpreters: 087e, 0966, 0a1f, 0ad6, 0966
-1ea7:1bae	g_chimpCounts	u16[15]	chimps per race index DS:4590 (halved on a 286, 2a80:079a)
+1ea7:1ab4	g_sndEventSizes	u8[4][8]	event size per class 1..4 and status nibble 8..F (dead tempo scaler)
+1ea7:1ad4	g_soundMuted	i16	sound switch: 1 = the silence song holds every channel (Snd_ToggleOption, SndRes_ApplySoundOption)
+1ea7:1ad6	g_sndLastEffectSlot	i16	slot of the last effect started (-1 after a stop); no reader
+1ea7:1ad8	g_sndLastMusicSlot	i16	slot of the last music started (-1 after a stop); no reader
+1ea7:1bae	g_chimpLists	far[15]	far pointers, per race index, to {u16 count, u16 room per chimp} (DS:1adc..); the 286 path halves the first room word
 1ea7:1d2e	g_chimpMoves		Cyber Chimp move lists with random chances
 1ea7:1f10	g_chimpTransitions		Cyber Chimp state transitions
+1ea7:1f66	g_fontIndex	i16	index of the selected font (0 = resource 9, the UI font; 1 = resource 10, the small font); Font_Select
+1ea7:1f68	g_font	far	the selected font record (0x24 bytes, Font_Load); Font_GetCurrent returns it
 1ea7:1f6c	g_glyphColor	u8	colour of Gfx_DrawGlyph
 1ea7:1f6e	s_playersDat	char[]	players.dat
+1ea7:1f7a	g_saveDisabled	i16	1 while the sign-in's Esc runs Cmd_SaveAndExit: Players_SaveCurrent then writes nothing (no player is loaded)
 1ea7:1f7c	g_rankNames	far[8]	Trainee .. Head Scientist
 1ea7:1f9c	g_rankThresholds	u32[7]	5000, 30000, 60000, 120000, 200000, 300000, 750000
 1ea7:20a8	g_attractSequence	far[]	attract sub-sequence run by Seq_Run (State_01_Attract)
-1ea7:20dc	g_rosterList		sign-in scroll list (8 rows of 11 px)
+1ea7:20dc	g_rosterScrollBar	rec[20]	the scroll bar record of the sign-in list {x 244, y 26, w 11, h 109, pos (top row), max, page 8, u32 next repeat tick, thumb y} (406a)
+1ea7:20f0	g_btnCancel	rec[0x20]	sign-in picture button Cancel: zone (250,172) 49x20 press 0x706 release 0x702, +0x16 bundle 0x102d, +0x18 enabled, +0x1a/1c/1e picture cache indices (normal, pressed, disabled)
+1ea7:2110	g_btnNewPlayer	rec[0x20]	sign-in picture button New Player: zone (197,170) 42x24 press 0x707 release 0x703, bundle 0x102c
+1ea7:2130	g_btnStartGame	rec[0x20]	sign-in picture button Start Game: zone (146,170) 42x24 press 0x708 release 0x704, bundle 0x102b
+1ea7:2150	g_rosterZone	zone	sign-in name list (62,46) 180x88, priority 4, release 0x700
+1ea7:2166	g_rosterScrollZone	zone	sign-in scroll bar (244,26) 11x109, priority 5, press = release = 0x701
+1ea7:217c	g_blueprintFramePos	i16[6][2]	x, y of the blueprint opening pictures 0x13..0x18
+1ea7:2198	g_blueprintOpen	i16	1 while the blueprint viewer is open (the workshop music cue then does not switch channels)
 1ea7:219a	g_workshopSequence	far[]	workshop sub-sequence run by Seq_Run
+1ea7:21a2	g_shelfZones	rec[2][22]	workshop shelf part zones: release 1004 (lower part) / 1005 (upper part), rectangles set at run time; they follow the NULL of g_workshopSequence
 1ea7:21ce	g_workshopZones		static click zones of the workshop
+1ea7:2268	g_workbenchZone	rec[22]	workshop drop zone for a carried part (72,117,180,48), release 1006, priority 50
+1ea7:2280	g_blueprintDoneButton	rec	Done button of the blueprint viewer at (248,142), code 1007
+1ea7:22a0	g_blueprintTitle	far	-> the 'Level-N' string at DS:22f2, char 6 = '1' + level
+1ea7:22a4	g_carriedRow	i16	-1 nothing carried in the workshop; else the carried part's flags without 0x8000 (bit 0 = upper row)
+1ea7:22a6	g_blueprintPics	u16[15]	blueprint picture per race index
+1ea7:22c4	g_blueprintBundles	u16[15]	blueprint bundle per race index ([I,I,S,T*n,G*n,S*n,I,M*z])
+1ea7:22e2	g_trophyX	i16[5]	workshop trophy x per level
+1ea7:22ec	g_trophyY	i16[3]	workshop trophy shelf y per building
+1ea7:22fa	g_mortyNamePtr	far	-> s_morty (result screen)
 1ea7:22fe	g_postRaceZones		post-race buttons (codes 2000..2004)
 1ea7:236c	g_movieCues	rec[]	final movie cues, words {type, frame, a, b}
 1ea7:243c	s_morty	char[]	race result name of the opponent
+1ea7:2442	s_first	char[]	'1st -' (result screen)
+1ea7:2448	s_second	char[]	'2nd -' (result screen)
+1ea7:244e	g_displayCode	i16	-1 = test; Video_DccSupported result (0x1a) or 8 (-GV); must be >= 7
 1ea7:2450	g_cpuType	i16	Cpu_Detect result (1 8086, 2 286, 3 386, 4 486); 2 halves the chimp count
 1ea7:2452	g_soundDevice	i16	-s switch: -1 auto (default), 0 off, 1 speaker, 4 FM
-1ea7:2454	g_randSeed	u32	srand(time(NULL)) seed at start-up
+1ea7:2454	g_randSeed	u16	the low word of time(NULL) passed to srand
+1ea7:2456	g_hintBox	rec[12]	message of Hint_Show: far title (DS:2462), far body (the hint text copy, set per call), far footer (DS:2472)
 1ea7:2462	s_newPlayerHint	char[]	title of the hint box
+1ea7:2472	s_hintFooter	char[]	footer of the hint box ("Press <Enter key-cap> to continue.")
+1ea7:2488	g_elecScreenRegion	rec[0x1c]	whole-screen cursor region, cursor = the puzzle cursor DS:a8d8
+1ea7:24a4	g_elecToolboxZone	zone	(7,67) 78x94, priority 100, press 0x459: put the held item back
+1ea7:24ba	g_elecBoardZone	zone	(91,17) 222x135, press 0x454
+1ea7:24d0	g_elecHintZone	zone	(26,13) 35x15, press 0x458
+1ea7:24e6	g_elecTools	rec[5][16]	toolbox: x, y, far picture (filled at run time), digit x, digit y, hot x, hot y
+1ea7:25cc	g_balanceWeights	rec[6][18]	per weight type 0..5: mass (1,2,3,4,5,10), inventory picture x, y, count picture x, y, inventory zone x, y, w, h (PzBalance_InitZones, PzBalance_DrawInventory, torque)
+1ea7:2638	g_balanceHooks	i16[11][10][2]	hook x, y per beam tilt 0..10 (g_balanceTilt + 5) and hook 0..9 (0..4 left, arm 5..1; 5..9 right, arm 1..5)
+1ea7:27f0	g_balanceWeightDx	i16[6]	x offset of a hanging weight picture from its hook, per weight type
+1ea7:27fc	g_balanceInvZone	zone	(8,67) 38x93, press 0x459: put the carried weight back
+1ea7:2812	g_balanceBeamZone	zone	(53,14) 265x146, press 0x454 (no handler: the code is ignored)
+1ea7:2828	g_balanceHintZone	zone	(6,13) 35x15, press 0x458
+1ea7:285a	g_energyWorkZone	zone	(59,16) 254x141, press 0x44c
+1ea7:28c8	g_energyLayout	i16[13]	device x, device y[4], form zone x, device zone x, zone y[4], line x at forms, line x at devices (line y at DS:28e2)
+1ea7:28e2	g_energyLineY	i16[4]	y of the line ends per row
+1ea7:28ea	s_energyNames	char[8][20]	the eight energy-form names, 20 bytes each
+1ea7:298a	g_magnetsInvZone	zone	(8,47) 58x75, press 0x459: take a magnet or put the carried one back
+1ea7:29a0	g_magnetsTableZone	zone	(70,23) 239x128, press 0x456: pick up or drop a magnet
+1ea7:29b6	g_magnetsHintZone	zone	(13,13) 36x15, press 0x458
+1ea7:29cc	g_magnetsRotateZone	zone	(3,124) 61x29, press 0x45a: ROTATE (only while a magnet is carried)
+1ea7:29e2	g_magnetsInvPos	i16[3][2]	inventory picture x, y per magnet kind (bar, horseshoe N-S, horseshoe S-N)
+1ea7:29ee	g_magnetsInvCountPos	i16[3][2]	inventory count x, y per magnet kind
+1ea7:29fa	g_magnetsPoles	s8[12][6][2]	pole offsets dx, dy per picture kind*4+orientation: poles 0..2 one polarity, 3..5 the other; (-1,-1) = no pole
+1ea7:2a8a	g_magnetsStock	s8[30][3]	magnets in the inventory per level and kind
+1ea7:2ae4	g_magnetsLevelOfVariant	u8[30]	level + 1 per puzzle variant (a permutation of 1..30)
+1ea7:2b02	g_launchZones	zone[16]	hint, box items (tag 1000), ramp clicks, gravity, plunger zones (22 bytes each, DS:2b02..2c61)
+1ea7:2c62	g_launchVariants	i16[30][15]	launch variant records (30 bytes)
+1ea7:2fe6	g_launchObjectTerm	i16[4]	landing index term per object
+1ea7:2fee	g_launchSurfaceTerm	i16[3]	landing index term per surface state
+1ea7:2ff4	g_launchGravityTerm	i16[3]	landing index term per gravity (DS:2ff6 when gravity is locked)
+1ea7:2ffa	g_launchRampTerm	i16[3]	landing index term per ramp
+1ea7:3000	g_launchLandingTable	i16[29]	landing position 0..12 by index
+1ea7:303a	g_launchFlightFrames	i16[9]	object frame per flight step
+1ea7:304c	g_launchHoleClipLeft	i16[9]	clip left x of the last flight step, per landing 4..12
+1ea7:305c	g_launchHoleClipBottom	i16[9]	clip bottom y of the last flight step, per landing 4..12
+1ea7:3120	g_launchPathX	far[9]	x arrays of the flight per landing 4..12
+1ea7:3144	g_launchPathYA	far[9]	y arrays per landing, ramps 2 and 3
+1ea7:3168	g_launchClimbX	i16[4]	x of the climb and roll-back steps
+1ea7:3170	g_launchClimbYA	i16[4]	y of the climb and roll-back steps, ramps 2 and 3
+1ea7:31f6	g_launchPathYB	far[9]	y arrays per landing, ramps 1 and 4
+1ea7:321a	g_launchClimbYB	i16[4]	roll-back y, ramps 1 and 4
+1ea7:32a0	g_launchPathYC	far[9]	y arrays per landing, ramps 0 and 5
+1ea7:32c4	g_launchClimbYC	i16[4]	roll-back y, ramps 0 and 5
+1ea7:32cc	g_launchHoleX	i16[8]	target glow x per hole
+1ea7:32dc	g_launchHoleY	i16[8]	target glow y per hole
+1ea7:32ec	g_launchRampX	i16[6]	ramp picture x per ramp 0..5
+1ea7:32f8	g_launchRampY	i16[6]	ramp picture y per ramp 0..5
+1ea7:3304	g_launchGlowFrame	i16	target glow frame 0..7
+1ea7:3306	g_pzGoBackZone	zone	(249,168) 65x19, press 0x5dd
+1ea7:331c	g_pzPanelZone	zone	(2,168) 212x32, priority 100, release 0x5de (pushed when solved)
+1ea7:3332	g_puzzleLeave	i16	1 = Start New Player, 2 = Return to Technology Center (menu codes 0x17a3 / 0x17a2 inside a puzzle)
 1ea7:3334	g_puzzleVariants	u16[8]	variants per puzzle type: 30, 20, 20, 31, 32, 30, 28, 30 (221)
+1ea7:338c	g_pzSndCount	i16	members of the loaded puzzle effect bank
+1ea7:338e	g_simpleScreenRegion	rec[0x1c]	whole-screen cursor region, cursor = the puzzle cursor DS:b41a
+1ea7:33aa	g_simpleWorkZone	zone	(66,14) 245x142, press 0x4b1
+1ea7:33c0	g_simpleCheckZone	zone	(10,150) 36x13, press 0x4b0
+1ea7:33d6	g_simpleInventoryZone	zone	(4,49) 48x98, priority 100, press 0x44c: put the held part back
+1ea7:33ec	g_simpleHintZone	zone	(11,13) 35x15, press 0x458
+1ea7:3402	g_simplePartLayout	rec[8][15]	per part type: icon x, y, (byte type), digit x, y, test-point dx, dy, fit sound
+1ea7:347a	g_simpleFitDx	i16[8]	x offset of the fit animation per part type
+1ea7:348a	g_simpleFitDy	i16[8]	y offset of the fit animation per part type
+1ea7:353a	g_piecesWorkZone	zone	(93,14) 219x142, press 0x454: drop the carried piece
+1ea7:3550	g_piecesBoxZone	zone	(5,82) 80x62, press 0x459: take a piece out of the box
+1ea7:3566	g_piecesHintZone	zone	(26,13) 35x15, press 0x458
+1ea7:357c	g_piecesExampleNames	far[20]	per variant: the machine's name (DS:35cc..) for the %s of the hint text 0x20b1
+1ea7:35cc	s_piecesExamples	char[]	the 20 machine names of the machine-pieces hint (NUL-terminated, DS:35cc..36cf)
+1ea7:36e2	g_gearsMinDist2	i16[2][2]	minimum squared cell distance between gear centres by gear types (4, 9, 9, 16)
+1ea7:36ea	g_gearsMesh	i16[2][2][5][5]	1 where two gears of types (a, b) mesh at cell offset (|dy|, |dx|)
+1ea7:37b2	g_gearsBoardZone	zone	(84,10) 226x151, press 0x44f: place the carried gear
+1ea7:37c8	g_gearsLargeZone	zone	circle at (53,109) radius 20, press 0x44d: large gear from the inventory (or put back)
+1ea7:37de	g_gearsSmallZone	zone	circle at (52,139) radius 10, press 0x44e: small gear from the inventory (or put back)
+1ea7:37f4	g_gearsCrankRects	i16[26][4]	crank handle rectangle x0, y0, x1, y1 per crank frame + 1, relative to the crank picture
+1ea7:38c4	g_gearsPicX	i16[2]	x of a gear picture at column 0, per gear type (86, 75)
+1ea7:38c8	g_gearsPicY	i16[2]	y of a gear picture at row 0, per gear type (31, 21)
+1ea7:38cc	g_gearsInvX	i16[2]	inventory gear picture x, per gear type
+1ea7:38d0	g_gearsInvY	i16[2]	inventory gear picture y, per gear type
+1ea7:38d4	g_gearsRadius	i16[2]	gear half size (hot spot, zone radius, centre offset), per gear type (10, 20)
+1ea7:38d8	g_gearsTensX	i16[2]	inventory count: tens digit x, per gear type
+1ea7:38dc	g_gearsUnitsX	i16[2]	inventory count: units digit x, per gear type
+1ea7:38e0	g_gearsTensY	i16[2]	inventory count: tens digit y, per gear type
+1ea7:38e4	g_gearsUnitsY	i16[2]	inventory count: units digit y, per gear type
+1ea7:38e8	g_gearsFrames	i16[2]	rotation frames per gear type (6, 8)
+1ea7:38ec	g_gearsHintZone	zone	(23,24) 36x15, press 0x3e8
+1ea7:3902	g_gearsDriveTable	near[6][11]	propagation handler per source type 0..5 and target type 0..10 (0 = none); rows 6..10 are other data and never used
 1ea7:398a	g_animRectCount	i16	entries in the DAM update-rect list DS:b86e
+1ea7:3994	g_raceMusicBanks	u16[3]	race music bank per building (0xf7, unused, 0xf9)
 1ea7:399a	g_raceBackgrounds	u16[15]	per race index: background
 1ea7:39b8	g_raceSprites1	u16[15]	per race index: sprite set
 1ea7:39d6	g_raceSprites2	u16[15]	per race index: sprite set
 1ea7:39f4	g_racePaths1	u16[15]	per race index: 'R' path
 1ea7:3a12	g_racePaths2	u16[15]	per race index: 'R' path
-1ea7:3dea	g_yesNoButtons		Yes/No button labels and keys
-1ea7:3e02	g_pagerButtons		See Next Page / Go Back a Page / Done
+1ea7:3a30	g_raceExtraLaps	u16[15]	laps to run before the finish line counts, per race index
+1ea7:3a4e	g_raceIntroTicks	u16[3]	music sound ticks to wait before a land race starts, per building
+1ea7:3a54	g_landPerfTables	u32[]	land-race performance tables (16.16 per variant) DS:3a54..3b33, read by Race_ComputePerformance
+1ea7:3b34	g_landBaseSpeed	u32[15]	base top speed per race index (16.16)
+1ea7:3b70	g_airCamera10	u32	aircraft race camera / 10 (16.16): scroll of the far scenery layer
+1ea7:3b74	g_airCamera	u32	aircraft race camera x (16.16)
+1ea7:3b78	g_airAnimFrames	u16[5]	aircraft sprite animation frames per level
+1ea7:3b82	g_airSprites1	u16[5]	player aircraft sprite bundle per level (painted)
+1ea7:3b8c	g_airSprites2	u16[5]	Morty's aircraft sprite bundle per level
+1ea7:3b96	g_airPaths1	u16[5]	player aircraft path per level
+1ea7:3ba0	g_airPaths2	u16[5]	Morty's aircraft path per level
+1ea7:3baa	g_airPerfTables	u32[]	aircraft performance tables (16.16 per variant, 3 or 4 entries each) DS:3baa..3da9, read by AirRace_ComputePerformance
+1ea7:3daa	g_airCameraLimit	i16[5][2]	screen-x limit (player, Morty) for the camera to follow, per level (never binds)
+1ea7:3dbe	g_airBaseSpeed	u32[5]	base speed per aircraft level (16.16)
+1ea7:3dd2	g_menuNesting	i16	Menu_RunDropDown nesting count: Zones_Push only at 0 -> 1, Zones_Pop when it drops back to 0
+1ea7:3dd4	g_dlgFooterZone	zone	footer line of a dialog: x/y/w set by Dlg_AddZones, h 10, priority 5, press = release = 0x1b (a click on the footer is Esc)
+1ea7:3dea	g_yesNoButtons	far[11]	dialog button label table {Yes, No, Cancel, Done, OK, Done, See Next Page, Go Back a Page, See Next Page, Go Back a Page, Done}; Yes/No = entries 0..1, the pager uses DS:3dfe/3e02/3e06/3e0e
+1ea7:3dfe	g_pagerOneButtons	far[1]	pager, single page: {Done}
+1ea7:3e02	g_pagerButtons	far[1]	pager, first page of several: {See Next Page}
+1ea7:3e06	g_pagerMidButtons	far[2]	pager, middle page: {Go Back a Page, See Next Page}
+1ea7:3e0e	g_pagerLastButtons	far[2]	pager, last page: {Go Back a Page, Done}
+1ea7:3e16	g_dlgKeys	u16[5]	button keys 'y' 'n' 'c' 'd' 'o' (Yes/No and the chimps box use the first two)
+1ea7:3e20	g_pagerKeys	u16[6]	pager keys: DS:3e20 {PgDn} single page, DS:3e22 {PgDn} first page, DS:3e24 {PgUp, PgDn} middle, DS:3e28 {PgUp, PgDn} last (0x149 PgUp, 0x151 PgDn)
 1ea7:3e2c	g_chimpButtons		With Chimps / Without Chimps
+1ea7:3e38	s_footerGoBack	char[]	dialog footer "<Esc key-cap> to Go Back" (Yes/No boxes, drop-downs, message bundles with flag 0)
+1ea7:3e45	s_footerGoOn	char[]	dialog footer "<Enter key-cap> to Go On" (message bundles with flag 1)
 1ea7:3f2b	s_unusedFileItems	char[]	File item list of another title, never referenced
 1ea7:3fcf	g_helpHandlers	far[6]	Help menu item handlers (411d stub entries)
 1ea7:4017	g_menuHelp	MenuDef	0x14 bytes: far title, +04 title width, +06 count, far items, far handlers, +10 drop-down width, +12 title x
 1ea7:402b	g_menuFile	MenuDef	File menu
 1ea7:403f	g_menuOptions	MenuDef	Options menu
 1ea7:4053	g_menuBar	MenuBarDef	{u16 3, far DS:4017}
+1ea7:405a	g_menuBarNone	rec[8]	{u16 0, far NULL}: the bar pointer after Menu_SetMenuBar(NULL)
+1ea7:4060	g_viewUpZone	zone	text viewer up arrow (117,29) 11x16, priority 503, press 0x51a, release 0x51b
+1ea7:4076	g_viewDownZone	zone	text viewer down arrow (117,149) 11x16, priority 503, press 0x51c, release 0x51d
+1ea7:408c	g_viewTextZone	zone	text viewer text area (0,28) 129x138, priority 502, press 0x51e (ignored)
+1ea7:40a2	g_viewCloseZone	zone	whole screen, priority 501, press 0x51f: a click outside the viewer closes it
+1ea7:40b8	g_viewPageUpZone	zone	text viewer track above the thumb (118,45) 9x(thumb y - 45), priority 503, press 0x520
+1ea7:40ce	g_viewThumbZone	zone	text viewer thumb (118, thumb y) 9x11, priority 503, press 0x521
+1ea7:40e4	g_viewPageDownZone	zone	text viewer track below the thumb (118, thumb y + 11) 9x(138 - thumb y), priority 503, press 0x522
 1ea7:4100	g_atexitCount	i16	atexit table entries
 1ea7:442a	g_randState	u32	rand() LCG state
 1ea7:452e	g_initTable	rec[]	_INIT_ table (6-byte records, DS:452e..454c)
 1ea7:454c	g_exitTable	rec[]	_EXIT_ table (DS:454c..4552)
+1ea7:4552	g_movieMusicBank	i16	sound handle of the final movie music (0x30ca)
+1ea7:4554	g_movieMusicStep	i16	Music_MovieCue counter (arrangement 1..4, all, reset at 7)
+1ea7:4556	g_workshopMusicCues	i16	Music_WorkshopCue call count
+1ea7:4558	g_workshopArrangement	i16	workshop music arrangement (1, or 2 from the cue)
 1ea7:455a	g_leaveRequest	i16	-1 quit, 2 back to sign-in, 3 back to the hub
 1ea7:455c	g_state	i16	Seq_Run state of the main sequence
 1ea7:455e	g_rematch	i16	1 = rematch of the last race
@@ -107,49 +321,297 @@
 1ea7:4572	g_score	u32	points
 1ea7:4576	g_playerSlot	i16	record slot in players.dat
 1ea7:4578	g_withChimps	i16	With/Without Chimps
-1ea7:457c	g_buildingLive	u8[0x14]	live state of the building in progress (saved into its record block)
+1ea7:457c	g_blueprintSeen	i16	first word of the 20-byte live building block DS:457c..458f (saved with the building); 1 once the blueprint was shown this level
 1ea7:457e	g_projectiles	i16	projectile counter (10 per level)
-1ea7:4580	g_levelParam	i16	DS:00b2[level] (1,2,2,3,3); meaning not established
+1ea7:4580	g_tubeRoom	i16	hall the workshop tube leads to (DS:00b2[level] at a new visit; the hall the player left through the tube)
 1ea7:4582	g_partsNeeded	i16	parts still needed (HUD)
+1ea7:4584	g_partsInstalled	i16	required parts installed on the vehicle (complete when = catalogue +0x06)
+1ea7:4586	g_vehicleBonusGiven	i16	the 100-point vehicle completion bonus was given this level
+1ea7:4588	g_paintColor	i16	paint colour applied in the workshop (-1 none)
 1ea7:458a	g_hintCancel1046	i16	cancels hint 0x1046
 1ea7:458c	g_hintCancel1048	i16	cancels hint 0x1048
+1ea7:458e	g_setupCoin	i16	R(100) < 50 at a new visit; written only
 1ea7:4590	g_raceIndex	i16	building*5 + level (0..14)
 1ea7:4592	g_building	i16	current building (0 Automotive, 1 Aircraft, 2 Alternative Energy)
 1ea7:4594	g_level	i16	current level in the building
 1ea7:4596	g_racesWon	i16[3]	races won per building (-1..4)
 1ea7:459c	g_buildingInProgress	i16[3]	building has saved live state
 1ea7:45a2	g_hintsOff	i16	New Player Hints switched off
-1ea7:45a4	g_hintSeen	u16[17]	per hint 0x1043..0x1053
+1ea7:45a4	g_hintSeen	u16[19]	one word per hint 0x1043..0x1055 (19, record +0x42..+0x67); set by Hint_Show also when hints are off
 1ea7:45cc	g_soundOff	i16	sound switched off
 1ea7:45d0	g_puzzleSolved	u16[8][33]	solved flags: + type*0x42 + variant*2
 1ea7:47e0	g_buildingRecords	rec[3][0x6ba]	per-building saved state in the player record
 1ea7:5c0e	g_racesWonTotal	i16	15 = the end
+1ea7:5c10	g_vehicleColor	u8[15]	vehicle colour per race index (player record +0x16ae), written by the workshop paint (2dee:055d, 11fa: paint 0..3 or the body default 4/5), read by the race sprites (3dd6:0825, 3e77) and the hub trophies (12e0:024d)
+1ea7:5c1f	g_keyHeldSeen	i16	set to 1 by Input_GetHeldKeys when a key is held; read by the HUD (1a04:0b7c)
 1ea7:5c22	g_palSaved	u8[768]	saved palette (Pal_FadeFromSaved)
 1ea7:5f22	g_rowTable	far[400]	row pointers: rows 0..199 screen, 200..399 back page
+1ea7:6562	g_swapSize	u16	bytes written to gizmo004.dat (w*h + 4)
+1ea7:6564	g_resFile	i16	handle of the archive of the current Res_Read
 1ea7:6566	g_resHandles	i16[4]	file handles of gizmo000..003.dat
 1ea7:6572	g_resType	u8	type byte of the last resource read
 1ea7:6574	g_resBuffer	far	shared 64 KB load and decompression buffer
 1ea7:6578	g_timers	u32[8]	deadline timer slots (Timer_Set)
 1ea7:6598	g_savedTicks	u32	tick counter saved by Dlg_RunModal
+1ea7:659c	g_partDeck	i16[]	shuffled deck of item kinds (part index or 1000)
+1ea7:6614	g_partDealIndex	i16	next deck entry (Parts_DealNext)
 1ea7:6616	g_playerVehicle	i16[]	part list of the player's vehicle (-1 terminated)
 1ea7:6634	g_mortyVehicle	rec	Morty's vehicle (after the part catalogue)
+1ea7:6638	g_levelDesc	far	level description and part catalogue (resource 0x2f5 + race)
+1ea7:663c	g_parts	far	first part record (0x8e bytes)
 1ea7:6640	g_picCache	rec[300]	picture cache (8 bytes: id, uses, far data)
+1ea7:6fa8	g_itemPool	rec[60][0x2c]	item nodes of all rooms (+8 = 1 free) (accessed only through an index or an immediate: no DAT label in the export yet)
+1ea7:79f8	g_roomSet	far	private copy of the room set resource
+1ea7:79fc	g_roomItemCounts	far	copy of 'I' 0x350 + race: word 0 all items, word r items of room r
+1ea7:7a00	g_cratesLeft	i16	banana crates in the rooms
+1ea7:7a02	g_cratesTotal	i16	crates of the level (item total - part count)
 1ea7:7a04	g_roomTable	far[16]	rooms of the building
+1ea7:7a44	g_effectBank	i16	sound handle of the current screen's effect bank (effect k = handle + k): the warehouse, the workshop (0x29) and the results (0x108f) load it; used by the animation opcodes -36/-37/-45 and 1cdd:0521
+1ea7:7a46	g_screenAnims	far	list of running screen animations
+1ea7:7a4a	g_cursorActiveRecord	far	cursor record currently copied to DS:7a6a
 1ea7:7a4e	g_zoneStack	far[]	saved zone lists (Zones_Push)
-1ea7:7a6c	g_cursorUnder	u8[]	background under the software cursor
+1ea7:7a62	g_mouseMaxY	i16	Mouse_SetBounds: y + h - cursor height
+1ea7:7a64	g_mouseMaxX	i16	Mouse_SetBounds: x + w - cursor width
+1ea7:7a6a	g_cursor	rec[0x18]	active cursor record copy: +2/+4 save-under position, +6/+8 size, +0xa/+0xc hot spot, +0xe picture, +0x12 shown, +0x14 save buffer
+1ea7:7a6c	g_cursorSavedX	i16	x of the saved background (the buffer is DS:7a7e)
+1ea7:7a70	g_cursorW	i16	active cursor width
+1ea7:7a72	g_cursorH	i16	active cursor height
+1ea7:7a74	g_cursorHotX	i16	active cursor hot spot x (added to click positions)
+1ea7:7a76	g_cursorHotY	i16	active cursor hot spot y
 1ea7:7a7c	g_cursorShown	i16	the software cursor is drawn
+1ea7:7a7e	g_cursorSaveBuf	far	save-under buffer of the active cursor (Gfx_GetImage format)
+1ea7:7a82	g_cursorArrow	far	the default cursor record (picture resource 0x0000)
+1ea7:7a86	g_mouseY	i16	cursor y (top-left of the cursor picture)
+1ea7:7a88	g_mouseX	i16	cursor x = driver x / 2 (top-left of the cursor picture)
 1ea7:7a8a	g_actors	rec[12][0xa0]	0 player, 1 projectile, 2..11 Cyber Chimps
-1ea7:7aa4	g_roomIndex	i16	current room (0 = workshop)
+1ea7:7aa4	g_playerRoom	i16	g_actors[0] +0x1a, the player's room (0 = workshop)
+1ea7:820a	g_projectilePicSlots	u16[5]	picture-cache slots of the projectile's bundle (accessed only through an index or an immediate: no DAT label in the export yet)
+1ea7:8214	g_playerPicSlots	u16[]	picture-cache slots of the player's sprite bundle (accessed only through an index or an immediate: no DAT label in the export yet)
+1ea7:8304	g_projectileSeqHall	far[]	sequence table of set 0x1036 (accessed only through an index or an immediate: no DAT label in the export yet)
+1ea7:8318	g_projectileSeqRoom	far[]	sequence table of set 0x1035 (accessed only through an index or an immediate: no DAT label in the export yet)
+1ea7:832c	g_playerSeqHall	far[]	sequence table of set 0x1034 (68 sequences) (accessed only through an index or an immediate: no DAT label in the export yet)
+1ea7:8440	g_playerSeqRoom	far[]	sequence table of set 0x1033 (53 sequences) (accessed only through an index or an immediate: no DAT label in the export yet)
+1ea7:8554	g_idleReported	i16	1 after Input_GetHeldKeys reported the idle bit 0x40
 1ea7:8556	g_kbdRing	rec[16][16]	key event ring {type 3, u32 tick}
 1ea7:8656	g_escHandler	far	Esc callback of Input_GetCode
 1ea7:865a	g_menuHandler	far	menu callback (Menu_RunDropDown)
+1ea7:9c58	g_sndBankMem	far[60]	loaded bank copies per sound handle
 1ea7:9d48	g_sndTable	rec[60]	sound bank table (SndRes_Init)
+1ea7:9dc0	g_sndGlobalEffects	i16	sound handle of the global effect bank 0x105b (effect 0 = the silence song)
+1ea7:9dc2	g_sndBankCueTick	u16	word read from a music bank's L member (misread: 0x4902 / 0x4905 for the workshop banks)
+1ea7:9dc4	g_musicBank	i16	sound handle of the current screen's music (attract, workshop)
+1ea7:9dc6	g_chimpSeqRoom	far[]	sequence table of the chimps' room set (0x1041 / 0x103d) (accessed only through an index or an immediate: no DAT label in the export yet)
+1ea7:9e72	g_chimpSeqHall	far[]	sequence table of the chimps' hall set (0x1042 / 0x103e) (accessed only through an index or an immediate: no DAT label in the export yet)
+1ea7:9f1e	g_chimpSetRoom	far	cached room-scale chimp set
+1ea7:9f22	g_chimpSetHall	far	cached hall-scale chimp set
+1ea7:9f26	g_chimpPicSlots	u16[]	picture-cache slots shared by all chimps (accessed only through an index or an immediate: no DAT label in the export yet)
+1ea7:a01c	g_roomChimpCount	i16[16]	chimps counted per room (music layer); re-incremented at every display (bug) (accessed only through an index or an immediate: no DAT label in the export yet)
+1ea7:a03c	g_chimpParts	far	carried-part list shared by all chimps (holder in part +0x0c)
+1ea7:a040	g_fonts	far[2]	font records of resources 9 and 10 (Font_Init)
+1ea7:a048	g_fontDrawGlyph	far	glyph routine of the selected font: Gfx_DrawGlyph (font flag bit 0) or Lpx_DrawKeyed
 1ea7:a04c	g_playersFile	i16	players.dat file handle
+1ea7:a04e	g_storyTextId	i16	text of the next story page (0x1019..0x101e; 0x1019 = first page)
+1ea7:a054	g_typedName	char[16]	sign-in: the name being typed (0x1f = placeholder of an empty new entry)
+1ea7:a065	g_signinArrowRepeat	i16	written only (0, 2 Up, 3 Down): vestige of a key-repeat throttle that never throttles
+1ea7:a067	g_signinArrowCount	i16	never incremented: always 0 (see g_signinArrowRepeat)
+1ea7:a069	g_signinPrevClick	u32	written only: copy of g_signinLastClick while no input is pending (vestige of a double click)
+1ea7:a06d	g_signinLastClick	u32	written only: tick of the last click on a name
+1ea7:a071	g_typedLen	i16	characters in g_typedName (-1 = sign-in just entered)
+1ea7:a073	g_signinClicked	i16	written only: 1 after a click on a name
 1ea7:a075	g_roster	far	roster buffer (players.dat header + 99 x 22-byte entries in name order)
 1ea7:a079	g_rosterIndex	i16	roster entry of the current player (written at 8 + index*22)
+1ea7:a07c	g_carriedPart	far	part carried on the cursor in the workshop
+1ea7:a080	g_shelfDirty	i16	workshop shelf needs redrawing (holds the scroll direction while scrolling)
+1ea7:a084	g_scrollLeft	i16	conveyor scroll distance left (px)
+1ea7:a086	g_scrollDir	i16	conveyor scroll: 0 none, -1 parts move left, 1 right
+1ea7:a088	g_workshopSeqState	i16	state of the workshop sub-sequence (never written: 0, so Seq_Run(DS:219a) runs nothing)
+1ea7:a08a	g_blueprintBundle	far	loaded blueprint bundle
+1ea7:a092	g_blueprintPageCount	i16	number of part pages of the blueprint
+1ea7:a094	g_blueprintPage	i16	part page shown
+1ea7:a0b4	g_vehicleSprites	far	list of vehicle sprite records (0x36 bytes, layer-sorted)
+1ea7:a0c8	g_shelfCount	i16	lower-row parts on the workshop shelf
+1ea7:a0ca	g_workshopNextState	i16	state returned by the workshop: 8 or 16
+1ea7:a0cc	g_vehicleSpritePool	far	20 vehicle sprite records of 0x36 bytes
+1ea7:a0d0	g_raceDoorOpen	i16	workshop race-track door open
+1ea7:a0d2	g_resultLost	i16	result screen: 1 = lost (warehouse button available)
+1ea7:a0d4	g_resultNextRace	i16	result screen: 1 = won and a next race exists in the building
 1ea7:a0d8	g_fmPresent	i16	1 = FM sound banks (id+1)
 1ea7:a0da	g_hintList	far	hint list (Hint_Init)
-1ea7:a0e6	g_hintQueue	rec[5][18]	pending hints
+1ea7:a0de	g_hintSlots	rec[5][18]	hint queue records {list node, +8 id (-1 free), +0xa u32 due tick, +0xe far cancel flag}
+1ea7:a0e6	g_hintSlotId	i16	the id field of hint slot 0 (records at DS:a0de, 18 bytes each)
+1ea7:a138	g_elecPaths	i16[10][20]	closed paths found by the path search (rows end with the start piece)
+1ea7:a2c8	g_elecPathCount	i16	rows in DS:a138
+1ea7:a2fc	g_elecPieces	rec[15][16]	type, x, y, far picture, used, switch closed, fixed
+1ea7:a3ec	g_elecTerminals	rec[15][3][26]	per piece and terminal: hit rect, anchor, dot offset, overlap height, link piece, link terminal, wire flag
+1ea7:a87e	g_elecBatteryShorted	i16[15]	PzElec_BatteryShorted per battery
+1ea7:a89c	g_elecOnPath	i16[15]	pieces on a closed path of the last bulb tested
+1ea7:a8be	g_elecMode	i16	99 idle, 0..3 a piece in hand, 4 a wire in hand
+1ea7:a8c0	g_elecFoundTerm	i16	terminal found by PzElec_FindFreeTerminal
+1ea7:a8c2	g_elecFoundPiece	i16	piece found by PzElec_FindFreeTerminal (99 none)
+1ea7:a8c4	g_elecPlugShown	i16	1 while the plug picture replaces the held cursor
+1ea7:a8c6	g_elecToolCounts	i16[5]	toolbox counts: battery, bulb, switch, Y-wire, wire
+1ea7:a8ce	g_elecWiresLost	i16	counts dropped and detached wires; never read
+1ea7:a8d4	g_elecHeldCursor	far	cursor record of the item in hand
+1ea7:a8d8	g_elecCursor	far	puzzle cursor (picture 0x20b4, hot x 1)
+1ea7:a8dc	g_elecToolZones	zone[5]	toolbox item zones, press 0x45b + item (PzElec_InitToolZones)
+1ea7:a94a	g_elecPieceZones	zone[15]	placed piece zones, press 0x4b0 + slot (PzElec_CreatePiece)
+1ea7:aa94	g_elecToolRegions	rec[5][0x1c]	label cursor regions over the toolbox items (cursor at +0x18)
+1ea7:ab20	g_balanceRightHeavy	i16	1 when the right side was heavier as the beam left the level (PzBalance_Compare); swing direction from level
+1ea7:ab22	g_balanceZoneSet	i16	hook zone set in use: 0 tilt -5, 1 tilt +5, 2 level (-1 none)
+1ea7:ab24	g_balanceTilt	i16	beam tilt -5..5: negative = right side down, 0 level
+1ea7:ab26	g_balanceHeld	i16	weight type carried, -1 none
+1ea7:ab28	g_balanceTable	far	copy of D 0x211b (variant table)
+1ea7:ab2c	g_balanceStackPic	far	0x211d: hook drawn under the last of 1..2 left weights
+1ea7:ab30	g_balanceRingPic	far	0x211c: ring drawn above every hanging weight
+1ea7:ab34	g_balanceCarryPics	far	bundle 0x2129: weights with their hook (inventory, carried cursor)
+1ea7:ab38	g_balanceRightPics	far	bundle 0x212b: hanging weights, right side
+1ea7:ab3c	g_balanceLeftPics	far	bundle 0x212a: hanging weights, left side
+1ea7:ab40	g_balanceCountPics	far	bundle 0x212c: inventory count pictures 0..8
+1ea7:ab44	g_balancePanelText	far	text 0x214d
+1ea7:ab48	g_balanceHintText	far	text 0x212d + variant
+1ea7:ab4c	g_balanceHintPic	far	pressed Hint 0x1095
+1ea7:ab50	g_balanceSolved	i16	1 once the beam came to level (return value)
+1ea7:ab52	g_balanceHeldCursor	far	cursor record of the carried weight
+1ea7:ab56	g_balanceCursor	far	puzzle cursor (resource 3, a hand)
+1ea7:ab5a	g_balanceHookZones	zone[3][5]	left hook zones per resting tilt (-5, +5, level): press 0x461 + i, 0x466 + i, 0x46b + i
+1ea7:aca4	g_balanceInvZones	zone[6]	inventory weight zones, press 0x45a + type
+1ea7:ad28	g_balanceHookWeights	i16[10][3]	weight types on each hook, top first, -1 = empty
+1ea7:ad64	g_balanceStock	i16[6]	weights left in the inventory per type
+1ea7:ad70	g_energyDevices	rec[4][18]	device resource id (-1 none) and 8 uses-form flags
+1ea7:adb8	g_energyForms	rec[4][26]	form index (-1 none), needed-line-satisfied[4], sent[4] (indexed device, form), line[4]
+1ea7:adba	g_energySatisfied	i16	satisfied[k][d] at + 0x1a*k + 2*d (inside the DS:adb8 rows): no line needed, or it is drawn
+1ea7:adc2	g_energySent	i16	sent[d][k] at + 0x1a*d + 2*k (inside the DS:adb8 rows): the line k->d delivered energy
+1ea7:adca	g_energyLines	i16	line[k][d] at + 0x1a*k + 2*d (inside the DS:adb8 rows): drawn
+1ea7:ae20	g_energyIdleFrame	i16[4]	idle frame per device, -1 once it has worked
+1ea7:ae88	g_energyMode	i16	0 pencil, 1 eraser, -1 no line left
+1ea7:ae8a	g_energyLinesLeft	i16	lines the player may still draw
+1ea7:ae8c	g_energyDeviceZones	zone[4]	circular device connector zones, press 0x456 + d
+1ea7:aee4	g_energyFormZones	zone[4]	circular form connector zones, press 0x452 + k
+1ea7:af48	g_magnetsHeldOrient	i16	orientation 0..3 of the carried magnet
+1ea7:af4a	g_magnetsHeld	i16	kind of the carried magnet, -1 none
+1ea7:af4c	g_magnetsCounts	i16[3]	magnets left in the inventory per kind
+1ea7:af52	g_magnetsSlots	far	64 magnet records of 0x12 bytes (kind -1 = free)
+1ea7:af58	g_magnetsTargetCounts	far	D 0x11a1: i16 targets per level [30]
+1ea7:af5c	g_magnetsTargets	far	D 0x11a1 + 0x3c: target records [30][40] of 4 i16
+1ea7:af60	g_magnetsTable	far	copy of D 0x11a1
+1ea7:af64	g_magnetsOutlinePics	far	bundle 0x11a6: target outlines
+1ea7:af68	g_magnetsShadowPics	far	bundle 0x11a5: magnet shadows (drawn at +2,+2)
+1ea7:af6c	g_magnetsPics	far	bundle 0x11a4: magnets, kind*4 + orientation
+1ea7:af70	g_magnetsDigits	far	bundle 0x11a3: count digits
+1ea7:af74	g_magnetsRotatePics	far	bundle 0x11a2: ROTATE button normal, pressed
+1ea7:af78	g_magnetsPanelText	far	text 0x11c5
+1ea7:af7c	g_magnetsHintText	far	text 0x11a7 + level
+1ea7:af80	g_magnetsHintPic	far	pressed Hint 0x1095
+1ea7:af84	g_magnetsHeldCursor	far	cursor record of the carried magnet
+1ea7:af88	g_magnetsCursor	far	puzzle cursor (resource 3, a hand)
+1ea7:af8c	g_launchObjectPic	far	object sprite picture (PzLaunch_SetObjectSprite)
+1ea7:af90	g_launchGlowOn	i16	1 until solved: the target hole glows
+1ea7:af9a	g_launchObjectShown	i16	object sprite valid
+1ea7:afa0	g_launchRampSet	far	ramp picture set of the current surface (DS:b02c / b014 / affc)
+1ea7:b118	g_launchObject	i16	selected object 0..3, -1 none
+1ea7:b11a	g_launchSurface	i16	surface state 0..2
+1ea7:b11c	g_launchLanding	i16	landing position 0..12 (4..11 = holes 0..7)
+1ea7:b11e	g_launchGravity	i16	0 high, 1 normal, 2 low, -1 locked
+1ea7:b120	g_launchObjectFrames	far	frame set of the selected object
+1ea7:b124	g_launchRamp	i16	ramp 0..2 (choosable) or 3..5 (fixed)
+1ea7:b126	g_launchTarget	i16	target hole 0..7
+1ea7:b128	g_launchGravityPic	i16	gravity slider picture 1..3 (0x114a)
+1ea7:b12a	g_launchEnergy	i16	plunger energy 0..7
+1ea7:b12c	g_launchVariant	far	pointer to the variant record
+1ea7:b130	g_pzGoBackPic	far	pressed Go Back picture 0x1092 (Puzzle_InitPanel)
+1ea7:b134	g_pzPanelPic	far	panel picture 0x1091 (Puzzle_InitPanel)
+1ea7:b138	g_puzzleVariant	i16	variant chosen by State_09_Puzzle
+1ea7:b13a	g_puzzleKind	i16	kind 0..7 chosen by State_09_Puzzle
+1ea7:b13c	g_puzzleResult	i16	the puzzle's return value (1 solved)
+1ea7:b13e	g_puzzleCandidates	i16[3]	candidate variants (-1 empty)
+1ea7:b144	g_puzzleGoThrough	i16	1 = go through the opened door; set by Enter or the panel, 0 by Go Back, kept otherwise
+1ea7:b146	g_pzSndSlots	i16[53]	song slot per effect of the puzzle bank
+1ea7:b1b0	g_pzSndBank	far	copy of the puzzle effect bank
+1ea7:b1b4	g_simpleData	far	copy of F 0x206d + variant (0x570 bytes)
+1ea7:b1b8	g_simpleHeld	i16	part type in hand, 9 none
+1ea7:b21a	g_simpleSlotZones	zone[8]	inventory slot zones, press 0x44d + type
+1ea7:b38a	g_simplePlaced	rec[10][14]	placed parts: type (9 free), x, y, w, h, test x, test y
+1ea7:b41a	g_simpleCursor	far	puzzle cursor (resource 3)
+1ea7:b41e	g_simpleSlotRegions	rec[8][0x1c]	label cursor regions over the inventory slots (cursor at +0x18)
+1ea7:b502	g_piecesPanelText	far	text 0x20b0
+1ea7:b506	g_piecesHintFormat	far	text 0x20b1 (one %s: the machine's name)
+1ea7:b50a	g_piecesMachinePic	far	last member of bundle 0x2088 + variant: the assembled machine
+1ea7:b50e	g_piecesHintPic	far	pressed Hint 0x1095
+1ea7:b512	g_piecesBoxPics	far	bundle 0x2087: box lid closed, half open, open
+1ea7:b516	g_piecesDigits	far	bundle 0x204f: digits
+1ea7:b51a	g_piecesBundle	far	copy of bundle 0x2088 + variant
+1ea7:b51e	g_pieces	rec[10][18]	F 0x209c + variant: x, y, w, h, far picture, u8 dx, u8 dy, group, placed
+1ea7:b5d2	g_piecesInBox	i16	pieces still in the box
+1ea7:b5d4	g_piecesCount	i16	pieces of the variant (bundle members - 1)
+1ea7:b5d6	g_piecesGroup	i16	group being moved by a drop (PzPieces_MergeGroups, PzPieces_MoveGroup)
+1ea7:b5d8	g_piecesHeld	i16	piece carried, 0xb = none
+1ea7:b5da	g_piecesZones	zone[10]	piece zones, press 0x45b + i, priority 32000 - w*h/100
+1ea7:b6b6	g_piecesBlankCursor	far	cursor resource 4 (a 1x1 picture), shown while a group slides
+1ea7:b6ba	g_piecesHeldCursor	far	cursor record of the carried piece
+1ea7:b6be	g_piecesSavedCursor	far	copy of g_cursor (DS:7a6a) taken at start and restored at exit
+1ea7:b6c2	g_piecesCursor	far	puzzle cursor (resource 3, a hand)
+1ea7:b6c6	g_gearsHeldCursor	far	cursor record of the carried gear (the current cursor is compared with it)
+1ea7:b6ca	g_gearsCursor	far	puzzle cursor (resource 3, a hand)
+1ea7:b6ce	g_gearsBlankCursor	far	cursor resource 4 (1x1), shown while the crank is turned
+1ea7:b6d2	g_gearsData	far	copy of F 0x2002 + variant
+1ea7:b6d6	g_gearsRackPics	far	bundle 0x2029: toothed and plain rack segments
+1ea7:b6da	g_gearsCrankPics	far	bundle 0x2026: crank, 24 frames
+1ea7:b6de	g_gearsCrankGripPics	far	bundle 0x2025: crank with the hand on the handle, 24 frames
+1ea7:b6e2	g_gearsCrankCur	far	crank picture set in use (0x2026, or 0x2025 while turning)
+1ea7:b6e6	g_gearsButtonPics	far	bundle 0x2027: buttons, 2 states x 4 placements
+1ea7:b6ea	g_gearsGearPics	far[2]	bundles 0x2023 (small gear, 6 frames) and 0x2024 (large gear, 8 frames)
+1ea7:b6f2	g_gearsDigits	far	bundle 0x2028: count digits
+1ea7:b6f6	g_gearsPanelText	far	text 0x202a
+1ea7:b6fa	g_gearsHintText	far	text 0x202b + variant
+1ea7:b6fe	g_gearsHintPic	far	pressed Hint 0x1095
+1ea7:b702	g_gearsStock	i16[2]	gears left in the inventory per type
+1ea7:b706	g_gearsCrankRect	rec[26][8]	crank handle rectangles x0, y0, x1, y1 on screen per crank frame + 1
+1ea7:b7d6	g_gearsObjects	far	object records (20 bytes) in the F copy, + 0x116
+1ea7:b7da	g_gearsGrid	far	peg grid u8[12][23] at the start of the F copy
+1ea7:b7de	g_gearsHeld	i16	object index of the gear carried (or last carried)
+1ea7:b7e0	g_gearsObjectCount	i16	objects of the variant
+1ea7:b7e2	g_gearsJam	i16	set by the propagation when a turn is impossible
+1ea7:b7e4	g_gearsCrankCY	i16	crank centre y
+1ea7:b7e6	g_gearsCrankCX	i16	crank centre x
+1ea7:b7e8	g_gearsGearZones	far	zone[100] (Mem_Alloc 0x898): circle zone per placed gear, press 0x4b0 + i
+1ea7:b818	g_gearsCrankZone	zone	crank handle rectangle of the current frame, priority 99, press 0x44c
 1ea7:b86e	g_animRects	rec[][8]	DAM update rectangles
 1ea7:ba1e	g_animCallbacks	far[]	DAM opcode 0x7FF8 callbacks
 1ea7:ba80	g_animChannels	rec[2][0x22]	DAM channels
+1ea7:baaa	g_raceEffects	i16	land race effect bank handle (0xf4)
+1ea7:baac	g_raceMusic	i16	land race music bank handle
+1ea7:baae	g_raceMorty	rec[0x3a]	land race racer record of Morty
+1ea7:bae8	g_racePlayer	rec[0x3a]	land race racer record of the player
+1ea7:bb22	g_raceFinishBits	u16	racer ids that crossed the finish (1 player, 2 Morty)
+1ea7:bb26	g_airPathEnd	i16	set when an aircraft path's -1 record is reached (never read)
+1ea7:bb28	g_airMorty	rec[0x3c]	aircraft racer record of Morty
+1ea7:bb64	g_airPlayer	rec[0x3c]	aircraft racer record of the player
+1ea7:bba0	g_airScenery2	far	near scenery layer (W 0x264 + level)
+1ea7:bba4	g_airScenery1	far	far scenery layer (backdrop tiles)
+1ea7:bba8	g_airLaunchPath2	far	level 1 launch path 0x253
+1ea7:bbac	g_airLaunchPath1	far	level 1 launch path 0x252 (NULL on other levels)
+1ea7:bbb0	g_airEffects	i16	aircraft race effect bank handle (0x260)
+1ea7:bbb2	g_airMusic	i16	aircraft race music bank handle (0x262)
+1ea7:bbb4	g_dlgSaveBuf	far	save-under of the dialog box: always g_resBuffer (Dlg_SaveUnder)
+1ea7:bbb8	g_dlgPicY	i16	picture origin y of a dialog (body y - 2)
+1ea7:bbba	g_dlgPicX	i16	picture origin x of a dialog (box x + 4)
+1ea7:bbbc	g_dlgButtons	rec[3][28]	dialog buttons: a 22-byte zone {0, x, y, w, h, 5, next, key, key, -} + far label (+0x16) + enabled (+0x1a)
+1ea7:bc10	g_dlgLineH	i16	line height of the dialog font (Font_GetHeight, 10)
+1ea7:bc12	g_dlgFooterY	i16	footer text y
+1ea7:bc14	g_dlgFooterX	i16	footer text x
+1ea7:bc16	g_dlgBodyW	i16	body wrap width (measured, or the descriptor's)
+1ea7:bc18	g_dlgTitleY	i16	title text y
+1ea7:bc1a	g_dlgTitleX	i16	title text x
+1ea7:bc1c	g_dlgBodyY	i16	body text y
+1ea7:bc1e	g_dlgBodyX	i16	body text x
+1ea7:bc20	g_dlgH	i16	box height
+1ea7:bc22	g_dlgW	i16	box width
+1ea7:bc24	g_dlgY	i16	box y
+1ea7:bc26	g_dlgX	i16	box x
+1ea7:bc28	g_dlgInnerW	i16	content width + 12 (before the button row and the outer 10): menu item zones and highlight width
+1ea7:bc2a	g_menuItemZones	far	Mem_Alloc'd zones of the open drop-down (outside zone, items, footer)
+1ea7:bc2e	g_menuTitleZones	zone[3]	global zones of the menu titles (release 0x13b + i)
+1ea7:bc70	g_menuBarCur	far	the installed MenuBarDef (DS:4053, or DS:405a after removal)
+1ea7:bc74	g_viewThumbStep	i16	text viewer: thumb pixels per line = 104 / g_viewScrollMax
+1ea7:bc76	g_viewThumbY	i16	text viewer thumb y (45..138)
+1ea7:bc78	g_viewScrollMax	i16	text viewer scroll positions = max(1, line breaks - 10)

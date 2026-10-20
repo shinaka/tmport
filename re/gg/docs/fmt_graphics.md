@@ -26,7 +26,7 @@ Labels: **[O]** observed in code, bytes or decoder output; **[I]** inferred.
 | Video mode | VGA/MCGA mode 13h, 320x200, 256 colours, linear; set by INT 10h AX=0013h | 12e0:0b92 |
 | Frame buffer | one 320x400 byte buffer (`Mem_Alloc(0x1F400)`): rows 0..199 = the screen being composed, rows 200..399 = a back page holding the clean background | 1473:0074 |
 | Row table | 400 far pointers at DS:5f22, stride 0x140; every primitive draws through it | 1473:0074 |
-| Sprite erase | copy rows y + 200 to y (`Gfx_CopyFromBack` 1399:02a2, 1399:0233) | |
+| Sprite erase | copy rows y + 200 to y (`Gfx_RestoreRect` 1399:0233); the reverse copy, screen rows y to y + 200, saves a drawn background into the back page (`Gfx_SaveToBack` 1399:02a2, wave 0 name `Gfx_CopyFromBack`) | `code_runtime.md` §10.3 |
 | Present | 40x25 map of dirty 8x8 tiles (in the code segment at 1581:0006); `Dirty_Flush` 1581:052a draws the software mouse cursor into the buffer and copies each dirty tile to A000; no retrace wait | 1581:03ee / 052a |
 | Play area | 320x165 (rows 0..164): rooms, puzzles, races; `1473:0337` = copy back page rows 0..164 | |
 | HUD | rows 165..199 (35 pixels): score, counters, parts strip | 1a04:00eb, 1a04:0b69 |
@@ -144,8 +144,8 @@ leftovers of the tool that wrote the files [I].
   palettes of the puzzle screens, 16..31 also with 0x1058/5 (§3.1). The tools read the base
   from the user's `ssg.exe` (`lpx.base_palette`).
 * 1473:000c (start-up) loads an all-black DAC and sets DS:024c = 1 ("faded out").
-* `1473:02f0(rgb, count, offset)` copies a range into the shadow and, unless faded out
-  (DS:024c), loads the whole shadow into the DAC. `1473:041c(id)` copies a palette resource
+* `Pal_SetShadowRange(rgb, byteOffset, count)` 1473:02f0 copies a range into the shadow and,
+  unless faded out (DS:024c), loads the whole shadow into the DAC. `1473:041c(id)` copies a palette resource
   into the shadow only. `1473:0399(picture, palette)` applies the palette (if > 0) with 02f0,
   then reads the picture.
 * `Pal_SetRange` 1399:05d6 writes 128 colours per group, each group after waiting for the start
@@ -155,7 +155,9 @@ leftovers of the tool that wrote the files [I].
 * Fades (1473:015c(n, from, to)): step = 63 / n + 1, each colour moves by |d| / step + 1 per
   load, step + 1 loads: fade out 1473:0265 (n 6, 12 loads, about 0.34 s), fade in 1473:02a0 (n 8,
   9 loads, about 0.26 s); 1473:0325 = fade out, present, fade in; 1473:074e / 0766 save and
-  restore the shadow [O, platform pass].
+  restore the shadow [O, platform pass]. The last load of each fade repeats the target, so 11 and
+  8 loads change colours: **22 and 16 visible frames** at 2 frames per load, as measured
+  (`code_runtime.md` §13.4, REFERENCE_CAPTURES §10.2).
 * The DAC holds 6 bits per channel. The tools show a value v as `(v * 255 + 31) / 63`, the
   rounding DOSBox-X uses (`re/dos/docs/fmt_graphics.md` §2.2) [I for G&G until checked against a
   capture].
@@ -262,8 +264,10 @@ is the launch puzzle (overlay 3797): `3797:100e(script, frames, ...)` loads scri
 frame bundle id + k with k = DS:b124 mod 3, for the pairs (0x114b, 0x1157), (0x114e, 0x115a),
 (0x1151, 0x115d), (0x1154, 0x1160) (3797:129d..139e), turns the bundle's offset table into the
 frame table DS:ba26, starts a channel with all other arguments 0 (3d39:03cb, so position and
-frame base 0 [I from the zero arguments]) and steps it every 18 PIT ticks (`Timer_Set(7,
-0x12)`) while 3d39:0468 says it is still running. So script 0x114b + j animates the members of
+frame base 0 [I from the zero arguments]) and steps it every **19** PIT ticks (`Timer_Set(7,
+0x12)` followed by a strict `Timer_Expired` loop, 3797:10ba / 01c3) while 3d39:0468 says it is
+still running; the queued cels are drawn by the puzzle's 6-tick redraw (3797:0103), not at each
+DAM step. The 0x7FF8 callback table DS:ba1e is never written (`code_puzzles_a.md` §5.5). So script 0x114b + j animates the members of
 bundle 0x1157 + j, drawn over the launch puzzle's palette 0x1134.
 
 ### 6.3 Channels and drawing
@@ -372,7 +376,8 @@ Colour 1 as "skip" is G&G's own twist on the DPaint coding. All 202 frames end e
 * The movie loads **no palette** (2fcb:0640 makes no palette call): it shows the shadow palette
   left by the results screen, which applied 0x1077 (colours 64..255) over colours 0..63 from
   before. The frames use only colours 0..31 and 64..255 (none in 32..63) [O]. So the movie's
-  palette is the base colours 0..31 plus 0x1077 [I, strong; not yet checked against a capture].
+  palette is the base colours 0..31 plus 0x1077 [O: round 2 saw no fade or palette load between
+  the rank box and the movie, `r2_movie_race15.avi`, REFERENCE_CAPTURES §9.4].
   `movie.py` uses exactly that by default (`--pal` replaces 0x1077).
 
 Nothing comparable exists in Treasure Mountain (TM Windows plays cut-scenes as DAM over PMAPs;
@@ -412,11 +417,13 @@ its key caps, and movie frames 0..201.
 ## 10. Open questions
 
 * Whether any caller passes blit mode 1 or 3 (§2.4), and which flag words the actor draw passes.
-* Palettes for room objects and actors, and where colours 64..127 come from in rooms; whether
-  puzzles restore colours 0..63 after their full palettes (1473:074e / 0766 callers).
-* The movie palette against a DOSBox-X capture of the ending, and the exact frame timing with
-  the cue pauses and the music cue at tick 0x250.
+* Palettes for room objects and actors, and where colours 64..127 come from in rooms. (The
+  puzzles do restore the room's palette: state 9 saves the shadow before the puzzle and restores
+  it after, 38e2:0000, `code_puzzles_a.md` §1.2.)
+* *Answered (round 2):* the movie loads no palette (§7.4); its frames come every 18.0 ticks and a
+  `Delay(1460)` cue lasts 10.06 s (REFERENCE_CAPTURES §10.5).
 * The 10 bytes after three of the full palettes (§3.1).
-* The wipe patterns `W` 0x11d6..0x11dd (636 bytes each) are not yet decoded (1473:0479).
+* *Answered:* the wipe patterns `W` 0x11d6..0x11dd (636 bytes each: period, sweep flags, 156 left
+  and right start columns, per-step increments) are decoded in `code_runtime.md` §14.2.
 * DOSBox-X's 6-bit to 8-bit rounding for VGA mode 13h (assumed equal to its MCGA rounding).
 * Whether the DAM interpreter checks a "DOP" tag as TM Windows' does.

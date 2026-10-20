@@ -1,4 +1,7 @@
 12e0:000f	Seq_Run	int far Seq_Run(void (far *far *table)(void),int far *state)	runs a table of far state functions (main: DS:00c2, state DS:455c); a state returns -2 = back to the previous state, -1 = stop, 0 = next, n = go to state n
+12e0:007f	Music_RoomCue	void far Music_RoomCue(void)	room music cue callback (Snd_SetCue from 1622:0346, tick DS:0a06[building]): DS:08be = (DS:08be + 1) mod 6, Snd_SetTranspose(slot of DS:09e6, 0, byte DS:010e[12*building + 2*DS:08be]); code_sound.md §14.1
+12e0:00bd	Music_WorkshopCue	void far Music_WorkshopCue(void)	workshop music cue callback (cue DS:9dc2): at the 2nd call DS:4558 = 2 and, unless DS:2198, arrangement 2; never reached in practice (cue beyond the song length); code_sound.md §14.2
+12e0:00ea	Music_MovieCue	void far Music_MovieCue(void)	final movie music cue callback (cue 0x250): DS:4554 += 1; arrangement 1..4, then all (5), reset at 7; code_sound.md §14.3
 12e0:012f	State_16_SaveAndLeave	int far State_16_SaveAndLeave(void)	saves (2b5a:01ea), frees the building (Building_Free), returns DS:455a (2 sign-in, 3 hub)
 12e0:0141	State_17_End	int far State_17_End(void)	returns 0 -> state 18 = NULL -> Seq_Run ends (after the final movie)
 12e0:0148	State_03_Hub	int far State_03_Hub(void)	Technology Center: buildings = zones 0xbb9..0xbbb, 0xbb8 -> state 2, Esc/0xbbc -> Cmd_SaveAndExit; 4 ticks per frame
@@ -9,32 +12,71 @@
 12e0:0820	State_04_BuildingSetup	int far State_04_BuildingSetup(void)	DS:4594 level = DS:4596[b]+1, DS:4590 = b*5+level; part catalogue, rooms, HUD; new visit or resume from DS:47e0+b*0x6ba
 12e0:096a	State_05_EnterRoom	int far State_05_EnterRoom(void)	menu bar on, room DS:7aa4 (1622:0411); room 0 -> 6 (workshop), else 7
 12e0:09aa	State_08_LeaveRoom	int far State_08_LeaveRoom(void)	DS:00bc (puzzle door) -> 9; DS:00be (vehicle finished) -> save, 10; else 5
-12e0:0a24	Room_SetDoorArt		door pictures by room word 0 bit 0 (0x30e/0x33c); a solved puzzle turns its door into type 9
+12e0:0a24	Room_OpenPuzzleDoor	void far Room_OpenPuzzleDoor(int solved)	If solved: the door actor0+0x36 (type 7) and its linked twin become type 9 (kind 4, picture 0x33c hall / 0x30e room); DS:b144 != 0 moves the player (actor0+0x1a) to the target room; called by State_09_Puzzle 38e2:0088
 12e0:0ace	Score_Add	void far Score_Add(int points)	DS:4572 += points (u32), HUD dirty
 12e0:0aea	Projectiles_Add	void far Projectiles_Add(int n)	DS:457e += n, HUD dirty bit 8
 12e0:0afb	Game_Init	void far Game_Init(void)	actors (18f5:0721), workshop (2dee:1db5), HUD (1a04:025b), SndRes_Init, hint queue (Hint_Init)
 12e0:0b19	Game_Shutdown	void far Game_Shutdown(void)	registered with atexit by main: DS:00c0 = -1, sound off (1bb4:0e15), 1473:0103, Res_CloseFiles, 303a:0250 (Input_Remove path)
 12e0:0b38	main	int far main(int argc,char far *far *argv,char far *far *envp)	atexit(Game_Shutdown); Init_CommandLine (303a:005c); 1473:0074; 2b16:021c; 15df:000d; 12e0:0afb; Seq_Run(DS:00c2, DS:455c=1); exit(0)
+1a04:000e	Hud_SetDigitColors	void near Hud_SetDigitColors(int set)	recolours the 10 digit pictures in place from colour set DS:1318 to `set` (DS:131a: 3 colours + 0xff per set)
+1a04:0058	Hud_DrawNumber	void near Hud_DrawNumber(int x,int y,unsigned long v,int digits,int set)	leading-zero digits 11 px apart, divisor DS:1384[digits]
 1a04:00eb	Hud_DrawBar		HUD strip y 165..199
+1a04:011c	Hud_ClearInfo	void near Hud_ClearInfo(void)	HUD background over the counter area x 218..319
+1a04:0166	Hud_FillRect	void near Hud_FillRect(void far *rect)	colour 0x16 over a sprite rectangle
+1a04:018e	Hud_DrawLabels	void near Hud_DrawLabels(int mask)	label pictures of HUD set 0x1058 at x 218, y 166 / 177 / 188 (mask 4 / 2 / 1)
+1a04:01fa	Hud_StripNeighbour	void far *far Hud_StripNeighbour(void far *part)	strip column to show after a part is removed
 1a04:025b	Hud_Init		
-1a04:084c	Hud_Cmd6003		HUD inventory command (code 6003)
-1a04:08ad	Hud_Cmd6002		HUD inventory command (code 6002)
+1a04:02c2	Hud_DrawAll	void far Hud_DrawAll(int labels)	bar, labels, saves rows 165..199 to the back page (State_04)
+1a04:02e9	Hud_DrawCounters	void near Hud_DrawCounters(void)	parts needed, bananas and score, and their shadows DS:8792..8798
+1a04:0348	Hud_LayoutStrip	void near Hud_LayoutStrip(void far *anchor,int mode)	assigns strip x positions (from 20, part width + 4, window < 153 px) around an anchor; pairs below (y 0xb8)
+1a04:0588	Hud_DrawStrip	void near Hud_DrawStrip(void)	carried parts, their zones (5000 + part), the arrows (zones DS:1330) and the trash can
+1a04:0690	Hud_FlashPart	void far Hud_FlashPart(int part,int pair)	blinks the carried part(s) of that type 5 times (dirty bit 0x40); used when a third part of a type is refused
+1a04:0754	Hud_SetInfoText	void far Hud_SetInfoText(void far *text)	text shown in the counter area at the next Hud_Update (dirty bit 0x10)
+1a04:076b	Hud_AddPart	void far Hud_AddPart(int part)	the new tail of the carried list gets its strip sprite and zone (release 5000 + part, priority 4); shows its text
+1a04:0809	Hud_StripAnchorFor	void far *far Hud_StripAnchorFor(int part)	Hud_StripNeighbour of a part record
+1a04:0823	Hud_RefreshStrip	void far Hud_RefreshStrip(void far *anchor)	full HUD redraw (bit 0x8000) and a new strip layout
+1a04:084c	Hud_ScrollRightArrow	void far Hud_ScrollRightArrow(void)	code 6003, the arrow at x 178: strip one column back from the first visible
+1a04:08ad	Hud_ScrollLeftArrow	void far Hud_ScrollLeftArrow(void)	code 6002, the arrow at x 2: strip one column on from the last visible
 1a04:090e	Hud_SelectPart	void far Hud_SelectPart(int n)	codes 5000..5100: picks part n of the inventory strip (it follows the cursor)
-1a04:0a82	Hud_Cmd6000		HUD inventory command (code 6000)
-1a04:0b5b	Hud_Cmd6001		HUD inventory command (code 6001)
+1a04:0a11	Hud_DrawInfoText	void near Hud_DrawInfoText(void)	font 1, colour 0, Text_DrawBox(218, 168, 102, text); DS:132a = 0
+1a04:0a58	Hud_CancelCursorPart	void near Hud_CancelCursorPart(void)	drops the part attached to the cursor (DS:1326 = -1), restores the cursor and bounds
+1a04:0a82	Hud_TrashCursorPart	void far Hud_TrashCursorPart(void)	code 6000, the trash can: the cursor part leaves the player, is flagged 0x4000 and goes to a random room (rand); hint 0x1049
+1a04:0b5b	Hud_PutBackCursorPart	void far Hud_PutBackCursorPart(void)	code 6001, a click elsewhere in the HUD: Hud_CancelCursorPart, full redraw
 1a04:0b69	Hud_Update		per-frame HUD: score (6 digits DS:4572), projectiles (DS:457e), parts needed (DS:4582), inventory strip; dirty bits DS:132c
+1a04:0d36	Hud_AddScoreNow	void far Hud_AddScoreNow(int points)	Score_Add, redraw the score and flush at once (puzzle rewards, 38e2:03bf)
+1a04:0d65	Hud_EscHook	void far Hud_EscHook(void)	Esc/menu hook DS:8656 in the warehouse: puts a cursor part back (Hud_PutBackCursorPart, Hud_Update)
+2b5a:0000	Player_InitRecord	void far Player_InitRecord(void)	blank record into DS:4562: zeros, building -1, races won -1 x 3 (its copy of DS:1ad4 into DS:45cc is overwritten by the memcpy)
 2b5a:004c	Players_Open		opens players.dat and checks the header (USR 0x1A, version word 12 at +4); mismatch -> re-created
+2b5a:00db	Players_Read	void far Players_Read(void far *buf,unsigned n,int fatal)	read; a short read with fatal set exits with code 1
 2b5a:010a	Players_WriteError		a failed write: message resource 0x106f, unlink players.dat, exit
 2b5a:0156	Players_Write		writes a record (code NOTES: write players.dat)
+2b5a:0189	Players_Close	void far Players_Close(void)	close(g_playersFile)
+2b5a:0198	Players_LoadRecord	void far Players_LoadRecord(int slot)	opens read-only (fatal), reads record slot into DS:4562, closes
 2b5a:01ea	Players_SaveCurrent		copies a building in progress into its record block (DS:47e0+b*0x6ba) and writes this player's slot (0x8a0 + DS:4576*0x16bd) and roster entry
 2bd4:0225	Rank_FromPoints	int far Rank_FromPoints(unsigned long points)	number of u32 thresholds DS:1f9c (7 values 5000..750000) <= points -> rank 0..7 (names DS:1f7c)
+2c11:0000	Attract_PlayAnim	int far Attract_PlayAnim(void far *anim,int fade,unsigned flags,...)	runs screen-animation channel scripts at 4 ticks per frame; fade 1 Pal_FadeIn / 2 Pal_FadeFromSaved after the first frame; flags 2 time-out (vararg seconds * 146 ticks), 4 end with a channel (vararg), 8 Enter/Esc/Space end; returns the key or 0
+2c11:03a7	Attract_DrawPictureSet	void far Attract_DrawPictureSet(unsigned id)	bundle of {I x, y} / G pairs drawn keyed, until an I member starting with 0xFF
 2c11:043f	Attract_TitleAnim		title animation (sub-sequence DS:20a8)
+2c11:05cf	Attract_AfterTitle	int far Attract_AfterTitle(void)	attract step 2: back page restored, palette 0x1004 faded in from the title's, animation DS:2096 until channel 0 ends; sets the first story text
 2c11:0630	Attract_StoryPage		one of the 6 story pages (text 0x1019..0x101e), 0x111c ticks = 30.1 s, Enter next, Space skip, Esc quit
+2c11:077f	Attract_AfterStory	int far Attract_AfterStory(void)	attract step 9: story box and line erased, animation DS:209c until channel 2 ends
+2c11:07e5	Attract_BeforePrompt	int far Attract_BeforePrompt(void)	attract step 10: picture 0x1002 with palette 0x1004, animation DS:20a2 until channel 0 ends
 2c11:084c	Attract_SignInPrompt		sign-in prompt page (picture 0x1029, text 0x1025); time-out returns 1 = restart the attract loop
 2c11:0913	State_01_Attract	int far State_01_Attract(void)	runs the attract sub-sequence DS:20a8 with Seq_Run
-2caa:004f	Players_CreateFile		creates players.dat full size: header, roster, 99 blank records
-2caa:01c5	Roster_Insert		inserts a player into the roster DS:a075 in name order (F_SCOPY shifting)
+2caa:0000	SignIn_HideButtons	void near SignIn_HideButtons(void)	PicBtn_Erase of the three sign-in buttons (before a dialog)
+2caa:0025	SignIn_ShowButtons	void near SignIn_ShowButtons(void)	PicBtn_Draw of the three sign-in buttons, Dirty_Flush
+2caa:004f	Roster_LoadOrCreate	void near Roster_LoadOrCreate(void)	reads the 0x8a0-byte header and index into g_roster, or (missing file, other version) creates players.dat: header, index (entry i slot i), 99 blank records saved one by one (the slot-98 anomaly)
+2caa:0145	Roster_Save	void far Roster_Save(void)	writes the 0x8a0-byte header and index (g_roster) to players.dat
+2caa:016e	SignIn_DrawScreen	void far SignIn_DrawScreen(void)	picture 0x1029 + palette 0x102a, title 0x1027 at (65,28), Screen_SaveAll
+2caa:01b3	SignIn_ShowScreen	void near SignIn_ShowScreen(void)	Font_Select(1), SignIn_DrawScreen, Screen_FadeOutIn
+2caa:01c5	Roster_UpdateTyped	int near Roster_UpdateTyped(int c)	removes the in-progress entry, then selects the first entry the typed text is a prefix of or inserts the typed name in name order (points -1, or -2 with c = 0x1f); 1 when the count changed
+2caa:04ae	SignIn_DrawScoreRank	void near SignIn_DrawScoreRank(unsigned long points,int x,int y)	points right-aligned at x + 100 and the rank name at x + 105 (nothing for negative points)
+2caa:053a	SignIn_DrawList	void near SignIn_DrawList(int flush,int a,int b)	draws rows a and b (all when b < 0) of the 8 visible, scrolls to the selection, updates the three button states
+2caa:082e	SignIn_HandleCode	int near SignIn_HandleCode(unsigned code)	typing, Backspace, Up/Down, Ctrl+R, list clicks, Cancel / New Player / Start Game; returns 0x0d to sign in
+2caa:0eb3	SignIn_Run	int near SignIn_Run(void)	sign-in loop (busy poll, table CS:1210); returns the code that signed in
 2caa:1240	State_02_SignIn	int far State_02_SignIn(void)	roster of up to 99 (8 rows), typing starts a new name (max 15, first letter upper-cased), Ctrl+R remove, chimps question for new players
+2caa:1382	SignIn_LoadButtons	void near SignIn_LoadButtons(void)	picture buttons, effect bank 0x102f, title music 0x1020 arrangement 1
+2caa:13f6	SignIn_Free	void near SignIn_Free(void)	frees the roster copy, the button bundles and the effect bank
 2fcb:0000	Result_DrawScreen		near: result screen (picture 0x1076, palette 0x1077), winner and points (DS:4560 = 0 won)
 2fcb:01dd	Result_RankUpMessage		rank-up message (bundle 0x1070, next threshold formatted with Str_FormatThousands); called at 2fcb:0552
 2fcb:0315	State_14_RedrawResult	int far State_14_RedrawResult(void)	Result_DrawScreen -> 13
@@ -46,7 +88,7 @@
 303a:0250	Init_Shutdown	void far Init_Shutdown(void)	Input_RemoveHandlers (called by Game_Shutdown)
 3060:0000	Hint_CompareDue		queue order: by due tick (+10)
 3060:0013	Hint_Init	void far Hint_Init(void)	creates the hint list DS:a0da and clears the 5-entry queue DS:a0e6
-3060:0037	Hint_Queue	void far Hint_Queue(int id,unsigned long delay,int far *cancel)	queues a New Player Hint due after delay ticks unless *cancel becomes non-zero (up to 5 pending)
+3060:0037	Hint_Queue	void far Hint_Queue(int id,unsigned delay,int far *cancel)	queues a New Player Hint due delay ticks from now (u16: one word is added to the tick) unless *cancel becomes non-zero; 5 slots DS:a0de, kept sorted by due tick; with no free slot it writes a sixth record past the queue (over g_elecPaths DS:a138)
 3060:00bc	Hint_Update	void far Hint_Update(void)	shows the first queued hint when it is due (unless cancelled)
 3060:013b	Hint_Show	void far Hint_Show(int id)	unless hints are off (DS:45a2) or already seen (DS:45a4[id-0x1043]): message box (Dlg_MessageBox) with sound 0x1056, marks it seen
 3060:01fb	Hint_ClearQueue	void far Hint_ClearQueue(void)	

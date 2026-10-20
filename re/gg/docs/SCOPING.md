@@ -45,15 +45,15 @@ overlays sit at 2a80..4140, and `DS:XXXX` = DGROUP 1ea7 = file 0xFC70 + XXXX (AR
 You play at a Technology Center (the hub) with three buildings: Automotive, Aircraft and Alternative
 Energy. Morty Maxwell, the villain, challenges you to five races in each building, 15 in all. In each
 building's warehouse rooms you open locked doors by solving science puzzles (8 kinds, 221 variants)
-and collect vehicle parts while his Cyber Chimps get in the way. You then build the vehicle from a
-blueprint in the workshop and race it. Points earn one of 8 ranks. A movie ends the game after the
+and collect vehicle parts while his Cyber Chimps get in the way. In the workshop you then build the
+vehicle from a blueprint and race it. Points earn one of 8 ranks. A movie ends the game after the
 15th race. The mouse is required. [O; `Seq_Run` 12e0:000f, state table DS:00c2, ARCHITECTURE §2]
 
 | | G&G DOS v1.0 (1993) | TM DOS V1.0 (1990) | TM Windows CD v1.01 |
 |---|---|---|---|
 | Program | `ssg.exe`, 213 200 bytes, MZ, **Borland C++ 3.0** (TLINK 5.0 byte 0x50 at file 0x1C), large model, 286 code, not packed. 108 544-byte load module plus a **Borland VROOMM overlay area** of 35 overlays (2 empty, 99 730 bytes) loaded on demand through INT 3Fh [O] | `SST.EXE`, 115 011 bytes, Turbo C 2.0, 8086 code, EXEPACK, no overlays | `TMTWINCD.EXE`, Win16 NE, Borland C++ 4.x |
 | Code | 1205 functions: 164 runtime and overlay manager, 217 overlay thunks, **824 game functions = 132 KB** [O] | 628 functions; game logic about 400 / 61 KB | 863 functions, about 112 KB |
-| Named so far | 192 of 1205 (scoping); after wave 0: 453 of the repaired export's 1234 (1017 without the thunks) | all | all |
+| Named so far | 192 of 1205 (scoping); after wave 0: 453 of the repaired export's 1234 (1017 without the thunks); after wave 1: 982 of the 1017 (all but the LZH and overlay-manager internals) | all | all |
 | Data | 4 compressed archives `gizmo000-003.dat`, 1897 resources, 1.2 MB packed / 5.75 MB unpacked [O] | 19 plain files, 667 KB | about 119 MB (DLLs, MIDI, WAV, speech) |
 | Screen | VGA mode 13h only, 320×200 in 256 colours, palettes built from 6-bit DAC ranges, palette fades [O] | 320×200 in 16 colours (EGA, Tandy, MCGA, CGA looks) | 512×384 in 256 colours inside 640×480 |
 | Sound | PC speaker or OPL2 (AdLib). Music and effects are 'BMF' MIDI-like songs, each in a speaker and an FM arrangement. No digitised audio: `-sb` and `-sm` just select the OPL2 [O] | speaker, Tandy PSG, PS/1, AdLib | MIDI, 22 kHz waves, speech |
@@ -92,7 +92,7 @@ systems, code and platform passes) [O sizes, I grouping]:
 | Engine, sound: BMF driver (64 song slots), sound banks, Ctrl+S | 1bb4, 1cdd | 81 | 5.1 KB |
 | Engine, timers, interrupt handlers, keyboard, mouse, click zones, memory | 1454, 152c, 1536, 17a0, 17ab, 198d, 1d3c | 53 | 3.9 KB |
 | TLC UI library: fonts, text renderer, DAM, dialogs, buttons, list box, menu bar, menu commands, help, text viewer | ovl01 2b16, ovl03 2b89, ovl23 3d39, ovl26-28, ovl30-34 | 101 | 14.8 KB |
-| **8 puzzle mini-games** | ovl13 3083 electric circuits, ovl20 3938 simple machines, ovl21 3a4a machine pieces, ovl15 33cd energy forms, ovl17 3797 launch (uses DAM) [O asserts, strings, DAM calls]; ovl22 3b2f gears, ovl14 32fe balance, ovl16 35bb magnets [I, from the order of the dispatch table at 38e2:00d4] | **235** | **49.5 KB** |
+| **8 puzzle mini-games** | ovl13 3083 electric circuits, ovl20 3938 simple machines, ovl21 3a4a machine pieces, ovl15 33cd energy forms, ovl17 3797 launch (uses DAM) [O asserts, strings, DAM calls]; ovl22 3b2f gears, ovl14 32fe balance, ovl16 35bb magnets [O: dispatch targets, screen pictures and the round 2 captures; wave 0 had them from the dispatch order only] | **235** | **49.5 KB** |
 | Puzzle choice and helpers | ovl18 38e2, ovl19 3924 | 19 | 1.4 KB |
 | Rooms, actors, player, projectile, Cyber Chimps, parts catalogue, collision | 1622, 1834, 18f5, 174b, 19c0, 1adb, 153f, ovl00 2a80 | 111 | 17.7 KB |
 | Workshop and vehicle assembly | ovl08 2dee | 29 | 7.5 KB |
@@ -139,10 +139,10 @@ this folder; the reference decoders are in `tools/gg/` (`python -P`, read-only o
 | `fnt` 0x1A fonts (ids 9, 10): proportional 1-bpp, key-cap glyphs | **decoded** [O] |
 | Text (`T`) and New Player Hints (`H`, with a `FF 06 … FF` designer note; `FF 03` colour escapes in part and help texts) | **decoded** [O] |
 | `DAM` 0x1A animation scripts, 16-bit opcodes 0x7FF8..0x7FFF | **decoded** (12 scripts) [O] |
-| Final movie: Deluxe Paint Animation "RunSkipDump" deltas (colour 1 = skip) | **decoded**, all 202 frames [O]; palette: none is loaded, the results screen's (base + 0x1077) stays [I, wave 0] |
+| Final movie: Deluxe Paint Animation "RunSkipDump" deltas (colour 1 = skip) | **decoded**, all 202 frames [O]; palette: none is loaded, the results screen's (base + 0x1077) stays [O, round 2 capture] |
 | `BMF` 0x1A music and effects: one track of MIDI-like events, speaker class 1 / OPL class 3 with 11-byte patches | **tokenised**, all 495 songs. Tick = 72.83 Hz (platform); wave 0 explained the channel flags, the "4 bytes after the end code" (the end-of-section meta event) and the `L` member (`fmt_sound.md`) |
-| `PLAYERS.DAT` | **layout decoded** (header, index, records, 3 × 1722-byte per-building blocks); field meanings inside the blocks still to be specified |
-| Game tables (`R` paths, `W` positions, `A` arrays, `F` puzzle grids, `D` scene descriptions with 142-byte objects, `S` actor sets) | **shapes known**, use partly inferred |
+| `PLAYERS.DAT` | **specified** (header, index, records, the 3 × 1722-byte per-building blocks; wave 1, `fmt_data.md` §8, `code_ui.md` §12) |
+| Game tables (`R` paths, `W` scenery and wipes, `A` room and animation sets, `F` puzzle data, `D` level descriptions and puzzle tables, `S` actor sets) | **specified** in wave 1 (`fmt_data.md` §7 and the `code_*.md` specs) |
 
 ## 3. Checked again
 
@@ -285,7 +285,8 @@ finished G&G port, nearly all of it infrastructure. This agrees with the verifie
    puzzle choice and history; New Player Hints; sign-in and roster; options; PLAYERS.DAT records.
 7. **Reverse engineering still to do:** names and specs for about 630 unnamed game functions; the
    meaning of the per-building save blocks; the puzzle grid and table semantics; the race model; the
-   BMF details; the movie palette.
+   BMF details; the movie palette. **Done in wave 1** (`code_*.md`; the remaining gaps are their open
+   questions, summarised in `PORTING_NOTES.md`).
 8. **Tooling:** guest mouse input for DOSBox-X and a G&G profile in `tmctl.py` (both done in wave 0,
    `REFERENCE_CAPTURES.md`), a G&G frame/step logger, a G&G profile in `fidelity.py`, and the
    reference captures (§8).
@@ -311,6 +312,20 @@ and the runtime model is the one tmport already implements for Windows. Dearer: 
 times as big with almost no reusable logic, less reverse engineering done so far, and a mouse-only
 game that the current capture tooling cannot drive.
 
+**After wave 1 (specs and round 2 captures).** The game-logic specs come to about 6 900 lines
+(world, vehicles and races, two puzzle parts, UI) plus 1 950 for the platform and sound, against
+7 400 for all of TM DOS's wave 1. Two findings shrink wave 3: the races are deterministic
+functions of two part lists with no input and no `rand()` (the feared steering and physics do not
+exist), and the world is data-driven (one 46-op actor interpreter runs the player, the banana and
+every chimp). Two make it bigger: the puzzles are full simulations (an electric path search, gear
+drive propagation, a magnet force model with 16-bit arithmetic, a balance, launch tables, a DAM
+cut-scene), about 37 % of the logic with little shared code, and the 1bb4 driver is new code, not
+an adaptation. The game-logic factor therefore stays at **1.6**, with a narrower range
+(**1.45-1.75**: no unknown mechanics are left, the remaining gaps are captures, not missing
+RE), and the total stays at **about 1.4-1.45** (range 1.25-1.65 with the other waves' ranges
+unchanged). In lines: TM DOS's game logic is about
+13 600 lines of C++ (`src/dos/game`); G&G's is estimated at 20 000-24 000 [I].
+
 ## 8. Risks and unknowns
 
 1. **Fidelity tooling (largest risk).** DOSBox-X feeds the guest mouse only while it has captured the
@@ -322,25 +337,30 @@ game that the current capture tooling cannot drive.
    the host pointer), so a guest-side TSR (`MOUSEKEY.COM`, built by `tools/gg/mouse_tsr.py`) owns
    the game's INT 33h event handler and takes mouse commands as posted keys; a puzzle was solved
    with it and the tour replays (`REFERENCE_CAPTURES.md`, `re/CONTEXT.md` G&G section). What
-   remains: warehouse runs depend on real-time pace, because the Cyber Chimps call `rand()` every
-   frame, so such runs start from save states.
+   remains: warehouse runs depend on real-time pace, because a walking chimp calls `rand()`
+   whenever one of its probes touches an edge, pad, door or item, so such runs start from save
+   states. Round 2 (wave 1) captured all 8 puzzle kinds, a race per building, the workshop, the
+   movie and sound runs this way.
 2. **Reverse-engineering scale and Ghidra quality.** Only 192 of 1205 functions were named in the
-   scoping pass (453 of 1017 real functions after wave 0). Overlay switch tables, the 64-KB boundary problem and struct-by-value calls make
+   scoping pass (453 of 1017 real functions after wave 0, 982 after wave 1). Overlay switch tables, the 64-KB boundary problem and struct-by-value calls make
    parts of the decompiled C unreliable, so assembly must be read [O].
 3. **Puzzles and races.** 221 puzzle variants run on grid and table data whose meaning is partly
    inferred. The race model (speed from parts, paths, whether the player steers) is inferred. Exact
-   simulation matters for pixel-exact checks [I].
+   simulation matters for pixel-exact checks [I]. **Wave 1:** every puzzle's data and algorithm
+   and both race models are specified; the races have no steering and no randomness; the simulated length of
+   the captured lost Aircraft race (Morty's finish) matches the AVI within about 0.2 s [I].
 4. **Sound.** BMF channel flags, the 4 bytes after the end code and the `L` member were unexplained;
    wave 0 explained them (`fmt_sound.md`). The first reference recordings exist: DOSBox-X `.dro` OPL
    captures of the title music, identical write for write across two boots; `oplcmp.py` can compare
    them, as for TM DOS [O/I].
 5. **Movie palette** not found by scoping (none of the 8 full palettes fits). Wave 0: the movie
-   loads none and shows the results screen's palette, base colours 0..31 plus 0x1077 [I, strong;
-   `fmt_graphics.md` §7.4]; to be checked against a capture of the ending.
+   loads none and shows the results screen's palette, base colours 0..31 plus 0x1077
+   (`fmt_graphics.md` §7.4); confirmed by the round 2 capture of the ending.
 6. **Timing details.** Overlay loads are disk reads inside frames. Fades are paced by the 70 Hz
    retrace. The BIOS clock runs 8 times fast in the game (it only feeds `srand(time)`). Frame counts
    (the results count-up over 50 frames) depend on frame time. Fidelity runs must take the random seed
-   from the DOSBox-X state, as for TM DOS [O/I].
+   from the DOSBox-X state, as for TM DOS [O/I]. **Round 2:** no overlay stall is visible in
+   DOSBox-X; fades are 22 and 16 visible frames; frame periods hold (REFERENCE_CAPTURES §10).
 7. **Touching finished code.** Extracting a shared core changes both TM editions. Every step must keep
    `tmtests` and both fidelity suites unchanged, with one owner, as the host split was handled in the
    TM DOS wave 2 [I].

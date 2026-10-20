@@ -8,7 +8,7 @@ user's own game folder at run time and contain no game data or text. Run the Pyt
 Three groups: the [decoders](#decoders-wave-0) of the data files, the [Ghidra project](#ghidra-project)
 (`vroomm.py`, `ghidra_import.sh`, `ghidra_export.sh`) and the
 [reference captures](#reference-captures-dosbox-x) in DOSBox-X (`mouse_tsr.py`,
-`capture_tour.py`).
+`capture_tour.py`, and for round 2 `capture_mem.py`, `capture_timing.py`, `capture_r2.py`).
 
 Common to all tools:
 
@@ -158,7 +158,8 @@ map against the exe.
   1000:027b (the overlay manager's fatal-error exit), is now a function.
 
 **Result:** 1234 functions (217 stub thunks and 1017 real ones; the scoping export had 1205 and
-988), 453 of them named, plus 155 DGROUP labels. Functions cover 147 584 of 155 072 executable
+988), 453 of them named in wave 0 and 982 after the wave 1 merge (`re/names/gg/README.md`), plus
+155 DGROUP labels in wave 0 and 617 after wave 1. Functions cover 147 584 of 155 072 executable
 bytes (95.2 %; scoping 92.6 %). The function entries equal the scoping export's, minus
 3f56:092d and plus 30 new ones. Two rebuilds from scratch give identical exports.
 
@@ -168,7 +169,11 @@ bytes (95.2 %; scoping 92.6 %). The function entries equal the scoping export's,
 |---|---|
 | `mouse_tsr.py` | builds MOUSEKEY.COM, the guest TSR behind `tmctl.py mouse` (INT 33h/21h/9 hooks, key protocol): `build OUT`; `keys X Y ACTION` prints a command's keys (ACTION move, ldown, lup, rdown, rup; X in INT 33h units, 0..639); `status STATE` prints the TSR's and the game's mouse variables from a DOSBox-X state |
 | `capture_tour.py` | replays the wave 0 tour in DOSBox-X through tmctl: `run door OUTDIR` (fresh boot to the first puzzle, with an AVI and a .dro of the title music), `run puzzle OUTDIR` (from the state w0/17_puzzle to the hub), `list SEGMENT` (the steps) |
+| `capture_mem.py` | reads and patches the guest RAM of a G&G save state (DGROUP found by its signature): `vars`, `peek`, `poke` / `pokew` / `poked`, `diffds` (two states), `rand` / `calls` (the LCG forwards, and the number of `rand()` calls between two states), `seedfor` / `seedpuz` / `door` (a `rand()` state that deals a chosen puzzle kind at a door), `boxes` / `boxset` (the part boxes of the building's rooms). Reads states; writes new `.sav` files only where told |
+| `capture_timing.py` | measurements on round 2 AVIs and `.dro` logs: `info`, `palette` (palette loads and fades), `pace` (the frame period of a screen box), `gaps` (runs of identical frames), `dro` (the OPL write grid) |
+| `capture_r2.py` | replays the round 2 segments in DOSBox-X through tmctl: `list`, `run SEGMENT OUTDIR [--av]` (puzzle_k0..k7, the three races, the movie, the workshop, the resume), `compare DIR_A DIR_B` |
 
-Both drive or read DOSBox-X only; `tools/tmctl.py --profile gg` and
-`re/gg/docs/REFERENCE_CAPTURES.md` describe the profile, the mouse protocol and the captures.
-Only start DOSBox-X when your task says so.
+They drive or read DOSBox-X only; `tools/tmctl.py --profile gg` and
+`re/gg/docs/REFERENCE_CAPTURES.md` describe the profile, the mouse protocol and the captures
+(round 1 §1-§6, round 2 §7-§13). `capture_mem.py` and `capture_timing.py` only read files and need
+no emulator. Only start DOSBox-X when your task says so.

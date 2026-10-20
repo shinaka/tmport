@@ -56,6 +56,11 @@ id + 1); effect banks 0x0029, 0x00f4, 0x0260, 0x1022, 0x102f, 0x1039, 0x105b, 0x
 effect bank have the same number of members, so effect n means the same sound in both. The FM
 music bank may have one more channel list than the speaker one (0x0360 vs 0x035f) [O].
 
+The puzzle effect banks, one per kind, are loaded by `PzSnd_LoadBank` 3924:0000 into their own
+handle table DS:b146 (`code_puzzles_a.md` §2.4): 0x11cc electric, 0x11ca simple machines and
+machine pieces, 0x11c8 gears, 0x11c6 balance, 0x11ce launch, 0x11d2 energy forms, 0x11d0 magnets.
+The other banks by screen are listed in `code_sound.md` §15.
+
 ### 2.1 Cue ticks and the `L` record [O bytes and code; I intent]
 
 A song slot can call a far function when its tick counter reaches a cue tick (s+0x07/+0x09, set
@@ -68,14 +73,21 @@ with callback 12e0:00bd. Those banks are the only ones with an `L` record starti
 `04 8d 02` and `04 1b 05`, i.e. 4 followed by the song's length as a word at payload + 1 (653 and
 1307 ticks, equal to the lengths of the two songs). 1cdd:0024 reads the word at payload + 2
 instead, which takes the length's high byte and the type byte `'I'` of the next member: 0x4902
-and 0x4905 (about 4.3 minutes) [O]. So the workshop's end-of-song cue probably fires much later
-than intended, or never, since a section restart (1bb4:0045) clears the tick counter [I].
+and 0x4905 (about 4.3 minutes) [O]. The looping song restarts its section (1bb4:0045 clears the tick counter) long before, so
+**the workshop's cue never fires** and the workshop always plays arrangement 1 (`code_sound.md`
+§14.2) [O].
 
-What the `M` channel lists select is to be traced in wave 1, with the calls that take a bank
-and small numbers (2fcb:0640 calls `1cdd:031a(bank, 0, 1)` and `1cdd:0423(bank, 1)`; 1cdd:031a
-walks the bank's members like 1cdd:0024 and reads a parameter from a member starting with 3).
-The workshop's two arrangements differ in length (653 and 1307 ticks), so the two devices do
-not play the same music note for note [O].
+The `M` members of a music bank are **lists of channels to mute** for an arrangement:
+`SndRes_SelectArrangement(handle, n)` (1cdd:0423) unmutes all 16 channels, then, for n ≥ 1, mutes
+the channels of the n-th member whose payload starts with 1 (`01 c c … FF`); n = 0 leaves every
+channel playing (`code_sound.md` §13.3). A member whose payload starts with 3 would give
+`SndRes_PlayMusic(handle, section, loop)` (1cdd:031a) its priority (none in the data, so 0). The
+callbacks 12e0:00bd (`Music_WorkshopCue`) and 12e0:00ea (`Music_MovieCue`) switch the workshop's
+and the movie's arrangements (`code_sound.md` §14). Hazard: list 4 of the speaker movie bank
+0x30ca ends in FDh instead of FFh, so the mute loop runs on into the next member: the 4th music
+pass is silent and 256 ticks longer (`code_sound.md` §13.4) [O]. The workshop's two arrangements
+differ in length (653 and 1307 ticks), so the two devices do not play the same music note for
+note [O].
 
 ---
 
@@ -187,17 +199,19 @@ is not stopped.
 
 | Item | Where |
 |---|---|
-| `Snd_Init(device)` 1bb4:1234: clears the 64 slots; detects the AdLib (timer test 1bb4:0142); returns caps: bit 0 speaker, bit 1 PSG (DS:1683), bit 2 OPL (DS:1684), bit 3 MPU (DS:1685) | DS:1681..1685 = class available (1, 1, 0, 0, 0 in the file; the OPL entry is set by the detection) |
+| `Snd_Init(device)` 1bb4:1234: clears the 64 slots; detects the AdLib (timer test 1bb4:0142) only for device -1, skips detection for 1 and 8, and for any other device runs the detection and then **forces** the OPL flag to 1 (so `-SN` loads the FM banks and plays them silently); returns caps: bit 0 speaker, bit 1 PSG (DS:1683), bit 2 OPL (DS:1684), bit 3 MPU (DS:1685) | DS:1681..1685 = class available (1, 1, 0, 0, 0 in the file; the OPL entry is set by the detection or forced) |
 | `-S` switch: N, '-' or none = off, I = speaker, A/B/M = FM; default -1 = detect | 303a:011c |
 | Register a song: 1bb4:0ebc checks the magic and calls 1bb4:0e71, which takes the first free slot (far pointers DS:1458[64]) if the song's class is available (DS:1681[class] == 1); results: slot, -1 no slot, -4 class not available, -6 not BMF | |
 | `Snd_Tick` 1bb4:0db3: for each active slot (DS:1558[64]): +3 tick counter += 1, call the cue callback when it equals +7; +1 delay -= 1; at 0 run the class interpreter (DS:1aaa[class]) | every 2nd PIT tick from the timer ISR 1454:0096 |
 | Section start 1bb4:0045: delay = 1, tick = 0, clear the channel bends, transpose from the section entry, skip the initial delay byte | |
 | Channels per class DS:1658 = 1, 16, 4, 11, 16 | |
-| Speaker: note + transpose → PIT divisor table DS:1816, pitch bend 1bb4:0541, port 61h gate | 1bb4:0966 |
-| OPL: note on 1bb4:0343 (transpose, bend, 96-entry note tables DS:1712 / DS:1792), note off 1bb4:0302, volume 1bb4:0218 (scales the TL by the master DS:1686 and channel DS:1688 volumes and the velocity), `AdLib_Write` 1bb4:00a9 (6 and 35 status reads, the same delays as TM DOS) | 1bb4:0ad6 |
+| Speaker: note + transpose → PIT divisor table DS:1812..1831 (base entry DS:1816, semitones −2..13 of the base octave; divisor = T[n % 12] >> (n / 12)), pitch bend 1bb4:0541, port 61h gate | 1bb4:0966 |
+| OPL: note on 1bb4:0343 (transpose, bend; the 128-entry tables DS:1712 = n / 12 and DS:1792 = n % 12; F-numbers DS:1852, 25 rows × 12, identical to the AdLib driver's `InitFNums` table), note off 1bb4:0302, volume 1bb4:0218 (scales the TL by the master DS:1686 and channel DS:1688 volumes and the velocity), `AdLib_Write` 1bb4:00a9 (6 and 35 status reads, the same delays as TM DOS) | 1bb4:0ad6 |
 | Lock DS:165d (set while the game changes slots; `Snd_Tick` does nothing while it is 1) | |
 
-Ctrl+S toggles sound (1cdd:05c8); dialogs pause it (1cdd:05db / 05e5). Treasure Mountain DOS's
+Ctrl+S toggles sound (1cdd:05c8) by playing or stopping a looping priority-7Fh silence song,
+effect 0 of 0x105b / 0x105c; dialogs and drop-downs pause the driver (1cdd:05db / 05e5). The full
+driver specification is `code_sound.md`. Treasure Mountain DOS's
 driver (TUNES/SFX, 236.7 Hz, per-device files) is a similar idea with a different format
 (`re/dos/docs/fmt_sound.md`); TM Windows uses MIDI files and PCM, so nothing there applies.
 
@@ -216,18 +230,14 @@ driver (TUNES/SFX, 236.7 Hz, per-device files) is a similar idea with a differen
 * Choose the arrangement exactly as the game does: id + 1 when an OPL is present, else id; an
   effect slot whose speaker member is `C FF` stays silent on the speaker.
 
-## 6. Open questions (wave 1)
+## 6. Open questions
 
-* The class interpreters in full: speaker monophony when several channels sound (which note
-  wins), the note and divisor tables, the bend formula, OPL voice allocation, the volume
-  formula, priorities between slots (1bb4:102c) and what the game's API calls (1cdd:031a,
-  0423, 03c9, 0409, 055f) do with banks, lists and slots.
-* The `M` channel lists of music banks, member kind 3 (1cdd:031a reads a parameter from a
-  member starting with 3; none in the data), and what the callbacks 12e0:00bd / 12e0:00ea do.
-* Whether the workshop music loops (1cdd:0423) and so whether its misread cue (§2.1) ever
-  fires; check in DOSBox-X.
-* Why 0x105b/0 has 12 bytes after its end event.
-* Classes 0 (divisor lists), 2 (PSG) and 4 (MPU) are not used by the data; the PSG and MPU flags
-  are never set (scoping §1). Confirm that no code path can select them.
-* Tempo: the format has no tempo field; check that no song or API call changes the tick
-  rate.
+Wave 1 (`code_sound.md`) answered the wave 0 questions: the class interpreters, tables, bend and
+volume formulas, voice allocation and slot priorities (§7..§10 there), the API calls and the `M`
+lists (§13 there), the callbacks (§14 there), the workshop cue (it never fires, §2.1 here), the dead classes 0, 2
+and 4 (no switch selects them, §9 there) and the tempo (no song or game call changes the tick
+rate; the tempo scaler 1bb4:0fb2 is dead code). Still open:
+
+* Why 0x105b/0 (the silence song) has 12 bytes after its end event.
+* Whether data-driven effect priorities (screen animations, actors, races) can exceed 40h, which
+  would let an effect past the sound-off silence song (`code_sound.md` open questions).
