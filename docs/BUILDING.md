@@ -185,6 +185,29 @@ scripts/package.sh ~/Games/tm.cue --soundfont ~/sf2/GeneralUser.sf2
 * The macOS bundle is signed ad hoc for local use. It has no icon of its own (the game window
   takes its icon from the game's files).
 
+**Gizmos & Gadgets:** `scripts\package_gg.bat` (Windows) and `scripts/package_gg.sh` (Linux,
+macOS) do the same for `ggport`:
+
+```
+scripts\package_gg.bat                               (Windows)
+scripts/package_gg.sh ~/Games/GIZMOS                 (Linux, macOS)
+```
+
+| Platform | Result | Start it with |
+|---|---|---|
+| Windows | `dist\GGPort\ggport.exe` + `GadgetsAndGizmos\` | a double-click on `ggport.exe` |
+| Linux | `dist/GGPort/ggport` + `GadgetsAndGizmos/` | `dist/GGPort/ggport` |
+| macOS | `dist/GGPort.app` (the folder in `Contents/Resources`) | a double-click, or `open dist/GGPort.app` |
+
+* **Game folder** (first argument, or `--data`): the folder with `SSG.EXE` and `GIZMO000.DAT` (or
+  a folder that contains it), copied whole. Without an argument the script uses `GG_DATA`, then the
+  repository's `GadgetsAndGizmos/`.
+* `--out <dir>` and `--zip` (`GGPort-<platform>.zip`) work as above, and the build goes to the same
+  `build-package/`. The script replaces only `GGPort` (and `GGPort-README.txt`) in `dist/`.
+* Players and settings stay in `ggport`'s preference folder (`GGPort`); the copy's `PLAYERS.DAT`
+  is imported on the first start and never written. `--data`, `GG_DATA` and `data =` in
+  `ggport.ini` still win over the copy's own folder.
+
 The copy contains your copy of the game: it is for your own use, not for sharing. `dist/` is in
 `.gitignore`.
 

@@ -463,12 +463,15 @@ through, from a new player to the final movie, the engine's pictures equal the r
 around effects); the puzzles' pointer moves (gears, magnets) are untried with a real mouse in a
 window; only the reference captures' puzzle variants and levels were compared with the original
 (`re/gg/docs/ENGINE_MAP.md` §8).
-Building: `docs/BUILDING.md`, "Gizmos & Gadgets".
+Building: `docs/BUILDING.md`, "Gizmos & Gadgets". A ready-to-play copy next to your game folder:
+`scripts\package_gg.bat` (Windows) or `scripts/package_gg.sh <G&G folder>` (Linux, macOS), which
+writes `dist/GGPort` (`docs/BUILDING.md`, "A ready-to-play copy").
 
 ## Credits and licences
 
-*Super Solvers Treasure Mountain!* © 1990, 1992–95 The Learning Company. The game, its pictures,
-sounds, music and texts belong to their rights holders; none of it is part of this project.
+*Super Solvers Treasure Mountain!* © 1990, 1992–95 The Learning Company. *Super Solvers: Gizmos &
+Gadgets!* © 1993 The Learning Company. The games, their pictures, sounds, music and texts belong to
+their rights holders; none of it is part of this project.
 
 Third-party components, downloaded by CMake at configure time (not stored in this repository) and
 built into the programs:
