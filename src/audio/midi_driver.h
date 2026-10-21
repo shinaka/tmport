@@ -18,7 +18,7 @@
 #include "audio/midi_player.h"
 #include "audio/smf.h"
 
-namespace tmport::vfs {
+namespace mischief::vfs {
 class DataSource;
 }
 
@@ -36,11 +36,11 @@ public:
 // TODO(mods): consult mods/MIDI/<9000..9009>.mid first (PORTING_NOTES.md §7.4).
 class DataSourceTrackLoader final : public TrackLoader {
 public:
-    explicit DataSourceTrackLoader(const vfs::DataSource& source) : source_(source) {}
+    explicit DataSourceTrackLoader(const mischief::vfs::DataSource& source) : source_(source) {}
     std::shared_ptr<const MidiSong> load(const std::string& relPath) override;
 
 private:
-    const vfs::DataSource& source_;
+    const mischief::vfs::DataSource& source_;
     std::map<std::string, std::shared_ptr<const MidiSong>> cache_;  // key: upper-case path
 };
 

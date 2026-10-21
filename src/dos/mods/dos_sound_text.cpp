@@ -6,8 +6,8 @@
 #include <optional>
 
 #include "dos/data/dgroup_offsets.h"
+#include "mischief/util/error.h"
 #include "mods/mod_common.h"
-#include "util/error.h"
 
 namespace tmport::dos {
 
@@ -48,7 +48,7 @@ std::string eventText(uint8_t b0, uint8_t b1) {
 size_t streamLength(std::span<const uint8_t> f, size_t off, std::string_view name) {
     for (size_t i = off; i + 1 < f.size(); i += 2)
         if ((f[i] & 0x0F) == 0x0F) return i + 2 - off;
-    throw FormatError(std::format("{}: the stream at {} has no end", name, off));
+    throw mischief::FormatError(std::format("{}: the stream at {} has no end", name, off));
 }
 
 std::vector<std::string_view> tokens(std::string_view line) {
@@ -97,7 +97,7 @@ bool isDosSoundFile(FileIndex index) {
 std::string soundFileToText(std::span<const uint8_t> file, FileIndex index, std::string_view name) {
     const DosSoundFormat fmt = dosSoundFormat(index);
     const int streams = fmt.entries * fmt.voices;
-    if (file.size() < fmt.headerBytes || rd16(file, 0) != fmt.headerBytes) throw FormatError(std::format("{}: bad header", name));
+    if (file.size() < fmt.headerBytes || rd16(file, 0) != fmt.headerBytes) throw mischief::FormatError(std::format("{}: bad header", name));
     std::vector<size_t> offs;
     for (int s = 0; s < streams; ++s) offs.push_back(rd16(file, 2 * static_cast<size_t>(s)));
     const char* entryWord = fmt.tunes ? "tune" : "effect";
@@ -111,10 +111,10 @@ std::string soundFileToText(std::span<const uint8_t> file, FileIndex index, std:
     size_t expect = fmt.headerBytes;
     for (int s = 0; s < streams; ++s) {
         const size_t off = offs[static_cast<size_t>(s)];
-        if (off != expect) throw FormatError(std::format("{}: stream {} is not where the previous one ends", name, s));
+        if (off != expect) throw mischief::FormatError(std::format("{}: stream {} is not where the previous one ends", name, s));
         const size_t len = streamLength(file, off, name);
         const size_t next = s + 1 < streams ? offs[static_cast<size_t>(s + 1)] : file.size();
-        if (next < off + len) throw FormatError(std::format("{}: streams overlap at {}", name, off));
+        if (next < off + len) throw mischief::FormatError(std::format("{}: streams overlap at {}", name, off));
         if (s % fmt.voices == 0) out += std::format("\n{} {}\n", entryWord, s / fmt.voices);
         const std::string indent = fmt.voices > 1 ? "    " : "  ";
         if (fmt.voices > 1) out += std::format("  voice {}\n", s % fmt.voices);
@@ -301,12 +301,12 @@ std::vector<uint8_t> soundFileFromText(std::string_view text, FileIndex index, s
     }
     ++lineNo;
     if (static_cast<int>(entries.size()) != fmt.entries)
-        throw FormatError(std::format("{}: {} {}(s); the game plays exactly {} ({} 0-{})", name, entries.size(), entryWord, fmt.entries,
+        throw mischief::FormatError(std::format("{}: {} {}(s); the game plays exactly {} ({} 0-{})", name, entries.size(), entryWord, fmt.entries,
                                       entryWord, fmt.entries - 1));
     std::vector<uint8_t> file(fmt.headerBytes, 0);
     const size_t streamSlots = static_cast<size_t>(fmt.entries * fmt.voices);
     if (streamSlots + slots.size() > fmt.headerBytes / 2)
-        throw FormatError(std::format("{}: {} 'slots' words; the header has room for {}", name, slots.size(),
+        throw mischief::FormatError(std::format("{}: {} 'slots' words; the header has room for {}", name, slots.size(),
                                       fmt.headerBytes / 2 - streamSlots));
     for (size_t k = 0; k < slots.size(); ++k) {
         file[2 * (streamSlots + k)] = static_cast<uint8_t>(slots[k] & 0xFF);
@@ -315,19 +315,19 @@ std::vector<uint8_t> soundFileFromText(std::string_view text, FileIndex index, s
     size_t slot = 0;
     for (size_t e = 0; e < entries.size(); ++e) {
         if (static_cast<int>(entries[e].size()) != fmt.voices)
-            throw FormatError(std::format("{}: {} {} has {} voice(s), it needs {}", name, entryWord, e, entries[e].size(), fmt.voices));
+            throw mischief::FormatError(std::format("{}: {} {} has {} voice(s), it needs {}", name, entryWord, e, entries[e].size(), fmt.voices));
         for (size_t v = 0; v < entries[e].size(); ++v, ++slot) {
             const Stream& s = entries[e][v];
             if (!s.ended)
                 throw mods::ModSyntaxError(std::format("{} {} voice {} has no 'end'", entryWord, e, v), s.line);
-            if (file.size() > 0xFFFF) throw FormatError(std::format("{}: larger than 64 KB", name));
+            if (file.size() > 0xFFFF) throw mischief::FormatError(std::format("{}: larger than 64 KB", name));
             file[2 * slot] = static_cast<uint8_t>(file.size() & 0xFF);
             file[2 * slot + 1] = static_cast<uint8_t>(file.size() >> 8);
             file.insert(file.end(), s.bytes.begin(), s.bytes.end());
         }
     }
     if (file.size() > fmt.bufferBytes)
-        throw FormatError(std::format("{}: {} bytes; the sound driver's static buffer holds {} (shorten a {} or drop 'pad' "
+        throw mischief::FormatError(std::format("{}: {} bytes; the sound driver's static buffer holds {} (shorten a {} or drop 'pad' "
                                       "lines)",
                                       name, file.size(), fmt.bufferBytes, entryWord));
     return file;

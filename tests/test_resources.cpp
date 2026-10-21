@@ -2,9 +2,9 @@
 
 #include <cstring>
 
+#include "mischief/util/hash.h"
 #include "res/resource_manager.h"
 #include "test_data.h"
-#include "util/hash.h"
 
 using namespace tmport;
 
@@ -71,9 +71,9 @@ TEST_CASE("Resources: BNDL member lists match tools/assets/bndl.py") {
         auto b = g->res->bundle(e.id);
         REQUIRE(b.has_value());
         CHECK(static_cast<int>(b->ids.size()) == e.count);
-        uint64_t h = kFnv64Offset;
+        uint64_t h = mischief::kFnv64Offset;
         for (int m : b->ids) {
-            h = fnv1a64U16(static_cast<uint16_t>(m), h);
+            h = mischief::fnv1a64U16(static_cast<uint16_t>(m), h);
             if (typeForId(m) == ResType::PMAP) ++pmapRefs;
             if (typeForId(m) == ResType::OTHR) ++othrRefs;
         }
@@ -119,8 +119,8 @@ TEST_CASE("Resources: RRGB, FFNT, OTHR raw bodies keep the rounded size") {
     REQUIRE(rrgb.has_value());
     CHECK(rrgb->size() == 1024);  // GetResourceInto copies 1024 bytes into DS:3d90
     CHECK(g->res->gameSize(900) == 1024);
-    CHECK(fnv1a64(std::span<const uint8_t>(rrgb->data(), 768)) == 0xc31b8c96caee1176ull);
-    const gfx::Palette pal = g->res->palette();
+    CHECK(mischief::fnv1a64(std::span<const uint8_t>(rrgb->data(), 768)) == 0xc31b8c96caee1176ull);
+    const mischief::gfx::Palette pal = g->res->palette();
     CHECK(pal.keyTable().count() == 2);
     CHECK(pal.keyTable()[15]);
     CHECK(pal.keyTable()[241]);
@@ -154,7 +154,7 @@ TEST_CASE("Resources: SSND headers") {
         CHECK(s->sampleRate == 22050u);
         CHECK(s->sampleCount == e.samples);
         CHECK_FALSE(s->truncated);
-        CHECK(fnv1a64(s->pcm(*raw)) == e.pcmHash);
+        CHECK(mischief::fnv1a64(s->pcm(*raw)) == e.pcmHash);
     }
     size_t n = 0;
     for (int k = 0; k < 9; ++k)

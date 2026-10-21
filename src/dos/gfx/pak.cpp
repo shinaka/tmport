@@ -2,8 +2,8 @@
 
 #include <format>
 
-#include "util/byte_reader.h"
-#include "util/error.h"
+#include "mischief/util/byte_reader.h"
+#include "mischief/util/error.h"
 
 namespace tmport::dos {
 
@@ -12,12 +12,12 @@ namespace {
 constexpr size_t kFrameHeader = 16;
 
 [[noreturn]] void fail(const std::string& name, const std::string& why) {
-    throw FormatError(std::format("{}: {}", name, why));
+    throw mischief::FormatError(std::format("{}: {}", name, why));
 }
 
 // One frame, the way the blitter reads it (1000:1cbb raw / run rows); `next` = start of the
 // following frame (or the file end) for the slot size.
-PakFrame decodeFrame(const ByteReader& r, size_t off, size_t next, int index, const std::string& name) {
+PakFrame decodeFrame(const mischief::ByteReader& r, size_t off, size_t next, int index, const std::string& name) {
     PakFrame f;
     f.index = index;
     f.fileOffset = off;
@@ -60,7 +60,7 @@ PakFrame decodeFrame(const ByteReader& r, size_t off, size_t next, int index, co
 PakFile PakFile::load(std::span<const uint8_t> file, std::string name) {
     PakFile p;
     p.name_ = std::move(name);
-    const ByteReader r(file, p.name_);
+    const mischief::ByteReader r(file, p.name_);
     if (file.size() < 12) fail(p.name_, "file too short");
     const int count = r.u16(0);
     for (int i = 0; i < 3; ++i) p.header_[i] = r.u16(2 + 2 * static_cast<size_t>(i));

@@ -41,9 +41,9 @@ int hiddenClueWords(const DosGame& g, int level) {
     return n;
 }
 
-PcKey keyOf(std::string_view name) {
-    const auto k = pcKeyByName(name);
-    return k ? *k : PcKey{};
+mischief::dos::PcKey keyOf(std::string_view name) {
+    const auto k = mischief::dos::pcKeyByName(name);
+    return k ? *k : mischief::dos::PcKey{};
 }
 
 }  // namespace
@@ -83,7 +83,7 @@ void Bot::hold(Key k, bool down) {
     static constexpr std::string_view kNames[] = {"left", "right", "up", "down", "space", "pgup", "home"};
     auto& h = held_[static_cast<size_t>(k)];
     if (h == down) return;
-    const PcKey key = keyOf(kNames[static_cast<size_t>(k)]);
+    const mischief::dos::PcKey key = keyOf(kNames[static_cast<size_t>(k)]);
     if (down) rig_.keyDown(key);
     else rig_.keyUp(key);
     h = down;
@@ -101,7 +101,7 @@ void Bot::releaseMovement() { holdOnly({}); }
 
 void Bot::tap(std::string_view keyName) {
     if (tapped_) return;
-    const PcKey k = keyOf(keyName);
+    const mischief::dos::PcKey k = keyOf(keyName);
     rig_.keyDown(k);
     tapped_ = k;
     lastTapTick_ = tick_;

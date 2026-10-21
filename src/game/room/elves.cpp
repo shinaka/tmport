@@ -2,8 +2,8 @@
 
 #include "game/room/room_gfx.h"
 #include "game/rules.h"
+#include "mischief/util/log.h"
 #include "res/resource_manager.h"
-#include "util/log.h"
 
 namespace tmport::game::room {
 
@@ -56,7 +56,7 @@ void ElfSystem::resetBehaviour(int i) {
 }
 
 // 1178:00d7 Elf_PlaceRandomly
-void ElfSystem::placeRandomly(int i, const GameState& s, BorlandRand& rng) {
+void ElfSystem::placeRandomly(int i, const GameState& s, mischief::BorlandRand& rng) {
     Elf& e = elves_[static_cast<size_t>(i)];
     e.x = i16(rng.random(kPlaceRangeX) + kPlaceMinX);
     e.y = kPlaceY;
@@ -74,7 +74,7 @@ void ElfSystem::placeRandomly(int i, const GameState& s, BorlandRand& rng) {
 }
 
 // 1178:0251 Elf_SpawnForLevel
-void ElfSystem::spawnForLevel(GameState& s, int count, BorlandRand& rng, const ResourceManager* res) {
+void ElfSystem::spawnForLevel(GameState& s, int count, mischief::BorlandRand& rng, const ResourceManager* res) {
     if (count == 0) return;
     if (count_ > 0) unloadAll();
     if (s.player.room == kCastleRoom) return;
@@ -107,7 +107,7 @@ void ElfSystem::loadSets(const ResourceManager* res) {
                 a.frameCount = i16(static_cast<int>(b->ids.size()));
                 for (const int id : b->ids) a.frames.push_back(res->pixmap(id));
             } else {
-                log::warn("elves: BNDL {} not found", kElfSetBndl[static_cast<size_t>(set)]);
+                mischief::log::warn("elves: BNDL {} not found", kElfSetBndl[static_cast<size_t>(set)]);
             }
         }
     }
@@ -172,7 +172,7 @@ void ElfSystem::caughtInNet(int mode, int i, ElfTick* t, gfx::FrameBuffer* fb, i
 }
 
 // 1178:0565 Elf_HandleRoomEdges
-void ElfSystem::handleRoomEdges(int i, const GameState& s, BorlandRand& rng) {
+void ElfSystem::handleRoomEdges(int i, const GameState& s, mischief::BorlandRand& rng) {
     Elf& e = elves_[static_cast<size_t>(i)];
     const int r0 = e.room;
     if (!RoomTable::valid(r0)) return;

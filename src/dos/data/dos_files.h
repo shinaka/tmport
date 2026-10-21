@@ -48,7 +48,7 @@ public:
     static constexpr size_t kUsersDatSize = 3 + 9 * 360;  // fmt_data.md §4
 
     // Loads SST.EXE (DosExe: V 1.0 only) and every file of its file table from `folder`. Throws
-    // tmport::MissingFileError (file() = the missing name) or tmport::FormatError (message starts
+    // mischief::MissingFileError (file() = the missing name) or mischief::FormatError (message starts
     // with the file name). A USERS.DAT of the wrong size is ignored with a warning. The installed
     // mod overrides (dosOverrides()) are applied to the checked originals.
     static DosFiles open(const std::filesystem::path& folder);
@@ -64,7 +64,7 @@ public:
     const FileTable& fileTable() const { return table_; }
 
     // Bytes of a file by its file-table index or by name ("SST.EXE" gives the packed EXE file).
-    // Throws tmport::MissingFileError for USERS.DAT when the folder has none (see hasUsersDat) and
+    // Throws mischief::MissingFileError for USERS.DAT when the folder has none (see hasUsersDat) and
     // std::out_of_range for a name that is not a game file.
     std::span<const uint8_t> bytes(FileIndex index) const;
     std::span<const uint8_t> bytes(std::string_view name) const;
@@ -88,12 +88,12 @@ private:
 };
 
 // The size/header checks of DosFiles::open for one data file (exposed for the tests and the mod
-// layer, whose replacements pass the same checks). Throws tmport::FormatError naming the file.
+// layer, whose replacements pass the same checks). Throws mischief::FormatError naming the file.
 void checkDosDataFile(FileIndex index, std::string_view name, std::span<const uint8_t> bytes);
 
 // The cross-file check of DosFiles::open: the questions of every quiz tier (DS:5fd2, tier 5 from the
 // file length) lie inside the one 0x7B00-byte read Quiz_LoadQuestions 46ce:09ab makes from the
-// tier's first question. Throws tmport::FormatError naming ALL_PUZS.
+// tier's first question. Throws mischief::FormatError naming ALL_PUZS.
 void checkPuzzleWindows(const DosExe& exe, std::span<const uint8_t> allPuzs);
 
 }  // namespace tmport::dos

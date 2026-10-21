@@ -4,7 +4,7 @@
 #include <format>
 
 #include "game/quiz.h"
-#include "util/error.h"
+#include "mischief/util/error.h"
 
 namespace tmport::game {
 
@@ -52,11 +52,11 @@ void applyLayoutRecord(RoomTable& rooms, int level, const LayoutRecord& r) {
     rooms.spotContent(shop.room, shop.slot) = kSpotShop;
 }
 
-LayoutChoice pickLayoutRecords(int count, BorlandRand& rng) {
+LayoutChoice pickLayoutRecords(int count, mischief::BorlandRand& rng) {
     // The re-roll loops below never end with fewer than 3 records (REVIEW_1 M-3). GameTables::load
     // refuses such tables; this keeps any other caller from hanging without pumping events.
     if (count < kMinLayoutRecords)
-        throw FormatError(std::format("a hiding-place layout table holds {} records; a climb needs at least {}", count,
+        throw mischief::FormatError(std::format("a hiding-place layout table holds {} records; a climb needs at least {}", count,
                                       kMinLayoutRecords));
     LayoutChoice c;
     c.record[0] = rng.random(count);
@@ -71,7 +71,7 @@ LayoutChoice pickLayoutRecords(int count, BorlandRand& rng) {
 
 // 1100:04b5 Layout_GenerateClimb
 LayoutChoice generateClimbLayout(RoomTable& rooms, ClueState& clues, uint8_t rankTier, const GameTables& t,
-                                 BorlandRand& rng) {
+                                 mischief::BorlandRand& rng) {
     rooms.clearSpots();
     const auto& table = t.layouts[rankTier < kTierCount ? rankTier : kTierCount - 1];
     const LayoutChoice c = pickLayoutRecords(static_cast<int>(table.size()), rng);

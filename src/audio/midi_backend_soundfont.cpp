@@ -6,8 +6,8 @@
 #include <algorithm>
 #include <cmath>
 
-#include "util/file_util.h"
-#include "util/log.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
 
 namespace tmport::audio {
 
@@ -43,7 +43,7 @@ bool SoundFontMidiBackend::open() {
         std::string error;
         synth_ = Sf2Synth::loadFile(cfg_.soundFont, cfg_.sampleRate > 0 ? cfg_.sampleRate : 44100, error);
         if (!synth_) {
-            log::warn("midi: SoundFont {}: {}; music is disabled", pathToUtf8(cfg_.soundFont), error);
+            mischief::log::warn("midi: SoundFont {}: {}; music is disabled", mischief::pathToUtf8(cfg_.soundFont), error);
             return false;
         }
     }
@@ -63,7 +63,7 @@ bool SoundFontMidiBackend::open() {
         // Start pulling only now that the synthesizer is ready.
         SDL_SetAudioStreamGetCallback(stream_, &SoundFontMidiBackend::streamCallback, this);
         if (!SDL_BindAudioStream(device_, stream_)) {
-            log::warn("midi: cannot attach the music stream to the audio device ({}); music is disabled", SDL_GetError());
+            mischief::log::warn("midi: cannot attach the music stream to the audio device ({}); music is disabled", SDL_GetError());
             open_ = false;
             closeDevice();
             return false;
@@ -75,7 +75,7 @@ bool SoundFontMidiBackend::open() {
 
 bool SoundFontMidiBackend::openDevice() {
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
-        log::warn("midi: SDL audio initialisation failed ({}); music is disabled", SDL_GetError());
+        mischief::log::warn("midi: SDL audio initialisation failed ({}); music is disabled", SDL_GetError());
         return false;
     }
     sdlInit_ = true;
@@ -84,7 +84,7 @@ bool SoundFontMidiBackend::openDevice() {
     if (device_ == 0) {
         device_ = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr);
         if (device_ == 0) {
-            log::warn("midi: no playback device ({}); music is disabled", SDL_GetError());
+            mischief::log::warn("midi: no playback device ({}); music is disabled", SDL_GetError());
             return false;
         }
         ownDevice_ = true;
@@ -97,15 +97,15 @@ bool SoundFontMidiBackend::openDevice() {
         std::string error;
         synth_ = Sf2Synth::loadFile(cfg_.soundFont, rate, error);
         if (!synth_) {
-            log::warn("midi: SoundFont {}: {}; music is disabled", pathToUtf8(cfg_.soundFont), error);
+            mischief::log::warn("midi: SoundFont {}: {}; music is disabled", mischief::pathToUtf8(cfg_.soundFont), error);
             return false;
         }
-        log::info("midi: SoundFont {} ({} presets), {} Hz", pathToUtf8(cfg_.soundFont), synth_->presetCount(), rate);
+        mischief::log::info("midi: SoundFont {} ({} presets), {} Hz", mischief::pathToUtf8(cfg_.soundFont), synth_->presetCount(), rate);
     }
     const SDL_AudioSpec src{SDL_AUDIO_F32, 2, synth_->sampleRate()};
     stream_ = SDL_CreateAudioStream(&src, nullptr);
     if (!stream_) {
-        log::warn("midi: cannot create the music stream ({}); music is disabled", SDL_GetError());
+        mischief::log::warn("midi: cannot create the music stream ({}); music is disabled", SDL_GetError());
         return false;
     }
     return true;
@@ -254,7 +254,7 @@ float SoundFontMidiBackend::peakSinceOpen() const {
 
 std::unique_ptr<MidiBackend> createSoundFontMidiBackend(const std::string& soundFontUtf8, uint32_t sdlDevice, float volume) {
     SoundFontMidiBackend::Config c;
-    c.soundFont = pathFromUtf8(soundFontUtf8);
+    c.soundFont = mischief::pathFromUtf8(soundFontUtf8);
     c.output = SoundFontMidiBackend::Output::Device;
     c.device = sdlDevice;
     c.volume = volume;

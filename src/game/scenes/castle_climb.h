@@ -31,7 +31,7 @@
 #include "game/game_state.h"
 #include "game/game_tables.h"
 #include "game/scenes/scene_support.h"
-#include "rtl/borland_rand.h"
+#include "mischief/rtl/borland_rand.h"
 
 namespace tmport {
 class ExeTables;
@@ -131,7 +131,7 @@ struct CastleOptions {
 class CastleClimb {
 public:
     CastleClimb(GameState& s, const GameTables& gt, const CastleTables& t, const CastleSizes& z, GameHooks& hooks,
-                BorlandRand& rng, CastleOptions options = {});
+                mischief::BorlandRand& rng, CastleOptions options = {});
 
     // --- the 1168 globals (DS:6178..6224, 2aa6/2aa8) ------------------------------------------
     int screen = 0;          // cl_screen 0..3
@@ -192,7 +192,7 @@ private:
     const CastleTables& t_;
     const CastleSizes& z_;
     GameHooks& hooks_;
-    BorlandRand& rng_;
+    mischief::BorlandRand& rng_;
     CastleOptions options_;
 };
 

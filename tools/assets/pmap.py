@@ -321,7 +321,7 @@ def dll_name(bits):
 
 class Source:
     """Reads PMAP / RRGB bodies either from extracted\\res\\<DLL>\\<type>\\<id> files or
-    straight from the NE DLLs (using tools/ne_resources.py)."""
+    straight from the NE DLLs (using the engine's tools/ne_resources.py)."""
 
     def __init__(self, res_dir=None, dll_dir=None):
         self.res_dir = res_dir
@@ -331,7 +331,9 @@ class Source:
     def _ne_table(self, dll):
         if dll not in self._ne:
             sys.path.insert(0, os.path.join(REPO, 'tools'))
-            import ne_resources
+            import mischief_engine
+            mischief_engine.add_tools_path()
+            import ne_resources  # the engine's tools/ne_resources.py
             d = open(os.path.join(self.dll_dir, dll), 'rb').read()
             tab = {}
             for t, n, off, ln, _fl in ne_resources.resources(d):

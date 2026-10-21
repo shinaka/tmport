@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "gfx/palette.h"
+#include "mischief/gfx/palette.h"
 #include "mods/mod_folder.h"
 #include "res/game_files.h"
 
@@ -33,7 +33,7 @@ struct ModKitReport {
     std::vector<std::string> failures;     // round-trip mismatches and errors
 };
 
-// Throws tmport::Error if the directory cannot be used (exists and is not empty without force).
+// Throws mischief::Error if the directory cannot be used (exists and is not empty without force).
 ModKitReport exportModKit(const GameFiles& files, const std::filesystem::path& outDir, const ModKitOptions& options = {});
 
 // One resource in its editable form (from the DLLs, ignoring mods).
@@ -47,6 +47,6 @@ struct ExportedFile {
 // nullopt if the resource does not exist. mode selects TMT16 art for PMAPs. Throws FormatError
 // for data that cannot be converted.
 std::optional<ExportedFile> exportResource(const ResourceManager& res, ResType type, int id,
-                                           gfx::ColorMode mode = gfx::ColorMode::Colour256);
+                                           mischief::gfx::ColorMode mode = mischief::gfx::ColorMode::Colour256);
 
 }  // namespace tmport::mods

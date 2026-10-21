@@ -29,7 +29,7 @@ OfflineRender renderEntry(DosSoundRenderer& r, bool tune, int id, int loops, dou
     else
         s.sfxPlay(id);
     OfflineRender res;
-    const auto maxTicks = static_cast<uint64_t>(maxSeconds * kPitTickHz);
+    const auto maxTicks = static_cast<uint64_t>(maxSeconds * mischief::dos::kPitTickHz);
     while (r.ticks() < maxTicks) {
         if (tune) s.setMusicLoop(s.musicLoops() + 1 < static_cast<uint32_t>(std::max(loops, 1)));
         r.renderTick(res.samples);
@@ -38,7 +38,7 @@ OfflineRender renderEntry(DosSoundRenderer& r, bool tune, int id, int loops, dou
     }
     res.ticks = r.ticks();
     const int rate = r.config().sampleRate;
-    if (r.config().mode == SynthMode::Raw) {
+    if (r.config().mode == mischief::dos::SynthMode::Raw) {
         res.samples.resize(res.samples.size() + static_cast<size_t>(rate * 0.05), 0.0);  // int(RATE * 0.05)
     } else {
         std::vector<double> tail(static_cast<size_t>(rate * 0.2));

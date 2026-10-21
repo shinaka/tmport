@@ -21,7 +21,7 @@
 #include "dos/game/sound.h"
 #include "dos/save/users_dat.h"
 #include "dos_game_fixture.h"
-#include "rtl/borland_rand.h"
+#include "mischief/rtl/borland_rand.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -76,7 +76,7 @@ std::vector<Call> calls(std::initializer_list<Call> c) { return std::vector<Call
 
 // The seed after `n` more rand() calls.
 uint32_t seedAfter(uint32_t seed, int n) {
-    BorlandRand r;
+    mischief::BorlandRand r;
     r.setRawSeed(seed);
     for (int i = 0; i < n; ++i) r.rand();
     return r.seed();
@@ -998,7 +998,7 @@ TEST_CASE("dos world: the castle hall, wall and top") {
         castleCreatureSpawn(g);
         CHECK(g.rand.seed() == seedAfter(s0, 1));
         // A seed whose next rand() & 0x3F is 1.
-        BorlandRand r;
+        mischief::BorlandRand r;
         uint32_t seed = 1;
         for (;; ++seed) {
             r.setRawSeed(seed);

@@ -3,12 +3,12 @@
 #include <algorithm>
 #include <cmath>
 
-#include "dos/audio/synth_common.h"
+#include "mischief/dos/audio/synth_common.h"
 
 namespace tmport::dos {
 
 int AdLibOpl::playTuneHold(size_t writes) {
-    const double ticks = static_cast<double>(writes) * kPlayTuneWriteSeconds * kPitTickHz;
+    const double ticks = static_cast<double>(writes) * kPlayTuneWriteSeconds * mischief::dos::kPitTickHz;
     return std::max(0, static_cast<int>(std::ceil(ticks + kCallPhase)) - 1);
 }
 

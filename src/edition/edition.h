@@ -18,7 +18,7 @@
 #include <string>
 #include <string_view>
 
-#include "util/error.h"
+#include "mischief/util/error.h"
 
 namespace tmport {
 
@@ -60,9 +60,9 @@ EditionScan scanEditions(const std::filesystem::path& path);
 EditionCandidate checkDosFolder(const std::filesystem::path& dir);
 
 // A data path that cannot be played; what() is the message for the player.
-class EditionError : public Error {
+class EditionError : public mischief::Error {
 public:
-    explicit EditionError(const std::string& message, std::string file = {}) : Error(message), file_(std::move(file)) {}
+    explicit EditionError(const std::string& message, std::string file = {}) : mischief::Error(message), file_(std::move(file)) {}
     const std::string& file() const { return file_; }
 
 private:

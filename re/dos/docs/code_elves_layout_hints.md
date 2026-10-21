@@ -19,9 +19,9 @@ Notation: **[O]** observed in code, bytes, decoded data or captures; **[I]** inf
 Widths: u8/i8, u16/i16 (all game arithmetic is 16-bit unless stated). "Bytes" as an x unit means
 2-pixel units of the 4-bpp back buffer. `rand()` is Turbo C `rand` (4d12:001f: seed = seed ×
 0x015A4E35 + 1 mod 2³², result (seed >> 16) & 0x7FFF; initial seed 1 at DS:8f48), the same LCG as
-`src/rtl/borland_rand`. `r % n` on a rand result is always non-negative (rand ≤ 0x7FFF), so signed
-`IDIV` and unsigned `DIV` give the same result. Game text is referred to by message number /
-DS offset only.
+the engine's `src/mischief/rtl/borland_rand`. `r % n` on a rand result is always non-negative (rand
+≤ 0x7FFF), so signed `IDIV` and unsigned `DIV` give the same result. Game text is referred to by
+message number / DS offset only.
 
 ---
 

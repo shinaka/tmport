@@ -1,9 +1,10 @@
 @echo off
-rem Configure and build the engine (Release, Ninja) into build\ at the repository root.
+rem Configure and build tmport (Release, Ninja) into build\ at the repository root.
 rem Usage: scripts\build.bat [extra cmake configure arguments]
 rem Set BUILD_DIR to build somewhere other than build\ (e.g. one directory per parallel task).
 rem Needs Visual Studio 2026 (MSVC + the bundled CMake and Ninja) and network access on the first
-rem configure (SDL and doctest are fetched by CMake).
+rem configure (CMake fetches the pinned MischiefEngine unless a local checkout is used, through it SDL,
+rem ymfm and doctest, and TinySoundFont; docs\BUILDING.md, "The engine").
 setlocal
 
 set "REPO=%~dp0.."

@@ -136,7 +136,7 @@ from the specs, original addresses in comments, no game data in the repo.
 | Part | Today | For two editions |
 |---|---|---|
 | `util/`, `vfs/` (directory source), `rtl/` | done | as is. Turbo C 2.0 `rand` is the same LCG as Borland's (`rtl/borland_rand`) |
-| `platform/` window, SDL pump, fullscreen, focus pause, screenshots | inside `Engine(GameFiles&, ColorMode, …)` | split an edition-neutral `platform/host.h` (window, renderer, event pump, clock, audio device, screenshot) out of `Engine`; the Windows `Engine` keeps its message/input-code model on top of it |
+| `platform/` window, SDL pump, fullscreen, focus pause, screenshots | inside `Engine(GameFiles&, ColorMode, …)` | split an edition-neutral `platform/host.h` (now the engine's `mischief/platform/host.h`) (window, renderer, event pump, clock, audio device, screenshot) out of `Engine`; the Windows `Engine` keeps its message/input-code model on top of it |
 | `gfx/presenter` | fixed 640×480 canvas, 512×384 game area | a `PresenterLayout` (canvas, game rect, pixel aspect). DOS: 320×200 shown at 4:3 (pixel aspect 1.2), letterboxed; integer option 5×6 = 1600×1200 (exact 4:3); "square pixels" option |
 | `timing/clock`, `input/` SDL event translation | Windows input codes | `Clock` as is; the SDL key/mouse capture is reused, the DOS translation is new (§5.3) |
 | `audio/` | wave voice + MIDI back ends on SDL | reuse the SDL device/stream plumbing (`sdl_wave_output`); MIDI/SoundFont are Windows-only |
@@ -150,7 +150,7 @@ from the specs, original addresses in comments, no game data in the repo.
 
 | Folder | Contents (original module) |
 |---|---|
-| `dos/data/` | `exepack` (in-memory unpack, the `tools/unexepack.py` algorithm), `dos_exe` (image, DGROUP and far-pointer resolution, code segment 1000 for the font), `dgroup_offsets.h`, `file_table` (DS:0476), `puzzles` (ALL_PUZS + PRG_DICT), `help_file` (HELP.DAT) |
+| `dos/data/` | `exepack` (in-memory unpack, the algorithm of the engine's `tools/unexepack.py`), `dos_exe` (image, DGROUP and far-pointer resolution, code segment 1000 for the font), `dgroup_offsets.h`, `file_table` (DS:0476), `puzzles` (ALL_PUZS + PRG_DICT), `help_file` (HELP.DAT) |
 | `dos/gfx/` | `pan`, `pak`, `palettes` (EGA, Tandy, MCGA, CGA dither), `back_buffer` (320×200 logical colours, fills, colour swap, dirty spans, scroll and tile-column ops of segment 1000), `blitter` (`Sprite_Draw` 1000:1b8d flags, clip window) |
 | `dos/text/` | `dos_font`, `text_draw` (43cb:0b63, 43cb:0cfc) |
 | `dos/audio/` | `sequencer` (491b, run at 236.696 Hz by sample count), `speaker_synth`, `psg_synth` (SN76496), later `opl2_driver` (4ac9) on a pinned BSD-licensed OPL2 core (ymfm) |

@@ -43,10 +43,10 @@ struct CursorImage {
     std::vector<uint8_t> rgba(int scale = 1) const;
 };
 
-// Decodes one RT_CURSOR resource. Throws tmport::FormatError.
+// Decodes one RT_CURSOR resource. Throws mischief::FormatError.
 CursorImage decodeCursorResource(std::span<const uint8_t> data);
 // Loads RT_GROUP_CURSOR groupId from an NE image and decodes the cursor it names (the first 1-bpp
-// entry, else the first entry). Throws tmport::FormatError / tmport::Error when missing.
+// entry, else the first entry). Throws mischief::FormatError / mischief::Error when missing.
 CursorImage loadGroupCursor(const ne::NeImage& image, uint16_t groupId);
 
 // The cursor table and the selection calls of segment 1020. Decoding is headless; SDL cursors

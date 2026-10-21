@@ -1,5 +1,5 @@
-// DOSBox-X save states of the DOS edition (dosbox_state.h), on the shared reader
-// (dos/save/dosbox_state_file.h).
+// DOSBox-X save states of the DOS edition (dosbox_state.h), on the engine's reader
+// (mischief/dos/save/dosbox_state_file.h).
 #include "dos/save/dosbox_state.h"
 
 #include <algorithm>
@@ -7,8 +7,8 @@
 #include <format>
 #include <string_view>
 
-#include "util/error.h"
-#include "util/file_util.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
 
 namespace tmport::dos {
 
@@ -24,13 +24,13 @@ constexpr uint32_t kTandyPage = 0x98000;     // the Tandy video page (top 32 KB 
 
 DosboxState DosboxState::load(const std::filesystem::path& path) {
     DosboxState s;
-    s.file_ = DosboxStateFile::load(path);
+    s.file_ = mischief::dos::DosboxStateFile::load(path);
     s.machine_ = s.file_.machineName() == "MCH_EGA" ? Machine::Ega : s.file_.machineName() == "MCH_TANDY" ? Machine::Tandy : Machine::Other;
 
     const auto seg = s.file_.findSegmentBySignature(kTurboCSignature, kSignatureOffset);
-    if (!seg) throw FormatError(std::format("{}: SST.EXE is not running in this state (DGROUP not found)", pathToUtf8(path)));
+    if (!seg) throw mischief::FormatError(std::format("{}: SST.EXE is not running in this state (DGROUP not found)", mischief::pathToUtf8(path)));
     s.dsSeg_ = *seg;
-    if (s.dgroup().size() != kDgroupBytes) throw FormatError(std::format("{}: DGROUP lies past the saved memory", pathToUtf8(path)));
+    if (s.dgroup().size() != kDgroupBytes) throw mischief::FormatError(std::format("{}: DGROUP lies past the saved memory", mischief::pathToUtf8(path)));
 
     if (s.machine_ == Machine::Tandy) {
         s.readScreen({});

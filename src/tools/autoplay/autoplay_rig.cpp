@@ -9,6 +9,7 @@
 #include "audio/audio_system.h"
 #include "game/game_state.h"
 #include "game/game_tables.h"
+#include "mischief/util/log.h"
 #include "platform/engine.h"
 #include "res/game_files.h"
 #include "save/settings.h"
@@ -16,7 +17,6 @@
 #include "text/text_renderer.h"
 #include "ui/game_dialog.h"
 #include "ui/menu_bar.h"
-#include "util/log.h"
 
 namespace tmport::autoplay {
 
@@ -31,7 +31,7 @@ Rig::Rig(GameFiles& files, const RigOptions& o) {
 
     EngineConfig cfg;
     if (o.manualClock) {
-        manual_ = std::make_unique<ManualClock>(o.clockStart);
+        manual_ = std::make_unique<mischief::ManualClock>(o.clockStart);
         cfg.clock = manual_.get();
     }
     // The autoplayer holds arrows like keys (down ... up, autoplay_bot.cpp); the tap latch only
@@ -40,7 +40,7 @@ Rig::Rig(GameFiles& files, const RigOptions& o) {
     cfg.tapLatch = true;
     cfg.pauseOnFocusLoss = false;
     cfg.screenshotDir = paths_->screenshotDir;
-    engine_ = std::make_unique<Engine>(files, gfx::ColorMode::Colour256, cfg);  // never opens a window
+    engine_ = std::make_unique<Engine>(files, mischief::gfx::ColorMode::Colour256, cfg);  // never opens a window
 
     if (o.audio) {
         try {
@@ -49,7 +49,7 @@ Rig::Rig(GameFiles& files, const RigOptions& o) {
             ac.midiBackend = audio::MidiBackendKind::Null;
             audio_ = audio::AudioSystem::create(files, ac);
         } catch (const std::exception& e) {
-            log::warn("autoplay: audio: {} (running without an audio system)", e.what());
+            mischief::log::warn("autoplay: audio: {} (running without an audio system)", e.what());
             audio_.reset();
         }
     }
@@ -107,6 +107,6 @@ Rig::~Rig() {
     ctx_.reset();
 }
 
-Clock& Rig::clock() { return engine_->clock(); }
+mischief::Clock& Rig::clock() { return engine_->clock(); }
 
 }  // namespace tmport::autoplay

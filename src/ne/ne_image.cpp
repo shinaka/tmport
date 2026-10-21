@@ -3,9 +3,9 @@
 #include <algorithm>
 #include <format>
 
-#include "util/byte_reader.h"
-#include "util/error.h"
-#include "util/file_util.h"
+#include "mischief/util/byte_reader.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
 
 namespace tmport::ne {
 
@@ -15,7 +15,7 @@ namespace {
 // 16-bit field past 32 bits (UB) or point gigabytes into the file (REVIEW_1 L-2).
 constexpr uint16_t kMaxAlignShift = 15;
 
-std::string pascalString(const ByteReader& r, size_t off) {
+std::string pascalString(const mischief::ByteReader& r, size_t off) {
     const uint8_t n = r.u8(off);
     auto b = r.bytes(off + 1, n);
     return std::string(b.begin(), b.end());
@@ -23,25 +23,25 @@ std::string pascalString(const ByteReader& r, size_t off) {
 
 }  // namespace
 
-NeImage NeImage::open(std::shared_ptr<vfs::File> file, std::string name) {
-    if (!file) throw Error(std::format("{}: no file", name));
+NeImage NeImage::open(std::shared_ptr<mischief::vfs::File> file, std::string name) {
+    if (!file) throw mischief::Error(std::format("{}: no file", name));
     NeImage img;
     img.file_ = std::move(file);
     img.name_ = std::move(name);
 
     const auto mz = img.file_->readRange(0, 0x40);
-    ByteReader mzr(mz, img.name_ + " (MZ header)");
-    if (mz.size() < 0x40 || mz[0] != 'M' || mz[1] != 'Z') throw FormatError(img.name_ + ": not an MZ executable");
+    mischief::ByteReader mzr(mz, img.name_ + " (MZ header)");
+    if (mz.size() < 0x40 || mz[0] != 'M' || mz[1] != 'Z') throw mischief::FormatError(img.name_ + ": not an MZ executable");
     img.neOffset_ = mzr.u32(0x3C);
 
     // All NE tables start within 64 KB of the NE header (their offsets are 16-bit); the entry
     // table may extend a little further. Read one block that covers them.
     const uint64_t fsize = img.file_->size();
-    if (img.neOffset_ + 0x40ull > fsize) throw FormatError(img.name_ + ": NE header outside the file");
+    if (img.neOffset_ + 0x40ull > fsize) throw mischief::FormatError(img.name_ + ": NE header outside the file");
     const size_t blobLen = static_cast<size_t>(std::min<uint64_t>(fsize - img.neOffset_, 0x20000));
     const std::vector<uint8_t> hdr = img.file_->readRange(img.neOffset_, blobLen);
-    ByteReader r(hdr, img.name_ + " (NE header)");
-    if (r.u8(0) != 'N' || r.u8(1) != 'E') throw FormatError(img.name_ + ": not an NE executable");
+    mischief::ByteReader r(hdr, img.name_ + " (NE header)");
+    if (r.u8(0) != 'N' || r.u8(1) != 'E') throw mischief::FormatError(img.name_ + ": not an NE executable");
 
     const uint16_t entOff = r.u16(0x04);
     const uint16_t entLen = r.u16(0x06);
@@ -59,7 +59,7 @@ NeImage NeImage::open(std::shared_ptr<vfs::File> file, std::string name) {
     img.alignShift_ = r.u16(0x32);
     if (img.alignShift_ == 0) img.alignShift_ = 9;
     if (img.alignShift_ > kMaxAlignShift)
-        throw FormatError(std::format("{}: invalid NE segment alignment shift {}", img.name_, img.alignShift_));
+        throw mischief::FormatError(std::format("{}: invalid NE segment alignment shift {}", img.name_, img.alignShift_));
     img.targetOs_ = r.u8(0x36);
 
     // Segment table.
@@ -83,7 +83,7 @@ NeImage NeImage::open(std::shared_ptr<vfs::File> file, std::string name) {
     if (impNames != 0 && impNames <= hdr.size()) {
         const size_t end = (entOff > impNames && entOff <= hdr.size()) ? entOff : hdr.size();
         img.importNames_.assign(hdr.begin() + impNames, hdr.begin() + static_cast<std::ptrdiff_t>(end));
-        ByteReader ir(img.importNames_, img.name_ + " (imported names)");
+        mischief::ByteReader ir(img.importNames_, img.name_ + " (imported names)");
         for (uint16_t i = 0; i < modCount; ++i) {
             const uint16_t off = r.u16(modRef + static_cast<size_t>(i) * 2);
             img.modules_.push_back(off < img.importNames_.size() ? pascalString(ir, off) : std::string());
@@ -93,10 +93,10 @@ NeImage NeImage::open(std::shared_ptr<vfs::File> file, std::string name) {
     img.parseEntries(hdr, entOff, entLen);
 
     if (rsrcTab != 0 && rsrcTab != resNames) {
-        ByteReader rr(std::span<const uint8_t>(hdr).subspan(rsrcTab), img.name_ + " (resource table)");
+        mischief::ByteReader rr(std::span<const uint8_t>(hdr).subspan(rsrcTab), img.name_ + " (resource table)");
         img.rsrcShift_ = rr.u16(0);
         if (img.rsrcShift_ > kMaxAlignShift)
-            throw FormatError(std::format("{}: invalid NE resource alignment shift {}", img.name_, img.rsrcShift_));
+            throw mischief::FormatError(std::format("{}: invalid NE resource alignment shift {}", img.name_, img.rsrcShift_));
         // A resource may end at most one alignment unit past the end of the file (the last one can
         // lack its padding); readResource() allocates the declared length, so nothing longer is
         // accepted (REVIEW_1 L-2: up to 0xFFFF << 15 bytes could otherwise be zero-filled).
@@ -124,7 +124,7 @@ NeImage NeImage::open(std::shared_ptr<vfs::File> file, std::string name) {
                 res.fileOffset = static_cast<uint32_t>(off) << img.rsrcShift_;
                 res.length = static_cast<uint32_t>(len) << img.rsrcShift_;
                 if (static_cast<uint64_t>(res.fileOffset) + res.length > resourceLimit)
-                    throw FormatError(std::format("{}: resource {} of type {} ({} bytes at {:#x}) extends past the end of "
+                    throw mischief::FormatError(std::format("{}: resource {} of type {} ({} bytes at {:#x}) extends past the end of "
                                                   "the file ({} bytes)",
                                                   img.name_, id & 0x7FFF, typeId & 0x7FFF, res.length, res.fileOffset,
                                                   fsize));
@@ -141,7 +141,7 @@ NeImage NeImage::open(std::shared_ptr<vfs::File> file, std::string name) {
 void NeImage::parseEntries(const std::vector<uint8_t>& hdr, uint16_t entOff, uint16_t entLen) {
     if (entOff == 0 || entLen == 0 || entOff >= hdr.size()) return;
     const size_t end = std::min<size_t>(hdr.size(), static_cast<size_t>(entOff) + entLen);
-    ByteReader r(std::span<const uint8_t>(hdr).subspan(entOff, end - entOff), name_ + " (entry table)");
+    mischief::ByteReader r(std::span<const uint8_t>(hdr).subspan(entOff, end - entOff), name_ + " (entry table)");
     size_t p = 0;
     uint16_t ordinal = 1;
     while (p < r.size()) {
@@ -179,12 +179,12 @@ void NeImage::parseNameTable() {
         }
     if (!nt) return;
     const std::vector<uint8_t> data = readResource(*nt);
-    ByteReader r(data, name_ + " (RT_NAMETABLE)");
+    mischief::ByteReader r(data, name_ + " (RT_NAMETABLE)");
     size_t p = 0;
     while (r.has(p, 2)) {
         const uint16_t cb = r.u16(p);
         if (cb == 0) break;
-        if (cb < 8 || !r.has(p, cb)) throw FormatError(std::format("{}: bad name-table entry at {:#x}", name_, p));
+        if (cb < 8 || !r.has(p, cb)) throw mischief::FormatError(std::format("{}: bad name-table entry at {:#x}", name_, p));
         NameTableEntry e;
         e.typeOrdinal = static_cast<uint16_t>(r.u16(p + 2) & 0x7FFF);
         e.idOrdinal = static_cast<uint16_t>(r.u16(p + 4) & 0x7FFF);
@@ -194,7 +194,7 @@ void NeImage::parseNameTable() {
         ++q;
         while (q < end && r.u8(q) != 0) e.idName.push_back(static_cast<char>(r.u8(q++)));
         if (auto it = resourceIndex_.find({e.typeOrdinal, e.idOrdinal}); it != resourceIndex_.end())
-            nameIndex_.emplace(std::make_pair(toUpperAscii(e.typeName), e.idOrdinal), it->second);
+            nameIndex_.emplace(std::make_pair(mischief::toUpperAscii(e.typeName), e.idOrdinal), it->second);
         nameTable_.push_back(std::move(e));
         p += cb;
     }
@@ -204,7 +204,7 @@ uint64_t NeImage::fileSize() const { return file_->size(); }
 
 const Segment& NeImage::segment(int number) const {
     if (number < 1 || static_cast<size_t>(number) > segments_.size())
-        throw Error(std::format("{}: no segment {}", name_, number));
+        throw mischief::Error(std::format("{}: no segment {}", name_, number));
     return segments_[static_cast<size_t>(number - 1)];
 }
 
@@ -212,7 +212,7 @@ std::vector<uint8_t> NeImage::segmentData(int number) const {
     const Segment& s = segment(number);
     if (s.fileOffset == 0) return {};
     auto data = file_->readRange(s.fileOffset, s.length);
-    if (data.size() != s.length) throw FormatError(std::format("{}: segment {} is truncated", name_, number));
+    if (data.size() != s.length) throw mischief::FormatError(std::format("{}: segment {} is truncated", name_, number));
     return data;
 }
 
@@ -220,7 +220,7 @@ size_t NeImage::relocationRecordCount(int number) const {
     const Segment& s = segment(number);
     if (!s.hasRelocations() || s.fileOffset == 0) return 0;
     const auto cnt = file_->readRange(static_cast<uint64_t>(s.fileOffset) + s.length, 2);
-    if (cnt.size() != 2) throw FormatError(std::format("{}: relocation table of segment {} is missing", name_, number));
+    if (cnt.size() != 2) throw mischief::FormatError(std::format("{}: relocation table of segment {} is missing", name_, number));
     return static_cast<size_t>(cnt[0] | (cnt[1] << 8));
 }
 
@@ -230,10 +230,10 @@ std::vector<Relocation> NeImage::relocations(int number) const {
     const size_t count = relocationRecordCount(number);
     if (count == 0) return out;
     const auto recs = file_->readRange(static_cast<uint64_t>(s.fileOffset) + s.length + 2, count * 8);
-    ByteReader rr(recs, std::format("{} (relocations of segment {})", name_, number));
+    mischief::ByteReader rr(recs, std::format("{} (relocations of segment {})", name_, number));
     const std::vector<uint8_t> data = segmentData(number);
-    ByteReader dr(data, std::format("{} (segment {})", name_, number));
-    ByteReader ir(importNames_, name_ + " (imported names)");
+    mischief::ByteReader dr(data, std::format("{} (segment {})", name_, number));
+    mischief::ByteReader ir(importNames_, name_ + " (imported names)");
 
     for (size_t k = 0; k < count; ++k) {
         const size_t o = k * 8;
@@ -289,7 +289,7 @@ std::vector<Relocation> NeImage::relocations(int number) const {
         // Fix-up chain: each site holds the offset of the next site; 0xFFFF ends the chain.
         uint16_t cur = site;
         for (int guard = 0; cur != 0xFFFF && guard < 0x10000; ++guard) {
-            if (!dr.has(cur, 2)) throw FormatError(std::format("{}: relocation chain leaves segment {}", name_, number));
+            if (!dr.has(cur, 2)) throw mischief::FormatError(std::format("{}: relocation chain leaves segment {}", name_, number));
             rel.site = cur;
             out.push_back(rel);
             cur = dr.u16(cur);
@@ -316,14 +316,14 @@ std::vector<uint8_t> NeImage::readResource(const Resource& r) const {
 }
 
 const Resource* NeImage::findByTypeName(std::string_view typeName, uint16_t id) const {
-    auto it = nameIndex_.find({toUpperAscii(typeName), id});
+    auto it = nameIndex_.find({mischief::toUpperAscii(typeName), id});
     return it == nameIndex_.end() ? nullptr : &resources_[it->second];
 }
 
 std::vector<uint16_t> NeImage::idsForTypeName(std::string_view typeName) const {
     std::vector<uint16_t> ids;
     for (const auto& e : nameTable_)
-        if (iequalsAscii(e.typeName, typeName)) ids.push_back(e.idOrdinal);
+        if (mischief::iequalsAscii(e.typeName, typeName)) ids.push_back(e.idOrdinal);
     return ids;
 }
 

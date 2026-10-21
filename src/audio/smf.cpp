@@ -4,7 +4,7 @@
 #include <cstring>
 #include <format>
 
-#include "util/error.h"
+#include "mischief/util/error.h"
 
 namespace tmport::audio {
 
@@ -110,7 +110,7 @@ private:
         p_ += len;
     }
     [[noreturn]] void fail(const std::string& what) const {
-        throw FormatError(std::format("MIDI file: track {}: {} (offset {})", track_, what, p_));
+        throw mischief::FormatError(std::format("MIDI file: track {}: {} (offset {})", track_, what, p_));
     }
     void warn(const std::string& what) { s_.warnings.push_back(std::format("track {} {}", track_, what)); }
 
@@ -156,22 +156,22 @@ MidiSong parseSmf(std::vector<uint8_t> bytes) {
     s.bytes = std::move(bytes);
     const auto& b = s.bytes;
     if (b.size() < 14 || std::memcmp(b.data(), "MThd", 4) != 0)
-        throw FormatError("not a Standard MIDI File (no MThd header)");
+        throw mischief::FormatError("not a Standard MIDI File (no MThd header)");
     const uint32_t hdrLen = be32(b, 4);
-    if (hdrLen < 6 || hdrLen > b.size() - 8) throw FormatError("MIDI file: bad header length");
+    if (hdrLen < 6 || hdrLen > b.size() - 8) throw mischief::FormatError("MIDI file: bad header length");
     s.format = be16(b, 8);
     s.trackCount = be16(b, 10);
     s.division = be16(b, 12);
-    if (s.format > 2) throw FormatError(std::format("MIDI file: unsupported format {}", s.format));
+    if (s.format > 2) throw mischief::FormatError(std::format("MIDI file: unsupported format {}", s.format));
     if (s.format == 2) s.warnings.push_back("format 2 (independent sequences) is played like format 1");
     if (s.division & 0x8000) {
         s.smpteFps = -static_cast<int>(static_cast<int8_t>(s.division >> 8));
         s.smpteTicksPerFrame = s.division & 0xFF;
         if ((s.smpteFps != 24 && s.smpteFps != 25 && s.smpteFps != 29 && s.smpteFps != 30) || s.smpteTicksPerFrame == 0)
-            throw FormatError(std::format("MIDI file: bad SMPTE division {:#06x}", s.division));
+            throw mischief::FormatError(std::format("MIDI file: bad SMPTE division {:#06x}", s.division));
     } else {
         s.ppqn = s.division;
-        if (s.ppqn == 0) throw FormatError("MIDI file: zero ticks per quarter note");
+        if (s.ppqn == 0) throw mischief::FormatError("MIDI file: zero ticks per quarter note");
     }
 
     std::vector<MidiEvent> events;
@@ -191,7 +191,7 @@ MidiSong parseSmf(std::vector<uint8_t> bytes) {
         }
         pos = start + len;
     }
-    if (found == 0) throw FormatError("MIDI file: no tracks");
+    if (found == 0) throw mischief::FormatError("MIDI file: no tracks");
     if (found < s.trackCount) s.warnings.push_back(std::format("header lists {} tracks, {} found", s.trackCount, found));
 
     // Merge: a stable sort by tick keeps (track, file order) for equal ticks, since the tracks

@@ -305,7 +305,7 @@ LoadedState loadDosboxState(DosGame& g, const DosboxState& s) {
     restoreInput(g, s);
     if (auto users = UsersDat::parse(s.dgroup().subspan(dg::kUsersFile, kUsersFileSize))) g.users.users() = *users;
     else out.warnings.push_back("the USERS.DAT image in RAM (DS:BA14) does not parse");
-    BiosKeyboard& bios = g.bios();
+    mischief::dos::BiosKeyboard& bios = g.bios();
     bios.flush();
     bios.setShiftFlags(s.biosShiftFlags());
     for (uint16_t k : s.biosKeys()) out.biosKeys += bios.push(k) ? 1 : 0;

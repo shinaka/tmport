@@ -7,7 +7,7 @@
 
 #include "data/exe_tables.h"
 #include "gfx/frame_buffer.h"
-#include "gfx/palette.h"
+#include "mischief/gfx/palette.h"
 #include "res/resource_manager.h"
 
 namespace tmport::cli {
@@ -18,6 +18,6 @@ struct TestSceneResult {
 };
 
 TestSceneResult composeTestScene(gfx::FrameBuffer& fb, const ResourceManager& res, const ExeTables& exe,
-                                 const gfx::Palette& palette, gfx::ColorMode mode);
+                                 const mischief::gfx::Palette& palette, mischief::gfx::ColorMode mode);
 
 }  // namespace tmport::cli

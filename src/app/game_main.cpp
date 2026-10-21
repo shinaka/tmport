@@ -1,6 +1,6 @@
 #include "app/game_main.h"
 
-#include "util/log.h"
+#include "mischief/util/log.h"
 
 namespace tmport::app {
 
@@ -27,7 +27,7 @@ int runGameMain(AppContext& ctx, const GameMainFn& entry) {
         } catch (const QuitGame&) {
             return 0;
         } catch (const RestartToSignIn&) {
-            log::warn("restart requested outside the game's restart point: starting over");
+            mischief::log::warn("restart requested outside the game's restart point: starting over");
         }
     }
 }

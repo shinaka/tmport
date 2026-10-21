@@ -24,7 +24,7 @@
 #include "game/game_hooks.h"
 #include "gfx/frame_buffer.h"
 #include "gfx/pixmap.h"
-#include "rtl/borland_rand.h"
+#include "mischief/rtl/borland_rand.h"
 
 namespace tmport {
 class ExeTables;
@@ -60,7 +60,7 @@ struct SceneHooks {
     // The game's Borland RNG for the scenes' R(n) calls (quiz R(4), castle layout / creature).
     // Null: ctx.engine.rng(). GameMain passes the generator the room loop uses, so the calls stay
     // in the original's order (ARCHITECTURE.md §5.16).
-    BorlandRand* rng = nullptr;
+    mischief::BorlandRand* rng = nullptr;
     // Optional event trace (tools and tests print it with the clock time).
     std::function<void(std::string_view event)> trace;
 };
@@ -107,7 +107,7 @@ public:
     // --- screen -----------------------------------------------------------------------------------
     void present(int x, int y, int w, int h);  // 1058:05bc Gfx_BlitToWindow
     void setCursorForced(bool on);             // 10e0:0063 SetCursorForced
-    // Res_LoadToScratch / GetResource of a PMAP; throws tmport::Error if it does not exist.
+    // Res_LoadToScratch / GetResource of a PMAP; throws mischief::Error if it does not exist.
     std::shared_ptr<const gfx::PixMap> pixmap(int id) const;
     // 1058:19b2 Gfx_HighlightRect with the palette's reading-highlight LUT.
     void highlightRect(int x, int y, int w, int h);
@@ -130,7 +130,7 @@ public:
     void exitGame();                // 1140:0098 MenuCmd_Exit (hook or built-in; may throw QuitGame)
     void clearGateUnlocking();      // DS:2d60 := 0 (hook)
     GameHooks& gameHooks();
-    BorlandRand& rng();
+    mischief::BorlandRand& rng();
     // The DAM engine: AppContext::anim (whose FC / FB sound binding is the app's), or one owned
     // by this SceneIo (created on first use, sound through sfxPlay / sfxStop).
     anim::AnimEngine& anim();

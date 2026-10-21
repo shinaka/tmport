@@ -68,7 +68,7 @@ struct DamOp {
     int pad = 0, sound = 0;
 };
 
-// Linear decode from offset 4 up to and including the first FF. Throws tmport::FormatError if
+// Linear decode from offset 4 up to and including the first FF. Throws mischief::FormatError if
 // the tag is not "DAM\x1A"/"DOP", if an operand runs past the end, or if no FF is found.
 std::vector<DamOp> disassemble(const DamScript& script);
 // One line of text, e.g. "0004  FD sprite dx=0 dy=0 frame=1 mode=0".

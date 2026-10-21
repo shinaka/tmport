@@ -14,49 +14,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(TM_BUILD_TESTS "Build the tmtests unit tests (fetches doctest)" ON)
 
-include(FetchContent)
+# --- The engine: MischiefEngine -----------------------------------------------------------------
 
-# --- Third-party code: pinned by URL + hash, fetched at configure time -------------------------
-
-# SDL 3.4.18 (zlib license), static.
-set(SDL_SHARED OFF CACHE BOOL "" FORCE)
-set(SDL_STATIC ON CACHE BOOL "" FORCE)
-set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
-set(SDL_TESTS OFF CACHE BOOL "" FORCE)
-set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
-FetchContent_Declare(SDL3
-    URL https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz
-    URL_HASH SHA256=9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3)
-FetchContent_MakeAvailable(SDL3)
-
-if(TM_BUILD_TESTS)
-    # doctest 2.4.12 (MIT), header-only.
-    set(DOCTEST_NO_INSTALL ON CACHE BOOL "" FORCE)
-    set(DOCTEST_WITH_TESTS OFF CACHE BOOL "" FORCE)
-    set(DOCTEST_WITH_MAIN_IN_STATIC_LIB OFF CACHE BOOL "" FORCE)
-    FetchContent_Declare(doctest
-        URL https://github.com/doctest/doctest/archive/refs/tags/v2.4.12.tar.gz
-        URL_HASH SHA256=73381c7aa4dee704bd935609668cf41880ea7f19fa0504a200e13b74999c2d70)
-    FetchContent_MakeAvailable(doctest)
-endif()
-
-# --- Common compile settings --------------------------------------------------------------------
-
-function(tm_configure_target target)
-    if(MSVC)
-        target_compile_options(${target} PRIVATE /W4 /utf-8 /permissive- /Zc:__cplusplus /EHsc)
-        target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
-    else()
-        target_compile_options(${target} PRIVATE -Wall -Wextra)
-    endif()
-endfunction()
-
-# --- Shared engine core (both games) -------------------------------------------------------------
-
-# portcore: the parts of the engine that are not Treasure Mountain's (cmake/portcore.cmake; the
-# Gizmos & Gadgets port at the end of this file links only this library).
-include(cmake/portcore.cmake)
+# The engine core (file and CD-image access, clocks, the SDL host and presenter, the DOS sound chips
+# and input models, the codecs, the TLC text engine) is the library `mischief` of the MischiefEngine
+# repository. cmake/engine.cmake fetches the commit pinned in cmake/engine_pin.cmake, or uses a local
+# checkout (MISCHIEF_ENGINE_DIR, else ../MischiefEngine); docs/BUILDING.md "The engine". The engine
+# brings SDL 3, ymfm, doctest and mischief_configure_target().
+include(cmake/engine.cmake)
 
 # --- Treasure Mountain engine library -----------------------------------------------------------
 
@@ -98,30 +63,32 @@ include(cmake/sources_dos_runtime.cmake)
 include(cmake/sources_dos_game.cmake)
 include(cmake/sources_dos_autoplay.cmake)
 target_include_directories(tmcore PUBLIC src)
-target_link_libraries(tmcore PUBLIC portcore SDL3::SDL3-static)
-tm_configure_target(tmcore)
+target_link_libraries(tmcore PUBLIC mischief)
+mischief_configure_target(tmcore)
 
 # --- The game executable ------------------------------------------------------------------------
 
 # WIN32: a GUI-subsystem program on Windows (no console window on a double-click; SDL_main.h
-# provides WinMain). From a console it attaches to it for its output (src/platform/console.h).
+# provides WinMain). From a console it attaches to it for its output (the engine's
+# mischief/platform/console.h).
 add_executable(tmport WIN32 src/main.cpp)
 target_link_libraries(tmport PRIVATE tmcore)
-tm_configure_target(tmport)
+mischief_configure_target(tmport)
 if(WIN32)
     # The same program as a console application: the shell waits for it and sees its exit code
     # (scripts, CI). Elsewhere tmport itself is a console program.
     add_executable(tmport-cli src/main.cpp)
     target_link_libraries(tmport-cli PRIVATE tmcore)
-    tm_configure_target(tmport-cli)
+    mischief_configure_target(tmport-cli)
 endif()
 
 # --- Unit tests ---------------------------------------------------------------------------------
 
 if(TM_BUILD_TESTS)
+    # doctest at the engine's version.
+    mischief_use_doctest()
     add_executable(tmtests
         tests/test_main.cpp
-        tests/test_util.cpp
         tests/test_rand.cpp
         tests/test_gfx.cpp
         tests/test_vfs.cpp
@@ -130,7 +97,6 @@ if(TM_BUILD_TESTS)
         tests/test_pmap.cpp
         tests/test_exe_tables.cpp
         tests/test_cli.cpp
-        tests/test_portcore.cpp
     )
     # Per-area test lists (each owns one file: target_sources(tmtests PRIVATE ...)).
     include(cmake/tests_text_ui.cmake)
@@ -152,24 +118,10 @@ if(TM_BUILD_TESTS)
     include(cmake/tests_dos_game.cmake)
     include(cmake/tests_dos_autoplay.cmake)
     target_include_directories(tmtests PRIVATE tests)
-    target_link_libraries(tmtests PRIVATE tmcore doctest::doctest)
+    target_link_libraries(tmtests PRIVATE tmcore mischief_test_support doctest::doctest)
     # Include the standard headers instead of forward-declaring std types (MSVC C5285).
     target_compile_definitions(tmtests PRIVATE DOCTEST_CONFIG_USE_STD_HEADERS)
-    tm_configure_target(tmtests)
+    mischief_configure_target(tmtests)
     enable_testing()
     add_test(NAME tmtests COMMAND tmtests)
-endif()
-
-# --- Gizmos & Gadgets (second game: src/gg, cmake/gg.cmake) --------------------------------------
-
-option(TM_BUILD_GG "Build the Gizmos & Gadgets port (ggport, ggtests)" ON)
-if(TM_BUILD_GG AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/gg.cmake")
-    # G&G links only the shared engine core, never Treasure Mountain's game code. Until the core
-    # library target exists it builds against tmcore.
-    if(TARGET portcore)
-        set(GG_CORE_LIB portcore)
-    else()
-        set(GG_CORE_LIB tmcore)
-    endif()
-    include(cmake/gg.cmake)
 endif()

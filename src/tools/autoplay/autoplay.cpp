@@ -23,6 +23,10 @@
 #include "game/room/room_run.h"
 #include "game/room_table.h"
 #include "game/rules.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
+#include "mischief/vfs/data_source.h"
 #include "platform/engine.h"
 #include "res/game_files.h"
 #include "save/user_record.h"
@@ -31,10 +35,6 @@
 #include "tools/autoplay/autoplay_rig.h"
 #include "tools/autoplay/autoplay_vision.h"
 #include "ui/game_dialog.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/log.h"
-#include "vfs/data_source.h"
 
 namespace tmport::autoplay {
 
@@ -108,7 +108,7 @@ private:
         auto* t = static_cast<LogTap*>(self);
         if (priority >= SDL_LOG_PRIORITY_WARN && t->out_.size() < 100)
             t->out_.push_back(std::format("log: {}", message ? message : ""));
-        if (t->prevFn_ && (priority >= SDL_LOG_PRIORITY_WARN || log::verbose())) t->prevFn_(t->prevData_, category, priority, message);
+        if (t->prevFn_ && (priority >= SDL_LOG_PRIORITY_WARN || mischief::log::verbose())) t->prevFn_(t->prevData_, category, priority, message);
     }
     std::vector<std::string>& out_;
     SDL_LogOutputFunction prevFn_ = nullptr;
@@ -136,13 +136,13 @@ void writeCraftedPlayer(const std::filesystem::path& usersDat, const game::GameT
     x.rank.rankTier = static_cast<uint8_t>(game::rankFromTotal(total, t) / 2);
     x.player.room = game::kRoomNewClimb;  // the next set-up generates a climb for this tier
     save::UsersTable table;
-    if (auto old = readWholeFile(usersDat)) save::parseUsersFile(*old, table);
+    if (auto old = mischief::readWholeFile(usersDat)) save::parseUsersFile(*old, table);
     table.recount();
     const int at = std::min(table.count, save::kSlotCount - 1);
     game::toPlayerRecord(x).writeTo(table.slots[static_cast<size_t>(at)]);
     table.recount();
     table.sortByTotal();
-    if (!save::writeUsersFile(usersDat, table)) throw Error("cannot write " + pathToUtf8(usersDat));
+    if (!save::writeUsersFile(usersDat, table)) throw mischief::Error("cannot write " + mischief::pathToUtf8(usersDat));
 }
 
 ResourceSample sample(Rig& rig, int climb) {
@@ -547,11 +547,11 @@ std::optional<int> runAutoplayCommand(int argc, char** argv) {
             return 2;
         }
     }
-    log::setVerbose(verbose);
+    mischief::log::setVerbose(verbose);
     if (dataPath.empty())
-        if (auto env = getEnv("TM_DATA")) dataPath = *env;
+        if (auto env = mischief::getEnv("TM_DATA")) dataPath = *env;
     if (dataPath.empty())
-        if (auto p = vfs::autoDetectDataPath(std::filesystem::current_path())) dataPath = pathToUtf8(*p);
+        if (auto p = mischief::vfs::autoDetectDataPath(std::filesystem::current_path())) dataPath = mischief::pathToUtf8(*p);
     if (dataPath.empty()) {
         std::fprintf(stderr, "tmport: the game data was not found. Pass --data <TMTWINCD folder or CD image> or set TM_DATA.\n");
         return 3;
@@ -560,7 +560,7 @@ std::optional<int> runAutoplayCommand(int argc, char** argv) {
     try {
         ResourceManager::Options ro;
         ro.requireSounds = true;
-        files = GameFiles::open(pathFromUtf8(dataPath), ro);
+        files = GameFiles::open(mischief::pathFromUtf8(dataPath), ro);
     } catch (const std::exception& e) {
         std::fprintf(stderr, "tmport: cannot open the game data: %s\n", e.what());
         return 3;
@@ -573,7 +573,7 @@ std::optional<int> runAutoplayCommand(int argc, char** argv) {
     std::signal(SIGILL, onCrashSignal);
     Watchdog watchdog(watchdogSeconds);
     const std::filesystem::path base0 =
-        prefBase.empty() ? std::filesystem::temp_directory_path() / "tmport_autoplay" : pathFromUtf8(prefBase);
+        prefBase.empty() ? std::filesystem::temp_directory_path() / "tmport_autoplay" : mischief::pathFromUtf8(prefBase);
     int failures = 0, runs = 0;
     for (uint32_t seed = seedA; seed <= seedB; ++seed) {
         RunOptions o = base;
@@ -611,7 +611,7 @@ std::optional<int> runAutoplayCommand(int argc, char** argv) {
             if (!r.abortReason.empty()) std::printf("  abort: %s\n", r.abortReason.c_str());
             for (const auto& v : r.violations) std::printf("  violation: %s\n", v.c_str());
             for (const auto& l : r.recent) std::printf("  | %s\n", l.c_str());
-            std::printf("  (pref dir kept: %s)\n", pathToUtf8(o.prefDir).c_str());
+            std::printf("  (pref dir kept: %s)\n", mischief::pathToUtf8(o.prefDir).c_str());
         }
         for (const auto& n : r.notes) std::printf("  note: %s\n", n.c_str());
         if (verbose)

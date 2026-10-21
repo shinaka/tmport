@@ -1367,7 +1367,7 @@ boundaries change only `g_level` (§6.1).
 
 ## 10. `rand()` calls in these modules
 
-Turbo C `rand` (4d12:001f; `src/rtl/borland_rand`) [O]:
+Turbo C `rand` (4d12:001f; the engine's `src/mischief/rtl/borland_rand`) [O]:
 
 | Order | Where | Calls | When |
 |---|---|---|---|
@@ -1438,7 +1438,7 @@ linear value 0x4D9490DE and throws `AddressOutOfBoundsException`. Clearing the D
 assumption over the bodies of 1568:1090, 1556, 15bc, 1c7b, 1d96 and 1e50 makes all six decompile
 (globals then appear as raw DS offsets such as `*(int *)0x92a1`). The repaired decompilations agree
 with §6. Script: `extracted/scratch/dos_w1_world/gh/scripts/FixFarPtr.java` (mode `wholeds`),
-applied to `re/ghidra_proj/TMDos` and re-exported (`tools/ghidra_scripts/ExportAll.java`).
+applied to `re/ghidra_proj/TMDos` and re-exported (the engine's `tools/ghidra_scripts/ExportAll.java`).
 
 ### 12.4 Checks against the real game
 

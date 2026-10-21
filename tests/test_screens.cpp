@@ -21,16 +21,16 @@
 #include "game/signin.h"
 #include "game/title.h"
 #include "input/win_msg.h"
+#include "mischief/timing/clock.h"
+#include "mischief/timing/deadline_timers.h"
+#include "mischief/util/file_util.h"
 #include "platform/engine.h"
 #include "save/settings.h"
 #include "save/users_file.h"
 #include "test_data.h"
 #include "text/font.h"
 #include "text/text_renderer.h"
-#include "timing/clock.h"
-#include "timing/deadline_timers.h"
 #include "ui/game_dialog.h"
-#include "util/file_util.h"
 
 using namespace tmport;
 using namespace tmport::game;
@@ -163,8 +163,8 @@ TEST_CASE("Sign-in: name buffer (g_playerName / g_nameCursor, 1160:0957)") {
 }
 
 TEST_CASE("Sign-in: caret blink every 333 ms on a manual clock (timer 0, XOR 15, no catch-up)") {
-    ManualClock clock(5000);
-    DeadlineTimers timers(&clock);
+    mischief::ManualClock clock(5000);
+    mischief::DeadlineTimers timers(&clock);
     CaretBlink caret;
     caret.start(timers);
     CHECK(caret.colour() == 0);  // black first
@@ -179,8 +179,8 @@ TEST_CASE("Sign-in: caret blink every 333 ms on a manual clock (timer 0, XOR 15,
     CHECK(toggles[2] == std::make_pair(uint64_t{999}, 15));
 
     // A late poll re-arms from the poll time: every later toggle moves (no catch-up).
-    ManualClock c2(0);
-    DeadlineTimers t2(&c2);
+    mischief::ManualClock c2(0);
+    mischief::DeadlineTimers t2(&c2);
     CaretBlink k;
     k.start(t2);
     c2.set(400);
@@ -209,7 +209,7 @@ struct StopRun {};
 
 // A headless engine on a manual clock with a script of window messages at given times.
 struct Rig {
-    ManualClock clock{1000};
+    mischief::ManualClock clock{1000};
     EngineConfig cfg;
     Engine engine;
     text::Font font;
@@ -225,7 +225,7 @@ struct Rig {
     uint64_t start = 0;
     uint64_t limit = 400000;
 
-    static EngineConfig makeCfg(ManualClock& c) {
+    static EngineConfig makeCfg(mischief::ManualClock& c) {
         EngineConfig e;
         e.clock = &c;
         return e;
@@ -233,7 +233,7 @@ struct Rig {
 
     explicit Rig(GameFiles& g, const std::filesystem::path& dir)
         : cfg(makeCfg(clock)),
-          engine(g, gfx::ColorMode::Colour256, cfg),
+          engine(g, mischief::gfx::ColorMode::Colour256, cfg),
           font(text::Font::load(*g.res)),
           text(font, &engine.frame(), &engine.presenter()),
           dialogs(engine, font),
@@ -673,9 +673,9 @@ TEST_CASE("Sign-in run (REVIEW_1 H-1): a damaged users.dat without a backup is k
     Rig r(*g, dir);
     writeRoster(r.paths.usersDat, {{"Lpha", 10}, {"Bravo", 5}});
     REQUIRE_FALSE(std::filesystem::exists(save::usersBackupPath(r.paths.usersDat)));
-    auto bytes = *readWholeFile(r.paths.usersDat);
+    auto bytes = *mischief::readWholeFile(r.paths.usersDat);
     bytes.resize(5000);  // an interrupted write
-    REQUIRE(writeWholeFile(r.paths.usersDat, bytes));
+    REQUIRE(mischief::writeWholeFile(r.paths.usersDat, bytes));
     int modals = 0;
     r.dialogs.hooks().menuIsEnabled = [&] {
         ++modals;
@@ -695,7 +695,7 @@ TEST_CASE("Sign-in run (REVIEW_1 H-1): a damaged users.dat without a backup is k
     CHECK(modals == 1);
     CHECK(res.name == "Tester");
     CHECK(res.userSel == 0);
-    CHECK(readWholeFile(r.paths.usersDat) == bytes);  // Lpha and Bravo's bytes are not destroyed
+    CHECK(mischief::readWholeFile(r.paths.usersDat) == bytes);  // Lpha and Bravo's bytes are not destroyed
 }
 
 TEST_CASE("Sign-in run (REVIEW_1 H-1): a damaged users.dat is listed and saved from users.dat.bak") {
@@ -704,9 +704,9 @@ TEST_CASE("Sign-in run (REVIEW_1 H-1): a damaged users.dat is listed and saved f
     Rig r(*g, dir);
     writeRoster(r.paths.usersDat, {{"Lpha", 10}, {"Bravo", 5}});
     writeRoster(r.paths.usersDat, {{"Lpha", 12}, {"Bravo", 5}});  // the first file becomes users.dat.bak
-    auto bytes = *readWholeFile(r.paths.usersDat);
+    auto bytes = *mischief::readWholeFile(r.paths.usersDat);
     bytes.resize(5000);
-    REQUIRE(writeWholeFile(r.paths.usersDat, bytes));
+    REQUIRE(mischief::writeWholeFile(r.paths.usersDat, bytes));
     int modals = 0;
     r.dialogs.hooks().menuIsEnabled = [&] {
         ++modals;

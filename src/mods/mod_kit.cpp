@@ -6,17 +6,17 @@
 
 #include "audio/audio_tables.h"
 #include "gfx/pixmap.h"
+#include "mischief/mods/json.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
 #include "mods/dam_asm.h"
-#include "mods/json.h"
 #include "mods/mod_data_source.h"
 #include "mods/pmap_codec.h"
 #include "mods/resource_import.h"
 #include "mods/table_overrides.h"
 #include "mods/text_codec.h"
 #include "mods/wav_codec.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/log.h"
 
 namespace tmport::mods {
 
@@ -49,8 +49,8 @@ public:
 
     ModKitReport run() {
         prepare();
-        pmaps(gfx::ColorMode::Colour256);
-        if (f_.res->hasDll(DllId::TMT16)) pmaps(gfx::ColorMode::Colour16);
+        pmaps(mischief::gfx::ColorMode::Colour256);
+        if (f_.res->hasDll(DllId::TMT16)) pmaps(mischief::gfx::ColorMode::Colour16);
         sounds();
         others();
         bundles();
@@ -69,17 +69,17 @@ private:
     void prepare() {
         std::error_code ec;
         if (std::filesystem::exists(out_, ec)) {
-            if (!std::filesystem::is_directory(out_, ec)) throw Error(std::format("{} exists and is not a directory", pathToUtf8(out_)));
+            if (!std::filesystem::is_directory(out_, ec)) throw mischief::Error(std::format("{} exists and is not a directory", mischief::pathToUtf8(out_)));
             if (!o_.force && std::filesystem::directory_iterator(out_, ec) != std::filesystem::directory_iterator())
-                throw Error(std::format("{} is not empty (use --force to overwrite the kit there)", pathToUtf8(out_)));
+                throw mischief::Error(std::format("{} is not empty (use --force to overwrite the kit there)", mischief::pathToUtf8(out_)));
         }
         std::filesystem::create_directories(out_, ec);
-        if (ec) throw Error(std::format("cannot create {}: {}", pathToUtf8(out_), ec.message()));
+        if (ec) throw mischief::Error(std::format("cannot create {}: {}", mischief::pathToUtf8(out_), ec.message()));
     }
 
     void write(const std::string& rel, std::span<const uint8_t> bytes, const std::string& group) {
-        const auto p = out_ / pathFromUtf8(rel);
-        if (!writeWholeFile(p, bytes)) throw Error(std::format("cannot write {}", pathToUtf8(p)));
+        const auto p = out_ / mischief::pathFromUtf8(rel);
+        if (!mischief::writeWholeFile(p, bytes)) throw mischief::Error(std::format("cannot write {}", mischief::pathToUtf8(p)));
         ++rep_.files;
         rep_.bytes += bytes.size();
         if (!group.empty()) ++rep_.counts[group];
@@ -109,7 +109,7 @@ private:
     }
 
     // Exports, writes and verifies one resource.
-    void one(ResType t, int id, gfx::ColorMode mode = gfx::ColorMode::Colour256) {
+    void one(ResType t, int id, mischief::gfx::ColorMode mode = mischief::gfx::ColorMode::Colour256) {
         try {
             const auto e = exportResource(*f_.res, t, id, mode);
             if (!e) return;
@@ -121,8 +121,8 @@ private:
         }
     }
 
-    void pmaps(gfx::ColorMode mode) {
-        const bool c16 = mode == gfx::ColorMode::Colour16;
+    void pmaps(mischief::gfx::ColorMode mode) {
+        const bool c16 = mode == mischief::gfx::ColorMode::Colour16;
         for (int id : sortedIds(ResType::PMAP, c16 ? DllId::TMT16 : DllId::TMT256)) one(ResType::PMAP, id, mode);
     }
 
@@ -162,7 +162,7 @@ private:
                 }
                 const auto bytes = file->readAll();
                 write(rel, bytes, "MIDI");
-                written[gamePath] = out_ / pathFromUtf8(rel);
+                written[gamePath] = out_ / mischief::pathFromUtf8(rel);
                 originals.emplace_back(gamePath, bytes);
                 try {
                     validateMidiFile(at.tuneIds[i], bytes);
@@ -173,12 +173,12 @@ private:
         }
         if (!o_.verify || written.empty()) return;
         // Serve the written files through the same overlay a mod uses and compare.
-        struct NoOwn final : vfs::DataSource {
-            explicit NoOwn(const vfs::DataSource& b) : b_(b) {}
+        struct NoOwn final : mischief::vfs::DataSource {
+            explicit NoOwn(const mischief::vfs::DataSource& b) : b_(b) {}
             std::string describe() const override { return b_.describe(); }
-            std::shared_ptr<vfs::File> open(std::string_view p) const override { return b_.open(p); }
-            std::vector<vfs::DirEntry> list(std::string_view d) const override { return b_.list(d); }
-            const vfs::DataSource& b_;
+            std::shared_ptr<mischief::vfs::File> open(std::string_view p) const override { return b_.open(p); }
+            std::vector<mischief::vfs::DirEntry> list(std::string_view d) const override { return b_.list(d); }
+            const mischief::vfs::DataSource& b_;
         };
         const ModDataSource overlay(std::make_unique<NoOwn>(*f_.source), written);
         for (const auto& [path, bytes] : originals) {
@@ -200,8 +200,8 @@ private:
             const std::shared_ptr<const ne::NeImage> img(&f_.exe->exe(), [](const ne::NeImage*) {});
             ExeTables copy(img);
             for (const auto& [name, text] : filesOut) {
-                const auto back = readWholeFile(out_ / "TABLES" / pathFromUtf8(name));
-                if (!back) throw Error("cannot read TABLES/" + name);
+                const auto back = mischief::readWholeFile(out_ / "TABLES" / mischief::pathFromUtf8(name));
+                if (!back) throw mischief::Error("cannot read TABLES/" + name);
                 applyTablesText(copy, std::string_view(reinterpret_cast<const char*>(back->data()), back->size()));
             }
             const auto a = copy.raw(), b = f_.exe->raw();
@@ -229,9 +229,9 @@ private:
 
 }  // namespace
 
-std::optional<ExportedFile> exportResource(const ResourceManager& res, ResType type, int id, gfx::ColorMode mode) {
-    const bool c16 = type == ResType::PMAP && mode == gfx::ColorMode::Colour16;
-    auto body = res.loadOriginal(type, id, c16 ? gfx::ColorMode::Colour16 : gfx::ColorMode::Colour256);
+std::optional<ExportedFile> exportResource(const ResourceManager& res, ResType type, int id, mischief::gfx::ColorMode mode) {
+    const bool c16 = type == ResType::PMAP && mode == mischief::gfx::ColorMode::Colour16;
+    auto body = res.loadOriginal(type, id, c16 ? mischief::gfx::ColorMode::Colour16 : mischief::gfx::ColorMode::Colour256);
     if (!body) return std::nullopt;
     ExportedFile e;
     e.id = id;
@@ -239,11 +239,11 @@ std::optional<ExportedFile> exportResource(const ResourceManager& res, ResType t
     switch (type) {
         case ResType::PMAP: {
             // The palette from the DLL itself (a mod's RRGB must not leak into the user's kit).
-            gfx::Palette pal = gfx::Palette::vga16();
+            mischief::gfx::Palette pal = mischief::gfx::Palette::vga16();
             if (!c16) {
                 const auto rrgb = res.loadOriginal(ResType::RRGB, 900);
-                if (!rrgb) throw FormatError("RRGB 900 is missing");
-                pal = gfx::Palette::fromRrgb(*rrgb);
+                if (!rrgb) throw mischief::FormatError("RRGB 900 is missing");
+                pal = mischief::gfx::Palette::fromRrgb(*rrgb);
             }
             const gfx::PixMap pm = gfx::decodePmap(*body, c16 ? 4 : 8);
             e.bytes = pixmapToEditablePng(pm, pal);
@@ -273,7 +273,7 @@ std::optional<ExportedFile> exportResource(const ResourceManager& res, ResType t
             break;
         case ResType::BNDL: {
             const auto b = parseBundle(*body);
-            if (!b) throw FormatError("not a BNDL");
+            if (!b) throw mischief::FormatError("not a BNDL");
             text(bndlJson(b->rawIds));
             e.kind = ModFileKind::Bndl;
             e.rel = std::format("BNDL/{}.json", id);
@@ -285,7 +285,7 @@ std::optional<ExportedFile> exportResource(const ResourceManager& res, ResType t
             e.rel = std::format("FFNT/{}.ffnt", id);
             break;
         case ResType::RRGB:
-            if (body->size() < 768) throw FormatError("palette shorter than 768 bytes");
+            if (body->size() < 768) throw mischief::FormatError("palette shorter than 768 bytes");
             e.bytes.assign(body->begin(), body->begin() + 768);
             e.kind = ModFileKind::Rrgb;
             e.rel = std::format("RRGB/{}.pal", id);

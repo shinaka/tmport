@@ -101,7 +101,7 @@ public:
     // g_level and the loaded/wanted scene (no load: g.pan / g.bank are set to the level's files),
     // g_playerState, g_uiMode = 0, g_curObj = the player.
     void placePlayer(uint16_t x, uint16_t y, uint16_t camX, uint16_t camY, uint16_t level, uint16_t state = 10);
-    // A --keys script in game ticks (dos/app/script_input.h), relative to the current tick when
+    // A --keys script in game ticks (mischief/dos/app/script_input.h), relative to the current tick when
     // `relative` (each item's tick += ticks run so far). False (and `error`) when it does not parse.
     bool setScript(std::string_view keys, bool relative = true, std::string* error = nullptr);
 

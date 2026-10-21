@@ -25,7 +25,7 @@
 #include <vector>
 
 #include "data/exe_tables.h"
-#include "mods/json.h"
+#include "mischief/mods/json.h"
 
 namespace tmport::mods {
 
@@ -33,7 +33,7 @@ namespace tmport::mods {
 const std::vector<std::string>& supportedTables();
 
 // The tables of exe as one JSON object (the exporter's form).
-json::Value exportTables(const ExeTables& exe);
+mischief::mods::json::Value exportTables(const ExeTables& exe);
 // One file per table: {file name, JSON text}, e.g. {"rooms.json", "{\"rooms\": [...]}"}.
 std::vector<std::pair<std::string, std::string>> exportTableFiles(const ExeTables& exe);
 
@@ -46,7 +46,7 @@ struct TableApplyResult {
 
 // Validates and applies a document. Throws FormatError naming the JSON path, e.g.
 // "rooms[12].exitLeft: 60 is not a room (0-49) or 255"; nothing is changed then.
-TableApplyResult applyTables(ExeTables& exe, const json::Value& doc);
+TableApplyResult applyTables(ExeTables& exe, const mischief::mods::json::Value& doc);
 TableApplyResult applyTablesText(ExeTables& exe, std::string_view jsonText);
 
 }  // namespace tmport::mods

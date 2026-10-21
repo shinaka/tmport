@@ -281,7 +281,7 @@ pixels vertically [inf from the /2 and the clip value].
 
 ### 7.1 Addressing [obs]
 
-* `SST.EXE` is EXEPACK-compressed; `tools\unexepack.py` restores a 297680-byte file (the 0x21F0-byte header plus
+* `SST.EXE` is EXEPACK-compressed; the engine's `tools\unexepack.py` restores a 297680-byte file (the 0x21F0-byte header plus
   the 288992-byte load image).
   Header 0x21F0 bytes, so a Ghidra address `SSSS:OOOO` is file offset
   `0x21F0 + (SSSS - 0x1000) * 16 + OOOO`, and DS:xxxx is file offset `0x3fb30 + xxxx`.
@@ -419,7 +419,7 @@ total treasures (record +0x0A) reach. The string "CHAMPION" (DS:013a) is separat
 
 * Everything above can be read from the user's files at runtime. The DGROUP tables
   (hints, menus, dialogs, words, ranks, envelopes, levels) live in the EXEPACKed SST.EXE, so
-  the backend needs an in-memory EXEPACK unpacker (a few dozen lines, `tools\unexepack.py`)
+  the backend needs an in-memory EXEPACK unpacker (a few dozen lines, the engine's `tools\unexepack.py`)
   and should verify the image (load image of 288992 bytes and the copyright at DS:0004) before using
   fixed DS offsets.
 * The DOS edition has 9 save slots and its own record layout; the backend should keep its

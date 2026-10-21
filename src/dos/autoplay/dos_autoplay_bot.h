@@ -194,7 +194,7 @@ private:
 
     // Keys.
     std::array<bool, static_cast<size_t>(Key::Count)> held_{};
-    std::optional<PcKey> tapped_;   // released before the next tick
+    std::optional<mischief::dos::PcKey> tapped_;   // released before the next tick
     uint64_t lastTapTick_ = 0;
     uint64_t tick_ = 0;
 

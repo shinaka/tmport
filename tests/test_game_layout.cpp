@@ -20,11 +20,11 @@
 #include "game/game_tables.h"
 #include "game/layout.h"
 #include "game/room_table.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/hash.h"
 #include "mods/mods.h"
 #include "test_data.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/hash.h"
 
 using namespace tmport;
 using namespace tmport::game;
@@ -42,7 +42,7 @@ uint64_t spotHash(const RoomTable& rooms) {
         for (int s = 0; s < 3; ++s) blob.push_back(rooms.spotKind(r, s));
     for (int r = 0; r < kRoomCount; ++r)
         for (int s = 0; s < 3; ++s) blob.push_back(rooms.spotContent(r, s));
-    return fnv1a64(blob);
+    return mischief::fnv1a64(blob);
 }
 
 struct LayoutVector {
@@ -134,7 +134,7 @@ TEST_CASE("layout: applyLayoutRecord writes record spots and markers, nothing el
 }
 
 TEST_CASE("layout: pickLayoutRecords draws distinct records like pick_records") {
-    BorlandRand rng;
+    mischief::BorlandRand rng;
     rng.srand(1);
     const LayoutChoice c = pickLayoutRecords(500, rng);
     CHECK(c.record == std::array<int, 3>{5, 1, 167});
@@ -154,7 +154,7 @@ TEST_CASE("layout: generation from fixed seeds matches othr_tables.py") {
         CAPTURE(v.seed);
         RoomTable rooms = RoomTable::fromDefs(t.rooms);
         ClueState clues;
-        BorlandRand rng;
+        mischief::BorlandRand rng;
         rng.srand(v.seed);
         const LayoutChoice c = generateClimbLayout(rooms, clues, uint8_t(v.tier), t, rng);
         CHECK(c.record == v.rec);
@@ -247,17 +247,17 @@ TEST_CASE("layout: dump for the reference comparison (TM_GAME_LAYOUT_DUMP)") {
     // Writes "tier seed a b c hash next voices..." for seeds 0..1999 of every tier when the variable
     // names an output file; extracted/scratch/game/compare_layout_dump.py checks it against
     // tools/assets/othr_tables.py.
-    const auto out = getEnv("TM_GAME_LAYOUT_DUMP");
+    const auto out = mischief::getEnv("TM_GAME_LAYOUT_DUMP");
     if (!out) return;
     TM_REQUIRE_GAME_DATA();
     const GameTables& t = tables();
-    std::ofstream f(pathFromUtf8(*out));
+    std::ofstream f(mischief::pathFromUtf8(*out));
     REQUIRE(f.good());
     for (int tier = 0; tier < 4; ++tier) {
         for (uint32_t seed = 0; seed < 2000; ++seed) {
             RoomTable rooms = RoomTable::fromDefs(t.rooms);
             ClueState clues;
-            BorlandRand rng;
+            mischief::BorlandRand rng;
             rng.srand(uint16_t(seed));
             const LayoutChoice c = generateClimbLayout(rooms, clues, uint8_t(tier), t, rng);
             buildClueVoiceIds(clues);
@@ -303,11 +303,11 @@ TEST_CASE("layout (REVIEW_1 M-3): fewer than 3 layout records is an error, not a
     for (int count : {0, 1, 2}) {
         auto threw = std::make_shared<std::atomic<bool>>(false);
         const bool finished = finishesWithin(2000, [count, threw] {
-            BorlandRand rng;
+            mischief::BorlandRand rng;
             rng.srand(1);
             try {
                 (void)pickLayoutRecords(count, rng);
-            } catch (const FormatError&) {
+            } catch (const mischief::FormatError&) {
                 *threw = true;
             }
         });
@@ -319,23 +319,23 @@ TEST_CASE("layout (REVIEW_1 M-3): fewer than 3 layout records is an error, not a
         try {
             (void)loadLayoutTable(10551, layoutBytes(count));
             FAIL("no error for a table of ", count, " records");
-        } catch (const FormatError& e) {
+        } catch (const mischief::FormatError& e) {
             const std::string m = e.what();
             CHECK(m.find("OTHR 10551") != std::string::npos);
             CHECK(m.find(std::to_string(count) + " records") != std::string::npos);
         }
     }
     CHECK(loadLayoutTable(10551, layoutBytes(3)).size() == 3);
-    CHECK_THROWS_AS(loadLayoutTable(10551, std::vector<uint8_t>{}), FormatError);
+    CHECK_THROWS_AS(loadLayoutTable(10551, std::vector<uint8_t>{}), mischief::FormatError);
 }
 
 TEST_CASE("layout (REVIEW_1 M-3): a mod layout table of 2 records is refused; the game's table stays") {
     TM_REQUIRE_GAME_DATA();
     std::random_device rd;
     const auto dir = std::filesystem::temp_directory_path() / ("tmport_layout_mod_" + std::to_string(rd()));
-    REQUIRE(writeWholeFile(dir / "M" / "OTHR" / "10551.bin", layoutBytes(2)));
+    REQUIRE(mischief::writeWholeFile(dir / "M" / "OTHR" / "10551.bin", layoutBytes(2)));
     ResourceManager::Options o;
-    auto files = std::make_unique<GameFiles>(GameFiles::open(pathFromUtf8(*testdata::dataPath()), o));
+    auto files = std::make_unique<GameFiles>(GameFiles::open(mischief::pathFromUtf8(*testdata::dataPath()), o));
     mods::applyMods(*files, {dir / "M"});
     CHECK(files->res->loadRaw(10551) == files->res->loadOriginal(ResType::OTHR, 10551));
     const GameTables t = GameTables::load(*files->exe, *files->res);  // no hang, no error

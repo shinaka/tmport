@@ -5,8 +5,8 @@
 #include <format>
 #include <system_error>
 
-#include "mods/json.h"
-#include "util/file_util.h"
+#include "mischief/mods/json.h"
+#include "mischief/util/file_util.h"
 
 namespace tmport::mods {
 
@@ -72,23 +72,23 @@ std::optional<int> parseId(std::string_view s) {
     return v;
 }
 
-void parseIdSet(const json::Value* v, IdSet& out, const char* key) {
+void parseIdSet(const mischief::mods::json::Value* v, IdSet& out, const char* key) {
     if (!v) return;
-    if (!v->isArray()) throw FormatError(std::format("mod.json: \"{}\" must be an array of ids or \"lo-hi\" ranges", key));
+    if (!v->isArray()) throw mischief::FormatError(std::format("mod.json: \"{}\" must be an array of ids or \"lo-hi\" ranges", key));
     for (const auto& e : v->asArray()) {
         if (e.isInteger()) {
             const int64_t id = e.asInt();
-            if (id < 0 || id > 32767) throw FormatError(std::format("mod.json: \"{}\": id {} is outside 0-32767", key, id));
+            if (id < 0 || id > 32767) throw mischief::FormatError(std::format("mod.json: \"{}\": id {} is outside 0-32767", key, id));
             out.add(static_cast<int>(id), static_cast<int>(id));
         } else if (e.isString()) {
             const std::string& s = e.asString();
             const size_t dash = s.find('-');
             const auto lo = parseId(s.substr(0, dash));
             const auto hi = dash == std::string::npos ? lo : parseId(s.substr(dash + 1));
-            if (!lo || !hi || *hi < *lo) throw FormatError(std::format("mod.json: \"{}\": '{}' is not an id or a lo-hi range", key, s));
+            if (!lo || !hi || *hi < *lo) throw mischief::FormatError(std::format("mod.json: \"{}\": '{}' is not an id or a lo-hi range", key, s));
             out.add(*lo, *hi);
         } else {
-            throw FormatError(std::format("mod.json: \"{}\" must contain numbers or \"lo-hi\" strings", key));
+            throw mischief::FormatError(std::format("mod.json: \"{}\" must contain numbers or \"lo-hi\" strings", key));
         }
     }
 }
@@ -116,11 +116,11 @@ const std::vector<DirKind>& dirKinds() {
 }  // namespace
 
 ModManifest parseManifest(std::string_view text) {
-    const json::Value v = json::parse(text);
-    if (!v.isObject()) throw FormatError("mod.json must hold a JSON object");
+    const mischief::mods::json::Value v = mischief::mods::json::parse(text);
+    if (!v.isObject()) throw mischief::FormatError("mod.json must hold a JSON object");
     ModManifest m;
     if (const auto* n = v.find("name")) {
-        if (!n->isString()) throw FormatError("mod.json: \"name\" must be a string");
+        if (!n->isString()) throw mischief::FormatError("mod.json: \"name\" must be a string");
         m.name = n->asString();
     }
     parseIdSet(v.find("newIds"), m.newIds, "newIds");
@@ -133,41 +133,41 @@ ModFolder scanModFolder(const std::filesystem::path& dir) {
     f.dir = dir;
     std::error_code ec;
     if (!std::filesystem::is_directory(dir, ec)) return f;
-    f.manifest.name = pathToUtf8(dir.filename());
+    f.manifest.name = mischief::pathToUtf8(dir.filename());
     for (const auto& top : std::filesystem::directory_iterator(dir, ec)) {
-        const std::string name = pathToUtf8(top.path().filename());
+        const std::string name = mischief::pathToUtf8(top.path().filename());
         if (top.is_regular_file(ec)) {
-            if (iequalsAscii(name, "mod.json")) {
+            if (mischief::iequalsAscii(name, "mod.json")) {
                 try {
-                    const auto text = readWholeFile(top.path());
-                    if (!text) throw FormatError("cannot read the file");
+                    const auto text = mischief::readWholeFile(top.path());
+                    if (!text) throw mischief::FormatError("cannot read the file");
                     ModManifest m = parseManifest(std::string_view(reinterpret_cast<const char*>(text->data()), text->size()));
                     if (m.name.empty()) m.name = f.manifest.name;
                     f.manifest = std::move(m);
                 } catch (const std::exception& e) {
-                    f.errors.push_back(std::format("{}: {}", pathToUtf8(top.path()), e.what()));
+                    f.errors.push_back(std::format("{}: {}", mischief::pathToUtf8(top.path()), e.what()));
                 }
             }
             continue;  // README files etc. at the top level are ignored
         }
         if (!top.is_directory(ec)) continue;
-        if (iequalsAscii(name, "TABLES")) {
+        if (mischief::iequalsAscii(name, "TABLES")) {
             for (const auto& e : std::filesystem::directory_iterator(top.path(), ec)) {
-                const std::string fn = pathToUtf8(e.path().filename());
-                if (e.is_regular_file(ec) && toLowerAscii(fn).ends_with(".json"))
+                const std::string fn = mischief::pathToUtf8(e.path().filename());
+                if (e.is_regular_file(ec) && mischief::toLowerAscii(fn).ends_with(".json"))
                     f.tableFiles.push_back(e.path());
                 else if (e.is_regular_file(ec))
-                    f.warnings.push_back(std::format("{}: ignored (TABLES/ holds .json files)", pathToUtf8(e.path())));
+                    f.warnings.push_back(std::format("{}: ignored (TABLES/ holds .json files)", mischief::pathToUtf8(e.path())));
             }
             std::sort(f.tableFiles.begin(), f.tableFiles.end(),
-                      [](const auto& a, const auto& b) { return toLowerAscii(pathToUtf8(a.filename())) < toLowerAscii(pathToUtf8(b.filename())); });
+                      [](const auto& a, const auto& b) { return mischief::toLowerAscii(mischief::pathToUtf8(a.filename())) < mischief::toLowerAscii(mischief::pathToUtf8(b.filename())); });
             continue;
         }
         const DirKind* dk = nullptr;
         for (const auto& k : dirKinds())
-            if (iequalsAscii(name, k.dir)) dk = &k;
+            if (mischief::iequalsAscii(name, k.dir)) dk = &k;
         if (!dk) {
-            f.warnings.push_back(std::format("{}: unknown folder, ignored", pathToUtf8(top.path())));
+            f.warnings.push_back(std::format("{}: unknown folder, ignored", mischief::pathToUtf8(top.path())));
             continue;
         }
         std::vector<std::filesystem::path> entries;
@@ -175,8 +175,8 @@ ModFolder scanModFolder(const std::filesystem::path& dir) {
             if (e.is_regular_file(ec)) entries.push_back(e.path());
         std::sort(entries.begin(), entries.end());
         for (const auto& p : entries) {
-            const std::string fn = pathToUtf8(p.filename());
-            const std::string lfn = toLowerAscii(fn);
+            const std::string fn = mischief::pathToUtf8(p.filename());
+            const std::string lfn = mischief::toLowerAscii(fn);
             bool matched = false;
             for (const auto& [ext, kind] : dk->exts) {
                 if (!lfn.ends_with(ext)) continue;
@@ -189,7 +189,7 @@ ModFolder scanModFolder(const std::filesystem::path& dir) {
             if (!matched) {
                 std::string expected;
                 for (const auto& [ext, kind] : dk->exts) expected += (expected.empty() ? "" : " or ") + describeKind(kind);
-                f.warnings.push_back(std::format("{}: ignored (expected {})", pathToUtf8(p), expected));
+                f.warnings.push_back(std::format("{}: ignored (expected {})", mischief::pathToUtf8(p), expected));
             }
         }
     }

@@ -1,8 +1,0 @@
-1d42:000e	__OvrOpenExe	int far __OvrOpenExe(char far *name)	VROOMM overlay manager (Borland OVERLAY.LIB, segment 1d42, DS = 1dd7): opens the program file (default name "gizmo.exe" at 1de3:0290 when none is given), checks 'MZ', seeks past the load module (pages*512 + last page, rounded to 16) and reads the 'FBOV' header; error codes -1..-4
-1d42:013e	__OvrCloseRestore	void far __OvrCloseRestore(void)	restores the INT 3Fh vector saved at 1dd7:0002 (vector number 1dd7:00a1) and closes the overlay file handle (1dd7:00b8) or re-opens it
-1d42:0191	__OvrExit	void far __OvrExit(void)	_EXIT_ table entry (priority 1, DS:454c): __OvrCloseRestore and the release hooks 1dd7:0012/0014
-1d42:04f2	__OvrTrap	void interrupt __OvrTrap(void)	INT 3Fh handler (far pointer at 1dd7:0002 = 0d42:04f2): called from a stub entry `CD 3F off`, loads the overlay (__OvrLoad 1d42:05a2) and jumps to stub segment:offset in the loaded copy
-1d42:05a2	__OvrLoad	void near __OvrLoad(void)	loads an overlay segment into the overlay buffer (reads code + fixups at the stub's file offset, fixes segment words through the segment table 1de3:0000)
-1d42:07f9	__OvrStackFixup	void near __OvrStackFixup(void)	(inferred) walks the BP chain and rewrites return addresses into overlays that are being moved/unloaded
-1d42:0891	__OvrReturnTrap	void far __OvrReturnTrap(void)	(inferred) reloads an overlay on return through a patched stack frame
-1d42:08e9	__OvrInit	void far __OvrInit(void)	_INIT_ table entry (priority 1, DS:452e): sets up the overlay buffer and hooks INT 3Fh

@@ -8,8 +8,8 @@
 
 #include "dos/data/puzzles.h"
 #include "dos/mods/dos_text_codec.h"
+#include "mischief/util/error.h"
 #include "mods/mod_common.h"
-#include "util/error.h"
 
 namespace tmport::dos {
 
@@ -108,7 +108,7 @@ std::string puzzlesToText(const PuzzleFile& puzzles, const Dictionary& dict, con
         const std::string exp = dict.expand(puzzles.raw(i));
         const std::span<const uint8_t> b(reinterpret_cast<const uint8_t*>(exp.data()), exp.size());
         const size_t tilde = exp.find('~');
-        if (tilde == std::string::npos) throw FormatError(std::format("ALL_PUZS: question {} has no '~'", i));
+        if (tilde == std::string::npos) throw mischief::FormatError(std::format("ALL_PUZS: question {} has no '~'", i));
         out += std::format("\n=== question {} (tier {})\n", i, tierOf(i));
         out += escapeDosText(b.first(tilde), DosTextForm::Lines);
         out += "\n--- answers\n";
@@ -121,7 +121,7 @@ std::string puzzlesToText(const PuzzleFile& puzzles, const Dictionary& dict, con
             if (end >= b.size()) {
                 finalBreak = false;
                 pos = b.size();
-                if (a < 2) throw FormatError(std::format("ALL_PUZS: question {} has fewer than three answers", i));
+                if (a < 2) throw mischief::FormatError(std::format("ALL_PUZS: question {} has fewer than three answers", i));
                 break;
             }
             pos = end + 1;
@@ -212,7 +212,7 @@ std::vector<uint8_t> compressPuzzle(std::span<const uint8_t> expanded, const Dic
     const std::string_view text(reinterpret_cast<const char*>(expanded.data()), expanded.size());
     for (size_t i = 0; i < expanded.size();) {
         const uint8_t c = expanded[i];
-        if (c >= 0x80) throw FormatError(std::format("byte {:#04x} cannot be stored in ALL_PUZS (it reads as a word code)", c));
+        if (c >= 0x80) throw mischief::FormatError(std::format("byte {:#04x} cannot be stored in ALL_PUZS (it reads as a word code)", c));
         int hit = -1;
         size_t len = 0;
         if (i == 0 || !isWordChar(expanded[i - 1])) {
@@ -240,23 +240,23 @@ std::vector<uint8_t> compressPuzzle(std::span<const uint8_t> expanded, const Dic
 
 std::vector<uint8_t> buildAllPuzs(const std::vector<std::vector<uint8_t>>& expanded, const Dictionary& dict) {
     if (expanded.size() != PuzzleFile::kCount)
-        throw FormatError(std::format("ALL_PUZS: {} questions; the game has exactly {}", expanded.size(), PuzzleFile::kCount));
+        throw mischief::FormatError(std::format("ALL_PUZS: {} questions; the game has exactly {}", expanded.size(), PuzzleFile::kCount));
     std::vector<uint8_t> file(PuzzleFile::kTableSize, 0);
     for (size_t i = 0; i < expanded.size(); ++i) {
         const size_t off = file.size() - PuzzleFile::kTableSize;
-        if (off > 0xFFFF) throw FormatError("ALL_PUZS: larger than 64 KB");
+        if (off > 0xFFFF) throw mischief::FormatError("ALL_PUZS: larger than 64 KB");
         file[2 * i] = static_cast<uint8_t>(off & 0xFF);
         file[2 * i + 1] = static_cast<uint8_t>(off >> 8);
         std::vector<uint8_t> c;
         try {
             c = compressPuzzle(expanded[i], dict);
-        } catch (const FormatError& e) {
-            throw FormatError(std::format("ALL_PUZS: question {}: {}", i, e.what()));
+        } catch (const mischief::FormatError& e) {
+            throw mischief::FormatError(std::format("ALL_PUZS: question {}: {}", i, e.what()));
         }
         file.insert(file.end(), c.begin(), c.end());
         file.push_back(0);
     }
-    if (file.size() > 0xFFFF) throw FormatError(std::format("ALL_PUZS: {} bytes; the game keeps its length in 16 bits (64 KB)", file.size()));
+    if (file.size() > 0xFFFF) throw mischief::FormatError(std::format("ALL_PUZS: {} bytes; the game keeps its length in 16 bits (64 KB)", file.size()));
     return file;
 }
 
@@ -314,12 +314,12 @@ std::string dictionaryToText(std::span<const uint8_t> prgDict) {
         "# game files. 'N word' per entry; the questions can use entries 0-127, at most 15 characters each.\n"
         "# ALL_PUZS.txt holds the questions with the words written out: they are compressed with this table.\n";
     const size_t n = prgDict.size() / Dictionary::kEntrySize;
-    if (prgDict.size() % Dictionary::kEntrySize != 0) throw FormatError("PRG_DICT: not a whole number of 16-byte entries");
+    if (prgDict.size() % Dictionary::kEntrySize != 0) throw mischief::FormatError("PRG_DICT: not a whole number of 16-byte entries");
     for (size_t i = 0; i < n; ++i) {
         const auto e = prgDict.subspan(i * Dictionary::kEntrySize, Dictionary::kEntrySize);
         const auto nul = std::find(e.begin(), e.end(), uint8_t{0});
         if (nul == e.end() || std::any_of(nul, e.end(), [](uint8_t b) { return b != 0; }))
-            throw FormatError(std::format("PRG_DICT: entry {} is not a NUL-padded word", i));
+            throw mischief::FormatError(std::format("PRG_DICT: entry {} is not a NUL-padded word", i));
         const auto word = e.first(static_cast<size_t>(nul - e.begin()));
         out += word.empty() ? std::format("{}\n", i) : std::format("{} {}\n", i, escapeDosText(word, DosTextForm::Lines));
     }
@@ -364,7 +364,7 @@ std::vector<uint8_t> dictionaryFromText(std::string_view text) {
 // ---- HELP.DAT ----------------------------------------------------------------------------------
 
 std::string helpToText(std::span<const uint8_t> helpDat) {
-    if (helpDat.size() < 4) throw FormatError("HELP.DAT: too short");
+    if (helpDat.size() < 4) throw mischief::FormatError("HELP.DAT: too short");
     int total = 0;
     for (int t = 0; t < 4; ++t) total += helpDat[static_cast<size_t>(t)];
     size_t expect = 4 + 2 * static_cast<size_t>(total);
@@ -376,16 +376,16 @@ std::string helpToText(std::span<const uint8_t> helpDat) {
     int page = 0;
     for (int t = 0; t < 4; ++t)
         for (int p = 0; p < helpDat[static_cast<size_t>(t)]; ++p, ++page) {
-            if (4 + 2 * static_cast<size_t>(page) + 2 > helpDat.size()) throw FormatError("HELP.DAT: truncated page table");
+            if (4 + 2 * static_cast<size_t>(page) + 2 > helpDat.size()) throw mischief::FormatError("HELP.DAT: truncated page table");
             const size_t off = static_cast<size_t>(helpDat[4 + 2 * page] | (helpDat[5 + 2 * page] << 8));
-            if (off != expect) throw FormatError(std::format("HELP.DAT: page {} is not where the previous one ends", page));
+            if (off != expect) throw mischief::FormatError(std::format("HELP.DAT: page {} is not where the previous one ends", page));
             const auto nul = std::find(helpDat.begin() + static_cast<std::ptrdiff_t>(off), helpDat.end(), uint8_t{0});
-            if (nul == helpDat.end()) throw FormatError(std::format("HELP.DAT: page {} has no end", page));
+            if (nul == helpDat.end()) throw mischief::FormatError(std::format("HELP.DAT: page {} has no end", page));
             const auto text = helpDat.subspan(off, static_cast<size_t>(nul - helpDat.begin()) - off);
             out += std::format("=== topic {} page {}\n", t, p) + escapeDosText(text, DosTextForm::Lines) + '\n';
             expect = off + text.size() + 1;
         }
-    if (expect != helpDat.size()) throw FormatError("HELP.DAT: bytes after the last page");
+    if (expect != helpDat.size()) throw mischief::FormatError("HELP.DAT: bytes after the last page");
     return out;
 }
 
@@ -412,7 +412,7 @@ std::vector<uint8_t> helpFromText(std::string_view text, std::span<const uint8_t
         ++pageInTopic;
     }
     if (static_cast<int>(pages.size()) != total)
-        throw FormatError(std::format("HELP.DAT: {} pages; the game has {} (topics of {}, {}, {} and {} pages)", pages.size(), total,
+        throw mischief::FormatError(std::format("HELP.DAT: {} pages; the game has {} (topics of {}, {}, {} and {} pages)", pages.size(), total,
                                       pageCounts[0], pageCounts[1], pageCounts[2], pageCounts[3]));
     std::vector<uint8_t> file(pageCounts.begin(), pageCounts.end());
     file.resize(4 + 2 * pages.size(), 0);
@@ -424,7 +424,7 @@ std::vector<uint8_t> helpFromText(std::string_view text, std::span<const uint8_t
         file.push_back(0);
     }
     if (file.size() > kHelpBuffer)
-        throw FormatError(std::format("HELP.DAT: {} bytes; the game reads at most {} into its help buffer ({} too many)", file.size(),
+        throw mischief::FormatError(std::format("HELP.DAT: {} bytes; the game reads at most {} into its help buffer ({} too many)", file.size(),
                                       kHelpBuffer, file.size() - kHelpBuffer));
     return file;
 }

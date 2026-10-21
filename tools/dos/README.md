@@ -57,9 +57,9 @@ engine's loader both read that from the `CPU` entry.
   on/off edges per PIT tick (wave 4, `re/dos/docs/fmt_sound.md` §11.6).
 * `oplcmp.py ENGINE_LOG REF.dro`: the AdLib driver's OPL register writes (`tmport --dos-sound adlib
   soundtest OUT --from-state STATE --script ... --opl-log LOG`) against a DOSBox-X raw OPL capture
-  (`tools/tmctl.py audio opl`), write for write after DOSBox-X's filter of unchanged registers, with the
-  registers where the capture continues and each write's time against its PIT tick (wave 5,
-  `fmt_sound.md` §11.7).
+  (MischiefEngine's `tools/tmctl.py audio opl`), write for write after DOSBox-X's filter of unchanged
+  registers, with the registers where the capture continues and each write's time against its PIT
+  tick (wave 5, `fmt_sound.md` §11.7).
 * `avifit.py`: an engine run against a DOSBox-X AVI. The run dumps the picture of every game tick of a
   range; every AVI frame of a range is looked up among them by exact picture, and the AVI's time base
   (tick = a + frame * k) is fitted; it reports the frames off it. EGA AVIs run at 60.29 frames per

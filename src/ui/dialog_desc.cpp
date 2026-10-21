@@ -6,8 +6,8 @@
 
 #include "data/dgroup_offsets.h"
 #include "data/exe_tables.h"
-#include "util/error.h"
-#include "util/log.h"
+#include "mischief/util/error.h"
+#include "mischief/util/log.h"
 
 namespace tmport::ui {
 
@@ -20,7 +20,7 @@ std::optional<std::vector<uint8_t>> farString(const ExeTables& exe, uint32_t off
     const FarPtr p = exe.farPtr(off);
     if (p.isNull()) return std::nullopt;
     if (p.kind != FarPtr::Kind::DGroup)
-        throw FormatError(std::format("DGROUP {:#06x}: far pointer does not point into DGROUP", off));
+        throw mischief::FormatError(std::format("DGROUP {:#06x}: far pointer does not point into DGROUP", off));
     return toVec(exe.cstr(p.offset));
 }
 
@@ -53,7 +53,7 @@ DlgDesc DlgDesc::fromExe(const ExeTables& exe, uint16_t off) {
     d.textWidth = exe.i16(off + 0x10u);
     d.lineCount = exe.i16(off + 0x12u);
     if (!exe.farPtr(off + 0x14u).isNull())
-        log::warn("DlgDesc {:#06x}: picture pointer cannot be resolved statically; ignored", off);
+        mischief::log::warn("DlgDesc {:#06x}: picture pointer cannot be resolved statically; ignored", off);
     d.picDx = exe.u8(off + 0x18u);
     d.picDy = exe.u8(off + 0x19u);
     return d;

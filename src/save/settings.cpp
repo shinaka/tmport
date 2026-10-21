@@ -7,8 +7,8 @@
 #include <charconv>
 #include <system_error>
 
-#include "util/file_util.h"
-#include "util/log.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
 
 namespace tmport::save {
 
@@ -21,7 +21,7 @@ std::string_view trim(std::string_view s) {
 }
 
 std::optional<bool> parseBool(std::string_view v) {
-    const std::string s = toLowerAscii(trim(v));
+    const std::string s = mischief::toLowerAscii(trim(v));
     if (s == "1" || s == "true" || s == "yes" || s == "on") return true;
     if (s == "0" || s == "false" || s == "no" || s == "off") return false;
     return std::nullopt;
@@ -36,7 +36,7 @@ std::optional<int> parseInt(std::string_view v) {
 }
 
 void warnBad(std::string_view section, std::string_view key, std::string_view value) {
-    log::warn("tmport.ini: [{}] {} = '{}' is not valid; using the default", section, key, value);
+    mischief::log::warn("tmport.ini: [{}] {} = '{}' is not valid; using the default", section, key, value);
 }
 
 }  // namespace
@@ -54,7 +54,7 @@ std::string_view iniValue(MidiBackend v) {
 }
 std::string_view iniValue(InputModeSetting v) { return v == InputModeSetting::FirstEvent ? "first-event" : "lossless"; }
 
-EngineSettings EngineSettings::fromIni(const IniFile& ini) {
+EngineSettings EngineSettings::fromIni(const mischief::save::IniFile& ini) {
     EngineSettings s;
     auto boolKey = [&](const char* sec, const char* key, bool& out) {
         if (auto v = ini.get(sec, key)) {
@@ -76,21 +76,21 @@ EngineSettings EngineSettings::fromIni(const IniFile& ini) {
     boolKey("engine", "pause_on_focus_loss", s.pauseOnFocusLoss);
     intKey("engine", "cursor_scale", s.cursorScale, 0, 8);
     if (auto v = ini.get("input", "mode")) {
-        const std::string m = toLowerAscii(*v);
+        const std::string m = mischief::toLowerAscii(*v);
         if (m == "lossless") s.inputMode = InputModeSetting::Lossless;
         else if (m == "first-event" || m == "first_event" || m == "original") s.inputMode = InputModeSetting::FirstEvent;
         else warnBad("input", "mode", *v);
     }
     boolKey("input", "tap_latch", s.tapLatch);
     if (auto v = ini.get("audio", "midi_set")) {
-        const std::string m = toLowerAscii(*v);
+        const std::string m = mischief::toLowerAscii(*v);
         if (m == "e" || m == "extended") s.midiSet = MidiSet::Extended;
         else if (m == "b" || m == "base") s.midiSet = MidiSet::Base;
         else warnBad("audio", "midi_set", *v);
     }
     for (const char* key : {"midi_backend", "midi"}) {  // "midi" is an alias; read last, it wins
         if (auto v = ini.get("audio", key)) {
-            const std::string m = toLowerAscii(*v);
+            const std::string m = mischief::toLowerAscii(*v);
             if (m == "auto") s.midiBackend = MidiBackend::Auto;
             else if (m == "winmm") s.midiBackend = MidiBackend::WinMM;
             else if (m == "null" || m == "none") s.midiBackend = MidiBackend::Null;
@@ -105,7 +105,7 @@ EngineSettings EngineSettings::fromIni(const IniFile& ini) {
     boolKey("debug", "keys", s.debugKeys);
     boolKey("debug", "show_treasure", s.showTreasure);
     if (auto v = ini.get("engine", "edition")) {
-        const std::string m = toLowerAscii(trim(*v));
+        const std::string m = mischief::toLowerAscii(trim(*v));
         if (m.empty() || m == "auto") s.edition.reset();
         else if (auto e = parseEditionKey(m)) s.edition = *e;
         else warnBad("engine", "edition", *v);
@@ -129,7 +129,7 @@ EngineSettings EngineSettings::fromIni(const IniFile& ini) {
     return s;
 }
 
-void EngineSettings::toIni(IniFile& ini) const {
+void EngineSettings::toIni(mischief::save::IniFile& ini) const {
     auto b = [](bool v) { return v ? "true" : "false"; };
     ini.set("engine", "data", dataPath);
     ini.set("engine", "window_scale", std::to_string(windowScale));
@@ -179,12 +179,12 @@ Paths Paths::under(const std::filesystem::path& prefDir, const std::filesystem::
 Paths Paths::detect() {
     std::filesystem::path pref, base;
     if (char* s = SDL_GetPrefPath("TMPort", "TMPort")) {
-        pref = pathFromUtf8(s);
+        pref = mischief::pathFromUtf8(s);
         SDL_free(s);
     } else {
-        log::warn("no preference directory: {}", SDL_GetError());
+        mischief::log::warn("no preference directory: {}", SDL_GetError());
     }
-    if (const char* b = SDL_GetBasePath()) base = pathFromUtf8(b);
+    if (const char* b = SDL_GetBasePath()) base = mischief::pathFromUtf8(b);
     return under(pref, base);
 }
 
@@ -205,33 +205,33 @@ ImportResult importOriginalUsersDat(EngineSettings& settings, const std::filesys
         return ImportResult::DestExists;
     }
     if (source.empty() || !std::filesystem::is_regular_file(source, ec)) return ImportResult::SourceMissing;
-    auto data = readWholeFile(source);
+    auto data = mischief::readWholeFile(source);
     if (!data) {
-        log::warn("users.dat import: cannot read {}", pathToUtf8(source));
+        mischief::log::warn("users.dat import: cannot read {}", mischief::pathToUtf8(source));
         return ImportResult::Failed;
     }
-    if (!writeFileAtomically(dest, *data)) {
-        log::warn("users.dat import: cannot write {}", pathToUtf8(dest));
+    if (!mischief::writeFileAtomically(dest, *data)) {
+        mischief::log::warn("users.dat import: cannot write {}", mischief::pathToUtf8(dest));
         return ImportResult::Failed;
     }
     settings.importedOriginal = true;
-    log::info("imported the original users.dat from {} ({} bytes)", pathToUtf8(source), data->size());
+    mischief::log::info("imported the original users.dat from {} ({} bytes)", mischief::pathToUtf8(source), data->size());
     return ImportResult::Imported;
 }
 
 EngineSettings loadSettingsAndImport(const Paths& paths, ImportResult* importResult) {
-    IniFile ini;
+    mischief::save::IniFile ini;
     if (!paths.iniPath.empty())
-        if (auto loaded = IniFile::load(paths.iniPath)) ini = std::move(*loaded);
+        if (auto loaded = mischief::save::IniFile::load(paths.iniPath)) ini = std::move(*loaded);
     EngineSettings s = EngineSettings::fromIni(ini);
     ImportResult r = ImportResult::SourceMissing;
     if (!paths.usersDat.empty()) {
-        const auto source = s.importFrom.empty() ? defaultOriginalUsersDat() : pathFromUtf8(s.importFrom);
+        const auto source = s.importFrom.empty() ? defaultOriginalUsersDat() : mischief::pathFromUtf8(s.importFrom);
         const bool before = s.importedOriginal;
         r = importOriginalUsersDat(s, source, paths.usersDat);
         if (s.importedOriginal != before && !paths.iniPath.empty()) {
             ini.set("saves", "imported_original", "true");
-            if (!ini.save(paths.iniPath)) log::warn("cannot write {}", pathToUtf8(paths.iniPath));
+            if (!ini.save(paths.iniPath)) mischief::log::warn("cannot write {}", mischief::pathToUtf8(paths.iniPath));
         }
     }
     if (importResult) *importResult = r;

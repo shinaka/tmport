@@ -26,18 +26,18 @@
 #include "data/dgroup_offsets.h"
 #include "dos/audio/dos_sound_cli.h"
 #include "dos/gfx/dos_gfx_cli.h"
-#include "gfx/image_export.h"
+#include "mischief/gfx/image_export.h"
 #include "mods/mods_cli.h"
 #include "platform/engine.h"
 #include "platform/engine_setup.h"
 #include "res/game_files.h"
 #include "tools/autoplay/autoplay.h"
 #include "dos/autoplay/dos_autoplay.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/log.h"
-#include "util/png_writer.h"
-#include "vfs/data_source.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
+#include "mischief/util/png_writer.h"
+#include "mischief/vfs/data_source.h"
 
 namespace tmport::cli {
 
@@ -49,7 +49,7 @@ void out(std::format_string<Args...> fmt, Args&&... args) {
     std::fwrite(s.data(), 1, s.size(), stdout);
 }
 
-gfx::ColorMode modeOf(const Options& o) { return o.colour16 ? gfx::ColorMode::Colour16 : gfx::ColorMode::Colour256; }
+mischief::gfx::ColorMode modeOf(const Options& o) { return o.colour16 ? mischief::gfx::ColorMode::Colour16 : mischief::gfx::ColorMode::Colour256; }
 
 ResourceManager::Options resOptions(const Options& o, bool requireSounds) {
     ResourceManager::Options r;
@@ -67,15 +67,15 @@ GameFiles openWithMods(const std::filesystem::path& dataPath, const Options& o) 
 
 std::filesystem::path exeDirectory() {
     const char* base = SDL_GetBasePath();  // owned by SDL
-    return base ? pathFromUtf8(base) : std::filesystem::path();
+    return base ? mischief::pathFromUtf8(base) : std::filesystem::path();
 }
 
 std::optional<std::filesystem::path> resolveDataPath(const Options& o) {
-    if (!o.dataPath.empty()) return pathFromUtf8(o.dataPath);
-    if (auto env = getEnv("TM_DATA")) return pathFromUtf8(*env);
+    if (!o.dataPath.empty()) return mischief::pathFromUtf8(o.dataPath);
+    if (auto env = mischief::getEnv("TM_DATA")) return mischief::pathFromUtf8(*env);
     // tmport.ini [engine] data = ... (area input_save).
-    if (const auto s = loadEngineSettings(pathFromUtf8(o.configPath)); !s.dataPath.empty()) return pathFromUtf8(s.dataPath);
-    return vfs::autoDetectDataPath(exeDirectory());
+    if (const auto s = loadEngineSettings(mischief::pathFromUtf8(o.configPath)); !s.dataPath.empty()) return mischief::pathFromUtf8(s.dataPath);
+    return mischief::vfs::autoDetectDataPath(exeDirectory());
 }
 
 std::string asText(std::span<const uint8_t> b) { return std::string(b.begin(), b.end()); }
@@ -86,7 +86,7 @@ std::string asText(std::span<const uint8_t> b) { return std::string(b.begin(), b
 
 int runInfo(const Options& o, const std::filesystem::path& dataPath) {
     bool ok = true;
-    auto source = vfs::openDataSource(dataPath);
+    auto source = mischief::vfs::openDataSource(dataPath);
     out("Data source: {}\n\n", source->describe());
 
     // File inventory.
@@ -106,7 +106,7 @@ int runInfo(const Options& o, const std::filesystem::path& dataPath) {
     const auto sounds = source->list("SOUNDS");
     size_t mids = 0;
     for (const auto& e : sounds)
-        if (!e.isDirectory && toUpperAscii(e.name).ends_with(".MID")) ++mids;
+        if (!e.isDirectory && mischief::toUpperAscii(e.name).ends_with(".MID")) ++mids;
     out("  SOUNDS\\        {} MIDI files\n\n", mids);
 
     auto exe = ExeTables::load(*source);
@@ -150,20 +150,20 @@ int runInfo(const Options& o, const std::filesystem::path& dataPath) {
     out("  SSND total: {}\n", totalSsnd);
 
     // Palette.
-    const gfx::Palette pal = res.palette(900);
+    const mischief::gfx::Palette pal = res.palette(900);
     std::string keys;
     for (int i = 0; i < 256; ++i)
         if (pal.keyTable()[static_cast<size_t>(i)]) keys += std::format(" {}", i);
     out("\nRRGB 900: colour key (RGB 0000AA) at logical index(es):{}\n", keys);
-    gfx::Palette pens = pal;
+    mischief::gfx::Palette pens = pal;
     pens.setPens(exe->egaColours(), exe->vga16Index());
     std::string penText;
     for (int k = 0; k < 16; ++k) penText += std::format(" {}", pens.pen(k));
     out("EGA pen colours (DS:07d8) -> nearest RRGB index:{}\n", penText);
 
     // PMAP decode check.
-    for (gfx::ColorMode mode : {gfx::ColorMode::Colour256, gfx::ColorMode::Colour16}) {
-        const DllId d = mode == gfx::ColorMode::Colour16 ? DllId::TMT16 : DllId::TMT256;
+    for (mischief::gfx::ColorMode mode : {mischief::gfx::ColorMode::Colour256, mischief::gfx::ColorMode::Colour16}) {
+        const DllId d = mode == mischief::gfx::ColorMode::Colour16 ? DllId::TMT16 : DllId::TMT256;
         if (!res.hasDll(d)) continue;
         std::map<gfx::PixEncoding, size_t> enc;
         size_t fail = 0;
@@ -248,13 +248,13 @@ int runDumpPmap(const Options& o, const std::filesystem::path& dataPath) {
     const auto mode = modeOf(o);
     auto pm = files.res->pixmap(o.pmapId, mode);
     if (!pm) {
-        log::error("PMAP {} does not exist in {}", o.pmapId, mode == gfx::ColorMode::Colour16 ? "TMT16.DLL" : "TMT256.DLL");
+        mischief::log::error("PMAP {} does not exist in {}", o.pmapId, mode == mischief::gfx::ColorMode::Colour16 ? "TMT16.DLL" : "TMT256.DLL");
         return 1;
     }
-    const gfx::Palette pal = files.makePalette(mode);
-    const auto path = pathFromUtf8(o.outPath);
-    if (!gfx::writePixmapPng(path, *pm, pal, !o.opaque)) {
-        log::error("cannot write {}", o.outPath);
+    const mischief::gfx::Palette pal = files.makePalette(mode);
+    const auto path = mischief::pathFromUtf8(o.outPath);
+    if (!mischief::gfx::writePixmapPng(path, *pm, pal, !o.opaque)) {
+        mischief::log::error("cannot write {}", o.outPath);
         return 1;
     }
     static const char* encNames[] = {"raw 4 bpp", "raw 8 bpp", "RUND", "memory"};
@@ -267,7 +267,7 @@ int runDumpPmap(const Options& o, const std::filesystem::path& dataPath) {
 int runDumpSheet(const Options& o, const std::filesystem::path& dataPath) {
     GameFiles files = openWithMods(dataPath, o);
     const auto mode = modeOf(o);
-    const gfx::Palette pal = files.makePalette(mode);
+    const mischief::gfx::Palette pal = files.makePalette(mode);
     std::vector<std::shared_ptr<const gfx::PixMap>> keep;
     std::vector<SheetItem> items;
     for (int id = o.firstId; id <= o.lastId; ++id) {
@@ -278,12 +278,12 @@ int runDumpSheet(const Options& o, const std::filesystem::path& dataPath) {
         items.push_back({id, pm.get()});
     }
     if (items.empty()) {
-        log::error("no PMAPs in [{}, {}]", o.firstId, o.lastId);
+        mischief::log::error("no PMAPs in [{}, {}]", o.firstId, o.lastId);
         return 1;
     }
     const SheetImage img = renderContactSheet(items, pal, !o.opaque);
-    if (!png::writeRgba(pathFromUtf8(o.outPath), img.width, img.height, img.rgba)) {
-        log::error("cannot write {}", o.outPath);
+    if (!mischief::png::writeRgba(mischief::pathFromUtf8(o.outPath), img.width, img.height, img.rgba)) {
+        mischief::log::error("cannot write {}", o.outPath);
         return 1;
     }
     out("{} PMAPs ({}..{}) -> {} ({}x{})\n", items.size(), items.front().id, items.back().id, o.outPath, img.width, img.height);
@@ -299,19 +299,19 @@ int runHeadlessFrame(const Options& o, const std::filesystem::path& dataPath) {
     const TestSceneResult r = composeTestScene(engine.frame(), *files.res, *files.exe, engine.palette(), mode);
     for (const auto& n : r.notes) out("  {}\n", n);
     engine.presentAll();
-    if (!engine.presenter().writeCanvasPng(pathFromUtf8(o.outPath))) {
-        log::error("cannot write {}", o.outPath);
+    if (!engine.presenter().writeCanvasPng(mischief::pathFromUtf8(o.outPath))) {
+        mischief::log::error("cannot write {}", o.outPath);
         return 1;
     }
     out("frame -> {} (640x480)\n", o.outPath);
     if (!o.fbDumpPath.empty()) {
-        const gfx::Palette& pal = engine.palette();
-        std::vector<Rgb8> colours(pal.colours().begin(), pal.colours().begin() + pal.size());
+        const mischief::gfx::Palette& pal = engine.palette();
+        std::vector<mischief::Rgb8> colours(pal.colours().begin(), pal.colours().begin() + pal.size());
         const auto& fb = engine.frame();
-        if (!png::writeIndexed(pathFromUtf8(o.fbDumpPath), gfx::FrameBuffer::kWidth, gfx::FrameBuffer::kHeight,
+        if (!mischief::png::writeIndexed(mischief::pathFromUtf8(o.fbDumpPath), gfx::FrameBuffer::kWidth, gfx::FrameBuffer::kHeight,
                                std::span<const uint8_t>(fb.pixels(), static_cast<size_t>(gfx::FrameBuffer::kWidth) * gfx::FrameBuffer::kHeight),
                                colours)) {
-            log::error("cannot write {}", o.fbDumpPath);
+            mischief::log::error("cannot write {}", o.fbDumpPath);
             return 1;
         }
         out("frame buffer -> {} (512x1055)\n", o.fbDumpPath);
@@ -323,25 +323,25 @@ int runHeadlessFrame(const Options& o, const std::filesystem::path& dataPath) {
 
 int runView(const Options& o, const std::filesystem::path& dataPath) {
     GameFiles files = openWithMods(dataPath, o);
-    gfx::ColorMode mode = modeOf(o);
-    EngineConfig cfg = engineConfigFromSettings(loadEngineSettings(pathFromUtf8(o.configPath)));
+    mischief::gfx::ColorMode mode = modeOf(o);
+    EngineConfig cfg = engineConfigFromSettings(loadEngineSettings(mischief::pathFromUtf8(o.configPath)));
     if (o.integerScale) cfg.integerScale = true;
     if (!o.inputMode.empty()) cfg.inputMode = parseInputMode(o.inputMode, cfg.inputMode);
     if (o.tapLatch) cfg.tapLatch = true;
     cfg.pauseOnFocusLoss = false;  // a viewer need not freeze
-    if (!o.screenshotDir.empty()) cfg.screenshotDir = pathFromUtf8(o.screenshotDir);
+    if (!o.screenshotDir.empty()) cfg.screenshotDir = mischief::pathFromUtf8(o.screenshotDir);
     cfg.title = "TM Port - PMAP viewer";
     Engine engine(files, mode, cfg);
     if (!engine.openWindow()) return 1;
 
-    auto idsFor = [&](gfx::ColorMode m) {
-        auto ids = files.res->ids(ResType::PMAP, m == gfx::ColorMode::Colour16 ? DllId::TMT16 : DllId::TMT256);
+    auto idsFor = [&](mischief::gfx::ColorMode m) {
+        auto ids = files.res->ids(ResType::PMAP, m == mischief::gfx::ColorMode::Colour16 ? DllId::TMT16 : DllId::TMT256);
         std::sort(ids.begin(), ids.end());
         return ids;
     };
     std::vector<int> ids = idsFor(mode);
     if (ids.empty()) {
-        log::error("no PMAPs found");
+        mischief::log::error("no PMAPs found");
         return 1;
     }
     size_t pos = 0;
@@ -366,7 +366,7 @@ int runView(const Options& o, const std::filesystem::path& dataPath) {
                     fb.drawSprite(x, y, *pm, mirror);
                 static const char* enc[] = {"4bpp", "8bpp raw", "RUND", "mem"};
                 title = std::format("PMAP {} - {}x{} {} - {} [{}/{}]{}{}", id, pm->width, pm->height,
-                                    enc[static_cast<int>(pm->encoding)], mode == gfx::ColorMode::Colour16 ? "TMT16" : "TMT256",
+                                    enc[static_cast<int>(pm->encoding)], mode == mischief::gfx::ColorMode::Colour16 ? "TMT16" : "TMT256",
                                     pos + 1, ids.size(), mirror ? " mirrored" : "", opaque ? " opaque" : "");
             } catch (const std::exception& e) {
                 title = std::format("PMAP {}: {}", id, e.what());
@@ -392,8 +392,8 @@ int runView(const Options& o, const std::filesystem::path& dataPath) {
             case 'o': case 'O': opaque = !opaque; break;
             case 'i': case 'I': engine.presenter().setIntegerScale(!engine.presenter().integerScale()); break;
             case 't': case 'T': {
-                const gfx::ColorMode other = mode == gfx::ColorMode::Colour16 ? gfx::ColorMode::Colour256 : gfx::ColorMode::Colour16;
-                if (!files.res->hasDll(other == gfx::ColorMode::Colour16 ? DllId::TMT16 : DllId::TMT256)) break;
+                const mischief::gfx::ColorMode other = mode == mischief::gfx::ColorMode::Colour16 ? mischief::gfx::ColorMode::Colour256 : mischief::gfx::ColorMode::Colour16;
+                if (!files.res->hasDll(other == mischief::gfx::ColorMode::Colour16 ? DllId::TMT16 : DllId::TMT256)) break;
                 const int cur = ids[pos];
                 mode = other;
                 engine.setPalette(files.makePalette(mode));
@@ -442,7 +442,7 @@ constexpr char kHelpHeader[] =
 }  // namespace
 
 int printHelp(const std::string& topicArg) {
-    std::string topic = toLowerAscii(topicArg);
+    std::string topic = mischief::toLowerAscii(topicArg);
     while (topic.starts_with("-")) topic.erase(0, 1);  // "--scene" -> "scene"
     static constexpr std::pair<std::string_view, std::string_view> kAliases[] = {
         {"play", "game"},   {"data", "inspect"}, {"info", "inspect"}, {"view", "inspect"}, {"dam", "anim"},
@@ -495,7 +495,7 @@ int run(int argc, char** argv) {
         std::fprintf(stderr, "tmport: %s\nRun `tmport --help` for the game options and the tools.\n", error.c_str());
         return 2;
     }
-    log::setVerbose(opts->verbose);
+    mischief::log::setVerbose(opts->verbose);
     if (opts->command == Command::Help) return printHelp(opts->helpTopic);
     const auto dataPath = resolveDataPath(*opts);
     if (!dataPath) {
@@ -512,7 +512,7 @@ int run(int argc, char** argv) {
             case Command::View: return runView(*opts, *dataPath);
             case Command::Help: break;
         }
-    } catch (const MissingFileError& e) {
+    } catch (const mischief::MissingFileError& e) {
         std::fprintf(stderr, "tmport: missing game file %s: %s\n", e.file().c_str(), e.what());
         return 3;
     } catch (const std::exception& e) {

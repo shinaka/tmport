@@ -5,8 +5,8 @@
 #include <cstdint>
 #include <vector>
 
-#include "gfx/palette.h"
 #include "gfx/pixmap.h"
+#include "mischief/gfx/palette.h"
 
 namespace tmport::cli {
 
@@ -20,7 +20,7 @@ struct SheetImage {
     std::vector<uint8_t> rgba;
 };
 
-SheetImage renderContactSheet(const std::vector<SheetItem>& items, const gfx::Palette& palette, bool transparentKey,
+SheetImage renderContactSheet(const std::vector<SheetItem>& items, const mischief::gfx::Palette& palette, bool transparentKey,
                               int cell = 128, int columns = 8);
 
 // Draws text made of digits, 'x', '-' and spaces (3x5 glyphs) into an RGBA image.

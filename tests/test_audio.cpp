@@ -16,13 +16,13 @@
 #include "audio/engine_input_port.h"
 #include "audio/sdl_wave_output.h"
 #include "platform/engine.h"
-#include "timing/clock.h"
+#include "mischief/timing/clock.h"
 #include "audio/sound.h"
 #include "audio/wave_voice.h"
 #include "audio_test_util.h"
 #include "res/resource_manager.h"
 #include "test_data.h"
-#include "util/hash.h"
+#include "mischief/util/hash.h"
 
 using namespace tmport;
 using namespace tmport::audio;
@@ -105,7 +105,7 @@ TEST_CASE("Audio: all 2861 SSND sounds decode (counts and durations vs fmt_sound
         uint32_t mn = UINT32_MAX, mx = 0;
         uint64_t sum = 0;
         for (int id : ids) {
-            CHECK(dllFor(ResType::SSND, id, gfx::ColorMode::Colour256) == e.dll);  // routing agrees
+            CHECK(dllFor(ResType::SSND, id, mischief::gfx::ColorMode::Colour256) == e.dll);  // routing agrees
             auto s = loader.load(id);
             REQUIRE(s != nullptr);
             CHECK(s->sampleRate == 22050u);
@@ -192,7 +192,7 @@ TEST_CASE("Audio: WAV export matches tools/assets/ssnd.py byte for byte") {
         REQUIRE(s != nullptr);
         const auto w = makeWav(*s);
         CHECK(w.size() == e.size);
-        CHECK(fnv1a64(w) == e.hash);
+        CHECK(mischief::fnv1a64(w) == e.hash);
     }
 }
 
@@ -447,11 +447,11 @@ TEST_CASE("Audio: speech wait on the headless Engine (peek look-ahead, Ctrl+S ho
     TM_REQUIRE_GAME_DATA();
     Rig r;
     r.sounds->lengthsMs = {{7100, 1000}};
-    ManualClock clock(10000);
+    mischief::ManualClock clock(10000);
     clock.onSleep = [&](uint64_t) { r.clock.us += 1000; };  // the wave voice runs on the rig clock
     EngineConfig cfg;
     cfg.clock = &clock;
-    Engine engine(*g, gfx::ColorMode::Colour256, cfg);
+    Engine engine(*g, mischief::gfx::ColorMode::Colour256, cfg);
     connectAudioToEngine(engine, *r.audio);
     EngineInputPort port(engine, r.audio.get());
     auto& a = *r.audio;

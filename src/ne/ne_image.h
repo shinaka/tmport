@@ -13,7 +13,7 @@
 #include <string_view>
 #include <vector>
 
-#include "vfs/data_source.h"
+#include "mischief/vfs/data_source.h"
 
 namespace tmport::ne {
 
@@ -92,7 +92,7 @@ struct EntryPoint {
 class NeImage {
 public:
     // Parses the headers. name is used in messages (usually the file name). Throws FormatError.
-    static NeImage open(std::shared_ptr<vfs::File> file, std::string name);
+    static NeImage open(std::shared_ptr<mischief::vfs::File> file, std::string name);
 
     const std::string& name() const { return name_; }
     uint64_t fileSize() const;
@@ -141,7 +141,7 @@ private:
     void parseNameTable();
     void parseEntries(const std::vector<uint8_t>& hdr, uint16_t entOff, uint16_t entLen);
 
-    std::shared_ptr<vfs::File> file_;
+    std::shared_ptr<mischief::vfs::File> file_;
     std::string name_;
     uint32_t neOffset_ = 0;
     uint16_t flags_ = 0;

@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <format>
 
-#include "util/byte_reader.h"
-#include "util/error.h"
+#include "mischief/util/byte_reader.h"
+#include "mischief/util/error.h"
 
 namespace tmport::anim {
 
@@ -38,18 +38,18 @@ ScriptPtr makeScript(int id, std::span<const uint8_t> bytes) {
 
 std::vector<DamOp> disassemble(const DamScript& script) {
     if (!script.hasDamTag() && !script.isDop())
-        throw FormatError(std::format("DAM script {}: bad tag", script.id));
-    const ByteReader r(script.bytes, std::format("DAM script {}", script.id));
+        throw mischief::FormatError(std::format("DAM script {}: bad tag", script.id));
+    const mischief::ByteReader r(script.bytes, std::format("DAM script {}", script.id));
     std::vector<DamOp> ops;
     size_t p = kScriptStart;
     for (;;) {
-        if (p >= r.size()) throw FormatError(std::format("DAM script {}: no FF before the end of the data", script.id));
+        if (p >= r.size()) throw mischief::FormatError(std::format("DAM script {}: no FF before the end of the data", script.id));
         DamOp o;
         o.offset = p;
         o.op = r.u8(p);
         o.size = 1 + operandSize(o.op);
         if (!r.has(p, o.size))
-            throw FormatError(std::format("DAM script {}: opcode {:02X} at {:#x} runs past the end", script.id, o.op, p));
+            throw mischief::FormatError(std::format("DAM script {}: opcode {:02X} at {:#x} runs past the end", script.id, o.op, p));
         switch (o.op) {
             case kOpUpdateRect:
                 o.x = r.i16(p + 1);

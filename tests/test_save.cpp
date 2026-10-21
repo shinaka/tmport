@@ -7,9 +7,9 @@
 #include <format>
 #include <string>
 
+#include "mischief/util/file_util.h"
 #include "save/user_record.h"
 #include "save/users_file.h"
-#include "util/file_util.h"
 
 using namespace tmport;
 using namespace tmport::save;
@@ -177,11 +177,11 @@ TEST_CASE("users.dat: save merges into the re-read file, stable sort, re-find by
     CHECK(sel == 0);
 
     // Nobody signed in: nothing is written.
-    const auto beforeBytes = readWholeFile(file);
+    const auto beforeBytes = mischief::readWholeFile(file);
     sel = 0;
     res = saveCurrentPlayer(file, player("________", 1), sel);
     CHECK_FALSE(res.attempted);
-    CHECK(readWholeFile(file) == beforeBytes);
+    CHECK(mischief::readWholeFile(file) == beforeBytes);
 }
 
 TEST_CASE("users.dat: save with a single player and with a missing file") {
@@ -193,7 +193,7 @@ TEST_CASE("users.dat: save with a single player and with a missing file") {
     CHECK(res.written);
     CHECK(out.count == 1);
     CHECK(sel == 0);
-    auto bytes = readWholeFile(file);
+    auto bytes = mischief::readWholeFile(file);
     REQUIRE(bytes);
     CHECK(bytes->size() == kFileSize);
     // The file was deleted while playing (sys_resources_saves.md §6.9). The original writes the
@@ -239,36 +239,6 @@ using Roster = std::vector<std::pair<std::string, uint32_t>>;
 
 }  // namespace
 
-TEST_CASE("file_util: checked and atomic writes") {
-    const fs::path dir = tempDir("atomic");
-    const fs::path f = dir / "sub" / "a.bin";
-    const std::vector<uint8_t> one(11085, 0x11), two(300, 0x22);
-    CHECK(writeWholeFile(f, one));  // creates the directory; size checked after the close
-    CHECK(fs::file_size(f) == one.size());
-    CHECK(writeFileAtomically(f, two));  // replaces an existing file
-    CHECK(readWholeFile(f) == two);
-    CHECK_FALSE(fs::exists(dir / "sub" / "a.bin.tmp"));
-    CHECK(writeFileAtomically(dir / "new.bin", one));
-    CHECK(readWholeFile(dir / "new.bin") == one);
-    // The temporary file cannot be created (a directory has its name): false, target unchanged.
-    fs::create_directories(dir / "sub" / "a.bin.tmp");
-    CHECK_FALSE(writeFileAtomically(f, one));
-    CHECK(readWholeFile(f) == two);
-    // Backups: the replaced contents are kept when they differ and `keep` accepts them.
-    const fs::path g = dir / "g.txt";
-    const std::vector<uint8_t> v1{'1'}, v2{'2'}, v3{'3'};
-    CHECK(replaceFileKeepingBackup(g, v1));
-    CHECK_FALSE(fs::exists(backupPathFor(g)));  // nothing to keep yet
-    CHECK(replaceFileKeepingBackup(g, v2));
-    CHECK(readWholeFile(backupPathFor(g)) == v1);
-    CHECK(replaceFileKeepingBackup(g, v2));  // identical: the backup keeps the older version
-    CHECK(readWholeFile(backupPathFor(g)) == v1);
-    CHECK(replaceFileKeepingBackup(g, v3, [](std::span<const uint8_t>) { return false; }));
-    CHECK(readWholeFile(g) == v3);
-    CHECK(readWholeFile(backupPathFor(g)) == v1);  // `keep` refused v2
-    CHECK(backupPathFor(g).filename() == "g.txt.bak");
-}
-
 TEST_CASE("users.dat (REVIEW_1 H-1): an interrupted write never costs the other players") {
     const fs::path dir = tempDir("h1");
     const fs::path file = dir / "users.dat";
@@ -277,16 +247,16 @@ TEST_CASE("users.dat (REVIEW_1 H-1): an interrupted write never costs the other 
     CHECK(fs::file_size(file) == kFileSize);  // the format is unchanged
     UsersTable disk;
     REQUIRE(readUsersFile(file, disk));
-    CHECK(readWholeFile(file) == disk.fileBytes());
+    CHECK(mischief::readWholeFile(file) == disk.fileBytes());
     // users.dat.bak holds the file before the last change: Ann and Bob.
     CHECK(roster(usersBackupPath(file)) == Roster{{"Ann", 50}, {"Bob", 30}});
-    const auto good = *readWholeFile(file);
+    const auto good = *mischief::readWholeFile(file);
 
     SUBCASE("with a valid users.dat.bak the roster is rebuilt from it") {
         // The reviewer's scenario: a write interrupted after 5 000 bytes, then Bob (slot 1) saves.
         auto bytes = good;
         bytes.resize(5000);
-        REQUIRE(writeWholeFile(file, bytes));
+        REQUIRE(mischief::writeWholeFile(file, bytes));
         UsersTable t;
         CHECK(readUsersFileStatus(file, t) == UsersFileStatus::Short);
         const RosterLoad load = loadRoster(file, t);  // what the sign-in shows
@@ -307,19 +277,19 @@ TEST_CASE("users.dat (REVIEW_1 H-1): an interrupted write never costs the other 
         fs::remove(usersBackupPath(file));
         auto bytes = good;
         bytes.resize(5000);
-        REQUIRE(writeWholeFile(file, bytes));
+        REQUIRE(mischief::writeWholeFile(file, bytes));
         int sel = 1;
         UsersTable merged;
         const auto r = saveCurrentPlayer(file, player("Bob", 31), sel, &merged);
         CHECK(r.attempted);
         CHECK_FALSE(r.written);  // the caller shows the Write Error box (DS:2084)
         CHECK(r.refused);
-        CHECK(readWholeFile(file) == bytes);  // untouched: nothing of Ann and Cy is destroyed
+        CHECK(mischief::readWholeFile(file) == bytes);  // untouched: nothing of Ann and Cy is destroyed
         CHECK(names(merged) == std::vector<std::string>{"Bob"});  // the in-memory roster
         // A backup that is itself short does not help either.
-        REQUIRE(writeWholeFile(usersBackupPath(file), std::vector<uint8_t>(100, 0)));
+        REQUIRE(mischief::writeWholeFile(usersBackupPath(file), std::vector<uint8_t>(100, 0)));
         CHECK_FALSE(saveCurrentPlayer(file, player("Bob", 32), sel).written);
-        CHECK(readWholeFile(file) == bytes);
+        CHECK(mischief::readWholeFile(file) == bytes);
     }
     SUBCASE("an unreadable users.dat is treated like a damaged one") {
         fs::remove(file);
@@ -342,9 +312,9 @@ TEST_CASE("users.dat (REVIEW_1 H-1): an interrupted write never costs the other 
         const auto r = saveCurrentPlayer(file, player("Bob", 99), sel);
         CHECK(r.attempted);
         CHECK_FALSE(r.written);
-        CHECK(readWholeFile(file) == good);
+        CHECK(mischief::readWholeFile(file) == good);
         CHECK_FALSE(writeUsersFile(file, UsersTable{}));
-        CHECK(readWholeFile(file) == good);
+        CHECK(mischief::readWholeFile(file) == good);
     }
     SUBCASE("a missing users.dat is still an empty roster (the original's rule)") {
         fs::remove(file);
@@ -463,12 +433,12 @@ TEST_CASE("users.dat: findByName is a byte-exact compare") {
 }
 
 TEST_CASE("users.dat: byte-identical round trip of a real file written by the original") {
-    const auto src = getEnv("TM_USERS_DAT");
+    const auto src = mischief::getEnv("TM_USERS_DAT");
     if (!src) {
         MESSAGE("TM_USERS_DAT is not set: test skipped");
         return;
     }
-    const auto original = readWholeFile(pathFromUtf8(*src));
+    const auto original = mischief::readWholeFile(mischief::pathFromUtf8(*src));
     REQUIRE(original);
     REQUIRE(original->size() == kFileSize);
 
@@ -481,17 +451,17 @@ TEST_CASE("users.dat: byte-identical round trip of a real file written by the or
     const fs::path dir = tempDir("real");
     const fs::path copy = dir / "users.dat";
     REQUIRE(writeUsersFile(copy, t));
-    CHECK(readWholeFile(copy) == original);
+    CHECK(mischief::readWholeFile(copy) == original);
 
     // Saving every player unchanged (fields read back from the file) rewrites the identical file
     // and finds the player at the same index.
     for (int i = 0; i < t.count; ++i) {
-        REQUIRE(writeWholeFile(copy, *original));
+        REQUIRE(mischief::writeWholeFile(copy, *original));
         const PlayerRecord rec = PlayerRecord::fromSlot(t.slots[static_cast<size_t>(i)]);
         int sel = i;
         const auto res = saveCurrentPlayer(copy, rec, sel);
         CHECK(res.written);
         CHECK(sel == t.findByName(rec.name));
-        CHECK(readWholeFile(copy) == original);
+        CHECK(mischief::readWholeFile(copy) == original);
     }
 }

@@ -1,6 +1,6 @@
 #include "edition/dos_options.h"
 
-#include "util/file_util.h"
+#include "mischief/util/file_util.h"
 
 namespace tmport::dos {
 
@@ -35,13 +35,13 @@ int soundDeviceOf(SoundDevice sound) {
 }
 
 std::optional<Look> parseLookOption(std::string_view text) {
-    const std::string t = toLowerAscii(text);
+    const std::string t = mischief::toLowerAscii(text);
     if (t == "hercules" || t == "hgc") return Look::Cga;  // drawn like CGA (g_videoType 4)
     return parseLook(t);
 }
 
 std::optional<SoundDevice> parseSoundDevice(std::string_view text) {
-    const std::string t = toLowerAscii(text);
+    const std::string t = mischief::toLowerAscii(text);
     if (t == "speaker" || t == "pc" || t == "ibm") return SoundDevice::Speaker;
     if (t == "tandy" || t == "psg") return SoundDevice::Tandy;
     if (t == "adlib" || t == "opl2") return SoundDevice::AdLib;
@@ -50,7 +50,7 @@ std::optional<SoundDevice> parseSoundDevice(std::string_view text) {
 }
 
 std::optional<FrameSpeed> parseFrameSpeed(std::string_view text) {
-    const std::string t = toLowerAscii(text);
+    const std::string t = mischief::toLowerAscii(text);
     if (t == "reference") return FrameSpeed::Reference;
     if (t == "period") return FrameSpeed::Period;
     return std::nullopt;

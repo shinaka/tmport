@@ -5,7 +5,7 @@
 // with the load image based at segment 0x1000, so image offset = (SSSS - 0x1000) * 16 + OOOO.
 // DGROUP is segment 0x4d94 (DS:XXXX). Far pointers stored in the image are {u16 off, u16 seg}
 // with image-relative segments (0x0568 for code segment 1568), exactly as left by the unpacker.
-// re/dos/docs/fmt_data.md §1 and tools/unexepack.py describe the format.
+// re/dos/docs/fmt_data.md §1 and the engine's tools/unexepack.py describe the format.
 
 #include <cstddef>
 #include <cstdint>

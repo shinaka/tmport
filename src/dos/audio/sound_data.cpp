@@ -4,8 +4,8 @@
 #include <format>
 
 #include "dos/data/dos_exe.h"
-#include "util/error.h"
-#include "vfs/data_source.h"
+#include "mischief/util/error.h"
+#include "mischief/vfs/data_source.h"
 
 namespace tmport::dos {
 
@@ -17,7 +17,7 @@ constexpr size_t kReadLimit = 9999;  // File_Read limit of Sound_LoadData (1460:
 uint16_t rd16(std::span<const uint8_t> b, size_t at) { return static_cast<uint16_t>(b[at] | (b[at + 1] << 8)); }
 
 [[noreturn]] void badTables(const std::string& why) {
-    throw FormatError("SST.EXE: the sound driver tables are not those of V 1.0 (" + why + ")");
+    throw mischief::FormatError("SST.EXE: the sound driver tables are not those of V 1.0 (" + why + ")");
 }
 
 void checkTables(const SoundTables& t) {
@@ -53,8 +53,8 @@ std::string_view soundCardName(SoundCard d) {
 
 SoundFile SoundFile::parse(std::span<const uint8_t> file, int voicesPerEntry, int entriesNeeded, size_t bufferSize,
                            std::string_view name) {
-    const auto fail = [&](const std::string& why) -> FormatError {
-        return FormatError(std::format("{}: {}", name, why));
+    const auto fail = [&](const std::string& why) -> mischief::FormatError {
+        return mischief::FormatError(std::format("{}: {}", name, why));
     };
     if (voicesPerEntry != 1 && voicesPerEntry != 4) throw fail("bad voice count");
     const uint16_t expectHeader = voicesPerEntry == 1 ? 0x96 : 0x230;  // 75 or 70 x 4 slots
@@ -129,10 +129,10 @@ SoundBank SoundBank::fromBytes(SoundCard device, std::span<const uint8_t> sfxFil
 }
 
 // 1460:022a Sound_LoadData
-SoundBank SoundBank::load(const vfs::DataSource& dosFolder, SoundCard device, std::shared_ptr<const SoundTables> tables) {
+SoundBank SoundBank::load(const mischief::vfs::DataSource& dosFolder, SoundCard device, std::shared_ptr<const SoundTables> tables) {
     const auto read = [&](std::string_view name) {
         auto f = dosFolder.open(name);
-        if (!f) throw MissingFileError(std::string(name), std::format("{} is missing from the DOS game folder", name));
+        if (!f) throw mischief::MissingFileError(std::string(name), std::format("{} is missing from the DOS game folder", name));
         return f->readRange(0, kReadLimit);
     };
     const auto sfx = read(sfxFileName(device));

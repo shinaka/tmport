@@ -9,7 +9,7 @@
 #include "gfx/pixmap.h"
 #include "anim/dam_script.h"
 #include "mods/dam_asm.h"
-#include "mods/json.h"
+#include "mischief/mods/json.h"
 #include "mods/mod_common.h"
 #include "mods/pmap_codec.h"
 #include "mods/text_codec.h"
@@ -17,8 +17,8 @@
 #include "res/resource_manager.h"
 #include "res/ssnd.h"
 #include "text/font.h"
-#include "util/error.h"
-#include "util/file_util.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
 
 namespace tmport::mods {
 
@@ -33,10 +33,10 @@ std::string asText(std::span<const uint8_t> b) { return std::string(reinterpret_
 void checkId(ModFileKind kind, int id, bool originalExists, const ImportContext& ctx) {
     const auto t = resTypeOf(kind);
     if (t && typeForId(id) != *t)
-        throw FormatError(std::format("id {} is a {} id; {} ids are {} (the id range decides the type)", id,
+        throw mischief::FormatError(std::format("id {} is a {} id; {} ids are {} (the id range decides the type)", id,
                                       resTypeName(typeForId(id)), resTypeName(*t), idRangeText(*t)));
     if (!originalExists && !(ctx.manifest && ctx.manifest->newIds.contains(id)))
-        throw FormatError(std::format("{} {} does not exist in the game; to add it, list it under \"newIds\" in the mod's mod.json",
+        throw mischief::FormatError(std::format("{} {} does not exist in the game; to add it, list it under \"newIds\" in the mod's mod.json",
                                       t ? std::string(resTypeName(*t)) : std::string("resource"), id));
 }
 
@@ -44,23 +44,23 @@ bool resizable(int id, const ImportContext& ctx) { return ctx.manifest && ctx.ma
 
 ImportResult importPmap(ModFileKind kind, int id, std::span<const uint8_t> bytes, const ImportContext& ctx) {
     const bool c16 = kind == ModFileKind::Pmap16;
-    const gfx::ColorMode mode = c16 ? gfx::ColorMode::Colour16 : gfx::ColorMode::Colour256;
+    const mischief::gfx::ColorMode mode = c16 ? mischief::gfx::ColorMode::Colour16 : mischief::gfx::ColorMode::Colour256;
     auto orig = ctx.original ? ctx.original(ResType::PMAP, id, mode) : std::nullopt;
     int origDepth = c16 ? 4 : 8;
     if (!orig && c16 && ctx.original) {
         // TMT16.DLL is not loaded (256-colour mode): both DLLs hold the same ids and sizes.
-        orig = ctx.original(ResType::PMAP, id, gfx::ColorMode::Colour256);
+        orig = ctx.original(ResType::PMAP, id, mischief::gfx::ColorMode::Colour256);
         origDepth = 8;
     }
     checkId(kind, id, orig.has_value(), ctx);
-    const gfx::Palette pal = c16 ? gfx::Palette::vga16() : (ctx.palette256 ? ctx.palette256() : gfx::Palette());
+    const mischief::gfx::Palette pal = c16 ? mischief::gfx::Palette::vga16() : (ctx.palette256 ? ctx.palette256() : mischief::gfx::Palette());
     PmapImage img = pngToIndices(bytes, pal);
     ImportResult r;
     gfx::PixEncoding enc = c16 ? gfx::PixEncoding::Raw4 : gfx::PixEncoding::Rund;
     if (orig) {
         const gfx::PixMap o = gfx::decodePmap(*orig, origDepth);
         if ((o.width != img.width || o.height != img.height) && !resizable(id, ctx))
-            throw FormatError(std::format(
+            throw mischief::FormatError(std::format(
                 "the picture is {}x{} but PMAP {} is {}x{}; the game lays out, centres and hit-tests by the original size "
                 "(list the id under \"resizable\" in mod.json to allow a new size)",
                 img.width, img.height, id, o.width, o.height));
@@ -73,7 +73,7 @@ ImportResult importPmap(ModFileKind kind, int id, std::span<const uint8_t> bytes
 }
 
 ImportResult importSsnd(int id, std::span<const uint8_t> bytes, const ImportContext& ctx) {
-    const auto orig = ctx.original ? ctx.original(ResType::SSND, id, gfx::ColorMode::Colour256) : std::nullopt;
+    const auto orig = ctx.original ? ctx.original(ResType::SSND, id, mischief::gfx::ColorMode::Colour256) : std::nullopt;
     checkId(ModFileKind::Ssnd, id, orig.has_value(), ctx);
     uint32_t rate = kDefaultSoundRate;
     if (orig)
@@ -92,21 +92,21 @@ ImportResult importSsnd(int id, std::span<const uint8_t> bytes, const ImportCont
 void checkQuestion(int id, std::span<const uint8_t> body, const ImportContext& ctx, ImportResult& r) {
     const auto q = game::parseQuestion(body);
     if (!q || !q->terminated)
-        throw FormatError(std::format(
+        throw mischief::FormatError(std::format(
             "question {} must end its text with two empty lines (three line breaks in a row), followed by three answers", id));
     if (q->answerCount != 3)
-        throw FormatError(std::format("question {} needs exactly three answers, one per line; the first one is the correct answer", id));
+        throw mischief::FormatError(std::format("question {} needs exactly three answers, one per line; the first one is the correct answer", id));
     for (int a = 0; a < 3; ++a) {
         const auto s = q->answer(a);
         if (s.find('\xFF') != std::string_view::npos)
-            throw FormatError(std::format("question {}: answer {} contains a control code (answers are plain text)", id, a + 1));
-        if (a < 2 && s.empty()) throw FormatError(std::format("question {}: answer {} is empty", id, a + 1));
+            throw mischief::FormatError(std::format("question {}: answer {} contains a control code (answers are plain text)", id, a + 1));
+        if (a < 2 && s.empty()) throw mischief::FormatError(std::format("question {}: answer {} is empty", id, a + 1));
     }
     if (q->answer(2).empty() || q->answer(2) == "\r")
-        throw FormatError(std::format("question {}: answer 3 is empty", id));
-    if (q->lineSlots > 10) throw FormatError(std::format("question {} has {} lines; the question screen has room for 10", id, q->lineSlots));
+        throw mischief::FormatError(std::format("question {}: answer 3 is empty", id));
+    if (q->lineSlots > 10) throw mischief::FormatError(std::format("question {} has {} lines; the question screen has room for 10", id, q->lineSlots));
     if (ctx.original)
-        if (const auto o = ctx.original(ResType::OTHR, id, gfx::ColorMode::Colour256))
+        if (const auto o = ctx.original(ResType::OTHR, id, mischief::gfx::ColorMode::Colour256))
             if (const auto oq = game::parseQuestion(*o); oq && oq->numLines != q->numLines)
                 r.warnings.push_back(std::format(
                     "question {} has {} text line(s), the original {}: the narration (SSND ids from the table at DS:1990, one "
@@ -116,7 +116,7 @@ void checkQuestion(int id, std::span<const uint8_t> body, const ImportContext& c
 }
 
 ImportResult importOthr(ModFileKind kind, int id, std::span<const uint8_t> bytes, const ImportContext& ctx) {
-    const auto orig = ctx.original ? ctx.original(ResType::OTHR, id, gfx::ColorMode::Colour256) : std::nullopt;
+    const auto orig = ctx.original ? ctx.original(ResType::OTHR, id, mischief::gfx::ColorMode::Colour256) : std::nullopt;
     checkId(kind, id, orig.has_value(), ctx);
     ImportResult r;
     if (kind == ModFileKind::OthrText) {
@@ -131,7 +131,7 @@ ImportResult importOthr(ModFileKind kind, int id, std::span<const uint8_t> bytes
         a.bytes.resize(a.paddedSize, 0);
         r.body = std::move(a.bytes);
     } else {
-        if (bytes.empty()) throw FormatError("the file is empty");
+        if (bytes.empty()) throw mischief::FormatError("the file is empty");
         r.body.assign(bytes.begin(), bytes.end());
         padToNe(r.body);
     }
@@ -141,15 +141,15 @@ ImportResult importOthr(ModFileKind kind, int id, std::span<const uint8_t> bytes
     if (id >= 10550 && id <= 10553 && r.body.size() >= 2) {
         const int count = static_cast<int16_t>(r.body[0] | (r.body[1] << 8));
         if (count <= 0 || static_cast<size_t>(count) * 38 + 2 > r.body.size())
-            throw FormatError(std::format("OTHR {}: the layout table declares {} records of 38 bytes that do not fit", id, count));
+            throw mischief::FormatError(std::format("OTHR {}: the layout table declares {} records of 38 bytes that do not fit", id, count));
         if (count < 3)  // a climb draws three different records (REVIEW_1 M-3)
-            throw FormatError(std::format("OTHR {}: the layout table has {} records; a climb needs at least 3", id, count));
+            throw mischief::FormatError(std::format("OTHR {}: the layout table has {} records; a climb needs at least 3", id, count));
     }
     return r;
 }
 
 ImportResult importBndl(int id, std::span<const uint8_t> bytes, const ImportContext& ctx) {
-    const auto orig = ctx.original ? ctx.original(ResType::BNDL, id, gfx::ColorMode::Colour256) : std::nullopt;
+    const auto orig = ctx.original ? ctx.original(ResType::BNDL, id, mischief::gfx::ColorMode::Colour256) : std::nullopt;
     checkId(ModFileKind::Bndl, id, orig.has_value(), ctx);
     ImportResult r;
     std::vector<uint32_t> members;
@@ -160,13 +160,13 @@ ImportResult importBndl(int id, std::span<const uint8_t> bytes, const ImportCont
     if (const auto rule = bundleRule(id)) {
         if (n < rule->minCount || n > rule->maxCount) {
             if (rule->minCount == rule->maxCount)
-                throw FormatError(std::format("BNDL {} ({}) must have exactly {} members, not {}", id, rule->what, rule->minCount, n));
-            throw FormatError(std::format("BNDL {} ({}) must have {} to {} members, not {}", id, rule->what, rule->minCount, rule->maxCount, n));
+                throw mischief::FormatError(std::format("BNDL {} ({}) must have exactly {} members, not {}", id, rule->what, rule->minCount, n));
+            throw mischief::FormatError(std::format("BNDL {} ({}) must have {} to {} members, not {}", id, rule->what, rule->minCount, rule->maxCount, n));
         }
         if (rule->firstIsScript && n > 0 && typeForId(static_cast<int>(members[0] & 0xFFFF)) != ResType::OTHR)
-            throw FormatError(std::format("BNDL {} ({}): member 0 must be its DAM script (an OTHR id)", id, rule->what));
+            throw mischief::FormatError(std::format("BNDL {} ({}): member 0 must be its DAM script (an OTHR id)", id, rule->what));
     } else if (origCount >= 0 && n != origCount && !resizable(id, ctx)) {
-        throw FormatError(std::format(
+        throw mischief::FormatError(std::format(
             "BNDL {} has {} members but the game's has {}; the code reads members by position (list the id under \"resizable\" in "
             "mod.json if this bundle may change size)",
             id, n, origCount));
@@ -180,7 +180,7 @@ ImportResult importBndl(int id, std::span<const uint8_t> bytes, const ImportCont
 }
 
 ImportResult importFfnt(int id, std::span<const uint8_t> bytes, const ImportContext& ctx) {
-    const auto orig = ctx.original ? ctx.original(ResType::FFNT, id, gfx::ColorMode::Colour256) : std::nullopt;
+    const auto orig = ctx.original ? ctx.original(ResType::FFNT, id, mischief::gfx::ColorMode::Colour256) : std::nullopt;
     checkId(ModFileKind::Ffnt, id, orig.has_value(), ctx);
     ImportResult r;
     r.body.assign(bytes.begin(), bytes.end());
@@ -196,9 +196,9 @@ ImportResult importFfnt(int id, std::span<const uint8_t> bytes, const ImportCont
 }
 
 ImportResult importRrgb(int id, std::span<const uint8_t> bytes, const ImportContext& ctx) {
-    const auto orig = ctx.original ? ctx.original(ResType::RRGB, id, gfx::ColorMode::Colour256) : std::nullopt;
+    const auto orig = ctx.original ? ctx.original(ResType::RRGB, id, mischief::gfx::ColorMode::Colour256) : std::nullopt;
     checkId(ModFileKind::Rrgb, id, orig.has_value(), ctx);
-    if (bytes.size() != 768) throw FormatError(std::format("a palette file holds 768 bytes (256 x R,G,B), not {}", bytes.size()));
+    if (bytes.size() != 768) throw mischief::FormatError(std::format("a palette file holds 768 bytes (256 x R,G,B), not {}", bytes.size()));
     ImportResult r;
     r.body.assign(bytes.begin(), bytes.end());
     padToNe(r.body);
@@ -225,20 +225,20 @@ std::optional<BundleRule> bundleRule(int id) {
 }
 
 std::vector<uint8_t> bndlBodyFromJson(std::string_view text, std::vector<uint32_t>* membersOut) {
-    const json::Value v = json::parse(text);
-    const json::Value* list = &v;
+    const mischief::mods::json::Value v = mischief::mods::json::parse(text);
+    const mischief::mods::json::Value* list = &v;
     if (v.isObject()) {
         list = v.find("members");
-        if (!list) throw FormatError("a BNDL file is a JSON array of ids or an object with a \"members\" array");
+        if (!list) throw mischief::FormatError("a BNDL file is a JSON array of ids or an object with a \"members\" array");
     }
-    if (!list->isArray()) throw FormatError("\"members\" must be an array of resource ids");
-    if (list->size() > 0x7FFF) throw FormatError("too many members");
+    if (!list->isArray()) throw mischief::FormatError("\"members\" must be an array of resource ids");
+    if (list->size() > 0x7FFF) throw mischief::FormatError("too many members");
     std::vector<uint32_t> members;
     for (size_t i = 0; i < list->size(); ++i) {
         const auto& e = list->asArray()[i];
         if (!e.isInteger() || e.asInt() < 0 || e.asInt() > 0xFFFFFFFFll)
-            throw FormatError(std::format("member {} is not a resource id", i));
-        if ((e.asInt() & 0xFFFF) > 32767) throw FormatError(std::format("member {}: id {} is outside 0-32767", i, e.asInt()));
+            throw mischief::FormatError(std::format("member {} is not a resource id", i));
+        if ((e.asInt() & 0xFFFF) > 32767) throw mischief::FormatError(std::format("member {}: id {} is outside 0-32767", i, e.asInt()));
         members.push_back(static_cast<uint32_t>(e.asInt()));
     }
     std::vector<uint8_t> b = {'B', 'N', 'D', 'L', static_cast<uint8_t>(members.size() & 0xFF), static_cast<uint8_t>(members.size() >> 8), 0, 0};
@@ -250,18 +250,18 @@ std::vector<uint8_t> bndlBodyFromJson(std::string_view text, std::vector<uint32_
 }
 
 std::string bndlJson(std::span<const uint32_t> members) {
-    json::Value arr = json::Value::array();
-    for (uint32_t m : members) arr.push(json::Value(static_cast<int64_t>(m)));
-    json::Value o = json::Value::object();
+    mischief::mods::json::Value arr = mischief::mods::json::Value::array();
+    for (uint32_t m : members) arr.push(mischief::mods::json::Value(static_cast<int64_t>(m)));
+    mischief::mods::json::Value o = mischief::mods::json::Value::object();
     o.set("members", std::move(arr));
-    return json::write(o);
+    return mischief::mods::json::write(o);
 }
 
 void validateMidiFile(int id, std::span<const uint8_t> bytes) {
-    if (id < 9000 || id > 9009) throw FormatError(std::format("music ids are 9000-9009, not {}", id));
-    if (bytes.size() < 14 || std::memcmp(bytes.data(), "MThd", 4) != 0) throw FormatError("not a Standard MIDI File (no MThd header)");
+    if (id < 9000 || id > 9009) throw mischief::FormatError(std::format("music ids are 9000-9009, not {}", id));
+    if (bytes.size() < 14 || std::memcmp(bytes.data(), "MThd", 4) != 0) throw mischief::FormatError("not a Standard MIDI File (no MThd header)");
     const audio::MidiSong s = audio::parseSmf(std::vector<uint8_t>(bytes.begin(), bytes.end()));
-    if (s.noteOnCount() == 0) throw FormatError("the MIDI file plays no notes");
+    if (s.noteOnCount() == 0) throw mischief::FormatError("the MIDI file plays no notes");
 }
 
 ImportResult importResourceBytes(ModFileKind kind, int id, std::span<const uint8_t> bytes, const ImportContext& ctx) {
@@ -279,19 +279,19 @@ ImportResult importResourceBytes(ModFileKind kind, int id, std::span<const uint8
         case ModFileKind::MidiE:
         case ModFileKind::MidiB: break;
     }
-    throw FormatError("not a resource override");
+    throw mischief::FormatError("not a resource override");
 }
 
 ImportResult importResourceFile(const ModFile& file, const ImportContext& ctx) {
-    const auto bytes = readWholeFile(file.path);
-    if (!bytes) throw FormatError("cannot read the file");
+    const auto bytes = mischief::readWholeFile(file.path);
+    if (!bytes) throw mischief::FormatError("cannot read the file");
     return importResourceBytes(file.kind, file.id, *bytes, ctx);
 }
 
 ImportContext importContextFor(const ResourceManager& res, const ModManifest* manifest) {
     ImportContext c;
     const ResourceManager* r = &res;
-    c.original = [r](ResType t, int id, gfx::ColorMode m) { return r->loadOriginal(t, id, m); };
+    c.original = [r](ResType t, int id, mischief::gfx::ColorMode m) { return r->loadOriginal(t, id, m); };
     c.palette256 = [r] { return r->palette(900); };
     c.exists = [r](int id) { return r->exists(id); };
     c.manifest = manifest;

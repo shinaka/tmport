@@ -12,13 +12,57 @@ saves and settings; this document is the reference for building, running and the
   the development packages SDL needs (see "Linux and macOS"). macOS: Xcode's Clang (builds and
   plays both editions, packaged with `scripts/package.sh`; the CI workflow also builds it, but has
   not been run yet).
-* Network access on the first configure. CMake downloads, pinned by URL and SHA-256:
-  * SDL 3.4.18 (zlib license), built as a static library;
-  * doctest 2.4.12 (MIT), header-only, for the unit tests only;
-  * TinySoundFont (MIT, `tsf.h`, pinned to commit `853a0a1`), header-only: the software
-    synthesizer of the SoundFont MIDI output (see "Music" below);
-  * ymfm (BSD-3-Clause, pinned to commit `81aec25`): its YM3812 (OPL2) emulator plays the DOS
-    edition's AdLib music; only its OPL sources are compiled (a static library of their own).
+* Git, and network access on the first configure. CMake downloads:
+  * the engine, MischiefEngine, at the commit pinned in `cmake/engine_pin.cmake` (a Git clone),
+    unless a local checkout is used (see "The engine" below);
+  * through the engine, pinned by URL and SHA-256: SDL 3.4.18 (zlib license), built as a static
+    library; doctest 2.4.12 (MIT), header-only, for the unit tests only; ymfm (BSD-3-Clause, pinned
+    to commit `81aec25`), whose YM3812 (OPL2) emulator plays the DOS edition's AdLib music (only its
+    OPL sources are compiled, a static library of their own);
+  * TinySoundFont (MIT, `tsf.h`, pinned to commit `853a0a1` by URL and SHA-256), header-only: the
+    software synthesizer of the SoundFont MIDI output (see "Music" below).
+
+## The engine
+
+The engine core is the library `mischief` of
+[MischiefEngine](https://github.com/shinaka/MischiefEngine): file and CD-image access, the Borland
+random numbers, clocks and timers, the SDL host and presenter, the DOS sound chips and input models,
+the DOSBox-X state reader, the INI file and codecs, and the TLC text engine (its `docs/DESIGN.md`
+describes them). ggport, the port of *Super Solvers: Gizmos & Gadgets!*, builds on the same engine.
+`cmake/engine.cmake` brings it into the build:
+
+* **The pinned commit.** `cmake/engine_pin.cmake` holds the line
+  `set(MISCHIEF_ENGINE_GIT_TAG <commit>)`. Without a local checkout CMake clones
+  `https://github.com/shinaka/MischiefEngine.git` at that commit into the build folder
+  (`_deps/mischiefengine-src`), and the configure prints `MischiefEngine: pinned commit <commit>
+  from <repository>`. `-DMISCHIEF_ENGINE_GIT_REPOSITORY=<url>` names another repository (a fork, a
+  mirror), and `-DMISCHIEF_ENGINE_GIT_TAG=<commit>` fetches another commit for that build folder
+  without editing the pin.
+* **A local checkout.** When `MISCHIEF_ENGINE_DIR` names a folder (the CMake variable,
+  `-DMISCHIEF_ENGINE_DIR=<folder>`, else the environment variable), or a checkout exists at
+  `../MischiefEngine` next to this repository, that folder is built as it is, uncommitted changes
+  included, and the pin is not used; the configure prints `MischiefEngine: local checkout <folder>
+  (the pin <commit> is not used)`.
+  `-DMISCHIEF_ENGINE_FETCH=ON` uses the pinned commit even then (what CI and a fresh clone without
+  the sibling do).
+* **Bumping the pin.** `python -P tools/engine_pin.py` prints the pin next to the local checkout's
+  `HEAD` and how far apart they are; `python -P tools/engine_pin.py --set` writes that `HEAD` into
+  `cmake/engine_pin.cmake` (it refuses a checkout with uncommitted changes; `--force` overrides).
+  Pin only commits that are pushed, or the pinned fetch cannot find them. Check a new pin with a
+  fresh configure and `-DMISCHIEF_ENGINE_FETCH=ON`.
+* **Working on the engine and TM together.** Clone MischiefEngine next to this repository
+  (`C:\Git\MischiefEngine` beside `C:\Git\TM`, say): every configure then builds against it, and
+  a change to the engine shows up in the next build of `tmport`. An engine change is built and tested
+  with both ports and with the engine's own tests (`mischieftests`, its README) before it is
+  committed; then commit and push the engine, run `tools/engine_pin.py --set` here and commit the
+  new pin together with the TM change that needs it.
+* **The engine's tools.** The study tools that are not Treasure Mountain's (`tmctl.py`,
+  `avi_frames.py`, `unexepack.py`, `ne_resources.py`, the Ghidra scripts, ...) are in the engine's
+  `tools/` folder. `tools/mischief_engine.py` finds them (the environment variable
+  `MISCHIEF_ENGINE_DIR`, else `../MischiefEngine`; a build that downloaded the engine has no
+  checkout for them): the Python tools here import them through it, and from a shell
+  `python -P tools/mischief_engine.py --tools` prints the folder. `tmctl.py` reads TM's DOSBox-X
+  profiles (`win`, `dos`) from `tools/tmctl_profiles.json`.
 
 ## Windows
 
@@ -38,12 +82,8 @@ This runs `vcvars64.bat`, configures a Release build with Ninja into `build\` an
   for it and sees its exit code;
 * `build\tmtests.exe`, the unit tests (a console program).
 
-The engine itself is two static libraries: `portcore` (the core both games share: utilities, data
-sources, clocks, the SDL host and presenter, the DOS sound chips and input models, the text engine;
-`cmake/portcore.cmake`) and `tmcore` (Treasure Mountain, linking `portcore`). With
-`-DTM_BUILD_GG=ON` (the default once `cmake/gg.cmake` exists) the build also makes the second game,
-*Gizmos & Gadgets!*: `ggcore` (linking only `portcore`), `ggport.exe`, `ggport-cli.exe` and
-`ggtests.exe`; `-DTM_BUILD_GG=OFF` builds Treasure Mountain alone.
+The engine itself is two static libraries: the engine core `mischief` (MischiefEngine, see "The
+engine" above) and `tmcore` (Treasure Mountain, linking `mischief`).
 
 If Visual Studio is not installed in the default place, set `VSROOT` first, e.g.
 `set VSROOT=C:\Program Files\Microsoft Visual Studio\18\Community`. Extra arguments are passed on
@@ -81,47 +121,11 @@ There `tmport` is an ordinary terminal program (no `tmport-cli`).
 ## Continuous integration
 
 `.github/workflows/ci.yml` builds the engine and runs `tmtests` on `windows-latest`,
-`ubuntu-latest` and `macos-latest` (presets `ci`). CI has no game data: the tests that need
-`TM_DATA` skip themselves, the data-free tests run. (The workflow has not run on GitHub yet; the
-Linux part of it was tried locally under WSL 2.)
-
-## Gizmos & Gadgets
-
-The same build makes the second game (`-DTM_BUILD_GG=ON`, the default): `ggport` (a windowed
-program on Windows), `ggport-cli` (Windows: the console version, for the tools and scripts) and
-`ggtests`. They link only the shared core: `python -P tools/check_core_deps.py --gg` checks that
-`src/gg/` and `tests/gg/` include nothing of Treasure Mountain. On Linux (WSL 2, GCC 15) `portcore`,
-`ggcore`, `ggport` and `ggtests` build without a warning in the project's code and the tests pass.
-
-* **Game data:** `--data <dir>` (the folder with `ssg.exe` and `gizmo000.dat` .. `gizmo003.dat`; the
-  game's `gizmo004.dat` is ignored), else `data =` in `ggport.ini`, else `GG_DATA`, else a folder
-  next to the program (or its parents, or a `GadgetsAndGizmos` folder there). The engine opens the
-  game files read-only and refuses other versions with a message naming the file.
-* **Preference folder:** `--pref-dir <dir>`, default SDL's `GGPort/GGPort` (`ggport.ini`,
-  `players.dat`, screenshots).
-* **Running:** `ggport` plays the game (README "Gizmos & Gadgets"); `--gg-preview` shows the wave 2
-  preview of the engine's screens instead. Options: `ggport --help` (`--sound off|speaker|fm`, `--gg-args "<the original's switches>"`,
-  `--cpu 286|386`, `--seed N`, `--fullscreen`, `--windowed`, `--square-pixels`, `--scale N`,
-  `--integer-scale`, `--no-pause`, `--screenshot-dir`, `--verbose`). Headless and scripted runs:
-  `--headless` (deterministic virtual time; the run ends after `--ticks N` PIT ticks or the script),
-  `--keys` / `--mouse` (input in PIT ticks: `TICK:tap:KEY`, `TICK:click:X:Y`, ...), `--frame-dump
-  DIR|FILE.png`, `--wav-dump FILE.wav` (the sound rendered offline), `--opl-log FILE`. For the
-  fidelity work: `--gg-trace FILE` (a CSV row per frame, with `--gg-trace-polls` per input poll
-  too), `--gg-dump-state TICK FILE` (the DGROUP image at a PIT tick, and `FILE.fields.tsv`),
-  `--gg-load-state FILE` (start from a DOSBox-X save state of the hub, the workshop, a warehouse
-  room, a puzzle or a race; `re/gg/docs/ENGINE_MAP.md` §10.6).
-* **Tools** (`ggport-cli`, each with `--data <dir>`; they never write into the game folder):
-  data `--gg-info`, `--gg-list [--leaves]`, `--gg-selftest`, `--gg-extract ID OUT`; graphics
-  `--gg-pic`, `--gg-pal`, `--gg-font`, `--gg-movie`, `--gg-title`, `--gg-fade`, `--gg-wipe`,
-  `--gg-lpx-list`, `--gg-font-list`, `--gg-movie-list`; sound `--gg-sound fm|speaker|off WHAT
-  OUT.wav` (WHAT: `song ID`, `music ID`, `effect ID K`, `soundtest NAME|SCRIPT`), `--gg-oplog`,
-  `--gg-dro-compare LOG REF.dro`, `--gg-songs`, `--gg-soundtest-check NAME|all`; runtime
-  `--gg-clock`, `--gg-input-trace`; screens `--gg-screen NAME OUT.png` (the attract, sign-in and UI
-  screens; `hub`, `warehouse`, `blueprint`, `puzzle KIND VARIANT` from the world), `--gg-ui-info`,
-  `--gg-rooms RACE`.
-* **Tests:** `ggtests` with `GG_DATA` (the game folder) and `GG_CAPTURES`
-  (`extracted\captures\gg`, the DOSBox-X reference material); without them the tests that need
-  them skip themselves.
+`ubuntu-latest` and `macos-latest` (presets `ci`). It builds against the pinned engine commit (the
+runner has no `../MischiefEngine`); a run can name another engine branch, tag or commit instead
+(the `engine_ref` input of "Run workflow"). CI has no game data: the tests that need `TM_DATA`
+skip themselves, the data-free tests run. (The workflow has not run on GitHub yet; the Linux part
+of it was tried locally under WSL 2.)
 
 ## Pointing the engine at the game data
 
@@ -184,29 +188,6 @@ scripts/package.sh ~/Games/tm.cue --soundfont ~/sf2/GeneralUser.sf2
   still win over the copy's own data.
 * The macOS bundle is signed ad hoc for local use. It has no icon of its own (the game window
   takes its icon from the game's files).
-
-**Gizmos & Gadgets:** `scripts\package_gg.bat` (Windows) and `scripts/package_gg.sh` (Linux,
-macOS) do the same for `ggport`:
-
-```
-scripts\package_gg.bat                               (Windows)
-scripts/package_gg.sh ~/Games/GIZMOS                 (Linux, macOS)
-```
-
-| Platform | Result | Start it with |
-|---|---|---|
-| Windows | `dist\GGPort\ggport.exe` + `GadgetsAndGizmos\` | a double-click on `ggport.exe` |
-| Linux | `dist/GGPort/ggport` + `GadgetsAndGizmos/` | `dist/GGPort/ggport` |
-| macOS | `dist/GGPort.app` (the folder in `Contents/Resources`) | a double-click, or `open dist/GGPort.app` |
-
-* **Game folder** (first argument, or `--data`): the folder with `SSG.EXE` and `GIZMO000.DAT` (or
-  a folder that contains it), copied whole. Without an argument the script uses `GG_DATA`, then the
-  repository's `GadgetsAndGizmos/`.
-* `--out <dir>` and `--zip` (`GGPort-<platform>.zip`) work as above, and the build goes to the same
-  `build-package/`. The script replaces only `GGPort` (and `GGPort-README.txt`) in `dist/`.
-* Players and settings stay in `ggport`'s preference folder (`GGPort`); the copy's `PLAYERS.DAT`
-  is imported on the first start and never written. `--data`, `GG_DATA` and `data =` in
-  `ggport.ini` still win over the copy's own folder.
 
 The copy contains your copy of the game: it is for your own use, not for sharing. `dist/` is in
 `.gitignore`.
@@ -510,8 +491,8 @@ build\tmtests.exe
 ```
 
 * Tests that need game data read `TM_DATA` (a folder or an image) and skip themselves when it
-  is not set; the data-free tests (PNG writer, CRC/Adler, RUND codec, frame buffer primitives,
-  palette, Borland RNG, id routing, icon decoder, ...) always run. This is what CI runs.
+  is not set; the data-free tests (RUND codec, frame buffer primitives, id routing, the mod
+  formats, the settings, ...) always run. This is what CI runs.
 * The tests of the 1990 DOS edition (file checks, decoders, screens, sound, input, saves, the
   runtime, the preview, the game logic and two end-to-end playthroughs) read the DOS folder from `TM_DATA_DOS` (the folder with `SST.EXE`) and
   skip themselves without it. They too store only sizes, counts and hashes.
@@ -519,12 +500,11 @@ build\tmtests.exe
   frame logs and USERS.DAT snapshots: the play-field redraws, the frame-log replays, the state
   loader, the save round trips) read it from `TM_DOS_CAPTURES` (`extracted\captures\dos`, see
   `re/dos/docs/REFERENCE_CAPTURES.md`) and skip themselves without it.
-* The core's parameters for the second game (PIT rates, deadline timers in ticks, the INT 33h
-  event handler, a game's own keyboard handler, the chip renderer and audio device with any driver,
-  the OPL write log, the text dialects) have data-free tests (`tests/test_portcore.cpp`).
-* `python -P tools/check_core_deps.py` checks that every file of `portcore` includes only core
-  files (`--gg`: and that `src/gg/` and `tests/gg/` include only core and G&G files); exit code 1
-  on a violation (docs/DESIGN.md "Core and games").
+* The engine core's own tests (the PNG writer, CRC/Adler, the palette, the presenter's layouts,
+  the Borland RNG, the icon decoder, the headless host, the sound chips, the keyboard and mouse
+  models, the INI file, the JSON and PNG codecs, the parameters each game sets) are MischiefEngine's
+  `mischieftests`; they moved there from `tmtests` with the same names and checks. A change to the
+  engine runs both (see "The engine").
 
 ### The DOS fidelity runner
 

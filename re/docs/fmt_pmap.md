@@ -414,7 +414,7 @@ Importable (no Pillow needed for decoding):
   `transparent_set(depth, palette, key='default'|'white'|None)`,
   `to_rgba(pm, palette, key)`, `to_image(pm, palette, transparent, key)` (Pillow).
 * `Source(res_dir=…)` reads `extracted\res`, and `Source(dll_dir=…)` reads the NE DLLs
-  directly (through `tools\ne_resources.py`).
+  directly (through the engine's `tools\ne_resources.py`).
 
 CLI (`python -P tools\assets\pmap.py …`):
 

@@ -13,9 +13,9 @@
 #include <cstdint>
 #include <vector>
 
-#include "gfx/palette.h"
 #include "gfx/pixmap.h"
-#include "gfx/rect.h"
+#include "mischief/gfx/palette.h"
+#include "mischief/gfx/rect.h"
 
 namespace tmport::gfx {
 
@@ -36,9 +36,9 @@ public:
     static constexpr int kPlayHeight = 267;
     static constexpr size_t kMaxDirtyRects = 256;
 
-    explicit FrameBuffer(ColorMode mode = ColorMode::Colour256);
+    explicit FrameBuffer(mischief::gfx::ColorMode mode = mischief::gfx::ColorMode::Colour256);
 
-    ColorMode mode() const { return mode_; }
+    mischief::gfx::ColorMode mode() const { return mode_; }
     uint8_t* pixels() { return px_.data(); }
     const uint8_t* pixels() const { return px_.data(); }
     uint8_t* row(int y) { return px_.data() + static_cast<size_t>(y) * kWidth; }
@@ -46,9 +46,9 @@ public:
     uint8_t at(int x, int y) const { return px_[static_cast<size_t>(y) * kWidth + static_cast<size_t>(x)]; }
 
     // Colour state (set from the palette).
-    void setKeys(const KeyTable& key, const KeyTable& whiteKey);
+    void setKeys(const mischief::gfx::KeyTable& key, const mischief::gfx::KeyTable& whiteKey);
     void setPens(const std::array<uint8_t, 16>& pens) { pens_ = pens; }
-    void setPalette(const Palette& p);  // keys + pens
+    void setPalette(const mischief::gfx::Palette& p);  // keys + pens
     // Pal_SetForeColor (1048:02fd): EGA colour number used by fill/frame/line routines.
     void setForeColor(int ega) { foreColor_ = ega & 15; }
     int foreColor() const { return foreColor_; }
@@ -66,7 +66,7 @@ public:
     bool dirtyEnabled() const { return dirtyEnabled_; }
     void addDirtyRect(int x, int y, int w, int h);
     void clearDirtyRects() { dirty_.clear(); }
-    const std::vector<Rect>& dirtyRects() const { return dirty_; }
+    const std::vector<mischief::gfx::Rect>& dirtyRects() const { return dirty_; }
 
     // Fills the whole buffer with one index.
     void clear(uint8_t index);
@@ -96,18 +96,18 @@ public:
     void highlightRect(int x, int y, int w, int h, const std::array<uint8_t, 256>& lut);
 
 private:
-    void blitClipped(int x, int y, const PixMap& pm, bool mirror, const KeyTable& key);
+    void blitClipped(int x, int y, const PixMap& pm, bool mirror, const mischief::gfx::KeyTable& key);
     void fillRaw(int x, int y, int w, int h, uint8_t value);  // clipped to the buffer
 
-    ColorMode mode_;
+    mischief::gfx::ColorMode mode_;
     std::vector<uint8_t> px_;
-    KeyTable key_;
-    KeyTable whiteKey_;
+    mischief::gfx::KeyTable key_;
+    mischief::gfx::KeyTable whiteKey_;
     std::array<uint8_t, 16> pens_{};
     int foreColor_ = 0;
     ClipRect clip_;
     bool dirtyEnabled_ = false;
-    std::vector<Rect> dirty_;
+    std::vector<mischief::gfx::Rect> dirty_;
 };
 
 }  // namespace tmport::gfx

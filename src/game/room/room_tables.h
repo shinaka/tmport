@@ -146,7 +146,7 @@ struct RoomTables {
     std::array<uint8_t, 16> dissolveColOrder{};  // DS:09ae
     std::array<uint8_t, 16> dissolveRowShift{};  // DS:09be
 
-    // Everything from the user's EXE. Throws tmport::Error on a malformed table.
+    // Everything from the user's EXE. Throws mischief::Error on a malformed table.
     static RoomTables fromExe(const ExeTables& exe);
 };
 

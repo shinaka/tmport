@@ -243,7 +243,7 @@ void netShopTakeNet(GameState& s, GameHooks& hooks) {
 // Treasures
 
 // 1198:0103 Treasures_PickForLevel
-void pickTreasuresForLevel(GameState& s, const GameTables& t, BorlandRand& rng) {
+void pickTreasuresForLevel(GameState& s, const GameTables& t, mischief::BorlandRand& rng) {
     if (s.rooms.level(s.player.room) >= 3) return;
     const int base = s.rank.climbsDone % kTreasureCycle;
     const int n = std::min<int>(t.gemsNeeded[std::min<size_t>(s.rank.rankTier, kTierCount - 1)], kMaxTreasuresPerLevel);
@@ -274,7 +274,7 @@ int deliveredTreasureIndex(uint16_t climbsDoneAfterIncrement) {
 // Rescue coin pile
 
 // 1110:00aa CoinPile_Update
-bool updateCoinPile(GameState& s, BorlandRand& rng, GameHooks& hooks) {
+bool updateCoinPile(GameState& s, mischief::BorlandRand& rng, GameHooks& hooks) {
     CoinPileState& p = s.coinPile;
     const uint8_t room = s.player.room;
     if (room == p.room) {
@@ -310,7 +310,7 @@ int finishCorrectAnswer(GameState& s, int slot, const GameTables& t, GameHooks& 
     return coins;
 }
 
-AnswerOutcome answerQuestion(GameState& s, int slot, int pos, const GameTables& t, BorlandRand& rng,
+AnswerOutcome answerQuestion(GameState& s, int slot, int pos, const GameTables& t, mischief::BorlandRand& rng,
                              GameHooks& hooks) {
     AnswerOutcome out;
     const QuizJudgement j = quizJudgeAnswer(s.quiz, slot, pos);
@@ -326,9 +326,9 @@ AnswerOutcome answerQuestion(GameState& s, int slot, int pos, const GameTables& 
 // ---------------------------------------------------------------------------------------------
 // Castle wall
 
-int pickCastleLayout(uint8_t rankTier, BorlandRand& rng) { return rng.random(rankTier + 1); }
+int pickCastleLayout(uint8_t rankTier, mischief::BorlandRand& rng) { return rng.random(rankTier + 1); }
 
-bool creatureSpawnRoll(uint8_t rankTier, const GameTables& t, BorlandRand& rng) {
+bool creatureSpawnRoll(uint8_t rankTier, const GameTables& t, mischief::BorlandRand& rng) {
     const int permille = t.creatureSpawnPermille[std::min<size_t>(rankTier, kTierCount - 1)];
     return rng.random(1000) < permille;
 }
@@ -370,7 +370,7 @@ void loadPlayerRecord(GameState& s, std::span<const uint8_t, kRecordSize> record
 }
 
 // 1118:00e5..0257
-ClimbSetup setupClimb(GameState& s, const GameTables& t, BorlandRand& rng, GameHooks& hooks) {
+ClimbSetup setupClimb(GameState& s, const GameTables& t, mischief::BorlandRand& rng, GameHooks& hooks) {
     ClimbSetup out;
     // A record only ever stores a room 0..49 or 0xFE; anything else (a damaged file) would make
     // the original read outside the room table, so it starts a new climb instead.
@@ -406,7 +406,7 @@ ClimbSetup setupClimb(GameState& s, const GameTables& t, BorlandRand& rng, GameH
 }
 
 // 1118 climb loop, after Room_Run
-bool onRoomChanged(GameState& s, int oldZone, int oldLevel, const GameTables& t, BorlandRand& rng,
+bool onRoomChanged(GameState& s, int oldZone, int oldLevel, const GameTables& t, mischief::BorlandRand& rng,
                    GameHooks& hooks) {
     if (s.rooms.musicZone(s.player.room) == oldZone) return false;
     bool levelChanged = false;

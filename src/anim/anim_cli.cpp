@@ -19,13 +19,13 @@
 #include "cli/contact_sheet.h"
 #include "cli/tool_mods.h"
 #include "data/exe_tables.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
+#include "mischief/util/png_writer.h"
+#include "mischief/vfs/data_source.h"
 #include "platform/engine.h"
 #include "res/game_files.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/log.h"
-#include "util/png_writer.h"
-#include "vfs/data_source.h"
 
 namespace tmport::anim {
 
@@ -198,7 +198,7 @@ std::optional<Args> parse(int argc, char** argv, std::string& error) {
             if (!need(i, 1)) return a;
             a.modDirs.emplace_back(argv[++i]);
         } else if (s == "--verbose") {
-            log::setVerbose(true);
+            mischief::log::setVerbose(true);
         } else {
             error = std::format("unknown argument '{}'", s);
             return a;
@@ -214,10 +214,10 @@ std::optional<Args> parse(int argc, char** argv, std::string& error) {
 }
 
 std::optional<std::filesystem::path> resolveDataPath(const Args& a) {
-    if (!a.dataPath.empty()) return pathFromUtf8(a.dataPath);
-    if (auto env = getEnv("TM_DATA")) return pathFromUtf8(*env);
+    if (!a.dataPath.empty()) return mischief::pathFromUtf8(a.dataPath);
+    if (auto env = mischief::getEnv("TM_DATA")) return mischief::pathFromUtf8(*env);
     const char* base = SDL_GetBasePath();
-    return vfs::autoDetectDataPath(base ? pathFromUtf8(base) : std::filesystem::path());
+    return mischief::vfs::autoDetectDataPath(base ? mischief::pathFromUtf8(base) : std::filesystem::path());
 }
 
 // 512x384 RGBA of what the player sees (presented window) or of the buffer's screen rows.
@@ -261,7 +261,7 @@ std::string describeTick(const AnimEngine& anim, const std::vector<int>& sounds,
 
 // ---------------------------------------------------------------------------------- --render-dam
 
-int runRender(const Args& a, GameFiles& files, gfx::ColorMode mode) {
+int runRender(const Args& a, GameFiles& files, mischief::gfx::ColorMode mode) {
     Engine engine(files, mode);  // headless: no window is opened
     gfx::FrameBuffer& fb = engine.frame();
     const ResourceManager& res = *files.res;
@@ -276,7 +276,7 @@ int runRender(const Args& a, GameFiles& files, gfx::ColorMode mode) {
     int bgPmap = a.bgPmap, bgX = a.bgX, bgY = a.bgY;
     if (a.bgRoom >= 0) {
         const auto rooms = files.exe->rooms();
-        if (a.bgRoom >= static_cast<int>(rooms.size())) throw Error(std::format("no room {}", a.bgRoom));
+        if (a.bgRoom >= static_cast<int>(rooms.size())) throw mischief::Error(std::format("no room {}", a.bgRoom));
         bgPmap = rooms[static_cast<size_t>(a.bgRoom)].bgPmap;
         bgX = 0;
         bgY = 20;
@@ -284,7 +284,7 @@ int runRender(const Args& a, GameFiles& files, gfx::ColorMode mode) {
     }
     if (bgPmap) {
         auto pm = res.pixmap(bgPmap);
-        if (!pm) throw Error(std::format("PMAP {} not found", bgPmap));
+        if (!pm) throw mischief::Error(std::format("PMAP {} not found", bgPmap));
         fb.drawOpaque(bgX, bgY, *pm);
     }
     fb.copyRect(0, 0, gfx::FrameBuffer::kWidth, gfx::FrameBuffer::kScreenHeight, 0, gfx::FrameBuffer::kLayer1Y);
@@ -300,7 +300,7 @@ int runRender(const Args& a, GameFiles& files, gfx::ColorMode mode) {
     // Loads a bundle; returns its script if member 0 is one (animation bundle).
     auto load = [&](int bndlId, int frameBase) -> ScriptPtr {
         const auto info = res.bundle(bndlId);
-        if (!info) throw Error(std::format("BNDL {} not found", bndlId));
+        if (!info) throw mischief::Error(std::format("BNDL {} not found", bndlId));
         const bool animBundle = !a.framesOnly && !info->ids.empty() && typeForId(info->ids[0]) == ResType::OTHR;
         if (animBundle) {
             const LoadedBundle b = loadBundle(res, anim, bndlId, frameBase);
@@ -401,16 +401,16 @@ int runRender(const Args& a, GameFiles& files, gfx::ColorMode mode) {
                             cells[static_cast<size_t>(k)].rgba.data() + static_cast<size_t>(r) * static_cast<size_t>(cw) * 4,
                             static_cast<size_t>(cw) * 4);
         }
-        ok = png::writeRgba(pathFromUtf8(a.outPath), img.width, img.height, img.rgba);
+        ok = mischief::png::writeRgba(mischief::pathFromUtf8(a.outPath), img.width, img.height, img.rgba);
         out("wrote sheet of {} ticks ({}x{}) to {}\n", n, img.width, img.height, a.outPath);
     } else {
         const auto rgba = cropRgba(captureGameArea(engine, a.buffer), 512, 384, cx, cy, cw, chh);
-        ok = png::writeRgba(pathFromUtf8(a.outPath), cw, chh, rgba);
+        ok = mischief::png::writeRgba(mischief::pathFromUtf8(a.outPath), cw, chh, rgba);
         out("wrote tick {} ({}x{}) to {}\n", std::min(a.tick, ended ? ended : a.tick), cw, chh, a.outPath);
     }
     if (!a.fbDump.empty()) {
         std::vector<uint8_t> idx(fb.pixels(), fb.pixels() + static_cast<size_t>(gfx::FrameBuffer::kWidth) * gfx::FrameBuffer::kHeight);
-        ok = png::writeIndexed(pathFromUtf8(a.fbDump), gfx::FrameBuffer::kWidth, gfx::FrameBuffer::kHeight, idx,
+        ok = mischief::png::writeIndexed(mischief::pathFromUtf8(a.fbDump), gfx::FrameBuffer::kWidth, gfx::FrameBuffer::kHeight, idx,
                                engine.palette().colours()) && ok;
     }
     return ok ? 0 : 1;
@@ -508,7 +508,7 @@ std::optional<int> runAnimCommand(int argc, char** argv) {
     }
     try {
         ResourceManager::Options ro;
-        ro.colorMode = a->colour16 ? gfx::ColorMode::Colour16 : gfx::ColorMode::Colour256;
+        ro.colorMode = a->colour16 ? mischief::gfx::ColorMode::Colour16 : mischief::gfx::ColorMode::Colour256;
         ro.requireSounds = false;
         GameFiles files = GameFiles::open(*dataPath, ro);
         cli::applyToolMods(files, a->modDirs);
@@ -518,7 +518,7 @@ std::optional<int> runAnimCommand(int argc, char** argv) {
             case Cmd::Check: return runCheck(files);
             default: break;
         }
-    } catch (const MissingFileError& e) {
+    } catch (const mischief::MissingFileError& e) {
         std::fprintf(stderr, "tmport: missing game file %s: %s\n", e.file().c_str(), e.what());
         return 3;
     } catch (const std::exception& e) {

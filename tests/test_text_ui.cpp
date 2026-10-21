@@ -13,6 +13,7 @@
 
 #include "data/dgroup_offsets.h"
 #include "gfx/frame_buffer.h"
+#include "mischief/util/hash.h"
 #include "platform/engine.h"
 #include "test_data.h"
 #include "text/font.h"
@@ -20,7 +21,6 @@
 #include "ui/dialog_desc.h"
 #include "ui/game_dialog.h"
 #include "ui/help_topics.h"
-#include "util/hash.h"
 
 using namespace tmport;
 
@@ -136,7 +136,7 @@ const text::Font& gameFont() {
 }
 
 uint64_t screenHash(const gfx::FrameBuffer& fb) {
-    return fnv1a64(std::span<const uint8_t>(fb.pixels(), static_cast<size_t>(512) * 384));
+    return mischief::fnv1a64(std::span<const uint8_t>(fb.pixels(), static_cast<size_t>(512) * 384));
 }
 
 // Pens = identity, so the buffer holds EGA numbers like the oracle's canvas; 255 = untouched.
@@ -151,13 +151,13 @@ void resetIdentity(gfx::FrameBuffer& fb) {
 std::vector<uint8_t> othrText(int id) {
     auto body = testdata::game()->res->loadRaw(ResType::OTHR, id);
     REQUIRE(body.has_value());
-    const auto s = text::untilNul(*body);
+    const auto s = mischief::text::untilNul(*body);
     return {s.begin(), s.end()};
 }
 
 ui::DlgDesc loadDialog(uint16_t off) {
     ui::DlgDesc d = ui::DlgDesc::fromExe(*testdata::game()->exe, off);
-    d.body = ui::formatPercentS(d.body, text::asBytes("Tester"));
+    d.body = ui::formatPercentS(d.body, mischief::text::asBytes("Tester"));
     return d;
 }
 
@@ -215,9 +215,9 @@ TEST_CASE("text: FFNT 999 tables and glyph bitmaps") {
     }
     CHECK(ink == 213);
     CHECK(maxW == 46);
-    CHECK(fnv1a64(widths) == kFontWidthHash);
-    CHECK(fnv1a64(pixels) == kFontPixelHash);
-    CHECK(fnv1a64(keycaps) == kKeyCapPixelHash);
+    CHECK(mischief::fnv1a64(widths) == kFontWidthHash);
+    CHECK(mischief::fnv1a64(pixels) == kFontPixelHash);
+    CHECK(mischief::fnv1a64(keycaps) == kKeyCapPixelHash);
 }
 
 TEST_CASE("text: FFNT parser rejects truncated data") {
@@ -279,7 +279,7 @@ TEST_CASE("text: OTHR texts lay out and draw like the reference renderer") {
         const auto s = othrText(tc.id);
         CHECK(s.size() == tc.length);
         text::TextRenderer measure(f);
-        CHECK(measure.measure(s, {}, tc.w) == text::TextExtent{tc.extentW, tc.extentH});
+        CHECK(measure.measure(s, {}, tc.w) == mischief::text::TextExtent{tc.extentW, tc.extentH});
         resetIdentity(fb);
         fb.setForeColor(tc.colour);
         text::TextRenderer tr(f, &fb);
@@ -317,18 +317,18 @@ TEST_CASE("text: control codes (synthetic strings)") {
     TM_REQUIRE_GAME_DATA();
     const text::Font& f = gameFont();
     gfx::FrameBuffer fb;
-    std::vector<text::Bytes> subst5, subst6;
-    for (auto s : kSubst5) subst5.push_back(text::asBytes(s));
-    for (auto s : kSubst6) subst6.push_back(text::asBytes(s));
+    std::vector<mischief::text::Bytes> subst5, subst6;
+    for (auto s : kSubst5) subst5.push_back(mischief::text::asBytes(s));
+    for (auto s : kSubst6) subst6.push_back(mischief::text::asBytes(s));
     int index = 0;
     for (const auto& sc : kSynthCases) {
         CAPTURE(index);
-        const text::SubstTable subst = index == 5 ? text::SubstTable(subst5)
-                                       : index == 6 ? text::SubstTable(subst6)
-                                                    : text::SubstTable{};
-        const text::Bytes s = text::asBytes(sc.text);
+        const mischief::text::SubstTable subst = index == 5 ? mischief::text::SubstTable(subst5)
+                                       : index == 6 ? mischief::text::SubstTable(subst6)
+                                                    : mischief::text::SubstTable{};
+        const mischief::text::Bytes s = mischief::text::asBytes(sc.text);
         text::TextRenderer m(f);
-        CHECK(m.measure(s, subst, sc.w) == text::TextExtent{sc.extentW, sc.extentH});
+        CHECK(m.measure(s, subst, sc.w) == mischief::text::TextExtent{sc.extentW, sc.extentH});
         resetIdentity(fb);
         text::TextRenderer tr(f, &fb);
         tr.drawBox(7, 9, sc.w, s, subst);
@@ -342,20 +342,20 @@ TEST_CASE("text: Text_Width and side effects of measuring") {
     const text::Font& f = gameFont();
     gfx::FrameBuffer fb;
     text::TextRenderer tr(f, &fb);
-    CHECK(tr.width(text::asBytes("")) == 0);
-    CHECK(tr.width(text::asBytes("Hello")) == 37);
-    CHECK(tr.width(text::asBytes("a b")) == 23);
-    CHECK(tr.width(text::asBytes("\t")) == -511);  // no glyph placed: 1 - w
+    CHECK(tr.width(mischief::text::asBytes("")) == 0);
+    CHECK(tr.width(mischief::text::asBytes("Hello")) == 37);
+    CHECK(tr.width(mischief::text::asBytes("a b")) == 23);
+    CHECK(tr.width(mischief::text::asBytes("\t")) == -511);  // no glyph placed: 1 - w
     fb.setForeColor(0);
-    CHECK(tr.width(text::asBytes("\xff\x03\x05\xffHi")) == 15);
+    CHECK(tr.width(mischief::text::asBytes("\xff\x03\x05\xffHi")) == 15);
     CHECK(fb.foreColor() == 4);  // FF 03 sets the pen even while only measuring (10b0:02ae)
     // A span stops at its end or at an embedded NUL.
     const uint8_t withNul[] = {'H', 'i', 0, 'X', 'X'};
-    CHECK(tr.width(withNul) == tr.width(text::asBytes("Hi")));
+    CHECK(tr.width(withNul) == tr.width(mischief::text::asBytes("Hi")));
     // Wrap test: a run ending exactly at x0 + w - 1 still fits.
-    const int wAB = tr.width(text::asBytes("ab cd"));
-    CHECK(tr.measure(text::asBytes("ab cd"), {}, wAB + 1).height == 17);
-    CHECK(tr.measure(text::asBytes("ab cd"), {}, wAB).height == 34);
+    const int wAB = tr.width(mischief::text::asBytes("ab cd"));
+    CHECK(tr.measure(mischief::text::asBytes("ab cd"), {}, wAB + 1).height == 17);
+    CHECK(tr.measure(mischief::text::asBytes("ab cd"), {}, wAB).height == 34);
 }
 
 // ================================================================================ dialogs
@@ -390,13 +390,13 @@ TEST_CASE("ui: static DlgDesc decoding") {
     CHECK(help.footer == 0);
     CHECK(help.pageCount == 0);
     const uint8_t fmt[] = {'a', '%', 's', 'b', '%', 's'};
-    const auto filled = ui::formatPercentS(fmt, text::asBytes("XY"));
+    const auto filled = ui::formatPercentS(fmt, mischief::text::asBytes("XY"));
     CHECK(std::string(filled.begin(), filled.end()) == "aXYb%s");
 }
 
 TEST_CASE("ui: dialog geometry of every static DlgDesc") {
     TM_REQUIRE_GAME_DATA();
-    Engine engine(*g, gfx::ColorMode::Colour256);
+    Engine engine(*g, mischief::gfx::ColorMode::Colour256);
     ui::DialogSystem ds(engine, gameFont());
     for (const auto& dc : kDialogCases) {
         CAPTURE(dc.off);
@@ -432,7 +432,7 @@ TEST_CASE("ui: dialog geometry of every static DlgDesc") {
 
 TEST_CASE("ui: dialog pixels match the reference renderer (WinG frame quirk included)") {
     TM_REQUIRE_GAME_DATA();
-    Engine engine(*g, gfx::ColorMode::Colour256);
+    Engine engine(*g, mischief::gfx::ColorMode::Colour256);
     ui::DialogSystem ds(engine, gameFont());
     for (const auto& dc : kDialogCases) {
         CAPTURE(dc.off);
@@ -445,7 +445,7 @@ TEST_CASE("ui: dialog pixels match the reference renderer (WinG frame quirk incl
 
 TEST_CASE("ui: help pager pages") {
     TM_REQUIRE_GAME_DATA();
-    Engine engine(*g, gfx::ColorMode::Colour256);
+    Engine engine(*g, mischief::gfx::ColorMode::Colour256);
     ui::DialogSystem ds(engine, gameFont());
     for (const auto& pc : kPagerCases) {
         CAPTURE(pc.firstId);
@@ -471,7 +471,7 @@ TEST_CASE("ui: help pager pages") {
 
 TEST_CASE("ui: Yes/No modal loop") {
     TM_REQUIRE_GAME_DATA();
-    Engine engine(*g, gfx::ColorMode::Colour256);
+    Engine engine(*g, mischief::gfx::ColorMode::Colour256);
     ui::DialogSystem ds(engine, gameFont());
     auto& fb = engine.frame();
     // A background pattern that the save-under must bring back.
@@ -533,7 +533,7 @@ TEST_CASE("ui: Yes/No modal loop") {
 
 TEST_CASE("ui: message box modal loop and hooks") {
     TM_REQUIRE_GAME_DATA();
-    Engine engine(*g, gfx::ColorMode::Colour256);
+    Engine engine(*g, mischief::gfx::ColorMode::Colour256);
     ui::DialogSystem ds(engine, gameFont());
     const ui::DlgDesc about = loadDialog(dg::kDlgAbout);
     int pauses = 0, resumes = 0, menuOff = 0, menuOn = 0, cursor = 0;
@@ -571,7 +571,7 @@ TEST_CASE("ui: message box modal loop and hooks") {
 
 TEST_CASE("ui: pager navigation") {
     TM_REQUIRE_GAME_DATA();
-    Engine engine(*g, gfx::ColorMode::Colour256);
+    Engine engine(*g, mischief::gfx::ColorMode::Colour256);
     ui::DialogSystem ds(engine, gameFont());
     const ui::PagerDesc p = ui::buildHelpPager(*g->exe, *g->res, 0);  // 4 pages
     REQUIRE(p.pageCount == 4);

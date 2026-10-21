@@ -4,8 +4,8 @@
 #include <string>
 #include <system_error>
 
-#include "util/file_util.h"
-#include "util/log.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
 
 namespace tmport::save {
 
@@ -101,7 +101,7 @@ UsersFileStatus readUsersFileStatus(const std::filesystem::path& path, UsersTabl
     std::error_code ec;
     if (std::filesystem::status(path, ec).type() == std::filesystem::file_type::not_found)
         return UsersFileStatus::Missing;
-    const auto data = readWholeFile(path);
+    const auto data = mischief::readWholeFile(path);
     if (!data) return UsersFileStatus::Unreadable;  // exists (or cannot even be examined) but no read
     return parseUsersFile(*data, out) ? UsersFileStatus::Ok : UsersFileStatus::Short;
 }
@@ -110,7 +110,7 @@ bool readUsersFile(const std::filesystem::path& path, UsersTable& out) {
     return readUsersFileStatus(path, out) == UsersFileStatus::Ok;
 }
 
-std::filesystem::path usersBackupPath(const std::filesystem::path& path) { return backupPathFor(path); }
+std::filesystem::path usersBackupPath(const std::filesystem::path& path) { return mischief::backupPathFor(path); }
 
 RosterLoad loadRoster(const std::filesystem::path& path, UsersTable& out) {
     RosterLoad r;
@@ -120,13 +120,13 @@ RosterLoad loadRoster(const std::filesystem::path& path, UsersTable& out) {
     UsersTable b;
     const UsersFileStatus bs = readUsersFileStatus(bak, b);
     if (bs == UsersFileStatus::Ok) {
-        log::warn("users.dat: {} is {}; using the roster saved in {} ({} players)", pathToUtf8(path), describe(r.file),
-                  pathToUtf8(bak), b.count);
+        mischief::log::warn("users.dat: {} is {}; using the roster saved in {} ({} players)", mischief::pathToUtf8(path), describe(r.file),
+                  mischief::pathToUtf8(bak), b.count);
         out = b;
         r.fromBackup = true;
     } else {
-        log::error("users.dat: {} is {} and {} is {}: the roster cannot be read, and the file is not overwritten",
-                   pathToUtf8(path), describe(r.file), pathToUtf8(bak), describe(bs));
+        mischief::log::error("users.dat: {} is {} and {} is {}: the roster cannot be read, and the file is not overwritten",
+                   mischief::pathToUtf8(path), describe(r.file), mischief::pathToUtf8(bak), describe(bs));
     }
     return r;
 }
@@ -138,8 +138,8 @@ bool writeUsersFile(const std::filesystem::path& path, const UsersTable& table) 
         UsersTable t;
         return parseUsersFile(old, t) && t.count > 0;
     };
-    if (!replaceFileKeepingBackup(path, bytes, keep)) {
-        log::error("users.dat: writing {} failed (the file is unchanged)", pathToUtf8(path));
+    if (!mischief::replaceFileKeepingBackup(path, bytes, keep)) {
+        mischief::log::error("users.dat: writing {} failed (the file is unchanged)", mischief::pathToUtf8(path));
         return false;
     }
     return true;
@@ -153,11 +153,11 @@ bool mergePlayer(UsersTable& table, const PlayerRecord& player, int& sel) {
         // means the file changed since sel was set (another instance, a deleted file, a failed write).
         const int found = table.findByName(name);  // count when absent
         if (at != table.count)
-            log::warn("users.dat: slot {} does not hold {}; saving to slot {}", at, name, found);
+            mischief::log::warn("users.dat: slot {} does not hold {}; saving to slot {}", at, name, found);
         at = found;
     }
     if (at >= kSlotCount) {
-        log::error("users.dat: the roster is full; {} cannot be saved", name);
+        mischief::log::error("users.dat: the roster is full; {} cannot be saved", name);
         return false;
     }
     player.writeTo(table.slots[static_cast<size_t>(at)]);

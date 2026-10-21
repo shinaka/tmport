@@ -1,6 +1,6 @@
 #include "res/resource_types.h"
 
-#include "util/file_util.h"
+#include "mischief/util/file_util.h"
 
 namespace tmport {
 
@@ -18,7 +18,7 @@ std::string_view resTypeName(ResType t) {
 
 std::optional<ResType> resTypeFromName(std::string_view name) {
     for (ResType t : kAllResTypes)
-        if (iequalsAscii(resTypeName(t), name)) return t;
+        if (mischief::iequalsAscii(resTypeName(t), name)) return t;
     return std::nullopt;
 }
 
@@ -50,9 +50,9 @@ std::string_view dllFileName(DllId d) {
     return "?";
 }
 
-std::optional<DllId> dllFor(ResType type, int id, gfx::ColorMode mode) {
+std::optional<DllId> dllFor(ResType type, int id, mischief::gfx::ColorMode mode) {
     const std::string_view name = resTypeName(type);
-    if (name[0] == 'P') return mode == gfx::ColorMode::Colour16 ? DllId::TMT16 : DllId::TMT256;
+    if (name[0] == 'P') return mode == mischief::gfx::ColorMode::Colour16 ? DllId::TMT16 : DllId::TMT256;
     if (name[0] == 'S') {
         const int s = static_cast<int16_t>(id);
         if (s >= 7000 && s <= 7099) return DllId::TM0SOUND;

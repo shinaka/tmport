@@ -6,10 +6,10 @@
 #include <vector>
 
 #include "gfx/frame_buffer.h"
-#include "gfx/palette.h"
 #include "gfx/pixmap.h"
-#include "gfx/presenter.h"
-#include "rtl/borland_rand.h"
+#include "mischief/gfx/palette.h"
+#include "mischief/gfx/presenter.h"
+#include "mischief/rtl/borland_rand.h"
 
 using namespace tmport;
 using namespace tmport::gfx;
@@ -18,7 +18,7 @@ namespace {
 
 // A synthetic 256-colour palette: index i = (i, i, i) except the key colour at 15 and 241 and
 // white at 0 and 77 (as in the shipped palette's layout, but no game data).
-Palette testPalette() {
+mischief::gfx::Palette testPalette() {
     std::vector<uint8_t> rgb(768);
     for (int i = 0; i < 256; ++i) rgb[i * 3] = rgb[i * 3 + 1] = rgb[i * 3 + 2] = static_cast<uint8_t>(i == 0 ? 1 : i);
     auto set = [&](int i, uint8_t r, uint8_t g, uint8_t b) {
@@ -35,8 +35,8 @@ Palette testPalette() {
     set(202, 0, 0, 170);     // blue (same as the key colour!)
     set(203, 170, 0, 0);     // red
     set(204, 170, 85, 0);    // brown
-    Palette p = Palette::fromRrgb(rgb);
-    std::array<Rgb8, 16> ega{};
+    mischief::gfx::Palette p = mischief::gfx::Palette::fromRrgb(rgb);
+    std::array<mischief::Rgb8, 16> ega{};
     ega[0] = {0, 0, 0};
     ega[1] = {0, 0, 170};
     ega[4] = {170, 0, 0};
@@ -73,7 +73,7 @@ TEST_CASE("RUND encoder matches the documented algorithm on a small vector") {
 }
 
 TEST_CASE("RUND round trip on pseudo-random images, packets crossing rows") {
-    BorlandRand r;
+    mischief::BorlandRand r;
     for (int t = 0; t < 50; ++t) {
         const int w = 1 + r.random(97), h = 1 + r.random(41);
         std::vector<uint8_t> px(static_cast<size_t>(w) * h);
@@ -106,44 +106,8 @@ TEST_CASE("PMAP decode: 4 bpp packed rows and raw 8 bpp") {
     CHECK_THROWS(decodePmap(std::vector<uint8_t>{4, 0, 4, 0, 1}, 8));
 }
 
-TEST_CASE("Palette: colour key by colour, white key, nearest index, VGA16") {
-    const Palette p = testPalette();
-    CHECK(p.keyTable()[15]);
-    CHECK(p.keyTable()[241]);
-    CHECK(p.keyTable()[202]);  // same colour as the key
-    CHECK(p.keyTable().count() == 3);
-    CHECK(p.whiteKeyTable()[0]);
-    CHECK(p.whiteKeyTable()[77]);
-    CHECK(p.nearestIndex({0, 0, 170}) == 15);  // first of the equal colours
-    CHECK(p.pen(14) == 200);
-    CHECK(p.pen(0) == 201);
-    const Palette v = Palette::vga16();
-    CHECK(v.mode() == ColorMode::Colour16);
-    CHECK(v.keyTable().count() == 1);
-    CHECK(v.keyTable()[3]);
-    CHECK(v.whiteKeyTable()[15]);
-    CHECK(v.colour(8) == Rgb8{0xC0, 0xC0, 0xC0});
-}
-
-TEST_CASE("Highlight LUT (1058:19b2)") {
-    const Palette p = testPalette();
-    const auto lut = p.highlightLut();
-    CHECK(lut[100] == p.pen(14));  // any colour -> yellow
-    CHECK(lut[p.pen(0)] == p.pen(1));  // black -> blue
-    CHECK(lut[p.pen(4)] == p.pen(6));  // red -> brown
-    CHECK(lut[p.pen(14)] == p.pen(1));  // yellow -> blue
-    // 16 colours: dev16 = 0,4,2,6,1,5,1,8,7,12,10,14,9,13,11,15
-    Palette v = Palette::vga16();
-    v.setPens({}, {0, 4, 2, 6, 1, 5, 1, 8, 7, 12, 10, 14, 9, 13, 11, 15});
-    const auto l16 = v.highlightLut();
-    CHECK(l16[7] == 11);
-    CHECK(l16[0] == 4);
-    CHECK(l16[1] == 1);
-    CHECK(l16[11] == 4);
-}
-
 TEST_CASE("FrameBuffer: keyed sprite, inclusive clip, mirror, dirty rects") {
-    const Palette p = testPalette();
+    const mischief::gfx::Palette p = testPalette();
     FrameBuffer fb;
     fb.setPalette(p);
     fb.clear(7);
@@ -160,7 +124,7 @@ TEST_CASE("FrameBuffer: keyed sprite, inclusive clip, mirror, dirty rects") {
     CHECK(fb.at(13, 10) == 7);  // right of the clip
     CHECK(fb.at(10, 9) == 7);
     REQUIRE(fb.dirtyRects().size() == 1);
-    CHECK(fb.dirtyRects()[0] == Rect{9, 9, 4, 2});  // the unclipped sprite box
+    CHECK(fb.dirtyRects()[0] == mischief::gfx::Rect{9, 9, 4, 2});  // the unclipped sprite box
 
     fb.resetClip();
     fb.clear(7);
@@ -175,7 +139,7 @@ TEST_CASE("FrameBuffer: keyed sprite, inclusive clip, mirror, dirty rects") {
     // Dirty rects are clipped to 512x384 and capped at 256.
     fb.clearDirtyRects();
     fb.addDirtyRect(-5, 380, 20, 10);
-    CHECK(fb.dirtyRects().back() == Rect{0, 380, 15, 4});
+    CHECK(fb.dirtyRects().back() == mischief::gfx::Rect{0, 380, 15, 4});
     fb.addDirtyRect(0, 400, 10, 10);  // entirely below the screen: dropped
     CHECK(fb.dirtyRects().size() == 1);
     for (int i = 0; i < 300; ++i) fb.addDirtyRect(0, 0, 1, 1);
@@ -187,7 +151,7 @@ TEST_CASE("FrameBuffer: keyed sprite, inclusive clip, mirror, dirty rects") {
 }
 
 TEST_CASE("FrameBuffer: opaque draws are unclipped (by the clip rectangle) and copyRect") {
-    const Palette p = testPalette();
+    const mischief::gfx::Palette p = testPalette();
     FrameBuffer fb;
     fb.setPalette(p);
     fb.clear(0);
@@ -202,7 +166,7 @@ TEST_CASE("FrameBuffer: opaque draws are unclipped (by the clip rectangle) and c
 }
 
 TEST_CASE("FrameBuffer: fills and frames (WinG 256-colour and 16-colour paths)") {
-    const Palette p = testPalette();
+    const mischief::gfx::Palette p = testPalette();
     FrameBuffer fb;
     fb.setPalette(p);
     fb.clear(7);
@@ -218,9 +182,9 @@ TEST_CASE("FrameBuffer: fills and frames (WinG 256-colour and 16-colour paths)")
     CHECK(fb.at(22, 25) == 7);  // GDI would draw it at 25
     CHECK(fb.at(20, 24) == w);
 
-    Palette v = Palette::vga16();
+    mischief::gfx::Palette v = mischief::gfx::Palette::vga16();
     v.setPens({}, {0, 4, 2, 6, 1, 5, 1, 8, 7, 12, 10, 14, 9, 13, 11, 15});
-    FrameBuffer f16(ColorMode::Colour16);
+    FrameBuffer f16(mischief::gfx::ColorMode::Colour16);
     f16.setPalette(v);
     f16.clear(0);
     f16.fillRectColor(10, 10, 0, 0, 14);  // widened to 1x1
@@ -248,10 +212,10 @@ TEST_CASE("FrameBuffer: save-under rounds to even x and width") {
 }
 
 TEST_CASE("Presenter: window picture and 640x480 canvas") {
-    const Palette p = testPalette();
+    const mischief::gfx::Palette p = testPalette();
     FrameBuffer fb;
     fb.clear(200);
-    Presenter pr;
+    mischief::gfx::Presenter pr;
     pr.setPalette(p);
     const auto c0 = pr.canvas();
     // Nothing presented yet: the game area shows the initial (index 0) picture, borders black.
@@ -270,10 +234,10 @@ TEST_CASE("Presenter: window picture and 640x480 canvas") {
 }
 
 TEST_CASE("Presenter: debug marks are outlines over the game area, under the overlay") {
-    const Palette p = testPalette();
+    const mischief::gfx::Palette p = testPalette();
     FrameBuffer fb;
     fb.clear(200);
-    Presenter pr;
+    mischief::gfx::Presenter pr;
     pr.setPalette(p);
     pr.blitAll(fb);
     const std::vector<uint8_t> before(pr.canvas().begin(), pr.canvas().end());
@@ -305,123 +269,9 @@ TEST_CASE("Presenter: debug marks are outlines over the game area, under the ove
 
 // ------------------------------------------------------------------------- presenter layouts
 
-TEST_CASE("PresenterLayout: the Windows CD and DOS layouts") {
-    const PresenterLayout w = PresenterLayout::windowsCd();
-    CHECK(w.canvasWidth == Presenter::kCanvasWidth);
-    CHECK(w.canvasHeight == Presenter::kCanvasHeight);
-    CHECK(w.gameRect == Rect{Presenter::kGameX, Presenter::kGameY, Presenter::kGameWidth, Presenter::kGameHeight});
-    CHECK(w.squarePixels());
-    CHECK(w.overlay);
-    CHECK(w.displayWidth() == 640);
-    CHECK(w.displayHeight() == 480);
-    CHECK(w.defaultWindowScale == 2);
-
-    const PresenterLayout d = PresenterLayout::dos1990();
-    CHECK(d.canvasWidth == 320);
-    CHECK(d.canvasHeight == 200);
-    CHECK(d.gameRect == Rect{0, 0, 320, 200});
-    CHECK(d.pixelAspect() == doctest::Approx(1.2));
-    CHECK_FALSE(d.squarePixels());
-    CHECK_FALSE(d.overlay);
-    CHECK(d.displayWidth() == 320);
-    CHECK(d.displayHeight() == 240);  // 4:3
-
-    const PresenterLayout sq = PresenterLayout::dos1990(true);
-    CHECK(sq.squarePixels());
-    CHECK(sq.displayHeight() == 200);
-    CHECK_FALSE(sq == d);
-}
-
-TEST_CASE("PresenterLayout: letterbox rectangles") {
-    const PresenterLayout d = PresenterLayout::dos1990();
-    // Exact 4:3 outputs are filled completely.
-    CHECK(presentRect(d, 960, 720, ScaleMode::Letterbox) == Rect{0, 0, 960, 720});
-    CHECK(presentRect(d, 1600, 1200, ScaleMode::Letterbox) == Rect{0, 0, 1600, 1200});
-    CHECK(presentRect(d, 320, 240, ScaleMode::Letterbox) == Rect{0, 0, 320, 240});
-    // Wide outputs: bars left and right.
-    CHECK(presentRect(d, 1920, 1080, ScaleMode::Letterbox) == Rect{240, 0, 1440, 1080});
-    CHECK(presentRect(d, 2560, 1440, ScaleMode::Letterbox) == Rect{320, 0, 1920, 1440});
-    CHECK(presentRect(d, 1280, 800, ScaleMode::Letterbox) == Rect{106, 0, 1067, 800});
-    // Tall outputs: bars above and below.
-    CHECK(presentRect(d, 1000, 1000, ScaleMode::Letterbox) == Rect{0, 125, 1000, 750});
-    CHECK(presentRect(d, 800, 1280, ScaleMode::Letterbox) == Rect{0, 340, 800, 600});
-    // Square pixels: 16:10.
-    const PresenterLayout sq = PresenterLayout::dos1990(true);
-    CHECK(presentRect(sq, 960, 720, ScaleMode::Letterbox) == Rect{0, 60, 960, 600});
-    CHECK(presentRect(sq, 1920, 1080, ScaleMode::Letterbox) == Rect{96, 0, 1728, 1080});
-    // Windows: 4:3, as the SDL logical presentation it uses.
-    const PresenterLayout w = PresenterLayout::windowsCd();
-    CHECK(presentRect(w, 1280, 960, ScaleMode::Letterbox) == Rect{0, 0, 1280, 960});
-    CHECK(presentRect(w, 1920, 1080, ScaleMode::Letterbox) == Rect{240, 0, 1440, 1080});
-    // Degenerate output.
-    CHECK(presentRect(d, 0, 720, ScaleMode::Letterbox) == Rect{});
-    // The picture keeps 4:3 within rounding at any size and always touches two edges.
-    int bad = 0;
-    for (int ow = 200; ow <= 3000; ow += 37)
-        for (int oh = 150; oh <= 2000; oh += 41) {
-            const Rect r = presentRect(d, ow, oh, ScaleMode::Letterbox);
-            const bool ok = r.w > 0 && r.x >= 0 && r.y >= 0 && r.x + r.w <= ow && r.y + r.h <= oh &&
-                            (r.w == ow || r.h == oh) && std::abs(r.w * 3 - r.h * 4) <= 2 &&
-                            std::abs((ow - r.w) - 2 * r.x) <= 1 && std::abs((oh - r.h) - 2 * r.y) <= 1;
-            if (!ok) ++bad;
-        }
-    CHECK(bad == 0);
-}
-
-TEST_CASE("PresenterLayout: integer scaling") {
-    const PresenterLayout d = PresenterLayout::dos1990();
-    // Exact pairs (5k, 6k) keep 4:3: 5x6 = 1600x1200.
-    CHECK(integerScaleFor(d, 1600, 1200) == IntScale{5, 6});
-    CHECK(integerScaleFor(d, 2560, 1440) == IntScale{5, 6});
-    CHECK(integerScaleFor(d, 3200, 2400) == IntScale{10, 12});
-    CHECK(presentRect(d, 1600, 1200, ScaleMode::Integer) == Rect{0, 0, 1600, 1200});
-    CHECK(presentRect(d, 2560, 1440, ScaleMode::Integer) == Rect{480, 120, 1600, 1200});
-    // An exact pair wins over a larger near pair (6x7 = 1920x1400 would fit as well).
-    CHECK(integerScaleFor(d, 2000, 1500) == IntScale{5, 6});
-    // No exact pair fits: the largest near pair.
-    CHECK(integerScaleFor(d, 1920, 1080) == IntScale{4, 5});  // 1280x1000
-    CHECK(presentRect(d, 1920, 1080, ScaleMode::Integer) == Rect{320, 40, 1280, 1000});
-    CHECK(integerScaleFor(d, 960, 720) == IntScale{2, 2});  // 3x4 = 960x800 is too tall
-    CHECK(integerScaleFor(d, 1280, 1024) == IntScale{4, 5});
-    CHECK(integerScaleFor(d, 320, 200) == IntScale{1, 1});
-    // Smaller than the canvas: letterbox fallback.
-    CHECK(integerScaleFor(d, 300, 200) == IntScale{});
-    CHECK(presentRect(d, 300, 300, ScaleMode::Integer) == presentRect(d, 300, 300, ScaleMode::Letterbox));
-    // Square pixels and Windows: (k, k).
-    const PresenterLayout sq = PresenterLayout::dos1990(true);
-    CHECK(integerScaleFor(sq, 1920, 1080) == IntScale{5, 5});
-    CHECK(presentRect(sq, 1920, 1080, ScaleMode::Integer) == Rect{160, 40, 1600, 1000});
-    const PresenterLayout w = PresenterLayout::windowsCd();
-    CHECK(integerScaleFor(w, 1920, 1080) == IntScale{2, 2});
-    CHECK(presentRect(w, 1920, 1080, ScaleMode::Integer) == Rect{320, 60, 1280, 960});
-}
-
-TEST_CASE("PresenterLayout: initial window size") {
-    const PresenterLayout w = PresenterLayout::windowsCd();
-    // Windows as before: 640x480 x window_scale, reduced until it fits 90% of the desktop.
-    CHECK(initialWindowSize(w, 2, false, 2560, 1440) == WindowSize{1280, 960});
-    CHECK(initialWindowSize(w, 2, false, 1920, 1080) == WindowSize{1280, 960});
-    CHECK(initialWindowSize(w, 2, false, 1366, 768) == WindowSize{640, 480});
-    CHECK(initialWindowSize(w, 2, true, 2560, 1440) == WindowSize{1280, 960});
-    CHECK(initialWindowSize(w, 3, false, 0, 0) == WindowSize{1920, 1440});
-    const PresenterLayout d = PresenterLayout::dos1990();
-    CHECK(initialWindowSize(d, 0, false, 2560, 1440) == WindowSize{960, 720});  // the default: 3 x 320x240
-    CHECK(initialWindowSize(d, 3, false, 1920, 1080) == WindowSize{960, 720});
-    CHECK(initialWindowSize(d, 4, false, 1920, 1080) == WindowSize{1280, 960});
-    CHECK(initialWindowSize(d, 3, false, 1024, 768) == WindowSize{640, 480});
-    // Integer scaling: the exact 5x6 picture, or the largest integer picture that fits.
-    CHECK(initialWindowSize(d, 3, true, 2560, 1440) == WindowSize{1600, 1200});
-    CHECK(initialWindowSize(d, 3, true, 0, 0) == WindowSize{1600, 1200});
-    CHECK(initialWindowSize(d, 6, true, 0, 0) == WindowSize{3200, 2400});
-    CHECK(initialWindowSize(d, 3, true, 1920, 1080) == WindowSize{960, 800});  // 3x4 within 1728x972
-    const PresenterLayout sq = PresenterLayout::dos1990(true);
-    CHECK(initialWindowSize(sq, 0, false, 2560, 1440) == WindowSize{960, 600});
-    CHECK(initialWindowSize(sq, 3, true, 2560, 1440) == WindowSize{960, 600});
-}
-
 TEST_CASE("Presenter: the DOS layout takes RGBA frames and has no overlay") {
-    Presenter pr(PresenterLayout::dos1990());
-    CHECK(pr.layout() == PresenterLayout::dos1990());
+    mischief::gfx::Presenter pr(mischief::gfx::PresenterLayout::dos1990());
+    CHECK(pr.layout() == mischief::gfx::PresenterLayout::dos1990());
     CHECK(pr.canvas().size() == 320u * 200u * 4u);
     std::vector<uint32_t> frame(320 * 200);
     for (size_t i = 0; i < frame.size(); ++i)

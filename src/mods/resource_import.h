@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "gfx/palette.h"
+#include "mischief/gfx/palette.h"
 #include "mods/mod_folder.h"
 #include "res/resource_types.h"
 
@@ -26,9 +26,9 @@ namespace tmport::mods {
 // What an import may ask about the game data (decoupled from ResourceManager for tests).
 struct ImportContext {
     // The original resource body (NE-rounded) from the DLLs, ignoring mods; nullopt if absent.
-    std::function<std::optional<std::vector<uint8_t>>(ResType, int, gfx::ColorMode)> original;
+    std::function<std::optional<std::vector<uint8_t>>(ResType, int, mischief::gfx::ColorMode)> original;
     // The 256-colour logical palette (RRGB 900, a mod's RRGB override included).
-    std::function<gfx::Palette()> palette256;
+    std::function<mischief::gfx::Palette()> palette256;
     // True if a resource id exists in the game or in a mod.
     std::function<bool(int)> exists;
     const ModManifest* manifest = nullptr;

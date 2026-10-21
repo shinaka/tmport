@@ -49,7 +49,7 @@ void drawTinyText(SheetImage& img, int x, int y, const char* text, uint32_t colo
     }
 }
 
-SheetImage renderContactSheet(const std::vector<SheetItem>& items, const gfx::Palette& palette, bool transparentKey,
+SheetImage renderContactSheet(const std::vector<SheetItem>& items, const mischief::gfx::Palette& palette, bool transparentKey,
                               int cell, int columns) {
     SheetImage img;
     const int n = static_cast<int>(items.size());

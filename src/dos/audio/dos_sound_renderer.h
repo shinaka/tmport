@@ -3,7 +3,7 @@
 // PIT rate 1193182 / 5041 Hz, and the device models it writes to (fmt_sound.md §9). Single
 // threaded; DosAudioDevice adds the SDL stream and the command queue around it.
 //
-// The chips, the clock and the mix are the shared core's ChipRenderer (dos/audio/chip_renderer.h),
+// The chips, the clock and the mix are the engine's ChipRenderer (mischief/dos/audio/chip_renderer.h),
 // with the sequencer as its tick source: the sequencer ticks at the start of each tick's block of
 // samples; block lengths come from a running fractional accumulator (samples per tick = rate * 5041
 // / 1193182, about 202.8 at 48 kHz), the same arithmetic as tools/dos/dos_sound.py, so timing never
@@ -16,12 +16,12 @@
 #include <span>
 #include <vector>
 
-#include "dos/audio/chip_renderer.h"
 #include "dos/audio/opl_backend.h"
-#include "dos/audio/psg_synth.h"
 #include "dos/audio/sequencer.h"
 #include "dos/audio/sound_data.h"
-#include "dos/audio/speaker_synth.h"
+#include "mischief/dos/audio/chip_renderer.h"
+#include "mischief/dos/audio/psg_synth.h"
+#include "mischief/dos/audio/speaker_synth.h"
 
 namespace tmport::dos {
 
@@ -30,12 +30,12 @@ namespace tmport::dos {
 // default volume. The speaker and the Tandy devices are not affected.
 inline constexpr double kAdLibMixLevel = 0.75;
 
-// The render settings: the core's (sample rate, synth mode, noise, filters; the tick rate and the
+// The render settings: the engine's (sample rate, synth mode, noise, filters; the tick rate and the
 // OPL mix level keep their defaults, kPitTickHz and kAdLibMixLevel).
-using DosRenderConfig = ChipRenderConfig;
-static_assert(ChipRenderConfig{}.oplMixLevel == kAdLibMixLevel && ChipRenderConfig{}.tickHz == kPitTickHz);
+using DosRenderConfig = mischief::dos::ChipRenderConfig;
+static_assert(mischief::dos::ChipRenderConfig{}.oplMixLevel == kAdLibMixLevel && mischief::dos::ChipRenderConfig{}.tickHz == mischief::dos::kPitTickHz);
 
-class DosSoundRenderer final : private SoundPorts, private SoundTickSource {
+class DosSoundRenderer final : private SoundPorts, private mischief::dos::SoundTickSource {
 public:
     // `bank` must outlive the renderer. With the AdLib device and no back end given, the tunes play
     // on the original's AdLib driver and an emulated OPL2 (AdLibOpl, opl_backend.h). The OPL's output
@@ -46,8 +46,8 @@ public:
     const Sequencer& sequencer() const { return seq_; }
     const DosRenderConfig& config() const { return chips_.config(); }
     double samplesPerTick() const { return chips_.samplesPerTick(); }
-    // The chips and the clock (the shared core's renderer; ChipAudioDevice plays it).
-    ChipRenderer& chips() { return chips_; }
+    // The chips and the clock (the engine's renderer; ChipAudioDevice plays it).
+    mischief::dos::ChipRenderer& chips() { return chips_; }
 
     // Called right before each PIT tick: the moment commands from the game take effect (between two
     // interrupts, like the original's calls from the main loop).
@@ -65,8 +65,8 @@ public:
     // Samples left in the current tick's block (0 = the next render starts with a tick).
     size_t samplesToNextTick() const { return chips_.samplesToNextTick(); }
 
-    SpeakerSynth& speaker() { return chips_.speaker(); }
-    PsgSynth& psg() { return chips_.psg(); }
+    mischief::dos::SpeakerSynth& speaker() { return chips_.speaker(); }
+    mischief::dos::PsgSynth& psg() { return chips_.psg(); }
     // The AdLib back end (nullptr on the speaker and the Tandy).
     OplBackend* opl() { return opl_.get(); }
     // A DOSBox-X state's AdLib driver from its DGROUP image (before Sequencer::restore with
@@ -99,7 +99,7 @@ private:
     int oplPlayTuneTicks() const override { return opl_ ? opl_->playTuneTicks() : 0; }
 
     std::unique_ptr<OplBackend> opl_;
-    ChipRenderer chips_;  // after the OPL back end (its output stage)
+    mischief::dos::ChipRenderer chips_;  // after the OPL back end (its output stage)
     Sequencer seq_;       // after the synths and the OPL back end: its constructor calls oplInit()
 };
 

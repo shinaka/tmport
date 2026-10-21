@@ -8,7 +8,7 @@
 #include "dos/game/game.h"
 #include "dos/game/signin.h"
 #include "dos/save/users_store.h"
-#include "util/file_util.h"
+#include "mischief/util/file_util.h"
 
 namespace tmport::dos::autoplay {
 
@@ -323,10 +323,10 @@ UserRecord Checker::packedRecord(DosGame& g) {
 
 void Checker::onSave(DosGame& g, const DosUsersStore& store, std::string_view moment, uint16_t gamesBefore) {
     ++saveChecks_;
-    const auto file = readWholeFile(store.path());
+    const auto file = mischief::readWholeFile(store.path());
     const std::vector<uint8_t> image = store.users().bytes();
     if (!file) {
-        fail(std::format("save {}: {} cannot be read", moment, pathToUtf8(store.path())));
+        fail(std::format("save {}: {} cannot be read", moment, mischief::pathToUtf8(store.path())));
         return;
     }
     // After Users_WriteFile the frame may go on with Game_Start (a new player, Start Over, the end of a

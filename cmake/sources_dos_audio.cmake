@@ -11,4 +11,5 @@ target_sources(tmcore PRIVATE
     src/dos/audio/adlib_driver.cpp
 )
 
-# The chips (speaker_synth, psg_synth, opl_chip with ymfm) are in the shared core (cmake/portcore.cmake).
+# The chips (speaker_synth, psg_synth, opl_chip with ymfm) are in the engine (MischiefEngine:
+# src/mischief/dos/audio/).

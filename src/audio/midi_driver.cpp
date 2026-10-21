@@ -1,25 +1,25 @@
 #include "audio/midi_driver.h"
 
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/log.h"
-#include "vfs/data_source.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
+#include "mischief/vfs/data_source.h"
 
 namespace tmport::audio {
 
 std::shared_ptr<const MidiSong> DataSourceTrackLoader::load(const std::string& relPath) {
-    const std::string key = toUpperAscii(relPath);
+    const std::string key = mischief::toUpperAscii(relPath);
     if (auto it = cache_.find(key); it != cache_.end()) return it->second;
     std::shared_ptr<const MidiSong> song;
     if (auto f = source_.open(relPath)) {
         try {
             song = std::make_shared<const MidiSong>(parseSmf(f->readAll()));
-            for (const auto& w : song->warnings) log::debug("midi: {}: {}", relPath, w);
-        } catch (const Error& e) {
-            log::warn("midi: {}: {}", relPath, e.what());
+            for (const auto& w : song->warnings) mischief::log::debug("midi: {}: {}", relPath, w);
+        } catch (const mischief::Error& e) {
+            mischief::log::warn("midi: {}: {}", relPath, e.what());
         }
     } else {
-        log::warn("midi: {} not found", relPath);
+        mischief::log::warn("midi: {} not found", relPath);
     }
     cache_[key] = song;  // failures are cached too (warn once)
     return song;

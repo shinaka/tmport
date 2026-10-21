@@ -1,6 +1,6 @@
 #pragma once
 // DOS edition sound output: the driver (DosSoundRenderer) run inside an SDL3 audio stream's pull
-// callback (the shared core's ChipAudioDevice, dos/audio/chip_audio_device.h), so the sequencer
+// callback (the engine's ChipAudioDevice, mischief/dos/audio/chip_audio_device.h), so the sequencer
 // advances by sample count at the PIT rate whatever the frame rate is (fmt_sound.md §9,
 // PORTING_NOTES.md §2.3). The game calls the driver's entry points from its
 // own thread; they are queued and take effect right before the next PIT tick of the audio thread,
@@ -27,14 +27,14 @@
 #include <string>
 #include <vector>
 
-#include "dos/audio/chip_audio_device.h"
 #include "dos/audio/dos_sound_renderer.h"
+#include "mischief/dos/audio/chip_audio_device.h"
 
 namespace tmport::dos {
 
 // render (DosRenderConfig), sdlDriver ("dummy" in tests: never audible; empty = SDL's choice) and
 // volume (master gain on the synth levels, speaker square +-0.5; 0.7).
-using DosAudioConfig = ChipAudioConfig;
+using DosAudioConfig = mischief::dos::ChipAudioConfig;
 
 class DosAudioDevice {
 public:
@@ -127,7 +127,7 @@ private:
     bool musicOnMirror_ = true;  // the caller's copy of g_musicOn (for the AdLib rand() draw)
 
     std::unique_ptr<DosSoundRenderer> renderer_;
-    std::unique_ptr<ChipAudioDevice> output_;  // after the renderer it plays (destroyed first)
+    std::unique_ptr<mischief::dos::ChipAudioDevice> output_;  // after the renderer it plays (destroyed first)
 
     std::mutex queueMutex_;
     std::vector<Command> queue_;

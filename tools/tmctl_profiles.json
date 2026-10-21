@@ -1,0 +1,41 @@
+{
+  "root": "..",
+  "dosbox": "tools/dosbox-x/bin/x64/Release/dosbox-x.exe",
+  "captures": "extracted/captures",
+  "default": "win",
+  "profiles": {
+    "win": {
+      "help": [
+        "Windows 3.1 + Win CD edition, tools/dosbox_tmwin.conf, states in extracted/captures/savestates,",
+        "USERS.DAT = extracted/win31_c/TLCWIN/TMTWINCD/USERS.DAT"
+      ],
+      "conf": "tools/dosbox_tmwin.conf",
+      "states": "extracted/captures/savestates",
+      "save_file": "extracted/win31_c/TLCWIN/TMTWINCD/USERS.DAT",
+      "save_ext": ".users"
+    },
+    "dos": {
+      "help": [
+        "1990 DOS edition (SST.EXE), tools/dosbox_tmdos.conf. C: = extracted/dos_c (a writable COPY of",
+        "TM-DOS, game in C:\\TM), states in extracted/captures/dos/savestates,",
+        "USERS.DAT = extracted/dos_c/TM/USERS.DAT. Start options --machine (default ega; tandy, cga,",
+        "hercules, mcga, vgaonly, svga_s3 ...), --args for SST.EXE, e.g. \"-E\" (EGA), \"-T\" (Tandy),",
+        "\"-C\" (CGA), \"-H\" (Hercules), \"-M\" (MCGA), \"-Sa\" (AdLib sound), --set K=V. Example:",
+        "  python -P <engine>/tools/tmctl.py start --profile dos --machine tandy --park",
+        "  python -P <engine>/tools/tmctl.py key enter text:ann enter",
+        "  python -P <engine>/tools/tmctl.py state save tandy/signin   (-> extracted/captures/dos/savestates/tandy/)",
+        "The 1990 game drops shifted keys (shift+a types nothing); type names in lower case, the",
+        "game capitalises the first letter itself."
+      ],
+      "conf": "tools/dosbox_tmdos.conf",
+      "states": "extracted/captures/dos/savestates",
+      "save_file": "extracted/dos_c/TM/USERS.DAT",
+      "save_ext": ".users",
+      "drive_c": "extracted/dos_c",
+      "game_dir": "TM",
+      "game_exe": "SST.EXE",
+      "game_command": "SST",
+      "missing_hint": "copy TM-DOS\\* there first (never mount TM-DOS itself)"
+    }
+  }
+}

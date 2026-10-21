@@ -11,11 +11,11 @@
 #include <vector>
 
 #include "dos/app/dos_runtime.h"
-#include "dos/input/bios_keyboard.h"
 #include "dos/input/input_poll.h"
 #include "dos/input/keyboard.h"
 #include "dos/input/mouse.h"
 #include "dos_test_data.h"
+#include "mischief/dos/input/bios_keyboard.h"
 
 using namespace tmport::dos;
 using namespace tmport::dos::keybits;
@@ -24,15 +24,15 @@ namespace {
 
 constexpr uint64_t kMs = 1'000'000;
 
-PcKey key(const char* name) {
-    const auto k = pcKeyByName(name);
+mischief::dos::PcKey key(const char* name) {
+    const auto k = mischief::dos::pcKeyByName(name);
     REQUIRE(k);
     return *k;
 }
 
 // Feeds a key press and release through a BIOS model with optional modifiers; returns the word read.
 uint16_t biosWordFor(uint8_t scan, bool extended, uint8_t modifierScan = 0) {
-    BiosKeyboard b;
+    mischief::dos::BiosKeyboard b;
     if (modifierScan) b.onScanByte(modifierScan);
     if (extended) b.onScanByte(0xE0);
     b.onScanByte(scan);
@@ -53,7 +53,7 @@ struct TerrainClient : RuntimeClient {
         uint16_t& keys = rt->keyboard().isr().keys;
         log[t.gameTick] = keys;
         keys &= static_cast<uint16_t>(~forbidden);
-        BiosKeyboard& b = rt->keyboard().bios();
+        mischief::dos::BiosKeyboard& b = rt->keyboard().bios();
         if (b.peek()) biosKeys.push_back(b.read());
     }
 };
@@ -67,7 +67,7 @@ struct Harness {
     }
     void run(const char* script, uint64_t ticks) {
         std::string err;
-        auto s = ScriptedInput::parse(script, err);
+        auto s = mischief::dos::ScriptedInput::parse(script, err);
         REQUIRE_MESSAGE(s, err);
         rt.setScript(*s);
         rt.stepGameTicks(ticks);
@@ -78,31 +78,6 @@ struct Harness {
 }  // namespace
 
 // ------------------------------------------------------------------------------------- mapping
-
-TEST_CASE("DOS keyboard: SDL scancodes map to PC set-1 keys by position") {
-    CHECK(pcKeyForSdlScancode(SDL_SCANCODE_UP) == PcKey{0x48, true});
-    CHECK(pcKeyForSdlScancode(SDL_SCANCODE_KP_8) == PcKey{0x48, false});
-    CHECK(pcKeyForSdlScancode(SDL_SCANCODE_PAGEUP) == PcKey{0x49, true});
-    CHECK(pcKeyForSdlScancode(SDL_SCANCODE_KP_9) == PcKey{0x49, false});
-    CHECK(pcKeyForSdlScancode(SDL_SCANCODE_A) == PcKey{0x1E, false});
-    CHECK(pcKeyForSdlScancode(SDL_SCANCODE_Q) == PcKey{0x10, false});
-    CHECK(pcKeyForSdlScancode(SDL_SCANCODE_M) == PcKey{0x32, false});
-    CHECK(pcKeyForSdlScancode(SDL_SCANCODE_0) == PcKey{0x0B, false});
-    CHECK(pcKeyForSdlScancode(SDL_SCANCODE_SPACE) == PcKey{0x39, false});
-    CHECK(pcKeyForSdlScancode(SDL_SCANCODE_RETURN) == PcKey{0x1C, false});
-    CHECK(pcKeyForSdlScancode(SDL_SCANCODE_KP_ENTER) == PcKey{0x1C, true});
-    CHECK(pcKeyForSdlScancode(SDL_SCANCODE_F12) == PcKey{0x58, false});
-    CHECK(pcKeyForSdlScancode(SDL_SCANCODE_RCTRL) == PcKey{0x1D, true});
-    CHECK_FALSE(pcKeyForSdlScancode(SDL_SCANCODE_LGUI));
-    CHECK_FALSE(pcKeyForSdlScancode(SDL_SCANCODE_PAUSE));
-    CHECK(pcKeyByName("PgUp") == PcKey{0x49, true});
-    CHECK(pcKeyByName("kp9") == PcKey{0x49, false});
-    CHECK(pcKeyByName("f10") == PcKey{0x44, false});
-    CHECK(pcKeyByName("scan29") == PcKey{0x29, false});
-    CHECK(pcKeyByName("escan48") == PcKey{0x48, true});
-    CHECK_FALSE(pcKeyByName("nosuchkey"));
-    CHECK_FALSE(pcKeyByName("scan"));
-}
 
 // --------------------------------------------------------------------------------------- Kbd_ISR
 
@@ -208,42 +183,6 @@ TEST_CASE("DOS Kbd_ISR: the scan tables match the user's SST.EXE (CS 43a0:019F /
 
 // ------------------------------------------------------------------------------------------ BIOS
 
-TEST_CASE("DOS BIOS keyboard: key words for the game's keys") {
-    CHECK(biosWordFor(0x01, false) == 0x011B);        // Esc
-    CHECK(biosWordFor(0x3B, false) == 0x3B00);        // F1
-    CHECK(biosWordFor(0x48, true) == 0x4800);         // grey Up
-    CHECK(biosWordFor(0x48, false) == 0x4800);        // keypad Up (Num Lock off)
-    CHECK(biosWordFor(0x48, false, 0x2A) == 0x4838);  // Shift + keypad 8 = '8'
-    CHECK(biosWordFor(0x48, true, 0x2A) == 0x4800);   // Shift + grey Up = Up
-    CHECK(biosWordFor(0x1C, false) == 0x1C0D);        // Enter
-    CHECK(biosWordFor(0x1C, true) == 0x1C0D);         // keypad Enter
-    CHECK(biosWordFor(0x35, true) == 0x352F);         // keypad /
-    CHECK(biosWordFor(0x1F, false) == 0x1F73);        // s
-    CHECK(biosWordFor(0x1F, false, 0x2A) == 0x1F53);  // S
-    CHECK(biosWordFor(0x1F, false, 0x1D) == 0x1F13);  // Ctrl+S
-    CHECK(biosWordFor(0x32, false, 0x38) == 0x3200);  // Alt+M
-    CHECK(biosWordFor(0x13, false, 0x1D) == 0x1312);  // Ctrl+R
-    CHECK(biosWordFor(0x0E, false) == 0x0E08);        // Backspace
-    CHECK(biosWordFor(0x0F, false) == 0x0F09);        // Tab
-    CHECK(biosWordFor(0x39, false) == 0x3920);        // Space
-    CHECK(biosWordFor(0x0B, false) == 0x0B30);        // 0
-    CHECK(biosWordFor(0x15, false, 0x36) == 0x1559);  // Y (right Shift)
-    // Enhanced words are dropped by INT 16h AH=00h/01h: F11, F12, keypad 5, Ctrl + grey Up.
-    CHECK(biosWordFor(0x57, false) == 0);
-    CHECK(biosWordFor(0x58, false) == 0);
-    CHECK(biosWordFor(0x4C, false) == 0);
-    CHECK(biosWordFor(0x48, true, 0x1D) == 0);
-    // Caps Lock inverts Shift for letters only.
-    BiosKeyboard b;
-    b.onScanByte(0x3A);
-    b.onScanByte(0xBA);
-    CHECK((b.shiftFlags() & BiosKeyboard::kCapsLock) != 0);
-    b.onScanByte(0x1E);
-    b.onScanByte(0x02);
-    CHECK(b.read() == 0x1E41);
-    CHECK(b.read() == 0x0231);
-}
-
 TEST_CASE("DOS BIOS keyboard: every key word of the game's key lists can be typed") {
     TM_REQUIRE_DOS_DATA();
     const InputTables t = InputTables::load(*dosExe);
@@ -265,33 +204,11 @@ TEST_CASE("DOS BIOS keyboard: every key word of the game's key lists can be type
     CHECK(words == 13 + 9 + 11 + 13 + 69 + 13);
 }
 
-TEST_CASE("DOS BIOS keyboard: 15-key buffer, peek, flush") {
-    BiosKeyboard b;
-    CHECK(b.peek() == 0);
-    CHECK(b.read() == 0);
-    for (int i = 0; i < 20; ++i) b.push(static_cast<uint16_t>(0x1E61 + i));
-    CHECK(b.size() == 15);
-    CHECK(b.full());
-    CHECK(b.dropped() == 5);
-    CHECK(b.peek() == 0x1E61);
-    CHECK(b.peek() == 0x1E61);
-    CHECK(b.read() == 0x1E61);
-    CHECK(b.size() == 14);
-    b.push(0x8500);  // an enhanced word in the middle is skipped by the reads
-    for (int i = 1; i < 15; ++i) CHECK(b.read() == 0x1E61 + i);
-    CHECK(b.size() == 1);
-    CHECK(b.peek() == 0);
-    CHECK(b.size() == 0);
-    b.push(0x011B);
-    b.flush();
-    CHECK(b.peek() == 0);
-}
-
 // ----------------------------------------------------------------------------- PC keyboard device
 
 TEST_CASE("DOS keyboard: typematic repeats are synthesised (500 ms, then every 33 ms)") {
     PcKeyboard kb;
-    const PcKey a = key("a");
+    const mischief::dos::PcKey a = key("a");
     kb.keyDown(a, 0);
     kb.keyDown(a, 30 * kMs);  // host auto-repeat: ignored
     kb.deliverUntil(0);
@@ -316,7 +233,7 @@ TEST_CASE("DOS keyboard: typematic repeats are synthesised (500 ms, then every 3
 
 TEST_CASE("DOS keyboard: only the last key pressed repeats") {
     PcKeyboard kb;
-    const PcKey a = key("a"), b = key("b");
+    const mischief::dos::PcKey a = key("a"), b = key("b");
     kb.keyDown(a, 0);
     kb.keyDown(b, 100 * kMs);
     kb.keyUp(a, 200 * kMs);  // releasing another key does not stop B's repeat
@@ -528,7 +445,7 @@ TEST_CASE("DOS Input_HitZone and Input_Poll (4a85:0130, 4a85:000E)") {
     CHECK(inputHitZone(z, m) == -1);
     z.count = 2;
 
-    BiosKeyboard bios;
+    mischief::dos::BiosKeyboard bios;
     InputPoll ip(t);
     m.prevButtons = 0;
     m.buttons = 0;
@@ -572,7 +489,7 @@ TEST_CASE("DOS Input_Tick: Esc and F1-F3 in play (4a85:03AC)") {
     km.keys = {0, 0x011B, 0x3B00, 0x1F73};
     km.commands = {-1, 0, 1, 13};
     t.setKeyMap(0, km);
-    BiosKeyboard bios;
+    mischief::dos::BiosKeyboard bios;
     MousePointer m;
     m.x = 200;  // outside every zone
     InputPoll ip(t);

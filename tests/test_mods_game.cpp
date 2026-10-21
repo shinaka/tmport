@@ -21,18 +21,18 @@
 #include "data/dgroup_offsets.h"
 #include "game/game_tables.h"
 #include "game/quiz.h"
+#include "mischief/mods/json.h"
+#include "mischief/mods/png_codec.h"
+#include "mischief/util/file_util.h"
 #include "mods/dam_asm.h"
-#include "mods/json.h"
 #include "mods/mod_kit.h"
 #include "mods/mods.h"
-#include "mods/png_codec.h"
 #include "mods/resource_import.h"
 #include "mods/table_overrides.h"
 #include "mods/text_codec.h"
 #include "mods/wav_codec.h"
 #include "test_data.h"
 #include "text/font.h"
-#include "util/file_util.h"
 
 using namespace tmport;
 using namespace tmport::mods;
@@ -54,22 +54,22 @@ struct TempDir {
     }
 };
 
-void put(const std::filesystem::path& p, std::span<const uint8_t> b) { REQUIRE(writeWholeFile(p, b)); }
+void put(const std::filesystem::path& p, std::span<const uint8_t> b) { REQUIRE(mischief::writeWholeFile(p, b)); }
 void putText(const std::filesystem::path& p, std::string_view s) { put(p, bytesOf(s)); }
 
-std::unique_ptr<GameFiles> freshFiles(gfx::ColorMode mode = gfx::ColorMode::Colour256) {
+std::unique_ptr<GameFiles> freshFiles(mischief::gfx::ColorMode mode = mischief::gfx::ColorMode::Colour256) {
     ResourceManager::Options o;
     o.colorMode = mode;
-    return std::make_unique<GameFiles>(GameFiles::open(pathFromUtf8(*testdata::dataPath()), o));
+    return std::make_unique<GameFiles>(GameFiles::open(mischief::pathFromUtf8(*testdata::dataPath()), o));
 }
 
 // Indexed PNG with the game palette (the direct path): a pattern of palette indices.
-std::vector<uint8_t> patternPng(const gfx::Palette& pal, int w, int h, uint8_t a, uint8_t b) {
+std::vector<uint8_t> patternPng(const mischief::gfx::Palette& pal, int w, int h, uint8_t a, uint8_t b) {
     std::vector<uint8_t> idx(static_cast<size_t>(w * h));
     for (int y = 0; y < h; ++y)
         for (int x = 0; x < w; ++x) idx[static_cast<size_t>(y * w + x)] = ((x / 4 + y / 4) % 2) ? a : b;
-    std::vector<Rgb8> colours(pal.colours().begin(), pal.colours().end());
-    return encodePngIndexed(w, h, idx, colours);
+    std::vector<mischief::Rgb8> colours(pal.colours().begin(), pal.colours().end());
+    return mischief::mods::encodePngIndexed(w, h, idx, colours);
 }
 
 std::vector<uint8_t> beepWav() {
@@ -81,7 +81,7 @@ std::vector<uint8_t> beepWav() {
             s.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
         }
     }
-    return makeWav(44100, 2, 16, s);
+    return mischief::mods::makeWav(44100, 2, 16, s);
 }
 
 std::vector<uint8_t> twoNoteMidi() {
@@ -113,7 +113,7 @@ TEST_CASE("mods/game: every resource round-trips byte-exactly through its editab
     const ImportContext ctx = importContextFor(res, &none);
     std::map<std::string, int> counts;
     int failures = 0;
-    auto check = [&](ResType t, int id, gfx::ColorMode mode) {
+    auto check = [&](ResType t, int id, mischief::gfx::ColorMode mode) {
         const auto e = exportResource(res, t, id, mode);
         REQUIRE(e);
         ++counts[e->rel.substr(0, e->rel.find('/')) + (e->kind == ModFileKind::OthrText ? ".txt" : e->kind == ModFileKind::OthrBin ? ".bin" : "")];
@@ -123,13 +123,13 @@ TEST_CASE("mods/game: every resource round-trips byte-exactly through its editab
             MESSAGE("round trip differs: " << e->rel);
         }
     };
-    for (int id : res.ids(ResType::PMAP, DllId::TMT256)) check(ResType::PMAP, id, gfx::ColorMode::Colour256);
+    for (int id : res.ids(ResType::PMAP, DllId::TMT256)) check(ResType::PMAP, id, mischief::gfx::ColorMode::Colour256);
     if (res.hasDll(DllId::TMT16))
-        for (int id : res.ids(ResType::PMAP, DllId::TMT16)) check(ResType::PMAP, id, gfx::ColorMode::Colour16);
+        for (int id : res.ids(ResType::PMAP, DllId::TMT16)) check(ResType::PMAP, id, mischief::gfx::ColorMode::Colour16);
     for (int n = 0; n < 9; ++n)
-        for (int id : res.ids(ResType::SSND, soundDll(n))) check(ResType::SSND, id, gfx::ColorMode::Colour256);
+        for (int id : res.ids(ResType::SSND, soundDll(n))) check(ResType::SSND, id, mischief::gfx::ColorMode::Colour256);
     for (ResType t : {ResType::OTHR, ResType::BNDL, ResType::FFNT, ResType::RRGB})
-        for (int id : res.ids(t, DllId::TMT)) check(t, id, gfx::ColorMode::Colour256);
+        for (int id : res.ids(t, DllId::TMT)) check(t, id, mischief::gfx::ColorMode::Colour256);
     CHECK(failures == 0);
     CHECK(counts["PMAP"] == 764);
     if (res.hasDll(DllId::TMT16)) CHECK(counts["PMAP16"] == 764);
@@ -218,7 +218,7 @@ TEST_CASE("mods/game: invalid table overrides are refused and change nothing") {
     auto err = [&](std::string_view j) -> std::string {
         try {
             applyTablesText(*exe, j);
-        } catch (const FormatError& e) {
+        } catch (const mischief::FormatError& e) {
             return e.what();
         }
         return "";
@@ -246,7 +246,7 @@ TEST_CASE("mods/game: invalid table overrides are refused and change nothing") {
 TEST_CASE("mods/game: PMAP overrides: precedence, size check, new ids, 16-colour fallback") {
     TM_REQUIRE_GAME_DATA();
     TempDir t("tmport_mods_pmap");
-    const gfx::Palette pal = g->res->palette(900);
+    const mischief::gfx::Palette pal = g->res->palette(900);
     const auto o1400 = g->res->pixmap(1400);
     const auto o1437 = g->res->pixmap(1437);
     const auto o1474 = g->res->pixmap(1474);
@@ -303,13 +303,13 @@ TEST_CASE("mods/game: PMAP overrides: precedence, size check, new ids, 16-colour
         CHECK(p->at(4, 0) == 2);
     }
     if (g->res->hasDll(DllId::TMT16)) {
-        auto files = freshFiles(gfx::ColorMode::Colour16);
+        auto files = freshFiles(mischief::gfx::ColorMode::Colour16);
         applyMods(*files, {a});
-        const auto p = files->res->pixmap(1400, gfx::ColorMode::Colour16);
+        const auto p = files->res->pixmap(1400, mischief::gfx::ColorMode::Colour16);
         REQUIRE(p);
         CHECK(p->depth == 4);
         CHECK(std::all_of(p->pixels.begin(), p->pixels.end(), [](uint8_t v) { return v < 16; }));
-        CHECK(p->pixels != files->res->pixmap(1437, gfx::ColorMode::Colour16)->pixels);
+        CHECK(p->pixels != files->res->pixmap(1437, mischief::gfx::ColorMode::Colour16)->pixels);
     }
 }
 
@@ -327,12 +327,12 @@ TEST_CASE("mods/game: RGBA art with transparency is quantised to the game palett
             p[2] = 128;
             p[3] = (x < 3) ? 0 : 255;  // a transparent stripe
         }
-    put(t.p / "M" / "PMAP" / "1700.png", encodePngRgba(o->width, o->height, rgba));
+    put(t.p / "M" / "PMAP" / "1700.png", mischief::mods::encodePngRgba(o->width, o->height, rgba));
     auto files = freshFiles();
     applyMods(*files, {t.p / "M"});
     const auto p = files->res->pixmap(1700);
     REQUIRE(p);
-    const gfx::Palette pal = files->res->palette(900);
+    const mischief::gfx::Palette pal = files->res->palette(900);
     CHECK(pal.keyTable()[p->at(0, 0)]);
     CHECK(pal.keyTable()[p->at(2, o->height - 1)]);
     for (int x = 3; x < o->width; x += 7) CHECK_FALSE(pal.keyTable()[p->at(x, 5)]);
@@ -399,7 +399,7 @@ TEST_CASE("mods/game: SSND, OTHR text, BNDL, DAM, RRGB and FFNT overrides with v
     CHECK(anim::analyze(*s).maxFrame == 2);
     CHECK(anim::loadScript(res, 20101)->bytes == *res.loadOriginal(ResType::OTHR, 20101));
     // RRGB and FFNT.
-    CHECK(res.palette(900).colour(200) == Rgb8{1, 2, 3});
+    CHECK(res.palette(900).colour(200) == mischief::Rgb8{1, 2, 3});
     const text::Font f = text::Font::load(res);
     CHECK(f.height() == 8);
     CHECK(f.charWidth('A') == 6);
@@ -434,8 +434,8 @@ TEST_CASE("mods/game: binary OTHR overrides and PMAP16 art") {
     REQUIRE(o);
     std::vector<uint8_t> idx16(o->pixels.size());
     for (size_t i = 0; i < idx16.size(); ++i) idx16[i] = (i / 8) % 2 ? 1 : 12;
-    const gfx::Palette vga = gfx::Palette::vga16();
-    put(m / "PMAP16" / "1400.png", encodePngIndexed(o->width, o->height, idx16, std::vector<Rgb8>(vga.colours().begin(), vga.colours().begin() + 16)));
+    const mischief::gfx::Palette vga = mischief::gfx::Palette::vga16();
+    put(m / "PMAP16" / "1400.png", mischief::mods::encodePngIndexed(o->width, o->height, idx16, std::vector<mischief::Rgb8>(vga.colours().begin(), vga.colours().begin() + 16)));
     put(m / "PMAP" / "1400.png", patternPng(g->res->palette(900), o->width, o->height, 2, 2));
 
     auto files = freshFiles();
@@ -449,9 +449,9 @@ TEST_CASE("mods/game: binary OTHR overrides and PMAP16 art") {
     CHECK(files->res->mods().failures().size() == 1);
     CHECK(files->res->pixmap(1400)->at(0, 0) == 2);
     if (g->res->hasDll(DllId::TMT16)) {
-        auto f16 = freshFiles(gfx::ColorMode::Colour16);
+        auto f16 = freshFiles(mischief::gfx::ColorMode::Colour16);
         applyMods(*f16, {m});
-        CHECK(f16->res->pixmap(1400, gfx::ColorMode::Colour16)->pixels == idx16);
+        CHECK(f16->res->pixmap(1400, mischief::gfx::ColorMode::Colour16)->pixels == idx16);
     }
 }
 
@@ -492,7 +492,7 @@ TEST_CASE("mods/game: MIDI overrides are served through the data source; table f
         n[0] = set;
         return at.soundsDir + n;
     };
-    auto read = [&](const vfs::DataSource& src, const std::string& p) {
+    auto read = [&](const mischief::vfs::DataSource& src, const std::string& p) {
         auto f = src.open(p);
         REQUIRE(f);
         return f->readAll();
@@ -502,7 +502,7 @@ TEST_CASE("mods/game: MIDI overrides are served through the data source; table f
     CHECK(read(*files->source, path(1, 'B')) == tune);
     CHECK(read(*files->source, path(1, 'E')) == read(*g->source, path(1, 'E')));
     CHECK(read(*files->source, path(2, 'E')) == read(*g->source, path(2, 'E')));
-    CHECK(read(*files->source, toLowerAscii(path(0, 'E'))) == tune);  // case-insensitive
+    CHECK(read(*files->source, mischief::toLowerAscii(path(0, 'E'))) == tune);  // case-insensitive
     CHECK(files->exe->array<uint8_t, 4>(dg::kGemsNeeded) == std::array<uint8_t, 4>{3, 3, 4, 5});
     // The DLLs still come from the game data.
     CHECK(files->res->pixmap(1000) != nullptr);

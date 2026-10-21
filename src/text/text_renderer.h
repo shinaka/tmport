@@ -2,7 +2,7 @@
 // Text_Render (10b0:00b5) and its wrappers: the game's word-wrapping proportional text engine
 // (re/docs/code_1098-10d8.md §7, fmt_bndl_ffnt.md §4-5). Measuring and drawing share one
 // routine, exactly as in the original, so box sizes, centring and line breaks agree everywhere.
-// The routine is the shared core's TextEngine (text/text_engine.h, TextDialect::treasureMountain())
+// The routine is the engine's TextEngine (mischief/text/text_engine.h, TextDialect::treasureMountain())
 // with the FFNT font and the frame buffer behind its interfaces.
 //
 // Strings are raw bytes (never transcoded), NUL-terminated in the original. Here a string is a
@@ -28,12 +28,15 @@
 #include <span>
 #include <string_view>
 
+#include "mischief/text/text_engine.h"
 #include "text/font.h"
-#include "text/text_engine.h"
+
+namespace mischief::gfx {
+class Presenter;
+}  // namespace mischief::gfx
 
 namespace tmport::gfx {
 class FrameBuffer;
-class Presenter;
 }  // namespace tmport::gfx
 
 namespace tmport::text {
@@ -44,7 +47,7 @@ public:
 
     // fb: drawing target and owner of the current pen colour (nullptr: measure only).
     // presenter: target of the per-glyph present when `flush` is set (nullptr: none).
-    explicit TextRenderer(const Font& font, gfx::FrameBuffer* fb = nullptr, gfx::Presenter* presenter = nullptr)
+    explicit TextRenderer(const Font& font, gfx::FrameBuffer* fb = nullptr, mischief::gfx::Presenter* presenter = nullptr)
         : metrics_(font), canvas_(font, fb, presenter), engine_(metrics_, fb ? &canvas_ : nullptr) {}
     TextRenderer(const TextRenderer&) = delete;
     TextRenderer& operator=(const TextRenderer&) = delete;
@@ -53,20 +56,20 @@ public:
     gfx::FrameBuffer* frameBuffer() const { return canvas_.fb; }
 
     // 10b0:0000 Text_Draw: box width 512, no substitution, no flush.
-    void draw(int x, int y, Bytes s) { render(x, y, kScreenWidth, s, {}, false, true); }
+    void draw(int x, int y, mischief::text::Bytes s) { render(x, y, kScreenWidth, s, {}, false, true); }
     // 10b0:0023 Text_DrawBox
-    void drawBox(int x, int y, int wrapW, Bytes s, SubstTable subst = {}, bool flush = false) {
+    void drawBox(int x, int y, int wrapW, mischief::text::Bytes s, mischief::text::SubstTable subst = {}, bool flush = false) {
         render(x, y, wrapW, s, subst, flush, true);
     }
     // 10b0:0050 Text_Measure: layout at (0,0) without drawing.
-    TextExtent measure(Bytes s, SubstTable subst = {}, int wrapW = kScreenWidth) {
+    mischief::text::TextExtent measure(mischief::text::Bytes s, mischief::text::SubstTable subst = {}, int wrapW = kScreenWidth) {
         return render(0, 0, wrapW, s, subst, false, false);
     }
     // 10b0:0080 Text_Width: 0 for an empty string, else the measured width in a 512 box.
-    int width(Bytes s);
+    int width(mischief::text::Bytes s);
 
     // 10b0:00b5 Text_Render: the core. Returns the extent the original writes to outW/outH.
-    TextExtent render(int x0, int y0, int wrapW, Bytes s, SubstTable subst, bool flush, bool draw) {
+    mischief::text::TextExtent render(int x0, int y0, int wrapW, mischief::text::Bytes s, mischief::text::SubstTable subst, bool flush, bool draw) {
         return engine_.render(x0, y0, wrapW, s, subst, flush, draw);
     }
 
@@ -74,7 +77,7 @@ public:
     // following FF 01 substitutions (other escapes add nothing; TAB and FE add their glyph
     // widths). With inSubst the scan starts inside substStr at substPos and resumes in s at pos
     // when the substitution ends.
-    int measureRun(uint8_t stop, Bytes s, size_t pos, SubstTable subst, bool inSubst = false, Bytes substStr = {},
+    int measureRun(uint8_t stop, mischief::text::Bytes s, size_t pos, mischief::text::SubstTable subst, bool inSubst = false, mischief::text::Bytes substStr = {},
                    size_t substPos = 0) const {
         return engine_.measureRun(stop, s, pos, subst, inSubst, substStr, substPos);
     }
@@ -85,12 +88,12 @@ public:
 
     // Debug/test hook: called for every glyph placed (drawn or measured) with its byte, cell
     // position and advance.
-    using GlyphObserver = TextEngine::GlyphObserver;
+    using GlyphObserver = mischief::text::TextEngine::GlyphObserver;
     void setGlyphObserver(GlyphObserver f) { engine_.setGlyphObserver(std::move(f)); }
 
 private:
     // The FFNT font's metrics (1068:00d9 Font_GetHeight, 1068:00dd Font_CharWidth).
-    struct Metrics final : TextFont {
+    struct Metrics final : mischief::text::TextFont {
         explicit Metrics(const Font& f) : font(f) {}
         int lineHeight() const override { return font.height(); }
         int charWidth(uint8_t c) const override { return font.charWidth(c); }
@@ -98,20 +101,20 @@ private:
     };
     // The frame buffer's pen and the presenter (Font_DrawChar 1068:00f6, Gfx_DrawHLine 1058:090f,
     // Pal_SetForeColor 1048:02fd, Gfx_BlitToWindow 1058:05bc).
-    struct Canvas final : TextCanvas {
-        Canvas(const Font& f, gfx::FrameBuffer* b, gfx::Presenter* p) : font(f), fb(b), presenter(p) {}
+    struct Canvas final : mischief::text::TextCanvas {
+        Canvas(const Font& f, gfx::FrameBuffer* b, mischief::gfx::Presenter* p) : font(f), fb(b), presenter(p) {}
         int drawGlyph(int x, int y, uint8_t c) override;
         void underline(int x, int y, int w) override;
         void setColour(int colour) override;
         void flushGlyph(int x, int y, int w, int h) override;
         const Font& font;
         gfx::FrameBuffer* fb;
-        gfx::Presenter* presenter;
+        mischief::gfx::Presenter* presenter;
     };
 
     Metrics metrics_;
     Canvas canvas_;
-    TextEngine engine_;
+    mischief::text::TextEngine engine_;
 };
 
 }  // namespace tmport::text

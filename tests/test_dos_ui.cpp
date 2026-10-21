@@ -28,8 +28,8 @@
 #include "dos/game/ui.h"
 #include "dos/gfx/blitter.h"
 #include "dos_game_fixture.h"
-#include "util/file_util.h"
-#include "util/hash.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/hash.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -49,7 +49,7 @@ dosgame::FixtureOptions optionsFor(Look look) {
     return o;
 }
 
-uint64_t hashOf(const BackBuffer& b) { return fnv1a64(b.logicalPixels()); }
+uint64_t hashOf(const BackBuffer& b) { return mischief::fnv1a64(b.logicalPixels()); }
 
 // A reference USERS.DAT of extracted/captures/dos (nullopt without the captures).
 std::optional<fs::path> capturesFile(const char* rel) {
@@ -73,7 +73,7 @@ bool storeUsers(dosgame::GameFixture& f, const char* rel) {
 // The raw seed whose next rand() % 6 is `order` (the answer order Quiz_PickQuestion draws).
 void seedForOrder(DosGame& g, int order) {
     for (uint32_t s = 1;; ++s) {
-        BorlandRand r;
+        mischief::BorlandRand r;
         r.setRawSeed(s);
         if (r.rand() % 6 == order) {
             g.rand.setRawSeed(s);
@@ -466,7 +466,7 @@ TEST_CASE("DOS ui: reference renders of the module paths") {
         }
         // Over the capture (verify.py): the render that is compared pixel for pixel.
         if (dir) {
-            const auto bg = readWholeFile(*dir / (std::string(c.name) + "_bg.bin"));
+            const auto bg = mischief::readWholeFile(*dir / (std::string(c.name) + "_bg.bin"));
             if (!bg || bg->size() != static_cast<size_t>(BackBuffer::kWidth) * BackBuffer::kHeight) continue;
             dosgame::GameFixture f(*gameFiles, optionsFor(c.look));
             BackBuffer& b = f.g().back;
@@ -474,7 +474,7 @@ TEST_CASE("DOS ui: reference renders of the module paths") {
                 for (int x = 0; x < BackBuffer::kWidth; ++x)
                     b.setPixel(x, y, (*bg)[static_cast<size_t>(y) * BackBuffer::kWidth + x]);
             REQUIRE(c.draw(f, *gameFiles));
-            CHECK(writeWholeFile(*dir / (std::string(c.name) + ".bin"), b.logicalPixels()));
+            CHECK(mischief::writeWholeFile(*dir / (std::string(c.name) + ".bin"), b.logicalPixels()));
         }
     }
 }
@@ -838,7 +838,7 @@ TEST_CASE("DOS ui: title phases, the 7200-tick page timer, keys and sparkle atte
     auto frame = [&](int cmd) {
         g.input.cmd = static_cast<int16_t>(cmd);
         const bool idle = g.player.slots[2].anim == 0 && g.ui.ssPage == 0;
-        BorlandRand replay;
+        mischief::BorlandRand replay;
         replay.setRawSeed(g.rand.seed());
         if (idle && (replay.rand() & 0x7F) == 0) replay.rand();
         g.frameClock().beginFrame(5);
@@ -945,7 +945,7 @@ TEST_CASE("DOS ui: the title loop on the reference clock: page draws, time-outs 
         s.prev = 0x5C;  // its script ended on this tick (-10)
         g.ui.sparkleIdle = false;
         g.ui.sparkleEndAt = 0;
-        BorlandRand replay;
+        mischief::BorlandRand replay;
         replay.setRawSeed(g.rand.seed());
         bool started = false;
         for (int k = 0; k < 32 && !started; ++k) {  // 0.75 + k / 7.3 < 5 PIT ticks: k = 0..31

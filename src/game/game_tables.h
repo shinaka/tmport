@@ -102,7 +102,7 @@ struct GameTables {
     std::array<std::vector<LayoutRecord>, kTierCount> layouts;  // OTHR 10550..10553
     std::vector<ObjectAttributes> objects;                      // OTHR 10555
 
-    // Everything (EXE tables + OTHR layouts). Throws tmport::Error on missing/short resources.
+    // Everything (EXE tables + OTHR layouts). Throws mischief::Error on missing/short resources.
     static GameTables load(const ExeTables& exe, const ResourceManager& res);
     // Only the DGROUP tables (layouts/objects stay empty).
     static GameTables fromExe(const ExeTables& exe);

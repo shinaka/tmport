@@ -7,11 +7,11 @@
 
 #include "data/dgroup_offsets.h"
 #include "data/exe_tables.h"
-#include "gfx/presenter.h"
+#include "mischief/gfx/presenter.h"
+#include "mischief/util/error.h"
+#include "mischief/util/log.h"
 #include "platform/engine.h"
 #include "text/font.h"
-#include "util/error.h"
-#include "util/log.h"
 
 namespace tmport::ui {
 
@@ -30,8 +30,8 @@ constexpr uint32_t kHighlightText = rgba(255, 255, 255);
 constexpr uint32_t kGrayText = rgba(128, 128, 128);
 constexpr uint32_t kShadowColour = rgba(64, 64, 64);
 
-constexpr int kCanvasW = gfx::Presenter::kCanvasWidth;
-constexpr int kCanvasH = gfx::Presenter::kCanvasHeight;
+constexpr int kCanvasW = mischief::gfx::Presenter::kCanvasWidth;
+constexpr int kCanvasH = mischief::gfx::Presenter::kCanvasHeight;
 
 uint8_t upperAscii(uint8_t c) { return (c >= 'a' && c <= 'z') ? static_cast<uint8_t>(c - 'a' + 'A') : c; }
 
@@ -113,13 +113,13 @@ MenuBarModel MenuBarModel::fromExe(const ExeTables& exe, uint16_t off) {
     MenuBarModel m;
     const int count = exe.i16(off);
     const auto popups = exe.dgPtr(off + 2u);
-    if (count < 0 || count > 16 || !popups) throw FormatError("menu bar definition: bad popup table");
+    if (count < 0 || count > 16 || !popups) throw mischief::FormatError("menu bar definition: bad popup table");
     for (int i = 0; i < count; ++i) {
         const uint32_t p = *popups + 0x14u * static_cast<uint32_t>(i);
         MenuDef def;
         def.title = MenuLabel::parse(exe.farCstr(p + 0x00));
         const int itemCount = exe.i16(p + 0x06);
-        if (itemCount < 0 || itemCount > 64) throw FormatError("menu bar definition: bad item count");
+        if (itemCount < 0 || itemCount > 64) throw mischief::FormatError("menu bar definition: bad item count");
         const auto items = exe.farCstr(p + 0x08);
         const auto handlers = exe.dgPtr(p + 0x0C);
         // Items are separated by '\n'; the scan of 1078:0000 stops at '\n' or NUL. Items missing
@@ -263,27 +263,27 @@ void MenuBar::postCommand(uint16_t commandId) { pending_ = commandId; }
 bool MenuBar::dispatch(uint16_t commandId) {
     if (inResourceLoad_) {
         ++stats_.droppedLoad;
-        log::debug("menu: command {:#06x} ignored during a resource load", commandId);
+        mischief::log::debug("menu: command {:#06x} ignored during a resource load", commandId);
         return false;
     }
     if (inHandler_) {
         ++stats_.droppedReentrant;
-        log::debug("menu: command {:#06x} ignored while a menu command runs", commandId);
+        mischief::log::debug("menu: command {:#06x} ignored while a menu command runs", commandId);
         return false;
     }
     if (!installed_ || !enabled_) {
         ++stats_.droppedDisabled;
-        log::debug("menu: command {:#06x} ignored, menu {}", commandId, installed_ ? "disabled" : "removed");
+        mischief::log::debug("menu: command {:#06x} ignored, menu {}", commandId, installed_ ? "disabled" : "removed");
         return false;
     }
     const MenuItemDef* item = model_.find(commandId);
     if (!item) {
         ++stats_.droppedUnknown;
-        log::warn("menu: unknown command {:#06x}", commandId);
+        mischief::log::warn("menu: unknown command {:#06x}", commandId);
         return false;
     }
     ++stats_.delivered;
-    log::debug("menu: command {:#06x} ({})", commandId, menuCommandName(item->command));
+    mischief::log::debug("menu: command {:#06x} ({})", commandId, menuCommandName(item->command));
     // Menu_EnableAll(0); handler; Menu_EnableAll(1). The guard also runs when the handler leaves
     // with RestartToSignIn / QuitGame (the original's longjmp skipped it, but the menu is removed
     // and reinstalled on both paths, which resets g_menusEnabled anyway).
@@ -676,7 +676,7 @@ int MenuBar::drawLabel(int x, int y, const MenuLabel& l, uint32_t colour) {
 }
 
 void MenuBar::redraw() {
-    gfx::Presenter& pr = engine_.presenter();
+    mischief::gfx::Presenter& pr = engine_.presenter();
     if (!installed_) {
         if (!drawn_.empty() || pr.hasOverlay()) pr.clearOverlay();
         drawn_ = {};

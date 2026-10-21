@@ -22,20 +22,20 @@ offset `0x3fb30`.
 | Config | `tools\dosbox_tmdos.conf`: `machine=ega` (the default), `memsize=16`, `cycles=fixed 6000`, SB16 (with OPL), `[mixer] nosound=true` (devices are still emulated, but nothing plays on the host speakers), `windowposition=-4000,100`, `saveremark=false`, `forceloadstate=true`, `show recorded filename=false` |
 | C: drive | `extracted\dos_c\`, a writable copy. `extracted\dos_c\TM\` is a byte-identical copy of `TM-DOS\*` (checked with `diff -r` before the first run). `TM-DOS` itself is never mounted. |
 | Start-up | The autoexec runs `C:\RUN.BAT`. `tmctl` rewrites that file on every DOS start as `cd \TM` followed by `SST <args>`. |
-| Driver | `tools\tmctl.py --profile dos` (additive; the default profile is still `win` and behaves exactly as before) |
+| Driver | the engine's `tools\tmctl.py --profile dos` (additive; the default profile is still `win` and behaves exactly as before) |
 
 Commands (bash, from `C:\Git\TM`):
 
 ```
-python -P tools/tmctl.py start --profile dos --park                     # EGA (machine=ega)
-python -P tools/tmctl.py start --profile dos --machine tandy --park     # Tandy 1000
-python -P tools/tmctl.py start --profile dos --machine mcga --park      # MCGA (or --machine cga ...)
-python -P tools/tmctl.py start --profile dos --args "-T" --set "cycles=fixed 3000"   # explicit switches
-python -P tools/tmctl.py key enter text:ada enter        # same key syntax as the Windows profile
-python -P tools/tmctl.py shot OUT.png                    # EGA: 640x400 (2x2 doubled); Tandy/CGA/MCGA: 320x200
-python -P tools/tmctl.py state save ega/castle           # -> extracted/captures/dos/savestates/ega/castle.sav + .users
-python -P tools/tmctl.py state load ega/castle           # also restores the matching USERS.DAT copy
-python -P tools/tmctl.py stop
+python -P <engine>/tools/tmctl.py start --profile dos --park                     # EGA (machine=ega)
+python -P <engine>/tools/tmctl.py start --profile dos --machine tandy --park     # Tandy 1000
+python -P <engine>/tools/tmctl.py start --profile dos --machine mcga --park      # MCGA (or --machine cga ...)
+python -P <engine>/tools/tmctl.py start --profile dos --args "-T" --set "cycles=fixed 3000"   # explicit switches
+python -P <engine>/tools/tmctl.py key enter text:ada enter        # same key syntax as the Windows profile
+python -P <engine>/tools/tmctl.py shot OUT.png                    # EGA: 640x400 (2x2 doubled); Tandy/CGA/MCGA: 320x200
+python -P <engine>/tools/tmctl.py state save ega/castle           # -> extracted/captures/dos/savestates/ega/castle.sav + .users
+python -P <engine>/tools/tmctl.py state load ega/castle           # also restores the matching USERS.DAT copy
+python -P <engine>/tools/tmctl.py stop
 ```
 
 - `start --profile dos` writes `extracted\captures\dosbox.profile`. Later `state` commands pick
@@ -176,7 +176,7 @@ Ada's game, §5.10).
 MCGA: title, story page 2, walk-off, sign-in, a level 2 game frame. CGA: title, story pages 1
 and 2, walk-off, sign-in, a level 2 game frame.
 
-### 4.4 AVIs (`avi\`, ZMBV; decode with `tools\avi_frames.py`)
+### 4.4 AVIs (`avi\`, ZMBV; decode with the engine's `tools\avi_frames.py`)
 
 `ega_opening_title`, `ega_signin_idle`, `ega_net_swing`, `ega_net_swings_repeated`,
 `ega_walk_and_scroll`, `ega_coin_drop_nothing`, `ega_coin_drop_key_found`,
@@ -604,7 +604,7 @@ early; sound in `fmt_sound.md` §11.6.
 ## Round 4 (wave 5, adlib agent): the AdLib driver's register stream
 
 Same setup as §1 (DOSBox-X 2026.10.01, `tools/dosbox_tmdos.conf`, EGA, SB16 OPL, host sound muted,
-window parked); `tools/tmctl.py audio opl|wav` while the harness state played, in turbo mode.
+window parked); the engine's `tools/tmctl.py audio opl|wav` while the harness state played, in turbo mode.
 
 | File | Content |
 |---|---|

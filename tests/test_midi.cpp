@@ -12,10 +12,10 @@
 #include "audio/midi_sequencer.h"
 #include "audio/smf.h"
 #include "audio_test_util.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/hash.h"
 #include "test_data.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/hash.h"
 
 using namespace tmport;
 using namespace tmport::audio;
@@ -41,7 +41,7 @@ std::vector<uint8_t> syntheticFormat1() {
 }
 
 std::uint64_t channelHash(const MidiSong& s) {
-    uint64_t h = kFnv64Offset;
+    uint64_t h = mischief::kFnv64Offset;
     for (const auto& e : s.events) {
         if (!e.isChannel()) continue;
         uint8_t b[11];
@@ -49,7 +49,7 @@ std::uint64_t channelHash(const MidiSong& s) {
         b[8] = e.status;
         b[9] = e.data1;
         b[10] = e.data2;
-        h = fnv1a64(b, h);
+        h = mischief::fnv1a64(b, h);
     }
     return h;
 }
@@ -152,19 +152,19 @@ TEST_CASE("SMF: SMPTE division, missing end of track, malformed files") {
     CHECK(s.lengthUs == 500'000);
     CHECK(s.warnings.size() == 1);
 
-    CHECK_THROWS_AS(parseSmf({'R', 'I', 'F', 'F', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}), FormatError);
+    CHECK_THROWS_AS(parseSmf({'R', 'I', 'F', 'F', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}), mischief::FormatError);
     TrackWriter bad;
     bad.ev(0, {0x3C, 0x40}).end(0);  // data byte with no running status
-    CHECK_THROWS_AS(parseSmf(smfFile(0, 96, {bad})), FormatError);
+    CHECK_THROWS_AS(parseSmf(smfFile(0, 96, {bad})), mischief::FormatError);
     TrackWriter longVlq;
     longVlq.bytes = {0x81, 0x81, 0x81, 0x81, 0x01, 0x90, 60, 1};
-    CHECK_THROWS_AS(parseSmf(smfFile(0, 96, {longVlq})), FormatError);
+    CHECK_THROWS_AS(parseSmf(smfFile(0, 96, {longVlq})), mischief::FormatError);
     TrackWriter ok;
     ok.end(0);
-    CHECK_THROWS_AS(parseSmf(smfFile(0, 0, {ok})), FormatError);   // zero PPQN
-    CHECK_THROWS_AS(parseSmf(smfFile(3, 96, {ok})), FormatError);  // unknown format
+    CHECK_THROWS_AS(parseSmf(smfFile(0, 0, {ok})), mischief::FormatError);   // zero PPQN
+    CHECK_THROWS_AS(parseSmf(smfFile(3, 96, {ok})), mischief::FormatError);  // unknown format
     auto noTracks = smfFile(0, 96, {});
-    CHECK_THROWS_AS(parseSmf(noTracks), FormatError);
+    CHECK_THROWS_AS(parseSmf(noTracks), mischief::FormatError);
 }
 
 TEST_CASE("SMF: all 20 SOUNDS\\*.MID match the independent reference parser") {
@@ -204,7 +204,7 @@ TEST_CASE("SMF: all 20 SOUNDS\\*.MID match the independent reference parser") {
     // Every MIDI file in the folder is covered by the table.
     size_t mids = 0;
     for (const auto& d : g->source->list("SOUNDS"))
-        if (toUpperAscii(d.name).ends_with(".MID")) ++mids;
+        if (mischief::toUpperAscii(d.name).ends_with(".MID")) ++mids;
     CHECK(mids == 20);
 }
 

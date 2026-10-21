@@ -16,14 +16,14 @@
 
 #include "app/bootstrap.h"
 #include "app/launch_options.h"
-#include "app_test_util.h"
 #include "dos/app/dos_preview.h"
 #include "dos/audio/dos_sound_renderer.h"
 #include "dos_test_data.h"
-#include "rtl/borland_rand.h"
-#include "util/file_util.h"
-#include "util/hash.h"
-#include "vfs/directory_source.h"
+#include "mischief/rtl/borland_rand.h"
+#include "mischief/test/app_test_util.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/hash.h"
+#include "mischief/vfs/directory_source.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -32,7 +32,7 @@ namespace fs = std::filesystem;
 namespace {
 
 uint64_t hashPixels(std::span<const uint32_t> px) {
-    return fnv1a64(std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(px.data()), px.size_bytes()));
+    return mischief::fnv1a64(std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(px.data()), px.size_bytes()));
 }
 
 float maxAbs(const std::vector<float>& s, size_t from, size_t to) {
@@ -42,7 +42,7 @@ float maxAbs(const std::vector<float>& s, size_t from, size_t to) {
 }
 
 std::pair<uint32_t, uint32_t> pngSize(const fs::path& p) {
-    auto data = readWholeFile(p);
+    auto data = mischief::readWholeFile(p);
     if (!data || data->size() < 24) return {0, 0};
     auto be32 = [&](size_t o) {
         return (uint32_t((*data)[o]) << 24) | (uint32_t((*data)[o + 1]) << 16) | (uint32_t((*data)[o + 2]) << 8) | (*data)[o + 3];
@@ -50,8 +50,8 @@ std::pair<uint32_t, uint32_t> pngSize(const fs::path& p) {
     return {be32(16), be32(20)};
 }
 
-PcKey key(const char* name) {
-    const auto k = pcKeyByName(name);
+mischief::dos::PcKey key(const char* name) {
+    const auto k = mischief::dos::pcKeyByName(name);
     REQUIRE(k.has_value());
     return *k;
 }
@@ -66,7 +66,7 @@ TEST_CASE("DOS preview: Enter cycles the screens, frames are the composer's, sou
     opt.sound = SoundDevice::Tandy;
     opt.headless = true;
     DosRuntime rt;
-    BorlandRand rnd;
+    mischief::BorlandRand rnd;
     auto audio = makeDosAudioDevice(files.files(), opt.sound, [&rnd] { return rnd.rand(); });
     REQUIRE(audio);
     CHECK(audio->device() == SoundCard::Tandy);
@@ -83,7 +83,7 @@ TEST_CASE("DOS preview: Enter cycles the screens, frames are the composer's, sou
     REQUIRE(frames.size() == 1);
     CHECK(frames[0].first == DosScreen::Title);
 
-    ScriptedInput sc;
+    mischief::dos::ScriptedInput sc;
     for (uint64_t t : {20, 40, 60, 80, 100}) sc.tap(t, key("enter"));
     sc.tap(90, key("5"));  // effect 5 on the path
     sc.keyDown(120, key("lctrl"));  // Ctrl+S in the castle: music and sound off
@@ -173,16 +173,16 @@ TEST_CASE("DOS preview: the mouse pointer follows the mouse on the title; a clic
     std::vector<uint64_t> frames;
     pv.setFrameSink([&](DosScreen, std::span<const uint32_t> px) { frames.push_back(hashPixels(px)); });
     pv.start();
-    ScriptedInput sc;
-    ScriptEvent move;
+    mischief::dos::ScriptedInput sc;
+    mischief::dos::ScriptEvent move;
     move.tick = 5;
-    move.kind = ScriptEvent::Kind::MouseMove;
+    move.kind = mischief::dos::ScriptEvent::Kind::MouseMove;
     move.x = 100;
     move.y = 60;
     sc.add(move);
-    ScriptEvent press = move;
+    mischief::dos::ScriptEvent press = move;
     press.tick = 10;
-    press.kind = ScriptEvent::Kind::MouseButtons;
+    press.kind = mischief::dos::ScriptEvent::Kind::MouseButtons;
     press.buttons = MouseDriver::kLeft;
     sc.add(press);
     rt.setScript(sc);
@@ -206,7 +206,7 @@ TEST_CASE("DOS preview: the offline sound equals the dos_audio render of the tit
         // The CLI's render (tmport --dos-sound <dev> tune 1, dos_sound_cli.cpp): a fresh renderer on
         // the folder's files, smooth mode at 48 kHz; the WAV is these samples x 0.7.
         auto tables = std::make_shared<const SoundTables>(SoundTables::fromExe(files.exe()));
-        const SoundBank bank = SoundBank::load(vfs::DirectorySource(folder), card, tables);
+        const SoundBank bank = SoundBank::load(mischief::vfs::DirectorySource(folder), card, tables);
         DosSoundRenderer r(bank, DosRenderConfig{});
         const OfflineRender cli = renderEntry(r, true, 1, 1, 12.0);  // the first 12 s
         const size_t n = cli.samples.size() - static_cast<size_t>(48000 * 0.2) - 512;  // without the ring-out and last tick
@@ -237,8 +237,8 @@ TEST_CASE("DOS preview: headless start-up with a frame-dump folder and a DOS --k
     const fs::path dir = apptest::outDir("dos_preview_run");
     std::ofstream(dir / "tmport.ini") << "[saves]\nimported_original = true\n";
     const fs::path dump = dir / "frames";
-    const std::string data = pathToUtf8(*testdata::dosDataPath());
-    const std::string pref = pathToUtf8(dir), ini = pathToUtf8(dir / "tmport.ini"), out = pathToUtf8(dump);
+    const std::string data = mischief::pathToUtf8(*testdata::dosDataPath());
+    const std::string pref = mischief::pathToUtf8(dir), ini = mischief::pathToUtf8(dir / "tmport.ini"), out = mischief::pathToUtf8(dump);
     std::vector<const char*> argv = {"tmport", "--edition", "dos", "--dos-preview", "--data", data.c_str(), "--headless", "--pref-dir", pref.c_str(),
                                      "--config", ini.c_str(), "--look", "tandy", "--frame-dump", out.c_str(),
                                      "--keys", "10:tap:enter, 20:tap:enter, 30:tap:3"};

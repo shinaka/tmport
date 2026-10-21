@@ -17,9 +17,9 @@
 #include <utility>
 #include <vector>
 
-#include "dos/input/bios_keyboard.h"
 #include "dos/input/keyboard.h"
 #include "dos/input/mouse.h"
+#include "mischief/dos/input/bios_keyboard.h"
 
 namespace tmport::dos {
 
@@ -52,7 +52,7 @@ public:
     // Empty tables (no keys, no zones, each zone table with its room); tests fill them by hand.
     InputTables();
     // Reads the tables of every context through the far pointers at DS:80DB / 80F3 / 810B.
-    // Throws tmport::FormatError when a pointer leaves DGROUP or a table does not fit.
+    // Throws mischief::FormatError when a pointer leaves DGROUP or a table does not fit.
     static InputTables load(const DosExe& exe);
 
     InputZoneTable& zones(int ctx) { return zones_.at(static_cast<size_t>(ctx)); }
@@ -109,9 +109,9 @@ public:
     int context = 0;           // g_inputContext DS:922C
 
     // 4a85:000E Input_Poll.
-    void poll(BiosKeyboard& bios, const MousePointer& mouse, uint8_t uiMode);
+    void poll(mischief::dos::BiosKeyboard& bios, const MousePointer& mouse, uint8_t uiMode);
     // 4a85:03AC Input_Tick: Input_Poll, then Esc/F1-F3 in play.
-    InputTickAction tick(BiosKeyboard& bios, const MousePointer& mouse, uint8_t uiMode, bool scriptedMove, bool slowCpu);
+    InputTickAction tick(mischief::dos::BiosKeyboard& bios, const MousePointer& mouse, uint8_t uiMode, bool scriptedMove, bool slowCpu);
     // 4a85:0208 Input_MouseWalk (per executed game tick, before Player_Update): Down -> coin where
     // Down cannot climb, arrow commands dropped in play, play-field press/hold -> walk, climb, jump
     // or net relative to the player, status-bar press -> coin, release -> stop. Writes g_keys and

@@ -6,7 +6,7 @@
 #include <string>
 
 #include "dos/data/dgroup_offsets.h"
-#include "util/file_util.h"
+#include "mischief/util/file_util.h"
 
 namespace tmport::dos {
 
@@ -86,7 +86,7 @@ DosExe DosExe::load(std::span<const uint8_t> exeFile) {
 }
 
 DosExe DosExe::loadFile(const std::filesystem::path& sstExe) {
-    const auto bytes = readWholeFile(sstExe);
+    const auto bytes = mischief::readWholeFile(sstExe);
     if (!bytes) throw std::runtime_error("cannot read " + sstExe.string());
     return load(*bytes);
 }

@@ -134,11 +134,11 @@ paths, mouse, video, palette, sound files, help, dictionary, BEGIN.PAK, `Game_In
 default seed **1** (the u32 seed lives at DS:8F48, initialised to 1 in the EXE [O]; `rand` 4d12:001F
 returns bits 16..30 of seed = seed * 0x015A4E35 + 1): `srand` is only called by `Layout_Generate`
 for a new game, so everything before it (title sparkles, a dissolve, the elves of a resumed game)
-runs on the unseeded sequence (`src/rtl/borland_rand` is the same LCG). The seed can be read out of
-any DOSBox-X save state (`savmem.py peek STATE 8f48 4`) to check the engine's sequence.
-On the AdLib device every `Music_Play` with the music on draws one `rand()` (4ac9:0002: the
-orchestration `4·tune + (rand() & 3)`), so the sound device changes the random sequence;
-`DosAudioDevice::musicPlay` draws it from the game's generator (wave 2).
+runs on the unseeded sequence (the engine's `src/mischief/rtl/borland_rand` is the same LCG). The
+seed can be read out of any DOSBox-X save state (`savmem.py peek STATE 8f48 4`) to check the
+engine's sequence. On the AdLib device every `Music_Play` with the music on draws one `rand()`
+(4ac9:0002: the orchestration `4·tune + (rand() & 3)`), so the sound device changes the random
+sequence; `DosAudioDevice::musicPlay` draws it from the game's generator (wave 2).
 
 ### 2.5 Long frames and disk I/O at the reference speed (wave 4) [O, R]
 

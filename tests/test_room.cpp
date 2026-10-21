@@ -429,7 +429,7 @@ struct ElfRig {
     PlayerRuntime p;
     SceneRuntime sc;
     Recorder hooks;
-    BorlandRand rng;
+    mischief::BorlandRand rng;
     ElfSystem elves{roomTables()};
     ElfRig() : s(GameState::initial(gameTables())) {}
     void tick() {
@@ -447,7 +447,7 @@ TEST_CASE("elves: spawn placement in the original's random-number order") {
     r.s.quiz.slots[1].q = kQuizNoQuestion;
     r.s.quiz.slots[2].q = 7;
     r.rng.srand(0x6f38);
-    BorlandRand ref;
+    mischief::BorlandRand ref;
     ref.srand(0x6f38);
     r.elves.init();
     r.elves.spawnForLevel(r.s, 8, r.rng, nullptr);
@@ -511,7 +511,7 @@ TEST_CASE("elves: a behaviour loop moves by the script and ends with R(20), R(30
     const ElfScript& s0 = roomTables().elfScripts[0];
     h = Elf{0, 0, int16_t(s0.frames.size() - 1), 100, 181, 0, 12, 0, 0};
     solo.rng.srand(99);
-    BorlandRand ref;
+    mischief::BorlandRand ref;
     ref.srand(99);
     solo.tick();
     ref.random(20);
@@ -533,7 +533,7 @@ TEST_CASE("elves: a behaviour loop moves by the script and ends with R(20), R(30
         t.elves.elves()[6] = Elf{1, 1, int16_t(s1.frames.size() - 1), 100, 189, 0, 12, 0, 0};
         t.elves.throwState = 0;
         t.rng.srand(seed);
-        BorlandRand rr;
+        mischief::BorlandRand rr;
         rr.srand(seed);
         const bool throws = rr.random(10) < 8;
         t.tick();
@@ -663,7 +663,7 @@ TEST_CASE("elves: room edges, confinement after the gate walk, the room-36 fount
         for (int i = 0; i < 3; ++i) d.elves.elves()[size_t(i)] = Elf{0, 0, 1, 200, 181, 0, 40, 0, 0};
         d.elves.elves()[3] = Elf{2, 2, 4, 500, 175, 0, 11, 0, 0};
         d.rng.srand(seed);
-        BorlandRand ref;
+        mischief::BorlandRand ref;
         ref.srand(seed);
         const bool door = ref.random(3) == 0;
         d.tick();
@@ -711,7 +711,7 @@ TEST_CASE("elves: room edges, confinement after the gate walk, the room-36 fount
 
 namespace {
 struct LoopRig {
-    ManualClock clock{1000};
+    mischief::ManualClock clock{1000};
     std::unique_ptr<Engine> engine;
     std::unique_ptr<text::Font> font;
     std::unique_ptr<text::TextRenderer> text;
@@ -724,7 +724,7 @@ struct LoopRig {
     LoopRig() : state(GameState::initial(gameTables())) {
         EngineConfig cfg;
         cfg.clock = &clock;
-        engine = std::make_unique<Engine>(*testdata::game(), gfx::ColorMode::Colour256, cfg);
+        engine = std::make_unique<Engine>(*testdata::game(), mischief::gfx::ColorMode::Colour256, cfg);
         font = std::make_unique<text::Font>(text::Font::load(*testdata::game()->res));
         text = std::make_unique<text::TextRenderer>(*font, &engine->frame(), &engine->presenter());
         dialogs = std::make_unique<ui::DialogSystem>(*engine, *font);
@@ -803,7 +803,7 @@ TEST_CASE("room: --show-treasure boxes the hiding places with a treasure or the 
             if (r.state.rooms.spotContent(rm, i) == kContentTreasure) room = rm;
     REQUIRE(room >= 0);
     r.state.player.room = uint8_t(room);
-    std::vector<gfx::Presenter::DebugMark> expected;
+    std::vector<mischief::gfx::Presenter::DebugMark> expected;
     for (int i = 0; i < 3; ++i) {
         const uint8_t c = r.state.rooms.spotContent(room, i);
         if (c != kContentTreasure && c != kContentKey) continue;
@@ -812,7 +812,7 @@ TEST_CASE("room: --show-treasure boxes the hiding places with a treasure or the 
     }
     r.loop->startClimb();
     struct Stop {};
-    std::vector<std::vector<gfx::Presenter::DebugMark>> seen;
+    std::vector<std::vector<mischief::gfx::Presenter::DebugMark>> seen;
     r.loop->hooks().afterTick = [&](uint64_t t) {
         seen.push_back(r.engine->presenter().debugMarks());
         if (t == 1) r.engine->setShowTreasure(true);

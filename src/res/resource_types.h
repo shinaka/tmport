@@ -7,7 +7,7 @@
 #include <optional>
 #include <string_view>
 
-#include "gfx/palette.h"
+#include "mischief/gfx/palette.h"
 
 namespace tmport {
 
@@ -36,6 +36,6 @@ inline DllId soundDll(int n) { return static_cast<DllId>(static_cast<int>(DllId:
 // (type, id) -> DLL: 'P' -> the pixmap DLL of the colour mode, 'S' -> the sound DLL by id range
 // (7000-7099 TM0, 7100-7999 TM1, 4000+400k..4399+400k TM(2+k)), anything else -> TMT.DLL.
 // nullopt for sound ids no DLL serves (6800-6999, 8000-9999 and anything else).
-std::optional<DllId> dllFor(ResType type, int id, gfx::ColorMode mode);
+std::optional<DllId> dllFor(ResType type, int id, mischief::gfx::ColorMode mode);
 
 }  // namespace tmport

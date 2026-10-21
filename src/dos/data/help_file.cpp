@@ -5,13 +5,13 @@
 #include <string>
 
 #include "dos/data/dgroup_offsets.h"
-#include "util/error.h"
+#include "mischief/util/error.h"
 
 namespace tmport::dos {
 
 namespace {
 
-[[noreturn]] void bad(const std::string& why) { throw FormatError("HELP.DAT: " + why); }
+[[noreturn]] void bad(const std::string& why) { throw mischief::FormatError("HELP.DAT: " + why); }
 
 }  // namespace
 

@@ -18,7 +18,7 @@
 //             sound = tandy | speaker | adlib | off      slow_cpu = false   frame_speed = reference | period
 //             square_pixels = false   window_scale = 3 (320x240 x this)   (edition/dos_options.h)
 //
-// IniFile (save/ini_file.h) keeps comments, unknown keys and the order of the user's file when
+// IniFile (mischief/save/ini_file.h) keeps comments, unknown keys and the order of the user's file when
 // values are updated.
 
 #include <filesystem>
@@ -29,7 +29,7 @@
 
 #include "edition/dos_options.h"
 #include "edition/edition.h"
-#include "save/ini_file.h"
+#include "mischief/save/ini_file.h"
 
 namespace tmport::save {
 
@@ -59,9 +59,9 @@ struct EngineSettings {
     dos::DosSettings dos;            // [dos] the DOS edition's options
 
     // Reads known keys; malformed values keep their defaults (a warning is logged).
-    static EngineSettings fromIni(const IniFile& ini);
+    static EngineSettings fromIni(const mischief::save::IniFile& ini);
     // Writes every key into ini (keeping the rest of the file).
-    void toIni(IniFile& ini) const;
+    void toIni(mischief::save::IniFile& ini) const;
 
     bool operator==(const EngineSettings&) const = default;
 };

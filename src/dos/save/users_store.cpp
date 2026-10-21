@@ -2,9 +2,9 @@
 
 #include <system_error>
 
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
 #include "save/settings.h"
-#include "util/file_util.h"
-#include "util/log.h"
 
 namespace tmport::dos {
 
@@ -27,7 +27,7 @@ std::optional<fs::path> findDosUsersDat(const fs::path& dosFolder) {
     std::error_code ec;
     for (fs::directory_iterator it(dosFolder, ec), end; !ec && it != end; it.increment(ec)) {
         if (!it->is_regular_file(ec)) continue;
-        if (iequalsAscii(pathToUtf8(it->path().filename()), "USERS.DAT")) return it->path();
+        if (mischief::iequalsAscii(mischief::pathToUtf8(it->path().filename()), "USERS.DAT")) return it->path();
     }
     return std::nullopt;
 }
@@ -72,19 +72,19 @@ DosUsersStatus DosUsersStore::load() {
     users_ = UsersDat{};
     fromBackup_ = false;
     if (!fileExists(path_)) return status_ = DosUsersStatus::Missing;
-    const auto data = readWholeFile(path_);
+    const auto data = mischief::readWholeFile(path_);
     if (data && wholeFile(*data)) {
         users_ = *UsersDat::parse(*data);
         return status_ = DosUsersStatus::Ok;
     }
     status_ = data ? DosUsersStatus::Short : DosUsersStatus::Unreadable;
     // Never start over from an empty roster on top of a damaged file: use the last good version.
-    if (const auto bak = readWholeFile(backupPathFor(path_)); bak && wholeFile(*bak)) {
+    if (const auto bak = mischief::readWholeFile(mischief::backupPathFor(path_)); bak && wholeFile(*bak)) {
         users_ = *UsersDat::parse(*bak);
         fromBackup_ = true;
-        log::warn("{}: {}; using the backup {}", pathToUtf8(path_), describe(status_), pathToUtf8(backupPathFor(path_)));
+        mischief::log::warn("{}: {}; using the backup {}", mischief::pathToUtf8(path_), describe(status_), mischief::pathToUtf8(mischief::backupPathFor(path_)));
     } else {
-        log::warn("{}: {}; the DOS roster will not be saved", pathToUtf8(path_), describe(status_));
+        mischief::log::warn("{}: {}; the DOS roster will not be saved", mischief::pathToUtf8(path_), describe(status_));
     }
     return status_;
 }
@@ -97,7 +97,7 @@ DosUsersStatus DosUsersStore::loadWithImport(const fs::path& dosFolder, DosImpor
         o.source = *src;
         o.result = importDosUsers(*src, path_, false);
         if (o.result == DosImportResult::Imported)
-            log::info("imported the DOS roster {} into {}", pathToUtf8(*src), pathToUtf8(path_));
+            mischief::log::info("imported the DOS roster {} into {}", mischief::pathToUtf8(*src), mischief::pathToUtf8(path_));
     } else {
         o.result = DosImportResult::SourceMissing;
     }
@@ -108,12 +108,12 @@ DosUsersStatus DosUsersStore::loadWithImport(const fs::path& dosFolder, DosImpor
 // 47c7:055a Users_WriteFile (whole image; the original retries after a critical-error box).
 bool DosUsersStore::write(DosSaveMoment moment) {
     if (!writable()) {
-        log::error("{}: not written at '{}' ({}, no whole backup)", pathToUtf8(path_), describe(moment), describe(status_));
+        mischief::log::error("{}: not written at '{}' ({}, no whole backup)", mischief::pathToUtf8(path_), describe(moment), describe(status_));
         return false;
     }
     const std::vector<uint8_t> data = users_.bytes();
-    if (!replaceFileKeepingBackup(path_, data, wholeFile)) {
-        log::error("{}: write failed at '{}'", pathToUtf8(path_), describe(moment));
+    if (!mischief::replaceFileKeepingBackup(path_, data, wholeFile)) {
+        mischief::log::error("{}: write failed at '{}'", mischief::pathToUtf8(path_), describe(moment));
         return false;
     }
     ++writes_;
@@ -168,17 +168,17 @@ bool DosUsersStore::saveGameEnd(int rec, uint16_t nets, uint16_t coins) {
 DosImportResult importDosUsers(const fs::path& dosUsersDat, const fs::path& dest, bool overwrite) {
     if (!overwrite && fileExists(dest)) return DosImportResult::DestExists;
     if (!fileExists(dosUsersDat)) return DosImportResult::SourceMissing;
-    const auto data = readWholeFile(dosUsersDat);
+    const auto data = mischief::readWholeFile(dosUsersDat);
     if (!data || !wholeFile(*data)) return DosImportResult::SourceInvalid;
     const std::span<const uint8_t> whole(data->data(), kUsersFileSize);
-    if (!replaceFileKeepingBackup(dest, whole, wholeFile)) return DosImportResult::Failed;
+    if (!mischief::replaceFileKeepingBackup(dest, whole, wholeFile)) return DosImportResult::Failed;
     return DosImportResult::Imported;
 }
 
 bool exportDosUsers(const fs::path& engineFile, const fs::path& dest) {
-    const auto data = readWholeFile(engineFile);
+    const auto data = mischief::readWholeFile(engineFile);
     if (!data || !wholeFile(*data)) return false;
-    return replaceFileKeepingBackup(dest, std::span<const uint8_t>(data->data(), kUsersFileSize), wholeFile);
+    return mischief::replaceFileKeepingBackup(dest, std::span<const uint8_t>(data->data(), kUsersFileSize), wholeFile);
 }
 
 }  // namespace tmport::dos

@@ -40,7 +40,7 @@ Scenario files: tools/dos/scenarios/<group>/<name>.json (numbers, file names and
         the tick the log's end state was saved at (its executed ticks since the start state), against
         the picture on the screen in that state
     {"id": "f204", "tick": 265, "avi": "avi/ega_r2_bonus_coins.avi", "frame": 204}
-        against frame 204 of a reference AVI (tools/avi_frames.py)
+        against frame 204 of a reference AVI (the engine's tools/avi_frames.py)
     "info": "why"  on a checkpoint: informational (the reference shows another moment, e.g. a capture
         taken before the state was saved); compared and kept in the baseline like the others, but
         counted apart in the summary
@@ -73,7 +73,7 @@ import avifit  # noqa: E402
 import fl2csv  # noqa: E402
 import imgcmp  # noqa: E402
 import savmem  # noqa: E402
-import avi_frames  # noqa: E402  (tools/, put on the path by avifit)
+import avi_frames  # noqa: E402  (the engine's tools/, put on the path by avifit)
 
 REPO = os.path.normpath(os.path.join(HERE, '..', '..'))
 SCENARIOS = os.path.join(HERE, 'scenarios')

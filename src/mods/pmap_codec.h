@@ -18,8 +18,8 @@
 #include <string>
 #include <vector>
 
-#include "gfx/palette.h"
 #include "gfx/pixmap.h"
+#include "mischief/gfx/palette.h"
 
 namespace tmport::mods {
 
@@ -34,7 +34,7 @@ struct PmapImage {
 
 // Decodes a PNG into palette indices for `palette` (256-colour logical palette, or the VGA
 // 16-colour palette for depth-4 art). Throws FormatError.
-PmapImage pngToIndices(std::span<const uint8_t> png, const gfx::Palette& palette);
+PmapImage pngToIndices(std::span<const uint8_t> png, const mischief::gfx::Palette& palette);
 
 // Encodes indices as a PMAP body (header + pixels, zero-padded to the NE size).
 // depth 8: encoding Raw8 or Rund; depth 4: Raw4.
@@ -42,6 +42,6 @@ std::vector<uint8_t> encodePmapBody(const PmapImage& img, int depth, gfx::PixEnc
 
 // Editable PNG of a decoded PMAP: indexed, the full palette (256 or 16 entries), key colours
 // with alpha 0. Compressed.
-std::vector<uint8_t> pixmapToEditablePng(const gfx::PixMap& pm, const gfx::Palette& palette);
+std::vector<uint8_t> pixmapToEditablePng(const gfx::PixMap& pm, const mischief::gfx::Palette& palette);
 
 }  // namespace tmport::mods

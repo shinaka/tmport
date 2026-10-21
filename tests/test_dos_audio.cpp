@@ -25,16 +25,16 @@
 #include "dos/audio/dos_audio_device.h"
 #include "dos/audio/dos_sound_renderer.h"
 #include "dos/audio/opl_backend.h"
-#include "dos/audio/opl_chip.h"
-#include "dos/audio/psg_synth.h"
 #include "dos/audio/sequencer.h"
 #include "dos/audio/sound_data.h"
-#include "dos/audio/speaker_synth.h"
 #include "dos/save/dosbox_state.h"
 #include "dos_test_data.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "vfs/directory_source.h"
+#include "mischief/dos/audio/opl_chip.h"
+#include "mischief/dos/audio/psg_synth.h"
+#include "mischief/dos/audio/speaker_synth.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/vfs/directory_source.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -180,13 +180,13 @@ TEST_CASE("DOS audio: sound file headers and entries") {
 
     auto bad = makeFile(1, std::vector<std::vector<Stream>>(12, std::vector<Stream>(1, Stream{})));
     bad[0] = 0x98;  // header length
-    CHECK_THROWS_AS(SoundFile::parse(bad, 1, 12, SoundFile::kSfxBufferSize, "X"), FormatError);
+    CHECK_THROWS_AS(SoundFile::parse(bad, 1, 12, SoundFile::kSfxBufferSize, "X"), mischief::FormatError);
     const auto few = makeFile(1, std::vector<std::vector<Stream>>(5, std::vector<Stream>(1, Stream{})));
-    CHECK_THROWS_AS(SoundFile::parse(few, 1, 12, SoundFile::kSfxBufferSize, "X"), FormatError);
-    CHECK_THROWS_AS(SoundFile::parse(std::vector<uint8_t>(2000, 0), 1, 12, SoundFile::kSfxBufferSize, "X"), FormatError);
+    CHECK_THROWS_AS(SoundFile::parse(few, 1, 12, SoundFile::kSfxBufferSize, "X"), mischief::FormatError);
+    CHECK_THROWS_AS(SoundFile::parse(std::vector<uint8_t>(2000, 0), 1, 12, SoundFile::kSfxBufferSize, "X"), mischief::FormatError);
 
     std::vector<uint8_t> ds(0x10000, 0);
-    CHECK_THROWS_AS(SoundTables::fromDgroup(ds), FormatError);  // no period table pointers
+    CHECK_THROWS_AS(SoundTables::fromDgroup(ds), mischief::FormatError);  // no period table pointers
 }
 
 // ------------------------------------------------------------------------------ driver rules
@@ -416,63 +416,6 @@ TEST_CASE("DOS audio: zero-length streams end instead of hanging") {
 
 // ---------------------------------------------------------------------------------- synths
 
-TEST_CASE("DOS audio: SN76496 register writes") {
-    PsgSynth psg(SynthMode::Raw, 44100, NoiseType::Ti15);
-    psg.write(0x8A);  // voice 0 period low = 0xA
-    psg.write(0x05);  // data: high 6 bits
-    CHECK(psg.period(0) == 0x5A);
-    psg.write(0xB3);  // voice 1 attenuation 3
-    CHECK(psg.attenuation(1) == 3);
-    psg.write(0x07);  // data byte after an attenuation latch rewrites it
-    CHECK(psg.attenuation(1) == 7);
-    psg.write(0xE6);
-    CHECK(psg.noiseControl() == 6);
-    CHECK(psg.toneFrequency(2) == doctest::Approx(3579545.0 / (32 * 1024)));  // period 0 = 1024
-}
-
-TEST_CASE("DOS audio: noise register restarts (TI every write, NCR 8496 on a mode change)") {
-    const auto noiseRun = [](NoiseType type, bool rewrite, uint8_t second) {
-        PsgSynth psg(SynthMode::Raw, 48000, type);
-        psg.write(0xF0);  // noise attenuation 0
-        psg.write(0xE4);  // white, clock / 512
-        std::vector<double> a(500, 0.0), b(500, 0.0);
-        psg.render(a.data(), a.size());
-        if (rewrite) psg.write(second);
-        psg.render(b.data(), b.size());
-        return std::make_pair(a, b);
-    };
-    // TI: rewriting the same value restarts the sequence (the phase of the shift clock continues,
-    // so compare the bit pattern over many samples).
-    const auto ti = noiseRun(NoiseType::Ti15, true, 0xE4);
-    const auto tiFree = noiseRun(NoiseType::Ti15, false, 0);
-    CHECK(ti.second != tiFree.second);
-    // NCR: the same value does not restart; flipping the white/periodic bit does.
-    const auto ncrSame = noiseRun(NoiseType::Ncr8496, true, 0xE4);
-    const auto ncrFree = noiseRun(NoiseType::Ncr8496, false, 0);
-    CHECK(ncrSame.second == ncrFree.second);
-    const auto ncrFlip = noiseRun(NoiseType::Ncr8496, true, 0xE0);
-    CHECK(ncrFlip.second != ncrFree.second);
-}
-
-TEST_CASE("DOS audio: counter reload at the half period (Smooth mode)") {
-    BoxSquare osc;
-    std::vector<double> out(48, 0.0);
-    osc.renderCounter(1000.0, 1.0, 10, out.data(), 48000.0);  // 48 samples per period
-    osc.renderCounter(2000.0, 1.0, 38, out.data() + 10, 48000.0);
-    for (int i = 0; i < 23; ++i) CHECK(out[static_cast<size_t>(i)] > 0.99);  // first half of the old period
-    for (int i = 24; i < 36; ++i) CHECK(out[static_cast<size_t>(i)] < -0.99); // new period's second half: 12 samples
-    CHECK(out[37] > 0.99);
-
-    SpeakerSynth spk(SynthMode::Smooth, 48000);
-    spk.setDivisor(1193);  // ~1 kHz
-    std::vector<double> s(10, 0.0);
-    spk.render(s.data(), s.size());
-    CHECK(s[5] == 0.0);  // gate low: silent
-    spk.setEnabled(true);
-    spk.render(s.data(), s.size());
-    CHECK(s[0] > 0.49);  // the counter restarts with a new period (output high first)
-}
-
 TEST_CASE("DOS audio: renderer clock (PIT ticks by sample count)") {
     Synthetic syn;
     const SoundBank bank = syn.bank(SoundCard::Tandy);
@@ -488,7 +431,7 @@ TEST_CASE("DOS audio: renderer clock (PIT ticks by sample count)") {
     }
     // Chunk sizes do not change the output (Raw mode).
     DosRenderConfig raw;
-    raw.mode = SynthMode::Raw;
+    raw.mode = mischief::dos::SynthMode::Raw;
     raw.sampleRate = 44100;
     DosSoundRenderer a(bank, raw), b(bank, raw);
     a.sequencer().musicPlay(0, 0);
@@ -594,7 +537,7 @@ uint32_t crc32(std::span<const int16_t> pcm) {  // zlib's CRC-32 of the little-e
 }
 
 SoundBank userBank(const DosExe& exe, SoundCard card) {
-    const vfs::DirectorySource folder(*testdata::dosDataPath());
+    const mischief::vfs::DirectorySource folder(*testdata::dosDataPath());
     return SoundBank::load(folder, card, std::make_shared<const SoundTables>(SoundTables::fromExe(exe)));
 }
 
@@ -693,7 +636,7 @@ TEST_CASE("DOS audio: lengths of every effect and tune (ticks, as dos_sound.py l
             CAPTURE(soundCardName(card));
             CAPTURE(i);
             DosRenderConfig cfg;
-            cfg.mode = SynthMode::Raw;
+            cfg.mode = mischief::dos::SynthMode::Raw;
             cfg.sampleRate = 8000;  // only the length matters here
             DosSoundRenderer r(bank, cfg);
             const auto res = renderEntry(r, i >= 12, i >= 12 ? i - 12 : i);
@@ -724,9 +667,9 @@ TEST_CASE("DOS audio: raw renders equal tools/dos/dos_sound.py (CRC-32 of the 16
         CAPTURE(c.tune);
         CAPTURE(c.id);
         DosRenderConfig cfg;
-        cfg.mode = SynthMode::Raw;
+        cfg.mode = mischief::dos::SynthMode::Raw;
         cfg.sampleRate = 44100;
-        cfg.noise = NoiseType::Ti15;
+        cfg.noise = mischief::dos::NoiseType::Ti15;
         DosSoundRenderer r(c.card == SoundCard::Speaker ? spk : tan, cfg);
         const auto res = renderEntry(r, c.tune, c.id);
         const auto pcm = toPcm16Normalized(res.samples);
@@ -792,7 +735,7 @@ TEST_CASE("DOS audio: the sound-test schedule (event counts checked against the 
 namespace {
 
 // Records the OPL register writes with the PIT tick they belong to, and the register image.
-struct OplRecorder final : OplWriter {
+struct OplRecorder final : mischief::dos::OplWriter {
     struct W {
         uint64_t tick;
         uint8_t reg, value;
@@ -1004,64 +947,6 @@ TEST_CASE("DOS AdLib: Music_Play holds the tune for AdLib_PlayTune's set-up time
     CHECK(f.notes == 1);
 }
 
-TEST_CASE("DOS AdLib: the OPL2 core: a key-on sounds at its F-number's pitch, a re-key starts a decayed note again") {
-    constexpr double kRate = 48000.0;
-    // One channel: a silent modulator (level 63), additive, a sine carrier at level 0.
-    const auto instrument = [](OplChip& c, uint8_t carrierEg, uint8_t carrierSr) {
-        for (auto [r, v] : RegList{{0x01, 0x20}, {0x20, 0x01}, {0x40, 0x3F}, {0x60, 0xF0}, {0x80, 0x0F}, {0xC0, 0x01},
-                                   {0x23, 0x01 | carrierEg}, {0x43, 0x00}, {0x63, 0xF8}, {0x83, carrierSr}})
-            c.oplWrite(static_cast<uint8_t>(r), static_cast<uint8_t>(v));
-    };
-    {
-        OplChip c(kRate);
-        instrument(c, 0x20, 0x05);  // sustaining
-        c.oplWrite(0xA0, 0x57);
-        c.oplWrite(0xB0, 0x31);  // block 4, F-number 343: 343 * 49715.9 / 65536 = 260.20 Hz
-        std::vector<double> out(static_cast<size_t>(kRate));
-        c.render(out.data(), out.size());
-        int crossings = 0;
-        size_t first = 0, last = 0;
-        for (size_t i = 24000; i < out.size(); ++i)
-            if (out[i - 1] < 0 && out[i] >= 0) {
-                if (!crossings) first = i;
-                last = i;
-                ++crossings;
-            }
-        REQUIRE(crossings > 100);
-        const double hz = (crossings - 1) * kRate / static_cast<double>(last - first);
-        CHECK(hz == doctest::Approx(260.20).epsilon(0.002));
-        double peak = 0;
-        for (double v : out) peak = std::max(peak, std::abs(v));
-        CHECK(peak > 0.2);
-    }
-    // A decaying note (EG type 0, sustain level 15) has died away after 3 s while its key is still on.
-    // AdLib_NoteOn's re-key (0xB0 = 0, 0xA0 = 0, 0xA0, 0xB0 with the key) sounds it again because the
-    // writes reach the chip one AdLib_Write apart; written at the same instant the chip never sees
-    // the key off and the channel stays silent.
-    for (double writeSeconds : {OplChip::kWriteSeconds, 0.0}) {
-        CAPTURE(writeSeconds);
-        OplChip c(kRate, writeSeconds);
-        instrument(c, 0x00, 0xF5);
-        c.oplWrite(0xA0, 0x57);
-        c.oplWrite(0xB0, 0x31);
-        std::vector<double> out(static_cast<size_t>(3 * kRate));
-        c.render(out.data(), out.size());
-        double tail = 0;
-        for (size_t i = out.size() - 4800; i < out.size(); ++i) tail = std::max(tail, std::abs(out[i]));
-        CHECK(tail < 1e-3);
-        for (auto [r, v] : RegList{{0xB0, 0x00}, {0xA0, 0x00}, {0xA0, 0x57}, {0xB0, 0x31}})
-            c.oplWrite(static_cast<uint8_t>(r), static_cast<uint8_t>(v));
-        std::vector<double> again(4800);
-        c.render(again.data(), again.size());
-        double peak = 0;
-        for (double v : again) peak = std::max(peak, std::abs(v));
-        if (writeSeconds > 0)
-            CHECK(peak > 0.2);
-        else
-            CHECK(peak < 1e-3);
-    }
-}
-
 TEST_CASE("DOS AdLib: a driver restored from its DGROUP image holds the same registers and goes on alike") {
     const auto tables = syntheticAdLibTables();
     Synthetic syn;
@@ -1102,7 +987,7 @@ struct Dro {
 };
 
 std::optional<Dro> readDro(const std::filesystem::path& path) {
-    const auto file = readWholeFile(path);
+    const auto file = mischief::readWholeFile(path);
     if (!file) return std::nullopt;
     const std::vector<uint8_t>& d = *file;
     if (d.size() < 26 || std::memcmp(d.data(), "DBRAWOPL", 8) != 0 || d[8] != 2) return std::nullopt;
@@ -1277,14 +1162,14 @@ TEST_CASE("DOS AdLib: the driver against DOSBox-X's OPL capture of all 12 orches
     // Timing (capture: whole ms, 4.2248 ms per PIT tick): every write of a timer interrupt at its tick
     // plus 70 us per write before it in the tick, the time base fitted per segment between two tune
     // starts (the capture's ms clock drifted 2.2 ms against the PIT once, in turbo mode).
-    const double tickMs = 1000.0 * kTimerDivisor / kPitHz;
+    const double tickMs = 1000.0 * mischief::dos::kTimerDivisor / mischief::dos::kPitHz;
     std::vector<std::vector<double>> segments(1);
     for (size_t i = 0; i < same; ++i) {
         if (logged[i].command) {
             if ((logged[i].reg >= 0x40 && logged[i].reg <= 0x55) && !segments.back().empty()) segments.emplace_back();
             continue;
         }
-        segments.back().push_back(ref->writes[d0 + i][0] - logged[i].tick * tickMs - pos[i] * OplChip::kWriteSeconds * 1000.0);
+        segments.back().push_back(ref->writes[d0 + i][0] - logged[i].tick * tickMs - pos[i] * mischief::dos::OplChip::kWriteSeconds * 1000.0);
     }
     size_t total = 0, within = 0, within60 = 0;
     for (auto& seg : segments) {

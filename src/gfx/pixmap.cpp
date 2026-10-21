@@ -3,8 +3,8 @@
 #include <cstring>
 #include <format>
 
-#include "util/byte_reader.h"
-#include "util/error.h"
+#include "mischief/util/byte_reader.h"
+#include "mischief/util/error.h"
 
 namespace tmport::gfx {
 
@@ -16,21 +16,21 @@ std::vector<uint8_t> rundDecompress(std::span<const uint8_t> data, int width, in
     out.reserve(total);
     size_t p = start;
     while (out.size() < total) {
-        if (p >= data.size()) throw FormatError(std::format("RUND stream truncated at {} ({}/{} pixels)", p, out.size(), total));
+        if (p >= data.size()) throw mischief::FormatError(std::format("RUND stream truncated at {} ({}/{} pixels)", p, out.size(), total));
         const uint8_t c = data[p];
         const size_t n = c & 0x7F;
         if (c & 0x80) {  // run: one byte repeated n times
-            if (p + 1 >= data.size()) throw FormatError("RUND run truncated");
+            if (p + 1 >= data.size()) throw mischief::FormatError("RUND run truncated");
             out.insert(out.end(), n, data[p + 1]);
             p += 2;
         } else {  // literal: n bytes follow (n = 0 is a no-op packet)
-            if (p + 1 + n > data.size()) throw FormatError("RUND literal truncated");
+            if (p + 1 + n > data.size()) throw mischief::FormatError("RUND literal truncated");
             out.insert(out.end(), data.begin() + static_cast<std::ptrdiff_t>(p + 1),
                        data.begin() + static_cast<std::ptrdiff_t>(p + 1 + n));
             p += 1 + n;
         }
     }
-    if (out.size() != total) throw FormatError(std::format("RUND stream overshoots: {} > {} pixels", out.size(), total));
+    if (out.size() != total) throw mischief::FormatError(std::format("RUND stream overshoots: {} > {} pixels", out.size(), total));
     if (end) *end = p;
     return out;
 }
@@ -80,12 +80,12 @@ std::vector<uint8_t> rundCompress(std::span<const uint8_t> pixels, int width, in
 }
 
 PixMap decodePmap(std::span<const uint8_t> data, int depth) {
-    ByteReader r(data, "PMAP");
+    mischief::ByteReader r(data, "PMAP");
     PixMap pm;
     // The EXE reads the header words as signed 16-bit (1058:0000); the largest value is 512.
     pm.width = r.i16(0);
     pm.height = r.i16(2);
-    if (pm.width <= 0 || pm.height <= 0) throw FormatError(std::format("PMAP has an empty size {}x{}", pm.width, pm.height));
+    if (pm.width <= 0 || pm.height <= 0) throw mischief::FormatError(std::format("PMAP has an empty size {}x{}", pm.width, pm.height));
     const size_t w = static_cast<size_t>(pm.width), h = static_cast<size_t>(pm.height);
 
     if (depth == 4) {
@@ -102,7 +102,7 @@ PixMap decodePmap(std::span<const uint8_t> data, int depth) {
         pm.consumed = kPmapHeaderSize + stride * h;
         return pm;
     }
-    if (depth != 8) throw FormatError(std::format("unsupported PMAP depth {}", depth));
+    if (depth != 8) throw mischief::FormatError(std::format("unsupported PMAP depth {}", depth));
     pm.depth = 8;
     if (isRund(data)) {
         pm.encoding = PixEncoding::Rund;

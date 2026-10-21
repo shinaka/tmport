@@ -20,9 +20,9 @@
 #include "dos/game/game.h"
 #include "dos/gfx/dos_screens.h"
 #include "dos/save/users_store.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/log.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
 
 namespace tmport::dos::autoplay {
 
@@ -97,7 +97,7 @@ private:
     static void SDLCALL output(void* self, int category, SDL_LogPriority priority, const char* message) {
         auto* t = static_cast<LogTap*>(self);
         if (priority >= SDL_LOG_PRIORITY_WARN && t->out_.size() < 100) t->out_.push_back(std::format("log: {}", message ? message : ""));
-        if (t->prevFn_ && (priority >= SDL_LOG_PRIORITY_WARN || log::verbose())) t->prevFn_(t->prevData_, category, priority, message);
+        if (t->prevFn_ && (priority >= SDL_LOG_PRIORITY_WARN || mischief::log::verbose())) t->prevFn_(t->prevData_, category, priority, message);
     }
     std::vector<std::string>& out_;
     SDL_LogOutputFunction prevFn_ = nullptr;
@@ -172,10 +172,10 @@ void accumulate(BotStats& t, const BotStats& b) {
 
 void writeCraftedPlayer(const std::filesystem::path& usersDat, std::string_view name, int total, uint16_t gamesPlayed) {
     UsersDat users{};
-    if (auto old = readWholeFile(usersDat))
+    if (auto old = mischief::readWholeFile(usersDat))
         if (auto parsed = UsersDat::parse(*old)) users = *parsed;
     const int at = users.firstFreeRecord();
-    if (at < 0) throw Error("the roster is full: no room for a crafted player");
+    if (at < 0) throw mischief::Error("the roster is full: no room for a crafted player");
     UserRecord r{};
     r.clear();  // Users_ClearRecord: zeros, answer masks 7
     r.setName(name);
@@ -197,7 +197,7 @@ void writeCraftedPlayer(const std::filesystem::path& usersDat, std::string_view 
     r.musicOn = r.soundOn = 1;
     r.gamesPlayed = gamesPlayed;
     users.records[static_cast<size_t>(at)] = r;
-    if (!writeWholeFile(usersDat, users.bytes())) throw Error("cannot write " + pathToUtf8(usersDat));
+    if (!mischief::writeWholeFile(usersDat, users.bytes())) throw mischief::Error("cannot write " + mischief::pathToUtf8(usersDat));
 }
 
 RunResult runDosAutoplay(const DosGfxFiles& files, const RunOptions& o) {
@@ -564,16 +564,16 @@ std::optional<int> runDosAutoplayCommand(int argc, char** argv) {
             return 2;
         }
     }
-    log::setVerbose(verbose);
+    mischief::log::setVerbose(verbose);
     if (dataPath.empty())
-        if (auto env = getEnv("TM_DATA_DOS")) dataPath = *env;
+        if (auto env = mischief::getEnv("TM_DATA_DOS")) dataPath = *env;
     if (dataPath.empty()) {
         std::fprintf(stderr, "tmport: the DOS game folder was not found. Pass --data <folder with SST.EXE> or set TM_DATA_DOS.\n");
         return 3;
     }
     std::optional<DosGfxFiles> files;
     try {
-        files.emplace(DosGfxFiles::open(pathFromUtf8(dataPath)));
+        files.emplace(DosGfxFiles::open(mischief::pathFromUtf8(dataPath)));
     } catch (const std::exception& e) {
         std::fprintf(stderr, "tmport: cannot open the DOS game files: %s\n", e.what());
         return 3;
@@ -586,7 +586,7 @@ std::optional<int> runDosAutoplayCommand(int argc, char** argv) {
     std::signal(SIGILL, dosAutoplayOnCrashSignal);
     Watchdog watchdog(watchdogSeconds);
     const std::filesystem::path base0 =
-        prefBase.empty() ? std::filesystem::temp_directory_path() / "tmport_dos_autoplay" : pathFromUtf8(prefBase);
+        prefBase.empty() ? std::filesystem::temp_directory_path() / "tmport_dos_autoplay" : mischief::pathFromUtf8(prefBase);
     int failures = 0, runs = 0, climbs = 0;
     for (uint32_t seed = seedA; seed <= seedB; ++seed) {
         RunOptions o = base;
@@ -632,7 +632,7 @@ std::optional<int> runDosAutoplayCommand(int argc, char** argv) {
             if (!r.abortReason.empty()) std::printf("  abort: %s\n", r.abortReason.c_str());
             for (const auto& v : r.violations) std::printf("  violation: %s\n", v.c_str());
             for (const auto& l : r.recent) std::printf("  | %s\n", l.c_str());
-            std::printf("  (pref dir kept: %s)\n", pathToUtf8(o.prefDir).c_str());
+            std::printf("  (pref dir kept: %s)\n", mischief::pathToUtf8(o.prefDir).c_str());
         }
         for (const auto& n : r.notes) std::printf("  note: %s\n", n.c_str());
         if (verbose)

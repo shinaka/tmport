@@ -41,10 +41,10 @@ struct DosSoundFormat {
 DosSoundFormat dosSoundFormat(FileIndex index);
 bool isDosSoundFile(FileIndex index);
 
-// File -> text. Throws tmport::FormatError for a file whose streams overlap or are out of order
+// File -> text. Throws mischief::FormatError for a file whose streams overlap or are out of order
 // (none of V 1.0).
 std::string soundFileToText(std::span<const uint8_t> file, FileIndex index, std::string_view name);
-// Text -> file. Throws mods::ModSyntaxError (line and what is wrong) or tmport::FormatError (an
+// Text -> file. Throws mods::ModSyntaxError (line and what is wrong) or mischief::FormatError (an
 // entry or voice missing, the file larger than the driver's buffer).
 std::vector<uint8_t> soundFileFromText(std::string_view text, FileIndex index, std::string_view name);
 

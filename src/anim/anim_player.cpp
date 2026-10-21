@@ -1,9 +1,9 @@
 #include "anim/anim_player.h"
 
 #include "input/input_codes.h"
+#include "mischief/timing/deadline_timers.h"
+#include "mischief/util/log.h"
 #include "platform/engine.h"
-#include "timing/deadline_timers.h"
-#include "util/log.h"
 
 namespace tmport::anim {
 
@@ -19,7 +19,7 @@ PresentFn enginePresent(Engine& engine) {
 
 int32_t modalTickMs(int fps) {
     if (fps == 0) {
-        log::warn("Anim_PlayModal: fps 0 (the original would fault); using 1");
+        mischief::log::warn("Anim_PlayModal: fps 0 (the original would fault); using 1");
         fps = 1;
     }
     // 10d8:00e4: (long)(int)(1000L / fps), truncated toward zero.
@@ -34,7 +34,7 @@ int playModal(AnimEngine& anim, ModalHost& host, const ModalParams& p) {
     int result = kModalFinished;
     const int32_t period = modalTickMs(p.fps);
     const int ch = anim.start(layer::kDefault, p.x, p.y, p.frameBase, p.script, p.user0, p.user1, kChannelFlagErase, {});
-    constexpr int kSlot = DeadlineTimers::kFrameSlot;
+    constexpr int kSlot = mischief::DeadlineTimers::kFrameSlot;
     host.timerSet(kSlot, 0);
     host.flushInput();
     do {

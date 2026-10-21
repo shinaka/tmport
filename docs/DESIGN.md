@@ -19,11 +19,15 @@ tables from the user's own copy of the game at runtime. Behaviour is specified i
 ## Build
 
 * CMake ≥ 3.24, C++20, warnings high (`/W4` MSVC, `-Wall -Wextra` others), warnings not fatal.
-* SDL **3.4.18** via `FetchContent` (static), pinned by URL. Other third-party code only if pinned
-  and license-compatible (MIT/zlib/BSD/public domain), fetched by CMake, never vendored blindly.
-* Targets: `portcore` (the engine core shared by both games, below), `tmcore` (Treasure Mountain's
-  engine, links `portcore`), `tmport` / `tmport-cli` (the game), `tmtests` (unit tests, doctest);
-  with `TM_BUILD_GG` the second game's `ggcore`, `ggport` and `ggtests` (`cmake/gg.cmake`).
+* The engine core, MischiefEngine, via `FetchContent` at the commit pinned in
+  `cmake/engine_pin.cmake`, or a local checkout (`cmake/engine.cmake`; `docs/BUILDING.md`, "The
+  engine"). It brings SDL **3.4.18** (static), ymfm and doctest, pinned by URL and SHA-256. Other
+  third-party code only if pinned and license-compatible (MIT/zlib/BSD/public domain), fetched by
+  CMake, never vendored blindly (TinySoundFont, `cmake/sources_audio.cmake`).
+* Targets: `mischief` (the engine core, below), `tmcore` (Treasure Mountain's engine, links
+  `mischief`), `tmport` / `tmport-cli` (the game), `tmtests` (unit tests, doctest, with the engine's
+  `mischief_test_support`). Every target takes `mischief_configure_target()` (the engine's
+  warnings and flags).
 * Windows first (MSVC 2026 + Ninja; `scripts/build.bat`), code kept portable for Linux/macOS (no
   Win32 outside `src/platform/` and the WinMM MIDI back end).
 
@@ -31,22 +35,18 @@ tables from the user's own copy of the game at runtime. Behaviour is specified i
 
 | Dir | Contents |
 |---|---|
-| `util/` | logging, byte reader (LE), file helpers, PNG writer (uncompressed, for screenshots/debug) |
-| `vfs/` | data-source abstraction: plain directory **or** CD image (`.cue`/`.bin`/`.iso`, ISO 9660), case-insensitive lookup |
 | `ne/` | `NeImage`: MZ/NE parser (segments, relocations, resource table, type-15 name table) |
 | `data/` | `ExeTables`: DGROUP of `TMTWINCD.EXE` with relocation fix-ups; typed accessors for every table (offsets in one header) |
 | `res/` | `ResourceManager`: id → type/DLL routing, PMAP/BNDL/FFNT/OTHR/RRGB/SSND access, BNDL trees, mod overrides |
-| `gfx/` | `PixMap` (+RUND), `Palette`, `FrameBuffer` (512×1055 indexed, clip, dirty rects), blit primitives, `Presenter`, screen effects |
-| `text/` | FFNT font, `TextRenderer` (byte-exact port of `Text_Render`, on the shared `text_engine`) |
+| `gfx/` | `PixMap` (+RUND), `FrameBuffer` (512×1055 indexed, clip, dirty rects), blit primitives, screen effects (`Palette` and `Presenter` are the engine's) |
+| `text/` | FFNT font, `TextRenderer` (byte-exact port of `Text_Render`, on the engine's `text_engine`) |
 | `anim/` | DAM engine (16 channels, frame table), modal animation player |
 | `input/` | input-code queue, hot-spot table (50 slots), held keys, mouse, cursors |
-| `timing/` | deadline timers (8 slots), clock, the virtual PIT of the DOS games (`pit_clock`) |
 | `audio/` | wave voice (single stream), speech wait, SFX, SMF sequencer + MIDI back ends, music manager |
 | `ui/` | game dialogs (DlgDesc), pager, in-engine menu bar |
 | `save/` | `users.dat` (byte-exact), settings, paths |
 | `game/` | game modules (main state machine, title, sign-in, room, player, HUD, layout, elves, quiz, hints, net shop, coin pile, hall, cut-scenes, castle, celebration, help) |
-| `rtl/` | Borland `rand`/`srand`/`R(n)`, `sprintf` subset |
-| `platform/` | SDL3 app, window, event pump, audio device |
+| `platform/` | `Engine` (the game's event pump, menu bar and presentation on the engine's SDL `Host`), its set-up, the window icon from `TMTWINCD.EXE` (`exe_icon_ne`) |
 | `mods/` | the mod layer: mod folders, override formats (PNG, WAV, text, DAM assembler, JSON, MIDI), table overrides, mod-kit exporter, `--check-mods` (`docs/MODDING.md`) |
 | `app/` | start-up (`bootstrap`: paths, settings, data, engine, audio, menus, `AppContext`), the game's command line, menu command handlers, scripted input (`--keys`) |
 | `cli/` | the tool dispatcher and `--help` (`commands`, `options`), the data tools (`--info`, PMAP dumps, test frame, PMAP viewer), the text/UI renders, `--mods` for the tools (`tool_mods`); the other areas keep their own tools (`*_cli.cpp`) |
@@ -55,84 +55,45 @@ Namespace `tmport` (a global namespace `tm` is impossible: it collides with the 
 `struct tm`, which `<ctime>` declares globally and `<format>`/`<chrono>` pull in). Files
 `snake_case.cpp/.h`, types `PascalCase`, functions/members `camelCase`,
 constants `kName`. One original module ≈ one engine file; cite the original address in a short
-comment at each ported routine (e.g. `// 1110:00aa CoinPile_Update`). The second game's code is in
-`tmport::gg` (`src/gg/<module>/`).
+comment at each ported routine (e.g. `// 1110:00aa CoinPile_Update`). The engine core's names are in
+namespace `mischief` (`mischief::dos`, `mischief::gfx`, ...) and its headers are included as
+`"mischief/<area>/<file>.h"`. Headers name engine types fully qualified (no using-directives in
+headers); `.cpp` files may use using-declarations.
 
-## Core and games
+## The engine core
 
-The repository holds two games: *Treasure Mountain!* (both editions, `tmcore`, `tmport`) and
-*Gizmos & Gadgets!* (DOS 1993, `src/gg/`, `ggcore`, `ggport`; `re/gg/docs/SCOPING.md` §9). What
-they share is the static library **`portcore`** (`cmake/portcore.cmake`), a library over the
-existing directories, not a separate tree. `tmcore` links it publicly, so TM code sees it as
-before; G&G links only `portcore` and never includes TM's game code.
+What is not Treasure Mountain's is the static library **`mischief`** of
+[MischiefEngine](https://github.com/shinaka/MischiefEngine), the engine core tmport shares with
+ggport (*Super Solvers: Gizmos & Gadgets!*). It started as this repository's `portcore` library and
+became a repository of its own when the games were split. Its parts (utilities, data sources, the
+Borland RTL, clocks and timers, the SDL host and presenter, the DOS sound chips and input models,
+the DOSBox-X state reader, the INI file, the JSON, PNG and WAV codecs, the TLC text engine) and its
+conventions are described in its `docs/DESIGN.md`. `tmcore` links it publicly, so every TM target
+sees it.
 
-| Part | Files (`src/`) |
-|---|---|
-| utilities | `util/` (log, files, byte reader, errors, hashes, PNG writer, inflate) |
-| data sources | `vfs/` (directory, CD image) |
-| Borland RTL | `rtl/borland_rand` |
-| time | `timing/clock.h`, `timing/deadline_timers`, `timing/pit_clock` |
-| host | `platform/host` (window, events, focus pause, fullscreen, screenshots, frame dumps), `platform/console`, `platform/exe_icon` (icon decoding; TM's NE loader is `exe_icon_ne`) |
-| pictures | `gfx/presenter` (layouts `windowsCd()` and `dos1990()`), `gfx/palette`, `gfx/rect.h`, `gfx/image_export` |
-| text | `text/text_engine` (the TLC `Text_Render` of TM Windows and G&G) |
-| DOS sound | `dos/audio/` speaker, SN76496 and OPL2 (ymfm) chips, `opl_writer.h`, `opl_output.h`, `opl_log`, `chip_renderer`, `chip_audio_device` |
-| DOS input | `dos/input/` `bios_keyboard`, `pc_keyboard` (SDL to set-1 scan codes, typematic repeats), `int33_mouse`; `dos/app/script_input` (scripted input in ticks) |
-| settings, mods | `save/ini_file`, `mods/json`, `mods/png_codec`, `mods/wav_file` |
-| test helpers | `tests/app_test_util.h` (header-only) |
+Where the games differ, the engine takes a parameter whose default is TM's behaviour (the engine's
+`docs/DESIGN.md`, "Where the games differ"); TM's classes sit on those parts:
+
+* `dos::PitClock` is TM's time base on `mischief::PitTimeBase` (divisor 0x13B1); deadline timers
+  are `mischief::DeadlineTimers` with TM's `>=` expiry.
+* `dos::MouseDriver` is a `mischief::dos::Int33Mouse` with TM's start positions; `dos::PcKeyboard`
+  is a `mischief::dos::ScanKeyboard` whose INT 09h handler is `KbdIsr`.
+* `dos::DosSoundRenderer` (the sequencer as the tick source) and `dos::DosAudioDevice` are built on
+  `mischief::dos::ChipRenderer` and `ChipAudioDevice`; `OplWriteLog` records the OPL writes for
+  `tools/dos/oplcmp.py`.
+* `text::TextRenderer` is the FFNT font and the frame buffer behind `mischief::text::TextEngine`
+  with `TextDialect::treasureMountain()`.
+* Files that mixed engine and game parts were split, keeping the game part here:
+  `platform/exe_icon_ne` (the engine has the icon decoder), `save/settings` (the engine has
+  `ini_file`), `mods/wav_codec` (the engine has `wav_file`).
 
 Rules:
 
-* A core file includes only core files (plus the standard library, SDL and ymfm).
-  `python -P tools/check_core_deps.py` follows every `#include "..."` of the files listed in
-  `cmake/portcore.cmake` and fails on anything else; `--gg` also checks that `src/gg/` and
-  `tests/gg/` include only core and G&G files. Run it after changing the core.
-* Where the games differ, the core takes a parameter whose default is TM's behaviour, so TM's
-  output stays byte for byte the same (checked against frame dumps, WAVs, OPL logs, the DOS
-  fidelity suite and `tmtests` when the core was extracted):
-  * `PitTimeBase(divisor)` / `VirtualPit(divisor)`: the PIT rate (TM DOS 0x13B1, G&G 0x2000),
-    callbacks on every n-th counter value (G&G's sound tick on even ticks) and a writable counter
-    (G&G's dialog time freeze); `dos::PitClock` is TM's time base on it.
-  * `DeadlineTimers(clock, ExpiryRule)`: the unit is the clock's (`PitTickClock` counts PIT
-    ticks), `expired()` is `>=` (TM) or `>` (`AfterDeadline`, G&G's `Timer_Expired`); `reached()`
-    is the end of a wait in both games.
-  * `dos::Int33Mouse(Int33MouseConfig)`: ranges (AX=07h/08h), the logical-to-driver x scale (TM
-    x / 2, mode 13h x * 2) and an AX=0Ch event handler besides polling; TM's `dos::MouseDriver` is
-    a subclass with its start positions.
-  * `dos::ScanKeyboard`: the game's INT 09h handler is an interface (`ScanByteHandler`); TM's
-    `PcKeyboard` overrides it with `KbdIsr`.
-  * `dos::ChipRenderer(ChipRenderConfig, OplOutput*)` with a `SoundTickSource`: the chips ticked
-    by any driver at `tickHz` (TM: every PIT tick; G&G: 72.83 Hz) with the OPL mix level;
-    `ChipAudioDevice` plays it through SDL or offline and queues the game's calls (`post`).
-    `OplWriteLog` / `OplLogTap` record OPL writes as `tick reg value` for `tools/dos/oplcmp.py`.
-    TM's `DosSoundRenderer` (the sequencer as tick source) and `DosAudioDevice` are built on them.
-  * `text::TextEngine(TextFont, TextCanvas*, TextDialect)`: `TextDialect::treasureMountain()`
-    (TAB, FE and `FF 04` tab stops, '_' as an underlined blank, width from the left-most glyph)
-    or `gizmos()` (none of these, width from x0, the centred start counts, the measure rule of
-    `TextFont::runWidth`); TM's `TextRenderer` is the FFNT font and the frame buffer behind it.
-* A file that mixes core and game parts is split, keeping the game part where it was (for
-  example `platform/exe_icon` and `exe_icon_ne`, `save/settings` and `save/ini_file`,
-  `mods/wav_codec` and `mods/wav_file`).
-
-*Gizmos & Gadgets!* (`src/gg/`, namespace `tmport::gg`; `cmake/gg.cmake` with one source list per
-area, `cmake/gg_sources_<area>.cmake`, and one test list, `cmake/gg_tests_<area>.cmake`; the map of
-original modules to files is `re/gg/docs/ENGINE_MAP.md`):
-
-| Dir | Contents |
-|---|---|
-| `gg/data/` | `GgExe` (`ssg.exe` with its overlays and DGROUP, `dgroup_offsets.h`), `GgFiles` (the game folder), the archives and LZH, resource parsers, the tools' shared argument helpers |
-| `gg/save/` | `PLAYERS.DAT` byte for byte, `PlayersStore` (the engine's copy in the preference folder) |
-| `gg/gfx/` | the 320×400 screen buffer and primitives, dirty tiles, sprites, the software cursor, VRAM, palette, DAC and fades, wipes, the movie, `Video` |
-| `gg/text/` | the two fonts and the text renderer on the core's `TextEngine` |
-| `gg/audio/` | BMF songs, the sound driver, the bank layer, music cues, the puzzles' sounds, `GgAudio` on the core's chips, the `.dro` comparison |
-| `gg/input/` | the keyboard ISR and key ring, the INT 33h mouse handler, click zones, `Input_GetCode` |
-| `gg/app/` | the clock and timers, `GgRuntime` (the yield points), `Seq_Run`, options and `ggport.ini`, the display on the runtime, the wave 2 preview, the tool dispatcher |
-| `gg/ui/` | the TLC UI library: dialogs, buttons, scroll bar, menu bar, help, hints, text viewer, attract, sign-in |
-| `gg/game/` | the world: picture cache, screen animations, actors, parts, rooms, HUD, building, hub, blueprint, puzzles |
-
-Its runtime is TM Windows' model (nested blocking loops whose waits pump the engine) with PIT
-ticks instead of milliseconds (`re/gg/docs/PORTING_NOTES.md` §2.2), not the DOS edition's lockstep.
-`ggtests` find the game through `GG_DATA` (default: the repository's `GadgetsAndGizmos` folder) and
-the DOSBox-X reference material through `GG_CAPTURES`, and skip what needs them otherwise.
+* TM's code, tables and rules stay in this repository; the engine includes nothing of a port.
+* A change to the engine must keep TM's output byte for byte the same unless that is its purpose:
+  it is built and tested against both ports (frame dumps, WAVs, OPL logs, the DOS fidelity suite,
+  `tmtests` and the engine's `mischieftests`) before it is committed and pinned (`docs/BUILDING.md`,
+  "The engine").
 
 ## Runtime model
 
@@ -195,6 +156,8 @@ read (MODDING.md, "The 1990 DOS edition").
 ## Testing
 
 * `tmtests`: decoders vs the Python reference tools in `tools/assets/` (byte-exact RUND
-  round-trip, BNDL trees, FFNT metrics, text layout), Borland RNG vectors, users.dat round trip.
+  round-trip, BNDL trees, FFNT metrics, text layout), users.dat round trip. The engine core's own
+  tests (Borland RNG vectors, codecs, the presenter's layouts, the sound chips, ...) are the engine's
+  `mischieftests`.
 * Visual: compare engine screenshots with reference captures of the original
   (`re/docs/REFERENCE_CAPTURES.md`).

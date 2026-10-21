@@ -13,9 +13,9 @@
 #include <string>
 #include <vector>
 
+#include "mischief/util/rgb.h"
+#include "mischief/vfs/data_source.h"
 #include "ne/ne_image.h"
-#include "util/rgb.h"
-#include "vfs/data_source.h"
 
 namespace tmport {
 
@@ -65,9 +65,9 @@ struct RoomDef {
 
 class ExeTables {
 public:
-    // Loads DGROUP of the given EXE image. Throws tmport::Error.
+    // Loads DGROUP of the given EXE image. Throws mischief::Error.
     explicit ExeTables(std::shared_ptr<const ne::NeImage> exe);
-    static std::unique_ptr<ExeTables> load(const vfs::DataSource& source);
+    static std::unique_ptr<ExeTables> load(const mischief::vfs::DataSource& source);
 
     const ne::NeImage& exe() const { return *exe_; }
     uint16_t segmentNumber() const { return segNum_; }
@@ -79,7 +79,7 @@ public:
     std::span<const uint8_t> patched() const { return patched_; }
     size_t size() const { return data_.size(); }
 
-    // Typed reads (little-endian). Throw tmport::FormatError outside DGROUP.
+    // Typed reads (little-endian). Throw mischief::FormatError outside DGROUP.
     uint8_t u8(uint32_t off) const;
     int8_t i8(uint32_t off) const;
     uint16_t u16(uint32_t off) const;
@@ -110,7 +110,7 @@ public:
 
     // --- Typed tables --------------------------------------------------------------------------
     std::array<RoomDef, 50> rooms() const;          // DS:23d8
-    std::array<Rgb8, 16> egaColours() const;        // DS:07d8, {u16 r, g, b}[16]
+    std::array<mischief::Rgb8, 16> egaColours() const;        // DS:07d8, {u16 r, g, b}[16]
     std::array<uint8_t, 16> vga16Index() const;     // DS:0838, u16[16] (low bytes)
     // Later milestones add typed decoders here (player tables, clue words, menus, dialogs, ...).
 

@@ -33,7 +33,6 @@
 #include <vector>
 
 #include "dos/app/dos_runtime.h"
-#include "dos/app/script_input.h"
 #include "dos/game/anim.h"
 #include "dos/game/endgame.h"
 #include "dos/game/game.h"
@@ -45,6 +44,7 @@
 #include "dos/input/keyboard.h"
 #include "dos/save/users_store.h"
 #include "dos_game_fixture.h"
+#include "mischief/dos/app/script_input.h"
 
 namespace dosplayer {
 
@@ -174,17 +174,17 @@ public:
     // e). The keyboard takes events in time order: call it once the run has reached tick e - 1.
     void keyAt(std::string_view name, bool down, uint64_t e, uint64_t usAfter = 0) {
         REQUIRE(ticks() + 1 == e);
-        const auto k = pcKeyByName(name);
+        const auto k = mischief::dos::pcKeyByName(name);
         REQUIRE(k.has_value());
         const uint64_t t = PitClock::timeOfGameTick(e - 1) + usAfter * 1000;
         if (down) runtime_.keyboard().keyDown(*k, t);
         else runtime_.keyboard().keyUp(*k, t);
     }
-    // A --keys script in engine ticks (dos/app/script_input.h): events of tick e are applied right
+    // A --keys script in engine ticks (mischief/dos/app/script_input.h): events of tick e are applied right
     // before engine tick e, at its exact time.
     void script(std::string_view text) {
         std::string err;
-        auto s = ScriptedInput::parse(text, err);
+        auto s = mischief::dos::ScriptedInput::parse(text, err);
         REQUIRE_MESSAGE(s.has_value(), err);
         runtime_.setScript(std::move(*s));
     }

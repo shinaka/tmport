@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <array>
 
-#include "util/log.h"
+#include "mischief/util/log.h"
 
 namespace tmport::audio {
 
@@ -24,7 +24,7 @@ bool SdlWaveOutput::open() {
     if (stream_) return true;
     if (!driver_.empty()) SDL_SetHintWithPriority(SDL_HINT_AUDIO_DRIVER, driver_.c_str(), SDL_HINT_OVERRIDE);
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
-        log::warn("audio: SDL audio initialisation failed ({}); sounds are disabled", SDL_GetError());
+        mischief::log::warn("audio: SDL audio initialisation failed ({}); sounds are disabled", SDL_GetError());
         return false;
     }
     sdlInit_ = true;
@@ -32,20 +32,20 @@ bool SdlWaveOutput::open() {
     // no further streams), so the music stream can join it.
     device_ = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr);
     if (!device_) {
-        log::warn("audio: no playback device ({}); sounds are disabled", SDL_GetError());
+        mischief::log::warn("audio: no playback device ({}); sounds are disabled", SDL_GetError());
         close();
         return false;
     }
     const SDL_AudioSpec spec{SDL_AUDIO_U8, 1, static_cast<int>(kDefaultRate)};
     stream_ = SDL_CreateAudioStream(&spec, nullptr);
     if (!stream_ || !SDL_BindAudioStream(device_, stream_)) {
-        log::warn("audio: cannot attach the wave voice to the playback device ({}); sounds are disabled", SDL_GetError());
+        mischief::log::warn("audio: cannot attach the wave voice to the playback device ({}); sounds are disabled", SDL_GetError());
         close();
         return false;
     }
     rate_ = kDefaultRate;
     SDL_ResumeAudioDevice(device_);
-    log::debug("audio: wave voice on SDL driver '{}'", driverName());
+    mischief::log::debug("audio: wave voice on SDL driver '{}'", driverName());
     return true;
 }
 
@@ -98,7 +98,7 @@ bool SdlWaveOutput::done() {
     if (SDL_GetTicksNS() < deadlineNs_) return false;
     // The device stopped consuming (removed, driver reset): give the sound up instead of waiting
     // forever (REVIEW_1 L-3).
-    log::warn("audio: the playback device stopped playing the wave voice; the sound is cut");
+    mischief::log::warn("audio: the playback device stopped playing the wave voice; the sound is cut");
     SDL_ClearAudioStream(stream_);
     return true;
 }

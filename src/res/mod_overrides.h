@@ -17,7 +17,7 @@
 #include <string>
 #include <vector>
 
-#include "gfx/palette.h"
+#include "mischief/gfx/palette.h"
 #include "res/resource_types.h"
 
 namespace tmport {
@@ -47,14 +47,14 @@ public:
     };
     // The winning override file for (type, id) in a colour mode. In 16-colour mode a PMAP16 file
     // wins over a PMAP file (which is then mapped to the 16 colours).
-    std::optional<Entry> lookup(ResType type, int id, gfx::ColorMode mode) const;
-    bool provides(ResType type, int id, gfx::ColorMode mode) const { return lookup(type, id, mode).has_value(); }
+    std::optional<Entry> lookup(ResType type, int id, mischief::gfx::ColorMode mode) const;
+    bool provides(ResType type, int id, mischief::gfx::ColorMode mode) const { return lookup(type, id, mode).has_value(); }
     // The override file, or an empty path.
-    std::filesystem::path overridePath(ResType type, int id, gfx::ColorMode mode = gfx::ColorMode::Colour256) const;
+    std::filesystem::path overridePath(ResType type, int id, mischief::gfx::ColorMode mode = mischief::gfx::ColorMode::Colour256) const;
 
     // Resource body in the original binary format (NE-padded), or nullopt to use the game's own
     // data (no override, or the override failed validation).
-    std::optional<std::vector<uint8_t>> find(ResType type, int id, gfx::ColorMode mode, const ResourceManager& res) const;
+    std::optional<std::vector<uint8_t>> find(ResType type, int id, mischief::gfx::ColorMode mode, const ResourceManager& res) const;
 
     // Every (type, id) with an override (PMAP16-only overrides are listed under PMAP).
     std::vector<std::pair<ResType, int>> overriddenIds() const;

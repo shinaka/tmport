@@ -10,13 +10,13 @@
 #include "data/dgroup_offsets.h"
 #include "data/exe_tables.h"
 #include "game/game_state.h"
+#include "mischief/util/error.h"
 #include "platform/engine.h"
 #include "res/resource_manager.h"
 #include "text/text_renderer.h"
 #include "ui/dialog_desc.h"
 #include "ui/game_dialog.h"
 #include "ui/menu_bar.h"
-#include "util/error.h"
 
 namespace tmport::game::scenes {
 
@@ -78,7 +78,7 @@ void SceneIo::setCursorForced(bool on) { ctx_.engine.cursor().setForced(on); }
 
 std::shared_ptr<const gfx::PixMap> SceneIo::pixmap(int id) const {
     auto pm = res().pixmap(id);
-    if (!pm) throw Error(std::format("PMAP {} is missing from the game files", id));
+    if (!pm) throw mischief::Error(std::format("PMAP {} is missing from the game files", id));
     return pm;
 }
 
@@ -163,7 +163,7 @@ void SceneIo::clearGateUnlocking() {
 
 GameHooks& SceneIo::gameHooks() { return hooks_.gameHooks ? *hooks_.gameHooks : *adapter_; }
 
-BorlandRand& SceneIo::rng() { return hooks_.rng ? *hooks_.rng : ctx_.engine.rng(); }
+mischief::BorlandRand& SceneIo::rng() { return hooks_.rng ? *hooks_.rng : ctx_.engine.rng(); }
 
 anim::AnimEngine& SceneIo::anim() {
     if (ctx_.anim) return *ctx_.anim;  // its FC / FB sound binding is the app's (anim_engine.h)

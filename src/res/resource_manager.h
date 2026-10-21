@@ -15,13 +15,13 @@
 #include <unordered_map>
 #include <vector>
 
-#include "gfx/palette.h"
 #include "gfx/pixmap.h"
+#include "mischief/gfx/palette.h"
+#include "mischief/vfs/data_source.h"
 #include "ne/ne_image.h"
 #include "res/mod_overrides.h"
 #include "res/resource_types.h"
 #include "res/ssnd.h"
-#include "vfs/data_source.h"
 
 namespace tmport {
 
@@ -46,16 +46,16 @@ struct ResourceTree {
 class ResourceManager {
 public:
     struct Options {
-        gfx::ColorMode colorMode = gfx::ColorMode::Colour256;
+        mischief::gfx::ColorMode colorMode = mischief::gfx::ColorMode::Colour256;
         bool requireSounds = true;   // the sound DLLs must exist
         bool cachePixmaps = true;
     };
 
     // Opens the DLLs from the data source. Throws MissingFileError naming a missing file.
-    explicit ResourceManager(const vfs::DataSource& source);
-    ResourceManager(const vfs::DataSource& source, Options options);
+    explicit ResourceManager(const mischief::vfs::DataSource& source);
+    ResourceManager(const mischief::vfs::DataSource& source, Options options);
 
-    gfx::ColorMode colorMode() const { return options_.colorMode; }
+    mischief::gfx::ColorMode colorMode() const { return options_.colorMode; }
     const ne::NeImage* dll(DllId d) const { return dlls_[static_cast<size_t>(d)].get(); }
     bool hasDll(DllId d) const { return dll(d) != nullptr; }
     ModOverrides& mods() { return mods_; }
@@ -66,7 +66,7 @@ public:
         const ne::Resource* resource;
     };
     // mode: pixmap DLL to use (default: the active colour mode). The DLLs only (no mods).
-    std::optional<Location> locate(ResType type, int id, std::optional<gfx::ColorMode> mode = {}) const;
+    std::optional<Location> locate(ResType type, int id, std::optional<mischief::gfx::ColorMode> mode = {}) const;
     // In the DLLs or provided by an installed mod (docs/MODDING.md).
     bool exists(int id) const { return locate(typeForId(id), id).has_value() || mods_.provides(typeForId(id), id, options_.colorMode); }
     // NE-aligned length (SizeofResource); 0 if missing. A mod override reports its own (padded) size.
@@ -76,19 +76,19 @@ public:
 
     // Raw body with the rounded size. The mod hook is consulted first.
     std::optional<std::vector<uint8_t>> loadRaw(int id) const { return loadRaw(typeForId(id), id); }
-    std::optional<std::vector<uint8_t>> loadRaw(ResType type, int id, std::optional<gfx::ColorMode> mode = {}) const;
+    std::optional<std::vector<uint8_t>> loadRaw(ResType type, int id, std::optional<mischief::gfx::ColorMode> mode = {}) const;
     // The body from the user's DLLs, ignoring mods (mod validation, the mod-kit exporter).
-    std::optional<std::vector<uint8_t>> loadOriginal(ResType type, int id, std::optional<gfx::ColorMode> mode = {}) const;
+    std::optional<std::vector<uint8_t>> loadOriginal(ResType type, int id, std::optional<mischief::gfx::ColorMode> mode = {}) const;
     // GetResource: loads id and, if it is a BNDL, all members recursively and in order.
     std::optional<ResourceTree> getResource(int id) const;
     std::optional<BundleInfo> bundle(int id) const;
 
     // RRGB palette (900 is the only one). Throws if missing.
-    gfx::Palette palette(int id = 900) const;
+    mischief::gfx::Palette palette(int id = 900) const;
     // Decoded PMAP from the active (or given) pixmap DLL; nullptr if it does not exist. Throws
     // FormatError (naming the id) for corrupt data.
     std::shared_ptr<const gfx::PixMap> pixmap(int id) const { return pixmap(id, options_.colorMode); }
-    std::shared_ptr<const gfx::PixMap> pixmap(int id, gfx::ColorMode mode) const;
+    std::shared_ptr<const gfx::PixMap> pixmap(int id, mischief::gfx::ColorMode mode) const;
     std::optional<SsndInfo> soundInfo(int id) const;
 
     // Ids of a type listed in a DLL's name table (table order); empty if the DLL is not loaded.
@@ -98,7 +98,7 @@ public:
 private:
     std::optional<ResourceTree> getResourceImpl(int id, int depth) const;
 
-    const vfs::DataSource& source_;
+    const mischief::vfs::DataSource& source_;
     Options options_;
     std::array<std::unique_ptr<ne::NeImage>, kDllCount> dlls_;
     ModOverrides mods_;

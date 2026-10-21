@@ -5,10 +5,10 @@
 
 #include "dos/data/help_file.h"
 #include "dos/data/puzzles.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/log.h"
-#include "vfs/directory_source.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
+#include "mischief/vfs/directory_source.h"
 
 namespace tmport::dos {
 
@@ -17,7 +17,7 @@ namespace {
 uint16_t le16(std::span<const uint8_t> b, size_t at) { return static_cast<uint16_t>(b[at] | (b[at + 1] << 8)); }
 
 [[noreturn]] void bad(std::string_view name, const std::string& why) {
-    throw FormatError(toUpperAscii(name) + ": " + why);
+    throw mischief::FormatError(mischief::toUpperAscii(name) + ": " + why);
 }
 
 // Buffers of the original that the files are read into (fmt_graphics.md §3.1, §5.1; fmt_sound.md §2.3).
@@ -118,24 +118,24 @@ DosFiles::DosFiles(std::filesystem::path folder, DosExe exe, FileTable table, st
     : folder_(std::move(folder)), exe_(std::move(exe)), table_(std::move(table)), exeFile_(std::move(exeFile)) {}
 
 bool DosFiles::looksLikeDosFolder(const std::filesystem::path& folder) {
-    const vfs::DirectorySource dir(folder);
+    const mischief::vfs::DirectorySource dir(folder);
     return dir.resolve(kExeName, false) && dir.resolve("SPRITES.PAK", false) && dir.resolve("ALL_PUZS", false);
 }
 
 DosFiles DosFiles::open(const std::filesystem::path& folder) { return open(folder, dosOverrides().get()); }
 
 DosFiles DosFiles::open(const std::filesystem::path& folder, const DosOverrides* overrides) {
-    const vfs::DirectorySource dir(folder);
+    const mischief::vfs::DirectorySource dir(folder);
     const auto read = [&](std::string_view name) -> std::optional<std::vector<uint8_t>> {
         const auto p = dir.resolve(name, false);
         if (!p) return std::nullopt;
-        auto bytes = readWholeFile(*p);
+        auto bytes = mischief::readWholeFile(*p);
         if (!bytes) bad(name, "cannot be read");
         return bytes;
     };
-    const auto missing = [&](std::string_view name) -> MissingFileError {
-        return MissingFileError(toUpperAscii(name), "The DOS game folder " + pathToUtf8(folder) + " has no " +
-                                                        toUpperAscii(name) + " (copy all files of Treasure Mountain! 1990)");
+    const auto missing = [&](std::string_view name) -> mischief::MissingFileError {
+        return mischief::MissingFileError(mischief::toUpperAscii(name), "The DOS game folder " + mischief::pathToUtf8(folder) + " has no " +
+                                                        mischief::toUpperAscii(name) + " (copy all files of Treasure Mountain! 1990)");
     };
 
     auto exeFile = read(kExeName);
@@ -157,7 +157,7 @@ DosFiles DosFiles::open(const std::filesystem::path& folder, const DosOverrides*
         if (index == FileIndex::UsersDat) {
             if (!bytes) continue;  // optional: only imported
             if (bytes->size() != kUsersDatSize) {
-                log::warn("{}: {} bytes instead of {}, ignored", toUpperAscii(name), bytes->size(), kUsersDatSize);
+                mischief::log::warn("{}: {} bytes instead of {}, ignored", mischief::toUpperAscii(name), bytes->size(), kUsersDatSize);
                 continue;
             }
         }
@@ -175,19 +175,19 @@ DosFiles DosFiles::open(const std::filesystem::path& folder, const DosOverrides*
 std::span<const uint8_t> DosFiles::bytes(FileIndex index) const {
     const auto& f = files_.at(static_cast<size_t>(index));
     if (index == FileIndex::UsersDat && f.empty())
-        throw MissingFileError(toUpperAscii(table_.name(index)), "no USERS.DAT in " + pathToUtf8(folder_));
+        throw mischief::MissingFileError(mischief::toUpperAscii(table_.name(index)), "no USERS.DAT in " + mischief::pathToUtf8(folder_));
     return f;
 }
 
 std::span<const uint8_t> DosFiles::bytes(std::string_view name) const {
-    if (iequalsAscii(name, kExeName)) return exeFile_;
+    if (mischief::iequalsAscii(name, kExeName)) return exeFile_;
     const auto i = table_.indexOf(name);
     if (!i) throw std::out_of_range("not a file of the DOS edition: " + std::string(name));
     return bytes(static_cast<FileIndex>(*i));
 }
 
 std::optional<std::filesystem::path> DosFiles::pathOf(std::string_view name) const {
-    return vfs::DirectorySource(folder_).resolve(name, false);
+    return mischief::vfs::DirectorySource(folder_).resolve(name, false);
 }
 
 }  // namespace tmport::dos

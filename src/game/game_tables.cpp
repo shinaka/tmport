@@ -4,8 +4,8 @@
 #include <format>
 
 #include "data/dgroup_offsets.h"
+#include "mischief/util/error.h"
 #include "res/resource_manager.h"
-#include "util/error.h"
 
 namespace tmport::game {
 
@@ -48,7 +48,7 @@ std::vector<LayoutRecord> parseLayoutTable(std::span<const uint8_t> data) {
 std::vector<LayoutRecord> loadLayoutTable(int id, std::span<const uint8_t> data) {
     auto records = parseLayoutTable(data);
     if (records.size() < static_cast<size_t>(kMinLayoutRecords))
-        throw FormatError(std::format("OTHR {} (hiding-place layouts) holds {} records; a climb needs at least {}", id,
+        throw mischief::FormatError(std::format("OTHR {} (hiding-place layouts) holds {} records; a climb needs at least {}", id,
                                       records.size(), kMinLayoutRecords));
     return records;
 }
@@ -99,11 +99,11 @@ GameTables GameTables::load(const ExeTables& exe, const ResourceManager& res) {
     for (int tier = 0; tier < kTierCount; ++tier) {
         const int id = kLayoutFirstId + tier;
         auto raw = res.loadRaw(id);
-        if (!raw) throw FormatError(std::format("OTHR {} (hiding-place layouts) not found in TMT.DLL", id));
+        if (!raw) throw mischief::FormatError(std::format("OTHR {} (hiding-place layouts) not found in TMT.DLL", id));
         t.layouts[static_cast<size_t>(tier)] = loadLayoutTable(id, *raw);
     }
     auto obj = res.loadRaw(kObjectTableId);
-    if (!obj) throw FormatError(std::format("OTHR {} (hiding-place pictures) not found in TMT.DLL", kObjectTableId));
+    if (!obj) throw mischief::FormatError(std::format("OTHR {} (hiding-place pictures) not found in TMT.DLL", kObjectTableId));
     t.objects = parseObjectTable(*obj);
     return t;
 }

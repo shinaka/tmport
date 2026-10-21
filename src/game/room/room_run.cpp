@@ -8,10 +8,10 @@
 #include "audio/engine_input_port.h"
 #include "data/exe_tables.h"
 #include "game/rules.h"
+#include "mischief/util/log.h"
 #include "platform/engine.h"
 #include "res/game_files.h"
 #include "text/text_renderer.h"
-#include "util/log.h"
 
 namespace tmport::game::room {
 
@@ -58,7 +58,7 @@ private:
     InputQueue& in_;
 };
 
-RoomLoop::RoomLoop(AppContext& ctx, GameState& s, const GameTables& t, BorlandRand& rng, RoomHooks hooks,
+RoomLoop::RoomLoop(AppContext& ctx, GameState& s, const GameTables& t, mischief::BorlandRand& rng, RoomHooks hooks,
                    anim::AnimEngine* anim)
     : ctx_(ctx), s_(s), t_(t), rng_(rng), hooks_(std::move(hooks)), rt_(RoomTables::fromExe(*ctx.files.exe)),
       elves_(rt_) {
@@ -147,7 +147,7 @@ void RoomLoop::replayClues() {
 void RoomLoop::updateTreasureMarks(bool show) {
     constexpr uint32_t kGold = 0xFF00D7FFu, kCyan = 0xFFFFFF00u;  // packed R,G,B,A: (255,215,0), (0,255,255)
     constexpr int kPad = 3;                                         // outside the 118x133 picture
-    std::vector<gfx::Presenter::DebugMark> marks;
+    std::vector<mischief::gfx::Presenter::DebugMark> marks;
     const int room = s_.player.room;
     if (show && ctx_.engine.showTreasure() && RoomTable::valid(room)) {
         for (int i = 0; i < 3; ++i) {
@@ -165,7 +165,7 @@ void RoomLoop::updateTreasureMarks(bool show) {
 void RoomLoop::tick(PlayerInput& in) {
     Engine& e = ctx_.engine;
     gfx::FrameBuffer& fb = e.frame();
-    e.timerSet(DeadlineTimers::kFrameSlot, 100);
+    e.timerSet(mischief::DeadlineTimers::kFrameSlot, 100);
     // g_unused0b9b is cleared (never set); g_rankPromoted is cleared.
     s_.rank.rankPromoted = 0;
     roomTickHints(s_, t_);  // QueueHint(0), QueueHint(2), room 9: Room9_QueueRankHint
@@ -232,7 +232,7 @@ void RoomLoop::tick(PlayerInput& in) {
     updateTreasureMarks(true);
     for (;;) {
         e.flushDirtyRects();
-        if (e.timerExpired(DeadlineTimers::kFrameSlot)) break;
+        if (e.timerExpired(mischief::DeadlineTimers::kFrameSlot)) break;
         fb.clearDirtyRects();
     }
     ++ticks_;
@@ -273,7 +273,7 @@ void RoomLoop::run() {
             static int lastWarned = -1;  // once per (room, exit) pair: the exit is retried every tick
             if (const int key = pl.room << 8 | p_.nextRoom; key != lastWarned) {
                 lastWarned = key;
-                log::warn("room {}: the exit leads to room {}, which does not exist; staying", int(pl.room),
+                mischief::log::warn("room {}: the exit leads to room {}, which does not exist; staying", int(pl.room),
                           int(p_.nextRoom));
             }
             p_.nextRoom = pl.room;

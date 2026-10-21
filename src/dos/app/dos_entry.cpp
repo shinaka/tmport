@@ -14,7 +14,6 @@
 
 #include "dos/app/dos_preview.h"
 #include "dos/app/dos_runtime.h"
-#include "dos/app/script_input.h"
 #include "dos/data/dgroup_offsets.h"
 #include "dos/game/game.h"
 #include "dos/game/load_state.h"
@@ -24,13 +23,14 @@
 #include "dos/game/ui.h"
 #include "dos/save/dosbox_state.h"
 #include "dos/save/users_store.h"
+#include "mischief/dos/app/script_input.h"
+#include "mischief/platform/host.h"
+#include "mischief/rtl/borland_rand.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
+#include "mischief/util/png_writer.h"
 #include "mods/wav_codec.h"
-#include "platform/host.h"
-#include "rtl/borland_rand.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/log.h"
-#include "util/png_writer.h"
 
 namespace tmport::dos {
 
@@ -45,7 +45,7 @@ std::vector<uint8_t> loadRoster(const DosOptions& o, const std::filesystem::path
     const DosUsersStatus status = store.loadWithImport(folder);
     if (status == DosUsersStatus::Ok || store.fromBackup()) return store.users().bytes();
     if (status != DosUsersStatus::Missing)
-        log::warn("{}: {}; showing the DOS folder's roster", pathToUtf8(store.path()), describe(status));
+        mischief::log::warn("{}: {}; showing the DOS folder's roster", mischief::pathToUtf8(store.path()), describe(status));
     return {};
 }
 
@@ -57,24 +57,24 @@ bool writeSoundWav(const std::filesystem::path& path, const std::vector<float>& 
         bytes[2 * i] = static_cast<uint8_t>(v & 0xFF);
         bytes[2 * i + 1] = static_cast<uint8_t>((static_cast<uint16_t>(v) >> 8) & 0xFF);
     }
-    return writeWholeFile(path, mods::makeWav(static_cast<uint32_t>(rate), 1, 16, bytes));
+    return mischief::writeWholeFile(path, mischief::mods::makeWav(static_cast<uint32_t>(rate), 1, 16, bytes));
 }
 
-std::optional<ScriptedInput> parseScript(const std::string& keys) {
+std::optional<mischief::dos::ScriptedInput> parseScript(const std::string& keys) {
     std::string error;
-    auto script = ScriptedInput::parse(keys, error);
-    if (!script) throw Error("--keys: " + error);
+    auto script = mischief::dos::ScriptedInput::parse(keys, error);
+    if (!script) throw mischief::Error("--keys: " + error);
     return script;
 }
 
 // The host's SDL events for the PC keyboard and the mouse driver (both editions of the DOS runtime).
-platform::HostHandlers dosInputHandlers(platform::Host& host, DosRuntime& runtime, DosAudioDevice* audio, bool& resync) {
+mischief::platform::HostHandlers dosInputHandlers(mischief::platform::Host& host, DosRuntime& runtime, DosAudioDevice* audio, bool& resync) {
     auto mouseAt = [&host, &runtime](float wx, float wy) {
         float cx = 0.0f, cy = 0.0f;
         if (host.windowToCanvas(wx, wy, cx, cy))
             runtime.mouse().setLogicalPosition(static_cast<int>(std::floor(cx)), static_cast<int>(std::floor(cy)));
     };
-    platform::HostHandlers h;
+    mischief::platform::HostHandlers h;
     h.input = [&runtime, mouseAt](const SDL_Event& e) {
         switch (e.type) {
             case SDL_EVENT_KEY_DOWN:
@@ -110,7 +110,7 @@ platform::HostHandlers dosInputHandlers(platform::Host& host, DosRuntime& runtim
 // Host time drives the virtual PIT (DosRuntime::advance, at most 4 game ticks per host frame after
 // a stall) until the game quits or the window closes. `afterAdvance` runs after each advance.
 template <class F>
-void interactiveLoop(platform::Host& host, DosRuntime& runtime, bool& resync, F&& afterAdvance) {
+void interactiveLoop(mischief::platform::Host& host, DosRuntime& runtime, bool& resync, F&& afterAdvance) {
     uint64_t last = host.nowNs();
     while (runtime.running() && !host.quitRequested()) {
         host.pump();
@@ -130,9 +130,9 @@ void interactiveLoop(platform::Host& host, DosRuntime& runtime, bool& resync, F&
 
 // ---- the wave-2 screen preview (--dos-preview) ---------------------------------------------------
 
-int runPreview(platform::Host& host, const DosOptions& options, const std::filesystem::path& folder) {
-    log::info("DOS edition in {} (look {}, sound {}{}, frame speed {}): preview of the screens and sound",
-              pathToUtf8(folder), lookName(options.look), iniValue(options.sound), options.slowCpu ? ", slow CPU" : "",
+int runPreview(mischief::platform::Host& host, const DosOptions& options, const std::filesystem::path& folder) {
+    mischief::log::info("DOS edition in {} (look {}, sound {}{}, frame speed {}): preview of the screens and sound",
+              mischief::pathToUtf8(folder), lookName(options.look), iniValue(options.sound), options.slowCpu ? ", slow CPU" : "",
               iniValue(options.frameSpeed));
     const DosGfxFiles files = DosGfxFiles::open(folder);
 
@@ -143,7 +143,7 @@ int runPreview(platform::Host& host, const DosOptions& options, const std::files
 
     // One Turbo C rand() for the whole game, unseeded (PORTING_NOTES §2.4); the AdLib driver draws
     // from it in Music_Play.
-    BorlandRand rand;
+    mischief::BorlandRand rand;
     const bool offline = options.headless || !host.hasWindow();
     std::unique_ptr<DosAudioDevice> audio = makeDosAudioDevice(files.files(), options.sound, [&rand] { return rand.rand(); });
     if (audio && !offline && !audio->open()) audio.reset();  // no device: no sound (open() logged why)
@@ -162,7 +162,7 @@ int runPreview(platform::Host& host, const DosOptions& options, const std::files
         host.presenter().presentFrame(rgba);
         if (dumpDir.empty()) return;
         const auto path = dumpDir / std::format("{:02}_{}_{}.png", dumped++, dosScreenName(s), lookName(options.look));
-        if (!host.writeFrameDump(path)) log::error("cannot write {}", pathToUtf8(path));
+        if (!host.writeFrameDump(path)) mischief::log::error("cannot write {}", mischief::pathToUtf8(path));
     });
     preview.start();
 
@@ -171,12 +171,12 @@ int runPreview(platform::Host& host, const DosOptions& options, const std::files
         // the keys it left in the BIOS buffer are read (one per game tick).
         runtime.setScript(std::move(*parseScript(options.keys)));
         while (runtime.running() && !runtime.script().finished()) runtime.stepGameTicks(1);
-        for (int i = 0; i < BiosKeyboard::kCapacity && runtime.running() && runtime.keyboard().bios().size() > 0; ++i)
+        for (int i = 0; i < mischief::dos::BiosKeyboard::kCapacity && runtime.running() && runtime.keyboard().bios().size() > 0; ++i)
             runtime.stepGameTicks(1);
-        log::info("DOS preview: {} game ticks, {} screens shown", runtime.gameTicks(), preview.screensShown());
+        mischief::log::info("DOS preview: {} game ticks, {} screens shown", runtime.gameTicks(), preview.screensShown());
         if (!dumpDir.empty() && audio) {
             const auto wav = dumpDir / "sound.wav";
-            if (!writeSoundWav(wav, preview.offlineSamples(), audio->sampleRate())) log::error("cannot write {}", pathToUtf8(wav));
+            if (!writeSoundWav(wav, preview.offlineSamples(), audio->sampleRate())) mischief::log::error("cannot write {}", mischief::pathToUtf8(wav));
         }
         return 0;
     }
@@ -200,15 +200,15 @@ void useStateUsersFile(const DosboxState& state, const std::filesystem::path& us
     const auto copy = DosboxState::usersFileOf(state.path());
     std::error_code ec;
     if (!std::filesystem::is_regular_file(copy, ec)) {
-        log::warn("{} not found: the DOS save of the preference folder stays as it is", pathToUtf8(copy));
+        mischief::log::warn("{} not found: the DOS save of the preference folder stays as it is", mischief::pathToUtf8(copy));
         return;
     }
     const DosImportResult r = importDosUsers(copy, usersPath, true);
-    if (r != DosImportResult::Imported) log::warn("{} -> {}: {}", pathToUtf8(copy), pathToUtf8(usersPath), describe(r));
+    if (r != DosImportResult::Imported) mischief::log::warn("{} -> {}: {}", mischief::pathToUtf8(copy), mischief::pathToUtf8(usersPath), describe(r));
 }
 
 void logLoadedState(const LoadedState& s) {
-    log::info("state loaded: CPU at {}{}{}, g_ticks {} (the next game tick at {}), PAN {} (before it {}), bank {}, {} dirty "
+    mischief::log::info("state loaded: CPU at {}{}{}, g_ticks {} (the next game tick at {}), PAN {} (before it {}), bank {}, {} dirty "
               "spans{}{}{}",
               s.cpu.empty() ? "?" : s.cpu, s.insideTimerBeforeCountdown ? " (timer interrupt, before its countdown)" : "",
               s.insideGameTick ? " (inside Game_Tick: the engine starts with the next tick)" : "", s.ticks, s.firstTickTicks,
@@ -217,7 +217,7 @@ void logLoadedState(const LoadedState& s) {
               s.midFrame ? std::format(", saved inside a frame ({} sprite backgrounds put back)", s.spritesRestored) : "",
               s.restartedSfx >= 0 ? std::format(", effect {} goes on", s.restartedSfx) : "",
               s.restartedTune >= 0 ? std::format(", tune {} goes on", s.restartedTune) : "");
-    for (const std::string& w : s.warnings) log::warn("state: {}", w);
+    for (const std::string& w : s.warnings) mischief::log::warn("state: {}", w);
 }
 
 // --frame-dump as a folder: the last frame of each screen the game showed (the title pages, the
@@ -278,8 +278,8 @@ private:
         if (!suffix.empty()) name += std::format("_{}", suffix);
         const auto path = dir_ / std::format("{}_{}.png", name, lookName(look_));
         const auto* bytes = reinterpret_cast<const uint8_t*>(rgba.data());
-        if (!png::writeRgba(path, BackBuffer::kWidth, BackBuffer::kHeight, std::span<const uint8_t>(bytes, rgba.size() * 4)))
-            log::error("cannot write {}", pathToUtf8(path));
+        if (!mischief::png::writeRgba(path, BackBuffer::kWidth, BackBuffer::kHeight, std::span<const uint8_t>(bytes, rgba.size() * 4)))
+            mischief::log::error("cannot write {}", mischief::pathToUtf8(path));
     }
 
     std::filesystem::path dir_;
@@ -292,7 +292,7 @@ private:
     size_t n_ = 0;
 };
 
-int runGame(platform::Host& host, const DosOptions& launchOptions, const std::filesystem::path& folder) {
+int runGame(mischief::platform::Host& host, const DosOptions& launchOptions, const std::filesystem::path& folder) {
     // --dos-load-state: the DOSBox-X state decides the machine (its look unless one was given, and
     // its sound device, which the game's rand() sequence depends on: AdLib draws one per tune).
     std::optional<DosboxState> state;
@@ -300,10 +300,10 @@ int runGame(platform::Host& host, const DosOptions& launchOptions, const std::fi
     if (!options.loadState.empty()) {
         state = DosboxState::load(options.loadState);
         if (!options.lookFromCommandLine) options.look = stateLook(*state);
-        log::info("DOSBox-X state {} ({}, g_videoType {}, g_soundDevice {})", pathToUtf8(options.loadState),
+        mischief::log::info("DOSBox-X state {} ({}, g_videoType {}, g_soundDevice {})", mischief::pathToUtf8(options.loadState),
                   state->machineName(), static_cast<int16_t>(state->dsWord(dg::kVideoType)), state->dsWord(dg::kSoundDevice));
     }
-    log::info("DOS edition in {} (look {}, sound {}{}, frame speed {})", pathToUtf8(folder), lookName(options.look),
+    mischief::log::info("DOS edition in {} (look {}, sound {}{}, frame speed {})", mischief::pathToUtf8(folder), lookName(options.look),
               iniValue(options.sound), options.slowCpu ? ", slow CPU" : "", iniValue(options.frameSpeed));
     const DosGfxFiles files = DosGfxFiles::open(folder);
 
@@ -319,12 +319,12 @@ int runGame(platform::Host& host, const DosOptions& launchOptions, const std::fi
     if (!options.prefDir.empty()) usersPath = options.prefDir / std::filesystem::path(kDosUsersFileName);
     DosUsersStore users(usersPath);
     if (usersPath.empty()) {
-        log::warn("no preference folder: the DOS edition's players and saved games are not kept");
+        mischief::log::warn("no preference folder: the DOS edition's players and saved games are not kept");
     } else {
         if (state) useStateUsersFile(*state, usersPath);
         const DosUsersStatus status = users.loadWithImport(folder);  // logs an import
         if (status != DosUsersStatus::Ok && status != DosUsersStatus::Missing)
-            log::warn("{}: {}{}", pathToUtf8(usersPath), describe(status), users.fromBackup() ? " (the backup is used)" : "");
+            mischief::log::warn("{}: {}{}", mischief::pathToUtf8(usersPath), describe(status), users.fromBackup() ? " (the backup is used)" : "");
     }
 
     // The sound driver of the chosen device. Without sound, or without an audio device, it still runs
@@ -338,15 +338,15 @@ int runGame(platform::Host& host, const DosOptions& launchOptions, const std::fi
     if (state) {
         device = stateSoundDevice(*state);  // also when silent: the device is part of the game's state
         if (!silent && device != options.sound)
-            log::info("sound device {}: the state's (the sound option does not apply to a loaded state)", iniValue(device));
+            mischief::log::info("sound device {}: the state's (the sound option does not apply to a loaded state)", iniValue(device));
     }
     std::unique_ptr<DosAudioDevice> audio = makeDosAudioDevice(files.files(), device,
                                                                [&game] { return game ? game->rand.rand() : 0; });
-    if (!audio) throw Error("the DOS sound driver could not be created");
+    if (!audio) throw mischief::Error("the DOS sound driver could not be created");
     bool audioOffline = offline || silent;
     if (!audioOffline && !audio->open()) {
         audioOffline = true;  // open() logged why
-        log::warn("no audio device: the game runs without sound");
+        mischief::log::warn("no audio device: the game runs without sound");
     }
     DosAudioSound driver(*audio, audioOffline);
     // A long frame's sound calls reach the driver where the original's frame made them (wave 5).
@@ -359,7 +359,7 @@ int runGame(platform::Host& host, const DosOptions& launchOptions, const std::fi
     std::unique_ptr<TraceSound> traceSound;
     if (!options.tracePath.empty()) {
         traceFile.open(options.tracePath, std::ios::binary | std::ios::trunc);
-        if (!traceFile) throw Error(std::format("--dos-trace: cannot write {}", pathToUtf8(options.tracePath)));
+        if (!traceFile) throw mischief::Error(std::format("--dos-trace: cannot write {}", mischief::pathToUtf8(options.tracePath)));
         traceSound = std::make_unique<TraceSound>(driver);
     }
     SoundFacade& sound = traceSound ? static_cast<SoundFacade&>(*traceSound) : driver;
@@ -413,14 +413,14 @@ int runGame(platform::Host& host, const DosOptions& launchOptions, const std::fi
             const auto& d = options.stateDumps[i];
             if (dumped[i] || tick < d.tick) continue;
             dumped[i] = true;
-            if (writeDgroupDump(g, d.file)) log::info("DGROUP after game tick {} -> {}", tick, pathToUtf8(d.file));
-            else log::error("cannot write {}", pathToUtf8(d.file));
+            if (writeDgroupDump(g, d.file)) mischief::log::info("DGROUP after game tick {} -> {}", tick, mischief::pathToUtf8(d.file));
+            else mischief::log::error("cannot write {}", mischief::pathToUtf8(d.file));
             // ... and the picture shown after that tick (<file>.png), to compare with a capture.
             auto shot = d.file;
             shot += ".png";
             const auto* bytes = reinterpret_cast<const uint8_t*>(rgba.data());
-            if (!png::writeRgba(shot, BackBuffer::kWidth, BackBuffer::kHeight, std::span<const uint8_t>(bytes, rgba.size() * 4)))
-                log::error("cannot write {}", pathToUtf8(shot));
+            if (!mischief::png::writeRgba(shot, BackBuffer::kWidth, BackBuffer::kHeight, std::span<const uint8_t>(bytes, rgba.size() * 4)))
+                mischief::log::error("cannot write {}", mischief::pathToUtf8(shot));
         }
     };
     // From a state, tick 0 is the loaded moment: --dos-dump-state 0:<file> and the frame dump see the
@@ -438,7 +438,7 @@ int runGame(platform::Host& host, const DosOptions& launchOptions, const std::fi
             runtime.stepGameTicks(1);
             afterTicks();
         }
-        for (int i = 0; i < BiosKeyboard::kCapacity && runtime.running() && runtime.keyboard().bios().size() > 0; ++i) {
+        for (int i = 0; i < mischief::dos::BiosKeyboard::kCapacity && runtime.running() && runtime.keyboard().bios().size() > 0; ++i) {
             runtime.stepGameTicks(1);
             afterTicks();
         }
@@ -461,12 +461,12 @@ int runGame(platform::Host& host, const DosOptions& launchOptions, const std::fi
     // main 130f:00D1: the loop ended because g_quit was set.
     if (!runtime.running()) gameShutdown(g);
     if (dumper) dumper->finish(g, runtime.gameTicks(), rgba);
-    log::info("DOS game: {} game ticks, {} frames; g_uiMode {:#04x}, level {}, scene {}{}", runtime.gameTicks(), runtime.frames(),
+    mischief::log::info("DOS game: {} game ticks, {} frames; g_uiMode {:#04x}, level {}, scene {}{}", runtime.gameTicks(), runtime.frames(),
               g.core.uiMode, g.core.level, g.world.loadedScene, runtime.running() ? "" : ", quit");
     trace.reset();
     if (keepWav) {
         const auto wav = options.frameDumpDir / "sound.wav";
-        if (!writeSoundWav(wav, driver.samples(), audio->sampleRate())) log::error("cannot write {}", pathToUtf8(wav));
+        if (!writeSoundWav(wav, driver.samples(), audio->sampleRate())) mischief::log::error("cannot write {}", mischief::pathToUtf8(wav));
     }
     if (!audioOffline) audio->close();
     runtime.setClient(nullptr);
@@ -475,7 +475,7 @@ int runGame(platform::Host& host, const DosOptions& launchOptions, const std::fi
 
 }  // namespace
 
-int runDosEdition(platform::Host& host, const DosOptions& options, const std::filesystem::path& folder) {
+int runDosEdition(mischief::platform::Host& host, const DosOptions& options, const std::filesystem::path& folder) {
     return options.preview ? runPreview(host, options, folder) : runGame(host, options, folder);
 }
 

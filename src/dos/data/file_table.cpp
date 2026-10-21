@@ -3,7 +3,7 @@
 #include <stdexcept>
 
 #include "dos/data/dgroup_offsets.h"
-#include "util/file_util.h"
+#include "mischief/util/file_util.h"
 
 namespace tmport::dos {
 
@@ -42,7 +42,7 @@ FileTable FileTable::read(const DosExe& exe) {
         }
         if (name.empty() || name.size() > 12) bad(i, "bad name length");
         if (disk != 1 && disk != 2) bad(i, "disk number " + std::to_string(disk));
-        if (!iequalsAscii(name, kExpectedNames[static_cast<size_t>(i)]))
+        if (!mischief::iequalsAscii(name, kExpectedNames[static_cast<size_t>(i)]))
             bad(i, "expected " + std::string(kExpectedNames[static_cast<size_t>(i)]));
         t.entries_[static_cast<size_t>(i)] = {std::move(name), disk};
     }
@@ -51,7 +51,7 @@ FileTable FileTable::read(const DosExe& exe) {
 
 std::optional<int> FileTable::indexOf(std::string_view name) const {
     for (int i = 0; i < kCount; ++i)
-        if (iequalsAscii(entries_[static_cast<size_t>(i)].name, name)) return i;
+        if (mischief::iequalsAscii(entries_[static_cast<size_t>(i)].name, name)) return i;
     return std::nullopt;
 }
 

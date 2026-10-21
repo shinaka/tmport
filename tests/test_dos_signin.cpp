@@ -20,7 +20,7 @@
 #include "dos/save/users_dat.h"
 #include "dos_game_fixture.h"
 #include "dos_test_data.h"
-#include "util/file_util.h"
+#include "mischief/util/file_util.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -309,7 +309,7 @@ TEST_CASE("DOS sign-in: a new player writes USERS.DAT like the original") {
     DosGame& g = f.g();
     // DS:929F (header bytes 1-2) is the sprite save heap's high-water mark of the frames drawn so far
     // (the anim module's); the reference run's value is put in so every other byte is compared.
-    const auto ref = readWholeFile(*after);
+    const auto ref = mischief::readWholeFile(*after);
     REQUIRE(ref);
     g.sprites.saveHeapHigh = static_cast<uint16_t>((*ref)[1] | ((*ref)[2] << 8));
     for (int c : {8, kA, kD, kA}) command(g, c);
@@ -322,7 +322,7 @@ TEST_CASE("DOS sign-in: a new player writes USERS.DAT like the original") {
     CHECK(g.ui.signinStart == 1);
     CHECK(f.users().writes() == 1);
     CHECK(f.users().lastMoment() == DosSaveMoment::NewPlayer);
-    const auto written = readWholeFile(f.users().path());
+    const auto written = mischief::readWholeFile(f.users().path());
     REQUIRE(written);
     std::vector<size_t> where;
     const int n = differingBytes(*written, *ref, &where);
@@ -358,7 +358,7 @@ TEST_CASE("DOS sign-in: Game_End and the menu save moments") {
         CHECK(g.rec().coins == 17);  // Users_Pack
         CHECK(g.rec().gamesPlayed == 5);
         CHECK(f.users().lastMoment() == DosSaveMoment::GameEnd);
-        const auto written = readWholeFile(f.users().path());
+        const auto written = mischief::readWholeFile(f.users().path());
         REQUIRE(written);
         CHECK(written->size() == kUsersFileSize);
     }
@@ -435,8 +435,8 @@ TEST_CASE("DOS sign-in: Exit and Save from reference states writes the reference
         g.sprites.saveHeapHigh = static_cast<uint16_t>(d[dg::kSaveHeapHigh] | (d[dg::kSaveHeapHigh + 1] << 8));
         g.ui.buttonSel = 1;
         menuCmdExitAndSave(g);
-        const auto written = readWholeFile(f.users().path());
-        const auto expected = readWholeFile(*ref);
+        const auto written = mischief::readWholeFile(f.users().path());
+        const auto expected = mischief::readWholeFile(*ref);
         REQUIRE(written);
         REQUIRE(expected);
         std::vector<size_t> where;
@@ -468,8 +468,8 @@ TEST_CASE("DOS sign-in: Game_End from the rank-chest state writes the following 
     const auto& d = *dgroup;
     g.sprites.saveHeapHigh = static_cast<uint16_t>(d[dg::kSaveHeapHigh] | (d[dg::kSaveHeapHigh + 1] << 8));
     gameEnd(g);
-    const auto written = readWholeFile(f.users().path());
-    const auto expected = readWholeFile(*ref);
+    const auto written = mischief::readWholeFile(f.users().path());
+    const auto expected = mischief::readWholeFile(*ref);
     REQUIRE(written);
     REQUIRE(expected);
     std::vector<size_t> where;

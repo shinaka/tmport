@@ -16,10 +16,10 @@
 #include "anim/dam_script.h"
 #include "gfx/frame_buffer.h"
 #include "input/input_codes.h"
+#include "mischief/timing/clock.h"
+#include "mischief/timing/deadline_timers.h"
 #include "platform/engine.h"
 #include "test_data.h"
-#include "timing/clock.h"
-#include "timing/deadline_timers.h"
 
 using namespace tmport;
 using namespace tmport::anim;
@@ -56,9 +56,9 @@ std::shared_ptr<const gfx::PixMap> solid(int w, int h, uint8_t v) {
 // A frame buffer whose key colour is index 15 (as RRGB 900's (0,0,AA)).
 gfx::FrameBuffer keyedBuffer() {
     gfx::FrameBuffer fb;
-    gfx::KeyTable key{};
+    mischief::gfx::KeyTable key{};
     key[15] = true;
-    gfx::KeyTable white{};
+    mischief::gfx::KeyTable white{};
     white[255] = true;
     fb.setKeys(key, white);
     return fb;
@@ -229,7 +229,7 @@ TEST_CASE("DAM: FC / FB sound callbacks, F9 update rects, no-op bytes") {
     AnimSound snd;
     snd.play = [&](int n) { played.push_back(n); };
     snd.stop = [&] { ++stops; };
-    std::vector<gfx::Rect> presented;
+    std::vector<mischief::gfx::Rect> presented;
     AnimEngine a(fb, [&](int x, int y, int w, int h) { presented.push_back({x, y, w, h}); }, snd);
 
     Dam d;
@@ -254,13 +254,13 @@ TEST_CASE("DAM: FC / FB sound callbacks, F9 update rects, no-op bytes") {
     fb.setClip({0, 383, 97, 511});
     a.flushUpdateRects();
     REQUIRE(presented.size() == 1);
-    CHECK(presented[0] == gfx::Rect{97, 0xF0, 3, 5});
+    CHECK(presented[0] == mischief::gfx::Rect{97, 0xF0, 3, 5});
     CHECK(a.updateRects().empty());
 }
 
 TEST_CASE("DAM: F9 presentation and clipping") {
     auto fb = keyedBuffer();
-    std::vector<gfx::Rect> presented;
+    std::vector<mischief::gfx::Rect> presented;
     AnimEngine a(fb, [&](int x, int y, int w, int h) { presented.push_back({x, y, w, h}); });
     Dam d;
     d.rect(-10, 5, 30, 8).rect(500, 250, 40, 200).fe().ff();
@@ -269,8 +269,8 @@ TEST_CASE("DAM: F9 presentation and clipping") {
     fb.resetClip();  // {0..383, 0..511}
     a.flushUpdateRects();
     REQUIRE(presented.size() == 2);
-    CHECK(presented[0] == gfx::Rect{0, 5, 22, 10});      // x -10 w 32 -> x 0 w 22
-    CHECK(presented[1] == gfx::Rect{500, 250, 12, 134}); // right/bottom clipped (inclusive 511/383)
+    CHECK(presented[0] == mischief::gfx::Rect{0, 5, 22, 10});      // x -10 w 32 -> x 0 w 22
+    CHECK(presented[1] == mischief::gfx::Rect{500, 250, 12, 134}); // right/bottom clipped (inclusive 511/383)
 }
 
 TEST_CASE("DAM: the stop flag turns the next opcode into FF; onEnd is called") {
@@ -433,7 +433,7 @@ TEST_CASE("DAM: keyed draw, mirror, stamp, opaque channels, DOP, yOff and erase 
     background(fb, 7);
     fb.resetClip();
     fb.setDirtyEnabled(true);
-    std::vector<gfx::Rect> presented;
+    std::vector<mischief::gfx::Rect> presented;
     AnimEngine a(fb, [&](int x, int y, int w, int h) { presented.push_back({x, y, w, h}); });
     // 3x1 picture: 50, key (15), 52.
     auto pm = std::make_shared<gfx::PixMap>();
@@ -478,7 +478,7 @@ TEST_CASE("DAM: keyed draw, mirror, stamp, opaque channels, DOP, yOff and erase 
         a.tick();
         CHECK(fb.at(41, 40) == 15);  // the key pixel is copied
         REQUIRE(presented.size() == 1);
-        CHECK(presented[0] == gfx::Rect{40, 40, 3, 1});
+        CHECK(presented[0] == mischief::gfx::Rect{40, 40, 3, 1});
         CHECK(a.eraseRects().size() == 1);
         a.resetAll();
         a.eraseSprites();
@@ -557,8 +557,8 @@ namespace {
 // ModalHost on a fake clock: Timer_Expired yields 1 ms when not expired (as Engine does), keys
 // are delivered at given times, and each Gfx_FlushDirtyRects records the time of the tick.
 struct FakeHost final : ModalHost {
-    ManualClock clock{10000};
-    DeadlineTimers timers{&clock};
+    mischief::ManualClock clock{10000};
+    mischief::DeadlineTimers timers{&clock};
     std::multimap<uint64_t, uint16_t> keys;  // time -> code
     std::vector<uint64_t> ticks;
     int flushes = 0;
@@ -850,7 +850,7 @@ TEST_CASE("DAM: Anim_LoadBundle fills the frame table; every FD finds a frame") 
 TEST_CASE("DAM: title tick 1 composes PMAP 2101 keyed over PMAP 2100") {
     TM_REQUIRE_GAME_DATA();
     const ResourceManager& res = *g->res;
-    const gfx::Palette pal = g->makePalette(gfx::ColorMode::Colour256);
+    const mischief::gfx::Palette pal = g->makePalette(mischief::gfx::ColorMode::Colour256);
     gfx::FrameBuffer fb;
     fb.setPalette(pal);
     fb.resetClip();
@@ -875,10 +875,10 @@ TEST_CASE("DAM: title tick 1 composes PMAP 2101 keyed over PMAP 2100") {
 
 TEST_CASE("modal player through Engine: celebration endings, timing and skip (shipped data)") {
     TM_REQUIRE_GAME_DATA();
-    ManualClock clock(50000);
+    mischief::ManualClock clock(50000);
     EngineConfig cfg;
     cfg.clock = &clock;
-    Engine engine(*g, gfx::ColorMode::Colour256, cfg);  // headless
+    Engine engine(*g, mischief::gfx::ColorMode::Colour256, cfg);  // headless
     gfx::FrameBuffer& fb = engine.frame();
     const ResourceManager& res = *g->res;
 

@@ -1,7 +1,7 @@
 # DOS edition names (`re/names/dos/`)
 
 One canonical name per address of `SST.EXE` (V 1.0), applied to the Ghidra project
-`re/ghidra_proj/TMDos` with `tools/ghidra_scripts/ApplyNames.java` and carried by the export
+`re/ghidra_proj/TMDos` with the engine's `tools/ghidra_scripts/ApplyNames.java` and carried by the export
 `re/dos/ghidra_export/`. The docs in `re/dos/docs/` and the engine (`src/dos/data/dgroup_offsets.h`)
 use exactly these names.
 

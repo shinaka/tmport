@@ -5,7 +5,7 @@
 #include <ostream>
 
 #include "dos/game/game.h"
-#include "util/file_util.h"
+#include "mischief/util/file_util.h"
 
 namespace tmport::dos {
 
@@ -162,7 +162,7 @@ void DosTrace::writeRow() {
 
 bool writeDgroupDump(const DosGame& g, const std::filesystem::path& file) {
     const std::vector<uint8_t> bytes = dumpToDgroup(g);
-    if (!writeWholeFile(file, bytes)) return false;
+    if (!mischief::writeWholeFile(file, bytes)) return false;
     std::string tsv = "# name\tds\tsize\tfarPointer\tsegWordOffset\tstride\tskipLen\tservice\n";
     auto add = [&tsv](const DgroupField& f) {
         tsv += std::format("{}\t{:04x}\t{}\t{}\t{}\t{}\t{}\t{}\n", f.name, f.ds, f.size, f.farPointer ? 1 : 0, f.segWordOffset,
@@ -172,7 +172,7 @@ bool writeDgroupDump(const DosGame& g, const std::filesystem::path& file) {
     for (const DgroupField& f : serviceFields()) add(f);
     auto tsvPath = file;
     tsvPath += ".fields.tsv";
-    return writeWholeFile(tsvPath, std::vector<uint8_t>(tsv.begin(), tsv.end()));
+    return mischief::writeWholeFile(tsvPath, std::vector<uint8_t>(tsv.begin(), tsv.end()));
 }
 
 }  // namespace tmport::dos

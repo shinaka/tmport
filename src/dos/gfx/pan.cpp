@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <format>
 
-#include "util/error.h"
+#include "mischief/util/error.h"
 
 namespace tmport::dos {
 
@@ -12,7 +12,7 @@ namespace {
 uint16_t rd16(std::span<const uint8_t> b, size_t at) { return static_cast<uint16_t>(b[at] | (b[at + 1] << 8)); }
 
 [[noreturn]] void fail(const std::string& name, const std::string& why) {
-    throw FormatError(std::format("{}: {}", name, why));
+    throw mischief::FormatError(std::format("{}: {}", name, why));
 }
 
 // 1000:2368 Map_Unpack with 1000:23b9 Map_UnpackRow, run in place on the map buffer exactly as the

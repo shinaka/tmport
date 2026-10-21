@@ -8,13 +8,13 @@
 #include <string>
 #include <vector>
 
-#include "app_test_util.h"
 #include "cli/commands.h"
 #include "cli/options.h"
 #include "cli/tool_mods.h"
+#include "mischief/test/app_test_util.h"
+#include "mischief/util/file_util.h"
 #include "res/game_files.h"
 #include "test_data.h"
-#include "util/file_util.h"
 
 using namespace tmport;
 
@@ -71,7 +71,7 @@ TEST_CASE("cli: the castle scene runs a comma-separated script and writes its fr
     std::error_code ec;
     std::filesystem::remove_all(out / "castle", ec);
     // Walk right to the ladder (held arrows: a press is shorter than the 100 ms tick), climb.
-    Argv a({"tmport", "--scene", "castle", "--tier", "2", "--data", *testdata::dataPath(), "--out", pathToUtf8(out / "castle"),
+    Argv a({"tmport", "--scene", "castle", "--tier", "2", "--data", *testdata::dataPath(), "--out", mischief::pathToUtf8(out / "castle"),
             "--shot-every", "1000", "--keys", "wait:500,hold:right:1200,hold:up:3000,click:100,200,end"});
     CHECK(cli::run(a.argc(), a.argv()) == 0);
     for (const char* f : {"0000.png", "0001.png", "0004.png", "final.png"})
@@ -79,7 +79,7 @@ TEST_CASE("cli: the castle scene runs a comma-separated script and writes its fr
 
     // A malformed token stops the tool before the scene (exit code 2, no frames).
     std::filesystem::remove_all(out / "bad", ec);
-    Argv b({"tmport", "--scene", "castle", "--data", *testdata::dataPath(), "--out", pathToUtf8(out / "bad"), "--keys",
+    Argv b({"tmport", "--scene", "castle", "--data", *testdata::dataPath(), "--out", mischief::pathToUtf8(out / "bad"), "--keys",
             "wait:500,no-such-key"});
     CHECK(cli::run(b.argc(), b.argv()) == 2);
     CHECK(!std::filesystem::exists(out / "bad" / "final.png"));
@@ -88,14 +88,14 @@ TEST_CASE("cli: the castle scene runs a comma-separated script and writes its fr
 TEST_CASE("cli: --mods reaches the tools that open the game files") {
     TM_REQUIRE_GAME_DATA();
     const auto mod = textMod("cli_mod");
-    const auto dp = pathFromUtf8(*testdata::dataPath());
+    const auto dp = mischief::pathFromUtf8(*testdata::dataPath());
 
     SUBCASE("applyToolMods") {
         GameFiles files = GameFiles::open(dp);
         const auto before = files.res->loadRaw(ResType::OTHR, 11605);
         REQUIRE(before);
         CHECK(cli::applyToolMods(files, {}) == 0);
-        CHECK(cli::applyToolMods(files, {pathToUtf8(mod / "no_such_folder"), pathToUtf8(mod)}) == 1);
+        CHECK(cli::applyToolMods(files, {mischief::pathToUtf8(mod / "no_such_folder"), mischief::pathToUtf8(mod)}) == 1);
         const auto after = files.res->loadRaw(ResType::OTHR, 11605);
         REQUIRE(after);
         CHECK(std::string(after->begin(), after->begin() + 5) == "Hello");
@@ -104,12 +104,12 @@ TEST_CASE("cli: --mods reaches the tools that open the game files") {
     SUBCASE("a text render through cli::run") {
         const auto out = apptest::outDir("cli_mod_out");
         const auto plain = out / "plain.png", modded = out / "modded.png";
-        Argv a({"tmport", "--render-text", "11605", "16", "40", "300", pathToUtf8(plain), "--data", pathToUtf8(dp)});
+        Argv a({"tmport", "--render-text", "11605", "16", "40", "300", mischief::pathToUtf8(plain), "--data", mischief::pathToUtf8(dp)});
         REQUIRE(cli::run(a.argc(), a.argv()) == 0);
-        Argv b({"tmport", "--render-text", "11605", "16", "40", "300", pathToUtf8(modded), "--data", pathToUtf8(dp), "--mods",
-                pathToUtf8(mod)});
+        Argv b({"tmport", "--render-text", "11605", "16", "40", "300", mischief::pathToUtf8(modded), "--data", mischief::pathToUtf8(dp), "--mods",
+                mischief::pathToUtf8(mod)});
         REQUIRE(cli::run(b.argc(), b.argv()) == 0);
-        const auto p = readWholeFile(plain), m = readWholeFile(modded);
+        const auto p = mischief::readWholeFile(plain), m = mischief::readWholeFile(modded);
         REQUIRE(p);
         REQUIRE(m);
         CHECK(*p != *m);

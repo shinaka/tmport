@@ -5,16 +5,16 @@
 
 namespace tmport::gfx {
 
-FrameBuffer::FrameBuffer(ColorMode mode) : mode_(mode), px_(static_cast<size_t>(kWidth) * kHeight, 0) {
+FrameBuffer::FrameBuffer(mischief::gfx::ColorMode mode) : mode_(mode), px_(static_cast<size_t>(kWidth) * kHeight, 0) {
     for (size_t i = 0; i < 16; ++i) pens_[i] = static_cast<uint8_t>(i);
 }
 
-void FrameBuffer::setKeys(const KeyTable& key, const KeyTable& whiteKey) {
+void FrameBuffer::setKeys(const mischief::gfx::KeyTable& key, const mischief::gfx::KeyTable& whiteKey) {
     key_ = key;
     whiteKey_ = whiteKey;
 }
 
-void FrameBuffer::setPalette(const Palette& p) {
+void FrameBuffer::setPalette(const mischief::gfx::Palette& p) {
     setKeys(p.keyTable(), p.whiteKeyTable());
     setPens(p.pens());
 }
@@ -46,7 +46,7 @@ void FrameBuffer::drawOpaque(int x, int y, const PixMap& pm) {
 // Shared body of 1058:0d43 (keyed) and 1058:114c (keyed, mirrored): clip to the inclusive clip
 // rectangle, copy every source pixel that is not a key colour. Mirrored: destination column X
 // takes source column (w-1) - (X - x).
-void FrameBuffer::blitClipped(int x, int y, const PixMap& pm, bool mirror, const KeyTable& key) {
+void FrameBuffer::blitClipped(int x, int y, const PixMap& pm, bool mirror, const mischief::gfx::KeyTable& key) {
     int x0 = std::max(x, clip_.left), x1 = std::min(x + pm.width, clip_.right + 1);
     int y0 = std::max(y, clip_.top), y1 = std::min(y + pm.height, clip_.bottom + 1);
     // Memory safety only (the clip rectangle normally lies inside the buffer).
@@ -121,7 +121,7 @@ void FrameBuffer::fillRaw(int x, int y, int w, int h, uint8_t value) {
 // widened to 1 before the nibble fill (1050:097c).
 void FrameBuffer::fillRectColor(int x, int y, int w, int h, int ega) {
     const uint8_t v = pens_[static_cast<size_t>(ega & 15)];
-    if (mode_ == ColorMode::Colour16) {
+    if (mode_ == mischief::gfx::ColorMode::Colour16) {
         if (w == 0) w = 1;
         if (h == 0) h = 1;
     }
@@ -137,7 +137,7 @@ void FrameBuffer::pixel(int x, int y) { fillRectColor(x, y, 1, 1, foreColor_); }
 // 1058:09b8 Gfx_FrameRectColor with RECT {x, y, x+w, y+h}.
 void FrameBuffer::frameRectColor(int x, int y, int w, int h, int ega) {
     const uint8_t v = pens_[static_cast<size_t>(ega & 15)];
-    if (mode_ == ColorMode::Colour16) {
+    if (mode_ == mischief::gfx::ColorMode::Colour16) {
         // Four nibble fills; top and left are one pixel longer than GDI's FrameRect.
         const int L = x, T = y, R = x + w, B = y + h;
         auto f = [&](int fx, int fy, int fw, int fh) {
@@ -173,7 +173,7 @@ PixMap FrameBuffer::saveRect(int x, int y, int w, int h) const {
     PixMap pm;
     pm.width = std::max(w, 0);
     pm.height = std::max(h, 0);
-    pm.depth = mode_ == ColorMode::Colour16 ? 4 : 8;
+    pm.depth = mode_ == mischief::gfx::ColorMode::Colour16 ? 4 : 8;
     pm.encoding = PixEncoding::Memory;
     pm.pixels.assign(static_cast<size_t>(pm.width) * static_cast<size_t>(pm.height), 0);
     for (int r = 0; r < pm.height; ++r) {

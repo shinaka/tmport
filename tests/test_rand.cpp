@@ -1,39 +1,9 @@
 #include <doctest/doctest.h>
 
+#include "mischief/rtl/borland_rand.h"
 #include "res/resource_types.h"
-#include "rtl/borland_rand.h"
 
 using namespace tmport;
-
-TEST_CASE("Borland rand vectors (code_1000.md §5)") {
-    BorlandRand r;  // initial seed 1
-    for (int v : {346, 130, 10982, 1090, 11656, 7117}) CHECK(r.rand() == v);
-    r.srand(0);
-    for (int v : {0, 346, 130, 10982}) CHECK(r.rand() == v);
-    r.srand(0x1234);
-    for (int v : {8151, 11177, 8835, 19970}) CHECK(r.rand() == v);
-}
-
-TEST_CASE("R(n) = rand()*n/32768 with signed 32-bit arithmetic") {
-    BorlandRand a, b;
-    a.srand(0x4321);
-    b.srand(0x4321);
-    for (int i = 0; i < 1000; ++i) {
-        const int n = 1 + (i * 37) % 600;
-        const int expect = static_cast<int>(static_cast<long long>(b.rand()) * n / 32768);
-        const int got = a.random(n);
-        CHECK(got == expect);
-        CHECK(got >= 0);
-        CHECK(got < n);
-    }
-    BorlandRand c;  // seed 1: first rand() = 346
-    CHECK(c.random(500) == 346 * 500 / 32768);
-    // The product wraps like IMUL; the quotient truncates toward zero like IDIV.
-    BorlandRand d;
-    d.srand(0);
-    d.rand();  // 0
-    CHECK(d.random(-1000) == -(346 * 1000 / 32768));
-}
 
 TEST_CASE("resource id -> type routing (1038:038a)") {
     CHECK(typeForId(300) == ResType::BNDL);
@@ -52,7 +22,7 @@ TEST_CASE("resource id -> type routing (1038:038a)") {
 }
 
 TEST_CASE("(type, id) -> DLL routing (sys_resources_saves.md §5.3)") {
-    using gfx::ColorMode;
+    using mischief::gfx::ColorMode;
     CHECK(dllFor(ResType::PMAP, 1000, ColorMode::Colour256) == DllId::TMT256);
     CHECK(dllFor(ResType::PMAP, 1000, ColorMode::Colour16) == DllId::TMT16);
     CHECK(dllFor(ResType::BNDL, 300, ColorMode::Colour256) == DllId::TMT);

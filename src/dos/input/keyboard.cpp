@@ -66,7 +66,7 @@ bool KbdIsr::onScanByte(uint8_t byte) {
 
 // ----------------------------------------------------------------------------------- PcKeyboard
 
-PcKeyboard::PcKeyboard(KeyboardOptions options) : ScanKeyboard(scanOptions(options)), options_(options) {
+PcKeyboard::PcKeyboard(KeyboardOptions options) : mischief::dos::ScanKeyboard(scanOptions(options)), options_(options) {
     isr_.tandy = options_.tandy;
 }
 
@@ -76,8 +76,8 @@ void PcKeyboard::setOptions(const KeyboardOptions& o) {
     setScanOptions(scanOptions(o));
 }
 
-ScanKeyboardOptions PcKeyboard::scanOptions(const KeyboardOptions& o) {
-    ScanKeyboardOptions s;
+mischief::dos::ScanKeyboardOptions PcKeyboard::scanOptions(const KeyboardOptions& o) {
+    mischief::dos::ScanKeyboardOptions s;
     s.typematicDelayMs = o.typematicDelayMs;
     s.typematicRateMs = o.typematicRateMs;
     s.prefixBytesToHandler = o.greyKeyE0Artefact;

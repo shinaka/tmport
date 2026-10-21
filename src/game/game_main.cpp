@@ -17,11 +17,11 @@
 #include "game/scenes/scenes.h"
 #include "game/signin.h"
 #include "game/title.h"
+#include "mischief/util/log.h"
 #include "platform/engine.h"
 #include "res/game_files.h"
 #include "ui/game_dialog.h"
 #include "ui/menu_bar.h"
-#include "util/log.h"
 
 namespace tmport::game {
 
@@ -62,9 +62,9 @@ public:
 private:
     template <class... Args>
     void trace(std::format_string<Args...> fmt, Args&&... args) {
-        if (!opts_.trace && !log::verbose()) return;
+        if (!opts_.trace && !mischief::log::verbose()) return;
         const std::string line = std::format(fmt, std::forward<Args>(args)...);
-        log::debug("game: {}", line);
+        mischief::log::debug("game: {}", line);
         if (opts_.trace) opts_.trace(line);
     }
 
@@ -80,7 +80,7 @@ private:
     void stopMusic();                        // 1128:00ef Music_StopScene
     void playMusic(int zone);                // 1128:0000 Music_PlayZone
     void blackScreen();  // colour 0, Gfx_FillRect(0,0,512,384), Gfx_BlitToWindow(0,0,512,384)
-    BorlandRand& rng() { return ctx_.engine.rng(); }
+    mischief::BorlandRand& rng() { return ctx_.engine.rng(); }
 
     AppContext& ctx_;
     GameMainOptions opts_;
@@ -105,7 +105,7 @@ void GameMain::bindHooks() {
     sceneHooks_.clearGateUnlocking = [this] { loop_.clearGateUnlocking(); };
     sceneHooks_.gameHooks = &loop_.gameHooks();
     sceneHooks_.rng = &ctx.engine.rng();  // the generator RoomLoop and setupClimb use
-    if (opts_.trace || log::verbose())
+    if (opts_.trace || mischief::log::verbose())
         sceneHooks_.trace = [this](std::string_view ev) { trace("scene: {}", ev); };
 
     // Room_Run's modal sub-states (S9).
@@ -119,7 +119,7 @@ void GameMain::bindHooks() {
         trace("S9 hint {}", event);
         scenes::showHint(ctx, event, sceneHooks_);
     };
-    if (opts_.trace || log::verbose())
+    if (opts_.trace || mischief::log::verbose())
         rh.beforePause = [this](int ms) { trace("room: presentation pause {} ms", ms); };
 
     // The room change's music and cut-scene (1118:0265..02f0).

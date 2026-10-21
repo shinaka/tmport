@@ -8,11 +8,11 @@
 #include "audio/audio_system.h"
 #include "data/dgroup_offsets.h"
 #include "data/exe_tables.h"
+#include "mischief/util/error.h"
 #include "platform/engine.h"
 #include "res/game_files.h"
 #include "text/text_renderer.h"
 #include "ui/game_dialog.h"
-#include "util/error.h"
 
 namespace tmport::game {
 
@@ -125,7 +125,7 @@ void TitleScreen::drawPage(int page) {
     const ResourceManager& res = *io_.ctx().files.res;
     if (page == 0) {
         auto pm = res.pixmap(kTitlePmap);
-        if (!pm) throw Error(std::format("title picture PMAP {} not found", kTitlePmap));
+        if (!pm) throw mischief::Error(std::format("title picture PMAP {} not found", kTitlePmap));
         fb.drawOpaqueOrFlippedWhiteKey(0, 20, *pm, false);
         fb.copyRect(0, 0, 512, 384, 0, gfx::FrameBuffer::kLayer1Y);  // save the title screen in layer 1
         io_.present(0, 0, 512, 384);
@@ -133,9 +133,9 @@ void TitleScreen::drawPage(int page) {
         fb.setForeColor(kBoxColour);
         fb.fillRect(kBoxX, kBoxY, kBoxW, kBoxH);
         const auto text = res.loadRaw(kPageTextFirst + page);
-        if (!text) throw Error(std::format("story text OTHR {} not found", kPageTextFirst + page));
+        if (!text) throw mischief::Error(std::format("story text OTHR {} not found", kPageTextFirst + page));
         fb.setForeColor(0);
-        io_.ctx().text.drawBox(kTextX, kTextY, kTextW, text::untilNul(*text));
+        io_.ctx().text.drawBox(kTextX, kTextY, kTextW, mischief::text::untilNul(*text));
         io_.present(kBoxX, kBoxY, kBoxW, kBoxH);
     }
     io_.trace(std::format("page {} drawn", page));

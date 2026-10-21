@@ -20,7 +20,7 @@
 #include "game/room/room_tables.h"
 #include "gfx/frame_buffer.h"
 #include "gfx/pixmap.h"
-#include "rtl/borland_rand.h"
+#include "mischief/rtl/borland_rand.h"
 
 namespace tmport {
 class ResourceManager;
@@ -56,7 +56,7 @@ struct ElfTick {
     PlayerRuntime& p;       // g_netStep, g_netX, g_gateWalkStarted, g_jumping
     SceneRuntime& scene;    // g_elfQuizResult
     GameHooks& hooks;       // Sfx_Play, HUD redraw (via the inventory rules)
-    BorlandRand& rng;
+    mischief::BorlandRand& rng;
 };
 
 class ElfSystem {
@@ -67,7 +67,7 @@ public:
     void init();
     // 1178:0251 Elf_SpawnForLevel(count): sets 0..6 and the projectile are loaded from res (when
     // given; tests run without pictures), then count elves are placed with R(250), R(2), 15 x R(3).
-    void spawnForLevel(GameState& s, int count, BorlandRand& rng, const ResourceManager* res);
+    void spawnForLevel(GameState& s, int count, mischief::BorlandRand& rng, const ResourceManager* res);
     // 1178:0364 Elf_UnloadAll.
     void unloadAll();
     // The loading part of Elf_SpawnForLevel (sets 0..6 and the projectile), and the elf count:
@@ -99,10 +99,10 @@ public:
     int16_t drawYOff = 0;                               // DS:65cc elf_drawYOff
 
 private:
-    void placeRandomly(int i, const GameState& s, BorlandRand& rng);  // 1178:00d7
+    void placeRandomly(int i, const GameState& s, mischief::BorlandRand& rng);  // 1178:00d7
     void checkNetCatch(int i, ElfTick& t);                            // 1178:03bb
     void caughtInNet(int mode, int i, ElfTick* t, gfx::FrameBuffer* fb, int playerRoom);  // 1178:0b1d
-    void handleRoomEdges(int i, const GameState& s, BorlandRand& rng);  // 1178:0565
+    void handleRoomEdges(int i, const GameState& s, mischief::BorlandRand& rng);  // 1178:0565
     void runScript(int mode, int i, const ElfScript& sc, ElfTick* t, gfx::FrameBuffer* fb, int playerRoom,
                    GameHooks* hooks);                                  // 1178:0766
     void throwHandler(int mode, int i, ElfTick* t, gfx::FrameBuffer* fb, int playerRoom);  // 1178:0cb0

@@ -511,7 +511,7 @@ The 5th Help handler is relocated to `1140:0000` (`MenuCmd_AboutTM`; ARCHITECTUR
 never reads +0x04, +0x10 or +0x12: `Menu_SetMenuBar` (1078:0000) copies each record (F_SCOPY) and
 uses only +0x06 and +0x08 to build a Win16 menu. *Gizmos & Gadgets* (DOS, 1993) links the same TLC
 menu library with the identical 0x14-byte record and draws its menu bar itself, and there all three
-fields are read (G&G addresses as in `re/gg/docs/ARCHITECTURE.md` §5.5): the title's click zone is
+fields are read (G&G addresses as in ggport's `re/docs/ARCHITECTURE.md` §5.5): the title's click zone is
 (x = +0x12, y 0, w = +0x04 + 2, h 9) (40a4:0035..0078), the title picture is drawn at x = +0x12
 (40a4:04db), and the drop-down box is opened at x = +0x12, y 9, width +0x10 (40a4:056c). Read the
 same way, TM Windows' values (the records at file offsets 0x24F83, 0x24F97 and 0x24FAB of

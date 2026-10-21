@@ -19,9 +19,9 @@
 #include "dos/gfx/scenery.h"
 #include "dos/text/dos_font.h"
 #include "dos_test_data.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/hash.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/hash.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -86,7 +86,7 @@ std::vector<uint8_t> tinyPak(const std::vector<TinyFrame>& frames) {
 // Frame {1 0 0 2 / 3 0 3 0}, hotspot (-1, -2).
 PakFile testPak() { return PakFile::load(tinyPak({{2, 2, -1, -2, {0x10, 0x02, 0x30, 0x30}}}), "TEST.PAK"); }
 
-uint64_t hashLogical(const BackBuffer& b) { return fnv1a64(b.logicalPixels()); }
+uint64_t hashLogical(const BackBuffer& b) { return mischief::fnv1a64(b.logicalPixels()); }
 
 }  // namespace
 
@@ -115,7 +115,7 @@ TEST_CASE("DOS PAN: word-RLE map with runs and row copies, A5h tile escapes, in-
 
     auto bad = tinyPan();
     bad.push_back(0);
-    CHECK_THROWS_AS(PanFile::load(bad, "BAD.PAN"), FormatError);
+    CHECK_THROWS_AS(PanFile::load(bad, "BAD.PAN"), mischief::FormatError);
 }
 
 TEST_CASE("DOS PAK: offset table, raw and run rows, header fields") {
@@ -135,7 +135,7 @@ TEST_CASE("DOS PAK: offset table, raw and run rows, header fields") {
     CHECK(k.headerWords()[1] == 62);
     auto bad = tinyPak({{2, 2, 0, 0, {1, 2, 3, 4}}});
     bad[10] = 0;  // break the FFFF FFFF trailer
-    CHECK_THROWS_AS(PakFile::load(bad, "BAD.PAK"), FormatError);
+    CHECK_THROWS_AS(PakFile::load(bad, "BAD.PAK"), mischief::FormatError);
 }
 
 TEST_CASE("DOS PAN/PAK: the user's files decode like tools/dos (counts and hashes)") {
@@ -162,8 +162,8 @@ TEST_CASE("DOS PAN/PAK: the user's files decode like tools/dos (counts and hashe
         CHECK(p.tileCount() == r.tiles);
         CHECK(p.rowBackRefs() == r.backRefs);
         CHECK(p.mapWordCount() == r.words);
-        CHECK(fnv1a64(std::span(p.mapBuffer()).first(r.words * 2)) == r.mapHash);
-        CHECK(fnv1a64(std::span(p.tileBuffer()).first(p.tileByteCount())) == r.tileHash);
+        CHECK(mischief::fnv1a64(std::span(p.mapBuffer()).first(r.words * 2)) == r.mapHash);
+        CHECK(mischief::fnv1a64(std::span(p.tileBuffer()).first(p.tileByteCount())) == r.tileHash);
     }
     struct PakRef {
         const char* name;
@@ -181,15 +181,15 @@ TEST_CASE("DOS PAN/PAK: the user's files decode like tools/dos (counts and hashe
         const PakFile& k = files.pak(r.name);
         CHECK(k.count() == r.frames);
         int raw = 0, run = 0;
-        uint64_t h = kFnv64Offset;
+        uint64_t h = mischief::kFnv64Offset;
         for (const PakFrame& f : k.frames()) {
             raw += f.rawRows;
             run += f.runRows;
-            h = fnv1a64U16(static_cast<uint16_t>(f.widthBytes), h);
-            h = fnv1a64U16(static_cast<uint16_t>(f.height), h);
-            h = fnv1a64U16(static_cast<uint16_t>(f.xOffset), h);
-            h = fnv1a64U16(static_cast<uint16_t>(f.yOffset), h);
-            h = fnv1a64(f.rows, h);
+            h = mischief::fnv1a64U16(static_cast<uint16_t>(f.widthBytes), h);
+            h = mischief::fnv1a64U16(static_cast<uint16_t>(f.height), h);
+            h = mischief::fnv1a64U16(static_cast<uint16_t>(f.xOffset), h);
+            h = mischief::fnv1a64U16(static_cast<uint16_t>(f.yOffset), h);
+            h = mischief::fnv1a64(f.rows, h);
             CHECK(f.word0 == 0);
             CHECK((f.usedBytes + 15) / 16 * 16 == f.slotBytes);  // every frame fills its 16-byte slot
         }
@@ -227,18 +227,18 @@ TEST_CASE("DOS palettes: EGA = Tandy RGBI, MCGA rounding, CGA dither positions")
     TM_REQUIRE_DOS_DATA();
     auto hashOf = [](const LookPalette& p) {
         std::vector<uint8_t> b;
-        for (const Rgb8& c : p.colours) b.insert(b.end(), {c.r, c.g, c.b});
-        return fnv1a64(b);
+        for (const mischief::Rgb8& c : p.colours) b.insert(b.end(), {c.r, c.g, c.b});
+        return mischief::fnv1a64(b);
     };
     const LookPalette ega = lookPalette(*dosExe, Look::Ega), tandy = lookPalette(*dosExe, Look::Tandy);
     const LookPalette mcga = lookPalette(*dosExe, Look::Mcga);
     CHECK(ega.colours == tandy.colours);
     CHECK(hashOf(ega) == 0x4389720808a60c74ull);
     CHECK(hashOf(mcga) == 0xa00c1c34abc68da3ull);
-    CHECK(ega.colours[15] == Rgb8{0, 0, 0});        // logical 15 = black
-    CHECK(ega.colours[0] == Rgb8{0, 0, 0xAA});      // logical 0 = blue
+    CHECK(ega.colours[15] == mischief::Rgb8{0, 0, 0});        // logical 15 = black
+    CHECK(ega.colours[0] == mischief::Rgb8{0, 0, 0xAA});      // logical 0 = blue
     // The DOSBox-X expansion of a 6-bit DAC value: (v*255+31)/63 (0x27 -> 0x9E, not 0x9D).
-    CHECK(mcga.colours[5] == Rgb8{0x9E, 0x00, 0x9E});
+    CHECK(mcga.colours[5] == mischief::Rgb8{0x9E, 0x00, 0x9E});
 
     BackBuffer b;
     b.fillRect(0, 0, 0x9F, 0xC7, 0x0F);
@@ -740,7 +740,7 @@ TEST_CASE("DOS screens: the composed reference screens equal the verified render
     CHECK(hashLogical(composeScreen(files, defaultScreenSpec(DosScreen::Title, Look::Cga))) == 0x2592d89bc038a1ffull);
     CHECK(hashLogical(composeScreen(files, defaultScreenSpec(DosScreen::Clubhouse, Look::Ega))) == 0xd3a186da87e0bb79ull);
     // The shipped USERS.DAT may have been changed by playing; the sign-in hash is only valid for it.
-    if (const auto users = readWholeFile(*testdata::dosDataPath() / "USERS.DAT"); users && fnv1a64(*users) == 0x751da8416dfb5ed3ull)
+    if (const auto users = mischief::readWholeFile(*testdata::dosDataPath() / "USERS.DAT"); users && mischief::fnv1a64(*users) == 0x751da8416dfb5ed3ull)
         CHECK(hashLogical(composeScreen(files, defaultScreenSpec(DosScreen::SignIn, Look::Ega))) == 0x3575c75c7ae54d23ull);
 
     // The play screens need the saved game of the captures: a USERS.DAT whose record 1 holds the
@@ -753,7 +753,7 @@ TEST_CASE("DOS screens: the composed reference screens equal the verified render
     std::copy(std::begin(kSavedPictures), std::end(kSavedPictures), users.begin() + 3 + 0x168 + 0xBB);
     const auto dir = std::filesystem::temp_directory_path() / "tmport_test_dos_gfx";
     const auto path = dir / "USERS.DAT";
-    REQUIRE(writeWholeFile(path, users));
+    REQUIRE(mischief::writeWholeFile(path, users));
     struct Ref {
         DosScreen screen;
         uint64_t hash;

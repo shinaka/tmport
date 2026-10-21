@@ -4,7 +4,7 @@
 
 #include "dos/data/dgroup_offsets.h"
 #include "dos/data/dos_exe.h"
-#include "util/error.h"
+#include "mischief/util/error.h"
 
 namespace tmport::dos {
 
@@ -17,13 +17,13 @@ constexpr uint16_t kCmdListPtrs = dg::kCmdLists;  // far[6] command lists
 uint16_t dgroupTarget(const DosExe& exe, uint16_t ptrAt, const char* what) {
     const DosExe::FarPtr p = exe.readFarPtr(ptrAt);
     if (p.seg != DosExe::kDgroupSeg)
-        throw FormatError(std::format("SST.EXE: {} pointer at DS:{:04X} leaves DGROUP ({:04X}:{:04X})", what, ptrAt, p.seg, p.off));
+        throw mischief::FormatError(std::format("SST.EXE: {} pointer at DS:{:04X} leaves DGROUP ({:04X}:{:04X})", what, ptrAt, p.seg, p.off));
     return p.off;
 }
 
 void need(const DosExe& exe, uint16_t off, size_t bytes, const char* what) {
     if (exe.dgroup().size() < static_cast<size_t>(off) + bytes)
-        throw FormatError(std::format("SST.EXE: {} at DS:{:04X} is outside DGROUP", what, off));
+        throw mischief::FormatError(std::format("SST.EXE: {} at DS:{:04X} is outside DGROUP", what, off));
 }
 
 }  // namespace
@@ -45,7 +45,7 @@ InputTables InputTables::load(const DosExe& exe) {
         need(exe, z, 1 + 8 * static_cast<size_t>(cap), "zone table");
         InputZoneTable& zt = t.zones_[c];
         zt.count = exe.ds8(z);
-        if (zt.count > cap) throw FormatError(std::format("SST.EXE: zone table DS:{:04X} has {} records", z, zt.count));
+        if (zt.count > cap) throw mischief::FormatError(std::format("SST.EXE: zone table DS:{:04X} has {} records", z, zt.count));
         zt.records.resize(static_cast<size_t>(cap));
         for (int i = 0; i < cap; ++i) {
             const auto r = static_cast<uint16_t>(z + 1 + 8 * i);
@@ -103,7 +103,7 @@ int8_t inputHitZone(const InputZoneTable& zones, const MousePointer& mouse) {
 }
 
 // 4a85:000E Input_Poll.
-void InputPoll::poll(BiosKeyboard& bios, const MousePointer& mouse, uint8_t uiMode) {
+void InputPoll::poll(mischief::dos::BiosKeyboard& bios, const MousePointer& mouse, uint8_t uiMode) {
     int16_t c;
     if (bios.peek() != 0) {  // bioskey(1)
         lastKey = bios.read();  // bioskey(0)
@@ -128,7 +128,7 @@ void InputPoll::poll(BiosKeyboard& bios, const MousePointer& mouse, uint8_t uiMo
 }
 
 // 4a85:03AC Input_Tick.
-InputTickAction InputPoll::tick(BiosKeyboard& bios, const MousePointer& mouse, uint8_t uiMode, bool scriptedMove,
+InputTickAction InputPoll::tick(mischief::dos::BiosKeyboard& bios, const MousePointer& mouse, uint8_t uiMode, bool scriptedMove,
                                 bool slowCpu) {
     poll(bios, mouse, uiMode);
     if (cmd == -1 || uiMode != 0) return InputTickAction::None;

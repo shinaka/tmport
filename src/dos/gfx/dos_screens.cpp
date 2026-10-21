@@ -9,8 +9,8 @@
 #include "dos/gfx/scenery.h"
 #include "dos/text/text_draw.h"
 #include "dos/text/ui_draw.h"
-#include "util/error.h"
-#include "util/file_util.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
 
 namespace tmport::dos {
 
@@ -42,8 +42,8 @@ std::string_view farString(const DosExe& exe, uint16_t dsOff) {
 }
 
 std::vector<uint8_t> readFile(const std::filesystem::path& p, const std::string& what) {
-    auto bytes = readWholeFile(p);
-    if (!bytes) throw MissingFileError(what, "cannot read " + pathToUtf8(p));
+    auto bytes = mischief::readWholeFile(p);
+    if (!bytes) throw mischief::MissingFileError(what, "cannot read " + mischief::pathToUtf8(p));
     return std::move(*bytes);
 }
 
@@ -59,7 +59,7 @@ std::vector<uint8_t> loadUsers(const DosGfxFiles& files, const DosScreenSpec& sp
         data.assign(b.begin(), b.end());
     }
     if (!data.empty() && data.size() < static_cast<size_t>(kUsersHeader + kUserCount * kUserRecord))
-        throw FormatError((spec.usersFile.empty() ? std::string("USERS.DAT") : pathToUtf8(spec.usersFile)) +
+        throw mischief::FormatError((spec.usersFile.empty() ? std::string("USERS.DAT") : mischief::pathToUtf8(spec.usersFile)) +
                           ": not a DOS USERS.DAT (3243 bytes)");
     return data;
 }
@@ -310,7 +310,7 @@ DosGfxFiles DosGfxFiles::open(const std::filesystem::path& dir) {
     f.font_ = DosFont::fromExe(f.exe());
     auto add = [&](auto& map, const char* stem, FileIndex index, auto load) {
         const std::string& name = f.files_.fileTable().name(index);
-        map.emplace(stem, load(f.files_.bytes(index), toUpperAscii(name)));
+        map.emplace(stem, load(f.files_.bytes(index), mischief::toUpperAscii(name)));
     };
     add(f.pans_, "OPENING", FileIndex::OpeningPan, PanFile::load);
     add(f.pans_, "MOUNTAIN", FileIndex::MountainPan, PanFile::load);
@@ -325,13 +325,13 @@ DosGfxFiles DosGfxFiles::open(const std::filesystem::path& dir) {
     return f;
 }
 
-const PanFile& DosGfxFiles::pan(std::string_view stem) const { return pans_.at(toUpperAscii(stem)); }
-const PakFile& DosGfxFiles::pak(std::string_view stem) const { return paks_.at(toUpperAscii(stem)); }
+const PanFile& DosGfxFiles::pan(std::string_view stem) const { return pans_.at(mischief::toUpperAscii(stem)); }
+const PakFile& DosGfxFiles::pak(std::string_view stem) const { return paks_.at(mischief::toUpperAscii(stem)); }
 
 // ------------------------------------------------------------------------------------- screens
 
 std::optional<DosScreen> parseDosScreen(std::string_view name) {
-    const std::string n = toLowerAscii(name);
+    const std::string n = mischief::toLowerAscii(name);
     if (n == "title") return DosScreen::Title;
     if (n == "signin" || n == "sign-in") return DosScreen::SignIn;
     if (n == "clubhouse" || n == "start") return DosScreen::Clubhouse;

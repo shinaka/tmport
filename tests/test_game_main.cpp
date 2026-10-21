@@ -29,6 +29,7 @@
 #include "game/room_table.h"
 #include "game/rules.h"
 #include "input/win_msg.h"
+#include "mischief/timing/clock.h"
 #include "platform/engine.h"
 #include "save/settings.h"
 #include "save/user_record.h"
@@ -36,7 +37,6 @@
 #include "test_data.h"
 #include "text/font.h"
 #include "text/text_renderer.h"
-#include "timing/clock.h"
 #include "ui/game_dialog.h"
 #include "ui/menu_bar.h"
 
@@ -71,7 +71,7 @@ const std::string kExitYes = "esc,wait:300,y,wait:500";
 
 // The parts the bootstrap builds (app/bootstrap.cpp), headless, on a manual clock, without audio.
 struct MainRig {
-    ManualClock clock{1000};
+    mischief::ManualClock clock{1000};
     std::unique_ptr<Engine> engine;
     std::unique_ptr<text::Font> font;
     std::unique_ptr<text::TextRenderer> text;
@@ -92,7 +92,7 @@ struct MainRig {
         EngineConfig cfg;
         cfg.clock = &clock;
         cfg.tapLatch = true;  // one scripted arrow press = one tick of a held arrow
-        engine = std::make_unique<Engine>(g, gfx::ColorMode::Colour256, cfg);
+        engine = std::make_unique<Engine>(g, mischief::gfx::ColorMode::Colour256, cfg);
         clock.onSleep = [this](uint64_t now) {
             for (auto it = timed.begin(); it != timed.end();) {
                 if (it->first <= now) {
@@ -261,7 +261,7 @@ TEST_CASE("game main: new player -> climb set-up in room 9 -> hints 0 and 2 -> E
     // layout are the ones setupClimb makes from that seed.
     GameState x = GameState::initial(*r.tables);
     initNewPlayer(x);
-    BorlandRand rng;
+    mischief::BorlandRand rng;
     rng.srand(0x1234);
     setupClimb(x, *r.tables, rng);
     const save::PlayerRecord expected = toPlayerRecord(x);
@@ -329,7 +329,7 @@ TEST_CASE("game main: the castle climb ends the climb: save before the score, ce
     GameState x = GameState::initial(*r.tables);
     x.player.setName("Gate1");
     initNewPlayer(x);
-    BorlandRand rng;
+    mischief::BorlandRand rng;
     rng.srand(7);
     setupClimb(x, *r.tables, rng);
     x.player.room = kCastleRoom;
@@ -403,7 +403,7 @@ TEST_CASE("game main: a caught carrier elf asks its question (Room_Run -> Quiz_A
         GameState x = GameState::initial(*r.tables);
         x.player.setName("Elfy");
         initNewPlayer(x);
-        BorlandRand rng;
+        mischief::BorlandRand rng;
         rng.srand(7);
         setupClimb(x, *r.tables, rng);
         x.player.room = 11;

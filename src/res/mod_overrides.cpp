@@ -5,11 +5,11 @@
 #include <set>
 #include <tuple>
 
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
 #include "mods/mod_folder.h"
 #include "mods/resource_import.h"
 #include "res/resource_manager.h"
-#include "util/file_util.h"
-#include "util/log.h"
 
 namespace tmport {
 
@@ -59,12 +59,12 @@ void ModOverrides::setFolders(std::vector<mods::ModFolder> folders) {
             }
             Entry& old = it->second;
             if (old.folder == fi && otherPriority(old.file->kind) >= otherPriority(f.kind)) {
-                impl_->shadowed.push_back(std::format("{}: ignored, {} of the same mod wins", pathToUtf8(f.path), pathToUtf8(old.file->path)));
+                impl_->shadowed.push_back(std::format("{}: ignored, {} of the same mod wins", mischief::pathToUtf8(f.path), mischief::pathToUtf8(old.file->path)));
                 continue;
             }
             impl_->shadowed.push_back(old.folder == fi
-                                          ? std::format("{}: ignored, {} of the same mod wins", pathToUtf8(old.file->path), pathToUtf8(f.path))
-                                          : std::format("{}: overridden by {}", pathToUtf8(old.file->path), pathToUtf8(f.path)));
+                                          ? std::format("{}: ignored, {} of the same mod wins", mischief::pathToUtf8(old.file->path), mischief::pathToUtf8(f.path))
+                                          : std::format("{}: overridden by {}", mischief::pathToUtf8(old.file->path), mischief::pathToUtf8(f.path)));
             old = Entry{&f, fi};
         }
     }
@@ -77,40 +77,40 @@ const std::vector<mods::ModFolder>& ModOverrides::folders() const {
     return impl_ ? impl_->folders : none;
 }
 
-std::optional<ModOverrides::Entry> ModOverrides::lookup(ResType type, int id, gfx::ColorMode mode) const {
+std::optional<ModOverrides::Entry> ModOverrides::lookup(ResType type, int id, mischief::gfx::ColorMode mode) const {
     if (!enabled()) return std::nullopt;
-    if (type == ResType::PMAP && mode == gfx::ColorMode::Colour16)
+    if (type == ResType::PMAP && mode == mischief::gfx::ColorMode::Colour16)
         if (auto it = impl_->index.find(Key{static_cast<int>(type), id, 1}); it != impl_->index.end()) return it->second;
     if (auto it = impl_->index.find(Key{static_cast<int>(type), id, 0}); it != impl_->index.end()) return it->second;
     return std::nullopt;
 }
 
-std::filesystem::path ModOverrides::overridePath(ResType type, int id, gfx::ColorMode mode) const {
+std::filesystem::path ModOverrides::overridePath(ResType type, int id, mischief::gfx::ColorMode mode) const {
     const auto e = lookup(type, id, mode);
     return e ? e->file->path : std::filesystem::path();
 }
 
-std::optional<std::vector<uint8_t>> ModOverrides::find(ResType type, int id, gfx::ColorMode mode, const ResourceManager& res) const {
+std::optional<std::vector<uint8_t>> ModOverrides::find(ResType type, int id, mischief::gfx::ColorMode mode, const ResourceManager& res) const {
     const auto e = lookup(type, id, mode);
     if (!e) return std::nullopt;
-    const bool c16 = type == ResType::PMAP && mode == gfx::ColorMode::Colour16;
+    const bool c16 = type == ResType::PMAP && mode == mischief::gfx::ColorMode::Colour16;
     const Key ck{static_cast<int>(type), id, c16 ? 1 : 0};
     if (auto it = impl_->cache.find(ck); it != impl_->cache.end()) return it->second;
 
     mods::ModFile file = *e->file;
     if (c16 && file.kind == mods::ModFileKind::Pmap) file.kind = mods::ModFileKind::Pmap16;  // 256-colour art mapped to 16 colours
     const mods::ModFolder& folder = impl_->folders[e->folder];
-    const std::string where = pathToUtf8(e->file->path);
+    const std::string where = mischief::pathToUtf8(e->file->path);
     std::optional<std::vector<uint8_t>> body;
     try {
         // May re-enter find() (the palette for a PMAP comes through RRGB): no iterators are held.
         mods::ImportResult r = mods::importResourceFile(file, mods::importContextFor(res, &folder.manifest));
-        for (const auto& n : r.notes) log::debug("mod: {}: {}", where, n);
-        for (const auto& w : r.warnings) log::warn("mod: {}: {}", where, w);
-        log::debug("mod: {} {} <- {}", resTypeName(type), id, where);
+        for (const auto& n : r.notes) mischief::log::debug("mod: {}: {}", where, n);
+        for (const auto& w : r.warnings) mischief::log::warn("mod: {}: {}", where, w);
+        mischief::log::debug("mod: {} {} <- {}", resTypeName(type), id, where);
         body = std::move(r.body);
     } catch (const std::exception& ex) {
-        log::error("mod: {}: {} (the game's own {} {} is used instead)", where, ex.what(), resTypeName(type), id);
+        mischief::log::error("mod: {}: {} (the game's own {} {} is used instead)", where, ex.what(), resTypeName(type), id);
         impl_->failures.push_back(std::format("{}: {}", where, ex.what()));
     }
     impl_->cache[ck] = body;

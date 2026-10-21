@@ -4,13 +4,13 @@
 #include <string>
 
 #include "dos/data/dgroup_offsets.h"
-#include "util/error.h"
+#include "mischief/util/error.h"
 
 namespace tmport::dos {
 
 namespace {
 
-[[noreturn]] void badPuzzles(const std::string& why) { throw FormatError("ALL_PUZS: " + why); }
+[[noreturn]] void badPuzzles(const std::string& why) { throw mischief::FormatError("ALL_PUZS: " + why); }
 
 }  // namespace
 
@@ -18,7 +18,7 @@ namespace {
 
 Dictionary Dictionary::parse(std::span<const uint8_t> prgDict) {
     if (prgDict.size() < kReachable * kEntrySize)
-        throw FormatError("PRG_DICT: " + std::to_string(prgDict.size()) + " bytes, needs at least " +
+        throw mischief::FormatError("PRG_DICT: " + std::to_string(prgDict.size()) + " bytes, needs at least " +
                           std::to_string(kReachable * kEntrySize));
     Dictionary d;
     d.bytes_.assign(prgDict.begin(), prgDict.end());
@@ -50,7 +50,7 @@ std::string Dictionary::expand(std::span<const uint8_t> src) const {
 
 Puzzle splitPuzzle(std::string_view expanded) {
     const size_t tilde = expanded.find('~');
-    if (tilde == std::string_view::npos) throw FormatError("ALL_PUZS: question without '~'");
+    if (tilde == std::string_view::npos) throw mischief::FormatError("ALL_PUZS: question without '~'");
     Puzzle p;
     p.question.assign(expanded.substr(0, tilde));
     size_t pos = tilde + 1;
@@ -119,10 +119,10 @@ QuizTiers QuizTiers::read(const DosExe& exe, const PuzzleFile& puzzles) {
     t.starts_[5] = static_cast<uint16_t>(puzzles.tier5Start());  // DS:5fdc, Quiz_FindTierEnd
     t.starts_[6] = PuzzleFile::kCount;                           // DS:5fde
     if (t.starts_[0] != 0 || t.starts_[4] != PuzzleFile::kCount)
-        throw FormatError("SST.EXE: unexpected quiz tier table at DS:5fd2");
+        throw mischief::FormatError("SST.EXE: unexpected quiz tier table at DS:5fd2");
     for (int k = 0; k < 4; ++k)
         if (t.starts_[static_cast<size_t>(k)] >= t.starts_[static_cast<size_t>(k + 1)])
-            throw FormatError("SST.EXE: quiz tiers at DS:5fd2 do not ascend");
+            throw mischief::FormatError("SST.EXE: quiz tiers at DS:5fd2 do not ascend");
     return t;
 }
 

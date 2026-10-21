@@ -13,7 +13,7 @@
 #include <vector>
 
 #include "game/game_tables.h"
-#include "rtl/borland_rand.h"
+#include "mischief/rtl/borland_rand.h"
 
 namespace tmport::game {
 
@@ -56,11 +56,11 @@ void quizCountStatusInRange(QuizState& s);
 // 1150:00a7 Quiz_PickByStatus(status, n, out): writes n question indices to out[n-1] down to
 // out[0], marks them dealt, falls back 0->1->2->3->0 when a pool runs out. One R(cnt) per pick.
 // (The original recurses forever when every pool is empty; this stops after a full cycle.)
-void quizPickByStatus(QuizState& s, int status, int n, std::span<int16_t> out, BorlandRand& rng);
+void quizPickByStatus(QuizState& s, int status, int n, std::span<int16_t> out, mischief::BorlandRand& rng);
 // 1150:01d5 Quiz_FillSlots: 3 unseen, 3 missed, 3 retried picks, random slots, random answer order.
-void quizFillSlots(QuizState& s, BorlandRand& rng);
+void quizFillSlots(QuizState& s, mischief::BorlandRand& rng);
 // 1150:0327 Quiz_NewRound (start of every new climb). Returns true if the quiz tier was promoted.
-bool quizNewRound(QuizState& s, const QuizTables& t, BorlandRand& rng);
+bool quizNewRound(QuizState& s, const QuizTables& t, mischief::BorlandRand& rng);
 // 1150:0375 Quiz_CarryMissedToNextLevel: the "broken swap" -- each slot of oldLevel whose question
 // is currently missed (status 2) is copied to the same elf's slot of the next level; the old slot
 // keeps it too. oldLevel >= 2 does nothing.

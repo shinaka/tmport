@@ -3,8 +3,8 @@
 #include "anim/anim_bundle.h"
 #include "game/room/room_gfx.h"
 #include "game/room_table.h"
+#include "mischief/util/log.h"
 #include "res/resource_manager.h"
-#include "util/log.h"
 
 namespace tmport::game::room {
 
@@ -15,7 +15,7 @@ std::vector<std::shared_ptr<const gfx::PixMap>> loadBundlePixmaps(const Resource
     if (!res) return out;
     const auto b = res->bundle(id);
     if (!b) {
-        log::warn("room scene: BNDL {} not found", id);
+        mischief::log::warn("room scene: BNDL {} not found", id);
         return out;
     }
     for (const int m : b->ids) out.push_back(res->pixmap(m));
@@ -121,7 +121,7 @@ void RoomScene::hallLoadRoom() {
             anim::loadFrames(*d_.res, d_.anim, kTreasureBndlFirstId + ped[k], d_.rt.hallPedFrameBase[k]);
             hallScripts_[k] = anim::loadScript(*d_.res, kTreasureAnimFirstId + ped[k]);
         } catch (const std::exception& e) {
-            log::warn("treasure hall: pedestal {}: {}", i, e.what());
+            mischief::log::warn("treasure hall: pedestal {}: {}", i, e.what());
         }
         hallFrame0_[k] = anim::bundleMember(*d_.res, kTreasureBndlFirstId + ped[k], 0);
     }

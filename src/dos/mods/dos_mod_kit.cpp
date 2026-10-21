@@ -12,9 +12,9 @@
 #include "dos/mods/dos_pictures.h"
 #include "dos/mods/dos_sound_text.h"
 #include "dos/mods/dos_text_files.h"
-#include "mods/json.h"
-#include "util/error.h"
-#include "util/file_util.h"
+#include "mischief/mods/json.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
 
 namespace tmport::dos {
 
@@ -68,7 +68,7 @@ public:
     }
 
 private:
-    std::string name(FileIndex i) const { return toUpperAscii(f_.fileTable().name(i)); }
+    std::string name(FileIndex i) const { return mischief::toUpperAscii(f_.fileTable().name(i)); }
     std::string stem(FileIndex i) const {
         const std::string n = name(i);
         return n.substr(0, n.find('.'));
@@ -86,19 +86,19 @@ private:
     void prepare() {
         std::error_code ec;
         if (std::filesystem::exists(out_, ec)) {
-            if (!std::filesystem::is_directory(out_, ec)) throw Error(std::format("{} exists and is not a directory", pathToUtf8(out_)));
+            if (!std::filesystem::is_directory(out_, ec)) throw mischief::Error(std::format("{} exists and is not a directory", mischief::pathToUtf8(out_)));
             if (!o_.force && std::filesystem::directory_iterator(out_, ec) != std::filesystem::directory_iterator())
-                throw Error(std::format("{} is not empty (use --force to overwrite the kit there)", pathToUtf8(out_)));
+                throw mischief::Error(std::format("{} is not empty (use --force to overwrite the kit there)", mischief::pathToUtf8(out_)));
         }
         std::filesystem::create_directories(out_, ec);
-        if (ec) throw Error(std::format("cannot create {}: {}", pathToUtf8(out_), ec.message()));
+        if (ec) throw mischief::Error(std::format("cannot create {}: {}", mischief::pathToUtf8(out_), ec.message()));
     }
 
     void write(const std::string& rel, std::span<const uint8_t> bytes, const std::string& group) {
-        const std::filesystem::path p = out_ / pathFromUtf8(rel);
+        const std::filesystem::path p = out_ / mischief::pathFromUtf8(rel);
         std::error_code ec;
         std::filesystem::create_directories(p.parent_path(), ec);
-        if (!writeWholeFile(p, bytes)) throw Error(std::format("cannot write {}", pathToUtf8(p)));
+        if (!mischief::writeWholeFile(p, bytes)) throw mischief::Error(std::format("cannot write {}", mischief::pathToUtf8(p)));
         ++rep_.files;
         rep_.bytes += bytes.size();
         if (!group.empty()) ++rep_.counts[group];
@@ -110,11 +110,11 @@ private:
     void pak(FileIndex i, const DosColours& colours) {
         guarded(name(i), [&] {
             const PakFile p = PakFile::load(f_.bytes(i), name(i));
-            mods::json::Value frames = mods::json::Value::object();
+            mischief::mods::json::Value frames = mischief::mods::json::Value::object();
             for (const PakFrame& fr : p.frames()) {
                 write(std::format("PAK/{}/{:03}.png", stem(i), fr.index), logicalToPng(pakFramePixels(fr), colours, true), "PAK");
                 if (fr.word0 != 0) rep_.failures.push_back(std::format("{} frame {}: header word 0 is not 0 (not kept by the kit)", name(i), fr.index));
-                mods::json::Value o = mods::json::Value::object();
+                mischief::mods::json::Value o = mischief::mods::json::Value::object();
                 o.set("x", fr.xOffset);
                 o.set("y", fr.yOffset);
                 o.set("a", static_cast<int>(fr.fieldA));
@@ -122,13 +122,13 @@ private:
                 o.set("e", static_cast<int>(fr.fieldE));
                 frames.set(std::to_string(fr.index), std::move(o));
             }
-            mods::json::Value root = mods::json::Value::object();
+            mischief::mods::json::Value root = mischief::mods::json::Value::object();
             root.set("_about", std::format("The frame headers of {}: x = hotspot in 2-pixel steps, y = hotspot in rows (for the status "
                                            "bar, cloud and title frames: the position on the screen); a, c, e = header words the "
                                            "game does not use. Keep only the frames you change in a mod.",
                                            name(i)));
             root.set("frames", std::move(frames));
-            writeText(std::format("PAK/{}.json", stem(i)), mods::json::write(root), "PAK");
+            writeText(std::format("PAK/{}.json", stem(i)), mischief::mods::json::write(root), "PAK");
             rep_.frames += static_cast<size_t>(p.count());
             rep_.framesReproduced += static_cast<size_t>(pakFramesReproduced(f_.bytes(i), name(i)));
         });

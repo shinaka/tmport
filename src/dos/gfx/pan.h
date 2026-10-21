@@ -27,7 +27,7 @@ public:
     static constexpr int kTileBytes = 32;              // 8x8 pixels, 4 bytes per row
     static constexpr int kBlockWords = 256;            // one 16x16-tile block = 512 bytes = 32 paragraphs
 
-    // Decodes a .PAN file; throws tmport::FormatError on a malformed file.
+    // Decodes a .PAN file; throws mischief::FormatError on a malformed file.
     static PanFile load(std::span<const uint8_t> file, std::string name);
 
     const std::string& name() const { return name_; }

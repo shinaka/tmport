@@ -34,7 +34,7 @@ struct DosModKitReport {
     std::vector<std::string> failures;     // round-trip mismatches and errors
 };
 
-// `files` must hold the original files (DosFiles::open(folder, nullptr)). Throws tmport::Error if
+// `files` must hold the original files (DosFiles::open(folder, nullptr)). Throws mischief::Error if
 // the directory cannot be used (exists and is not empty without force).
 DosModKitReport exportDosModKit(const DosFiles& files, const std::filesystem::path& outDir, const DosModKitOptions& options = {});
 

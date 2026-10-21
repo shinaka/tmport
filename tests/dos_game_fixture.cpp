@@ -5,12 +5,12 @@
 #include <format>
 #include <system_error>
 
-#include "dos/app/script_input.h"
 #include "dos/game/init.h"
 #include "dos/game/signin.h"
 #include "dos/save/users_dat.h"
 #include "dos_test_data.h"
-#include "util/file_util.h"
+#include "mischief/dos/app/script_input.h"
+#include "mischief/util/file_util.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -87,7 +87,7 @@ GameFixture::~GameFixture() {
 }
 
 bool GameFixture::loadUsers(const std::filesystem::path& usersDat) {
-    const auto bytes = readWholeFile(usersDat);
+    const auto bytes = mischief::readWholeFile(usersDat);
     if (!bytes) return false;
     auto parsed = UsersDat::parse(*bytes);
     if (!parsed) return false;
@@ -122,15 +122,15 @@ void GameFixture::placePlayer(uint16_t x, uint16_t y, uint16_t camX, uint16_t ca
 
 bool GameFixture::setScript(std::string_view keys, bool relative, std::string* error) {
     std::string err;
-    auto script = ScriptedInput::parse(keys, err);
+    auto script = mischief::dos::ScriptedInput::parse(keys, err);
     if (!script) {
         if (error) *error = err;
         return false;
     }
     if (relative) {
-        ScriptedInput shifted;
+        mischief::dos::ScriptedInput shifted;
         const uint64_t base = runtime_.gameTicks();
-        for (ScriptEvent e : script->events()) {
+        for (mischief::dos::ScriptEvent e : script->events()) {
             e.tick += base;
             shifted.add(e);
         }

@@ -2,9 +2,9 @@
 
 #include <algorithm>
 
+#include "mischief/util/log.h"
 #include "res/resource_manager.h"
 #include "res/ssnd.h"
-#include "util/log.h"
 
 namespace tmport::audio {
 
@@ -69,12 +69,12 @@ std::vector<uint8_t> makeWav(const Sound& s) {
 std::shared_ptr<const Sound> ResourceSoundLoader::load(int id) {
     auto raw = res_.loadRaw(ResType::SSND, id);
     if (!raw) {
-        log::warn("sound {} does not exist", id);
+        mischief::log::warn("sound {} does not exist", id);
         return nullptr;
     }
     auto s = soundFromSsnd(*raw, id);
     if (!s) {
-        log::warn("sound {} is not a valid SSND resource", id);
+        mischief::log::warn("sound {} is not a valid SSND resource", id);
         return nullptr;
     }
     return std::make_shared<const Sound>(std::move(*s));

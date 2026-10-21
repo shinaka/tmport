@@ -2,7 +2,7 @@
 // WAV <-> SSND (re/docs/fmt_sound.md §3.2: u32 0, u32 sample rate, u32 sample count, 8-bit
 // unsigned mono PCM).
 //
-// Import accepts what mods/wav_file.h reads (any PCM or float WAV, mixed down to mono and resampled
+// Import accepts what mischief/mods/wav_file.h reads (any PCM or float WAV, mixed down to mono and resampled
 // to the target rate). 8-bit mono at the target rate is copied unchanged, so export -> import is
 // byte-exact.
 
@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#include "mods/wav_file.h"
+#include "mischief/mods/wav_file.h"
 
 namespace tmport::mods {
 

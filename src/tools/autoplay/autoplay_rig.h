@@ -14,7 +14,7 @@
 #include <memory>
 
 #include "app/app_context.h"
-#include "timing/clock.h"
+#include "mischief/timing/clock.h"
 
 namespace tmport {
 struct GameFiles;
@@ -53,8 +53,8 @@ public:
     audio::AudioSystem* audio() { return audio_.get(); }
     anim::AnimEngine& anim() { return *anim_; }
     const save::Paths& paths() const { return *paths_; }
-    Clock& clock();
-    ManualClock* manualClock() { return manual_.get(); }
+    mischief::Clock& clock();
+    mischief::ManualClock* manualClock() { return manual_.get(); }
 
     // True while a game dialog (DialogSystem::runModal / pager) polls for input: the dialogs'
     // Input_GetCode hook is wrapped so that the autoplayer knows a Yes/No box is up.
@@ -63,7 +63,7 @@ public:
     uint64_t dialogPolls() const { return dialogPolls_; }
 
 private:
-    std::unique_ptr<ManualClock> manual_;
+    std::unique_ptr<mischief::ManualClock> manual_;
     std::unique_ptr<save::Paths> paths_;
     std::unique_ptr<Engine> engine_;
     std::unique_ptr<audio::AudioSystem> audio_;

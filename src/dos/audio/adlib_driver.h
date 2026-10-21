@@ -25,7 +25,7 @@
 #include <cstdint>
 #include <span>
 
-#include "dos/audio/opl_writer.h"
+#include "mischief/dos/audio/opl_writer.h"
 
 namespace tmport::dos {
 
@@ -85,7 +85,7 @@ public:
     static constexpr uint16_t kDsOrchTranspose = 0x8988;  // i8[12][9] transposition per channel
 
     // `tables` (the DGROUP image) must outlive the driver; `out` receives the register writes.
-    AdLibDriver(const SoundTables& tables, OplWriter& out);
+    AdLibDriver(const SoundTables& tables, mischief::dos::OplWriter& out);
 
     void init();                            // 4ac9:00b7 AdLib_Init
     void playTune(int tune, int variant);   // 4ac9:0002 AdLib_PlayTune (variant = rand() & 3, drawn by the caller)
@@ -142,7 +142,7 @@ private:
     void writeWave(int slot);      // 4ac9:0c03 AdLib_SetWave       0xE0 + slot offset
 
     const SoundTables& tables_;
-    OplWriter& out_;
+    mischief::dos::OplWriter& out_;
     State s_;
 };
 

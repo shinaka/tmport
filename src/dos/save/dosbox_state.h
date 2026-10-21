@@ -4,8 +4,8 @@
 // engine can start from the exact moment DOSBox-X saved (dos/game/load_state.h) and tests can compare
 // with it. Engine tooling only: the reader takes the user's own state files at run time.
 //
-// Format (DOSBox-X 2026.10.01, observed): a zip archive of deflated entries, read by the shared core's
-// reader (dos/save/dosbox_state_file.h: the archive, "Machine_Type", the RAM of "Memory", the "CPU"
+// Format (DOSBox-X 2026.10.01, observed): a zip archive of deflated entries, read by the engine's
+// reader (mischief/dos/save/dosbox_state_file.h: the archive, "Machine_Type", the RAM of "Memory", the "CPU"
 // registers, the BIOS keyboard buffer). This edition's part: "Vga" is the VGA/EGA state, whose video
 // memory (4 planes interleaved, one 4-byte group per address) starts where the game's latch table
 // A000:0000..003F lies (1000:0836 fills it with colour k at bits C0 of address k, k = 0..15,
@@ -29,7 +29,7 @@
 #include <string>
 #include <vector>
 
-#include "dos/save/dosbox_state_file.h"
+#include "mischief/dos/save/dosbox_state_file.h"
 
 namespace tmport::dos {
 
@@ -42,15 +42,15 @@ public:
     static constexpr int kScreenRowBytes = 160;
     static constexpr int kScreenRows = 200;
 
-    // Reads a state file; throws tmport::Error (unreadable, not a zip, no "Memory" entry) or
-    // tmport::FormatError (SST.EXE's DGROUP is not in its RAM).
+    // Reads a state file; throws mischief::Error (unreadable, not a zip, no "Memory" entry) or
+    // mischief::FormatError (SST.EXE's DGROUP is not in its RAM).
     static DosboxState load(const std::filesystem::path& path);
 
     const std::filesystem::path& path() const { return file_.path(); }
     Machine machine() const { return machine_; }
     const std::string& machineName() const { return file_.machineName(); }  // "MCH_EGA", "MCH_TANDY", ...
     // The shared reader under it (the archive's other entries).
-    const DosboxStateFile& file() const { return file_; }
+    const mischief::dos::DosboxStateFile& file() const { return file_; }
 
     // Guest RAM from physical address 0 (the conventional 640 KB and the upper memory up to A0000).
     std::span<const uint8_t> memory() const { return file_.memory(); }
@@ -86,7 +86,7 @@ public:
 
     // The CPU's registers where DOSBox-X stopped it (the "CPU" entry: the general registers and IP
     // first, the segment values as 8-byte words ES, CS, SS, DS found by DS = dgroupSegment()).
-    using Cpu = DosboxStateFile::Cpu;  // cs, ss (run-time segments), ip, sp
+    using Cpu = mischief::dos::DosboxStateFile::Cpu;  // cs, ss (run-time segments), ip, sp
     const std::optional<Cpu>& cpu() const { return cpu_; }
     // The far return addresses on the live stack (SS:SP upwards, `bytes` of it) whose segment is a
     // code segment of the program, as Ghidra segment:offset pairs, innermost first.
@@ -99,7 +99,7 @@ private:
     uint32_t dsLinear() const { return static_cast<uint32_t>(dsSeg_) * 16; }
     void readScreen(std::span<const uint8_t> vga);
 
-    DosboxStateFile file_;
+    mischief::dos::DosboxStateFile file_;
     Machine machine_ = Machine::Other;
     uint16_t dsSeg_ = 0;
     std::optional<std::vector<uint8_t>> screen_;

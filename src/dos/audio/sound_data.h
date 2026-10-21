@@ -20,7 +20,7 @@
 
 #include "dos/data/dgroup_offsets.h"
 
-namespace tmport::vfs {
+namespace mischief::vfs {
 class DataSource;
 }
 
@@ -45,7 +45,7 @@ public:
     static constexpr int kTuneCount = 3;              // and tunes 0..2 (fmt_sound.md §4.1)
 
     // Validates the header (first word 0x96 for 1 voice per entry, 0x230 for 4) and that the first
-    // `entriesNeeded` entries point into the file; throws tmport::FormatError naming `name`.
+    // `entriesNeeded` entries point into the file; throws mischief::FormatError naming `name`.
     static SoundFile parse(std::span<const uint8_t> file, int voicesPerEntry, int entriesNeeded, size_t bufferSize,
                            std::string_view name);
 
@@ -82,7 +82,7 @@ struct SoundTables {
     static constexpr int kEnvelopeCount = 36;
 
     // Copies DGROUP (DS:0000..FFFF, zero past the initialised data) and checks the tables; throws
-    // tmport::FormatError for an SST.EXE whose sound tables are not where V 1.0 has them.
+    // mischief::FormatError for an SST.EXE whose sound tables are not where V 1.0 has them.
     static SoundTables fromExe(const DosExe& exe);
     // For tests: tables built from a 64 KB DGROUP image.
     static SoundTables fromDgroup(std::vector<uint8_t> dgroup);
@@ -108,8 +108,8 @@ struct SoundBank {
     std::shared_ptr<const SoundTables> tables;
 
     // The files of 1460:022a for `device`, read from the DOS folder (names looked up without regard
-    // to case). Throws tmport::MissingFileError / FormatError.
-    static SoundBank load(const vfs::DataSource& dosFolder, SoundCard device, std::shared_ptr<const SoundTables> tables);
+    // to case). Throws mischief::MissingFileError / FormatError.
+    static SoundBank load(const mischief::vfs::DataSource& dosFolder, SoundCard device, std::shared_ptr<const SoundTables> tables);
     static SoundBank fromBytes(SoundCard device, std::span<const uint8_t> sfxFile, std::span<const uint8_t> musicFile,
                                std::shared_ptr<const SoundTables> tables);
 };

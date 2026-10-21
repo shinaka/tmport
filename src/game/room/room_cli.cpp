@@ -17,16 +17,16 @@
 #include "game/quiz.h"
 #include "game/room/room_run.h"
 #include "game/rules.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
+#include "mischief/vfs/data_source.h"
 #include "platform/engine.h"
 #include "res/game_files.h"
 #include "save/users_file.h"
 #include "text/font.h"
 #include "text/text_renderer.h"
 #include "ui/game_dialog.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/log.h"
-#include "vfs/data_source.h"
 
 namespace tmport::game::room {
 
@@ -158,7 +158,7 @@ bool parseScript(const std::string& text, std::vector<Action>& actions, std::str
 
 class ScriptDriver {
 public:
-    ScriptDriver(Engine& engine, ManualClock& clock, std::vector<Action> actions, std::filesystem::path outDir)
+    ScriptDriver(Engine& engine, mischief::ManualClock& clock, std::vector<Action> actions, std::filesystem::path outDir)
         : engine_(engine), clock_(clock), actions_(std::move(actions)), outDir_(std::move(outDir)) {}
     void begin() { start_ = clock_.nowMs(); started_ = true; }
     uint64_t elapsed() const { return started_ ? clock_.nowMs() - start_ : 0; }
@@ -173,7 +173,7 @@ public:
                 case Action::Shot: {
                     const auto path = outDir_ / (a.name + ".png");
                     engine_.presenter().writeGameAreaPng(path);
-                    out("[{:>7} ms] shot {}\n", t, pathToUtf8(path));
+                    out("[{:>7} ms] shot {}\n", t, mischief::pathToUtf8(path));
                     break;
                 }
                 case Action::End: throw ScriptEnd{};
@@ -183,7 +183,7 @@ public:
 
 private:
     Engine& engine_;
-    ManualClock& clock_;
+    mischief::ManualClock& clock_;
     std::vector<Action> actions_;
     size_t next_ = 0;
     std::filesystem::path outDir_;
@@ -255,7 +255,7 @@ std::optional<Args> parseArgs(int argc, char** argv, std::string& error) {
             a.keys += " " + next("--keys");
         } else if (s == "--keys-file") {
             const std::string f = next("--keys-file");
-            std::ifstream in(pathFromUtf8(f));
+            std::ifstream in(mischief::pathFromUtf8(f));
             if (!in) error = std::format("cannot read {}", f);
             std::stringstream ss;
             ss << in.rdbuf();
@@ -288,29 +288,29 @@ std::optional<Args> parseArgs(int argc, char** argv, std::string& error) {
 }
 
 std::optional<std::filesystem::path> resolveDataPath(const Args& a) {
-    if (!a.dataPath.empty()) return pathFromUtf8(a.dataPath);
-    if (auto env = getEnv("TM_DATA")) return pathFromUtf8(*env);
+    if (!a.dataPath.empty()) return mischief::pathFromUtf8(a.dataPath);
+    if (auto env = mischief::getEnv("TM_DATA")) return mischief::pathFromUtf8(*env);
     const char* base = SDL_GetBasePath();
-    return vfs::autoDetectDataPath(base ? pathFromUtf8(base) : std::filesystem::path());
+    return mischief::vfs::autoDetectDataPath(base ? mischief::pathFromUtf8(base) : std::filesystem::path());
 }
 
-int runRoom(const Args& a, GameFiles& files, gfx::ColorMode mode) {
+int runRoom(const Args& a, GameFiles& files, mischief::gfx::ColorMode mode) {
     std::vector<Action> actions;
     std::string error;
     if (!parseScript(a.keys, actions, error)) {
         std::fprintf(stderr, "tmport: %s\n", error.c_str());
         return 2;
     }
-    const std::filesystem::path outDir = pathFromUtf8(a.outDir);
+    const std::filesystem::path outDir = mischief::pathFromUtf8(a.outDir);
     std::error_code ec;
     std::filesystem::create_directories(outDir, ec);
     std::filesystem::path dumpDir;
     if (a.dumpEvery > 0) {
-        dumpDir = pathFromUtf8(a.dumpDir);
+        dumpDir = mischief::pathFromUtf8(a.dumpDir);
         std::filesystem::create_directories(dumpDir, ec);
     }
 
-    ManualClock clock(1000);
+    mischief::ManualClock clock(1000);
     EngineConfig cfg;
     cfg.clock = &clock;
     cfg.showTreasure = a.showTreasure;
@@ -327,7 +327,7 @@ int runRoom(const Args& a, GameFiles& files, gfx::ColorMode mode) {
         out("new player {}\n", a.newPlayer);
     } else {
         save::UsersTable t;
-        if (!save::readUsersFile(pathFromUtf8(a.usersFile), t)) {
+        if (!save::readUsersFile(mischief::pathFromUtf8(a.usersFile), t)) {
             std::fprintf(stderr, "tmport: cannot read %s\n", a.usersFile.c_str());
             return 3;
         }
@@ -514,7 +514,7 @@ std::optional<int> runRoomCommand(int argc, char** argv) {
         std::fprintf(stderr, "tmport: %s\n\n%s", error.c_str(), roomUsage().c_str());
         return 2;
     }
-    log::setVerbose(a->verbose);
+    mischief::log::setVerbose(a->verbose);
     const auto dataPath = resolveDataPath(*a);
     if (!dataPath) {
         std::fprintf(stderr, "tmport: the game data was not found. Pass --data <folder or CD image> or set TM_DATA.\n");
@@ -522,12 +522,12 @@ std::optional<int> runRoomCommand(int argc, char** argv) {
     }
     try {
         ResourceManager::Options ro;
-        ro.colorMode = a->colour16 ? gfx::ColorMode::Colour16 : gfx::ColorMode::Colour256;
+        ro.colorMode = a->colour16 ? mischief::gfx::ColorMode::Colour16 : mischief::gfx::ColorMode::Colour256;
         ro.requireSounds = false;
         GameFiles files = GameFiles::open(*dataPath, ro);
         cli::applyToolMods(files, a->modDirs);
         return runRoom(*a, files, ro.colorMode);
-    } catch (const MissingFileError& e) {
+    } catch (const mischief::MissingFileError& e) {
         std::fprintf(stderr, "tmport: missing game file %s: %s\n", e.file().c_str(), e.what());
         return 3;
     } catch (const std::exception& e) {

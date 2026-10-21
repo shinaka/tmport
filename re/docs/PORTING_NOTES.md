@@ -461,7 +461,7 @@ answer 0 correct), and voice-id tables matching the question line counts.
 * **RNG and generation**: Borland `rand` test vectors (`code_1000.md` §5); layout generation from a
   fixed seed compared with `othr_tables.py` (`BorlandRand`, `pick_records`, `place_record`).
 * **Text layout**: render OTHR 11605 and 11000 and compare with the `ffnt.py` previews.
-* **Reference captures**: drive the original under DOSBox-X with `tools/tmctl.py` (keyboard only) and
+* **Reference captures**: drive the original under DOSBox-X with the engine's `tools/tmctl.py` (keyboard only) and
   compare frames (`GAPS.md` §4 lists the scenes).
 * **Save compatibility**: round-trip real `users.dat` files byte for byte through load/save.
 

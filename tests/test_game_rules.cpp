@@ -305,7 +305,7 @@ TEST_CASE("rules: treasure picks (1198:0103) in the original call order") {
                 s.rank.rankTier = tier;
                 s.rank.climbsDone = climbs;
                 s.inv.treasureCount2 = found;
-                BorlandRand rng, ref;
+                mischief::BorlandRand rng, ref;
                 rng.srand(uint16_t(climbs * 7 + tier));
                 ref = rng;
                 pickTreasuresForLevel(s, t, rng);
@@ -336,7 +336,7 @@ TEST_CASE("rules: treasure picks (1198:0103) in the original call order") {
     // No pick in the castle (level 3).
     s.player.room = 49;
     s.treasures.count = 0;
-    BorlandRand rng;
+    mischief::BorlandRand rng;
     pickTreasuresForLevel(s, t, rng);
     CHECK(s.treasures.count == 0);
     // Delivered treasure after climbsDone++.
@@ -350,7 +350,7 @@ TEST_CASE("rules: rescue coin pile (1110:00aa)") {
     const GameTables t = syntheticTables();
     GameState s = GameState::initial(t);
     RecordingHooks h;
-    BorlandRand rng;
+    mischief::BorlandRand rng;
     rng.srand(321);
     s.inv.coins = 0;
     s.inv.nets = 0;
@@ -366,7 +366,7 @@ TEST_CASE("rules: rescue coin pile (1110:00aa)") {
     updateCoinPile(s, rng, h);
     CHECK(s.coinPile.room == 0xFE);
     s.player.room = 11;
-    BorlandRand ref = rng;
+    mischief::BorlandRand ref = rng;
     updateCoinPile(s, rng, h);
     CHECK(s.coinPile.room == 11);
     CHECK(s.coinPile.noSpawnRoom == 0xFF);
@@ -445,7 +445,7 @@ TEST_CASE("rules: new player, climb set-up and climb end") {
     CHECK(s.inv.nets == 10);
     CHECK(s.shop.coinsLeft == 4);
 
-    BorlandRand rng;
+    mischief::BorlandRand rng;
     rng.srand(1);
     const ClimbSetup cs = setupClimb(s, t, rng, h);
     CHECK(cs.newClimb);
@@ -464,7 +464,7 @@ TEST_CASE("rules: new player, climb set-up and climb end") {
         for (int k = 0; k < 3; ++k) CHECK_FALSE(s.clues.text[size_t(L)][size_t(k)].empty());
     // The deal came first (45 rand calls), then the layout draw.
     {
-        BorlandRand ref;
+        mischief::BorlandRand ref;
         ref.srand(1);
         for (int i = 0; i < 45; ++i) ref.rand();
         const LayoutChoice c = pickLayoutRecords(500, ref);
@@ -484,7 +484,7 @@ TEST_CASE("rules: new player, climb set-up and climb end") {
     GameState r = s;
     r.player.room = 13;
     const auto quizBefore = r.quiz;
-    BorlandRand rng2;
+    mischief::BorlandRand rng2;
     const ClimbSetup rs = setupClimb(r, t, rng2, h);
     CHECK_FALSE(rs.newClimb);
     CHECK(r.player.newClimb == 0);
@@ -526,7 +526,7 @@ TEST_CASE("rules: new player, climb set-up and climb end") {
     updateRankTier(s, t);
     CHECK(s.rank.rankTier == 0);
     // Next climb starts in the hall.
-    BorlandRand rng3;
+    mischief::BorlandRand rng3;
     rng3.srand(2);
     setupClimb(s, t, rng3, h);
     CHECK(s.player.room == kHallFirstRoom);
@@ -577,7 +577,7 @@ TEST_CASE("rules: sound-on-load quirk (1160:137d)") {
 
 TEST_CASE("rules: castle wall per-tier randomness") {
     const GameTables t = syntheticTables();
-    BorlandRand rng, ref;
+    mischief::BorlandRand rng, ref;
     rng.srand(77);
     ref.srand(77);
     for (uint8_t tier = 0; tier < 4; ++tier) {

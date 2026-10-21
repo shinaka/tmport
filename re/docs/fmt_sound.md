@@ -76,7 +76,7 @@ See §8.1 for the analysis.
 ### 3.1 How SSND resources are stored in the DLLs [O]
 
 * Each sound DLL is a resource-only Win16 NE module. The payloads use the **integer resource type
-  0xFF01** (the raw NE type word is `0xFF01`; `tools/ne_resources.py` prints it as 32513 = 0x7F01).
+  0xFF01** (the raw NE type word is `0xFF01`; the engine's `tools/ne_resources.py` prints it as 32513 = 0x7F01).
   The resource id is the sound id.
 * Each DLL also has an `RT_NAMETABLE` resource (type 15). It holds one 12-byte record per sound:
 

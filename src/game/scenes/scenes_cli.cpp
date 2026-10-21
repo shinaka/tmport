@@ -34,16 +34,16 @@
 #include "game/scenes/level_cutscene.h"
 #include "game/scenes/quiz_screen.h"
 #include "game/scenes/scene_hud.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
+#include "mischief/vfs/data_source.h"
 #include "platform/engine.h"
 #include "res/game_files.h"
 #include "res/resource_manager.h"
 #include "text/font.h"
 #include "text/text_renderer.h"
 #include "ui/game_dialog.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/log.h"
-#include "vfs/data_source.h"
 
 namespace tmport::game::scenes {
 
@@ -116,7 +116,7 @@ std::optional<Args> parseArgs(int argc, char** argv, std::string& error) {
         };
         if (o == "--keys") a.keys = need(k);
         else if (o == "--keys-file") {
-            std::ifstream f(pathFromUtf8(need(k)));
+            std::ifstream f(mischief::pathFromUtf8(need(k)));
             std::stringstream ss;
             ss << f.rdbuf();
             a.keys = ss.str();
@@ -156,7 +156,7 @@ std::optional<Args> parseArgs(int argc, char** argv, std::string& error) {
 
 class ClockWaveOutput final : public audio::WaveOutput {
 public:
-    explicit ClockWaveOutput(Clock& c) : clock_(c) {}
+    explicit ClockWaveOutput(mischief::Clock& c) : clock_(c) {}
     bool available() const override { return true; }
     void start(const audio::Sound& s) override {
         startMs_ = clock_.nowMs();
@@ -166,7 +166,7 @@ public:
     bool done() override { return clock_.nowMs() >= startMs_ + durMs_; }
 
 private:
-    Clock& clock_;
+    mischief::Clock& clock_;
     uint64_t startMs_ = 0, durMs_ = 0;
 };
 
@@ -327,7 +327,7 @@ std::optional<std::vector<Step>> parseScript(const std::string& text, std::strin
 struct Rig {
     Args args;
     GameFiles files;
-    ManualClock clock{1000};
+    mischief::ManualClock clock{1000};
     std::unique_ptr<Engine> engine;
     std::unique_ptr<text::Font> font;
     std::unique_ptr<text::TextRenderer> text;
@@ -355,7 +355,7 @@ struct Rig {
 bool Rig::shot(const std::string& name) {
     const auto p = outDir / (name + ".png");
     const bool ok = engine->presenter().writeGameAreaPng(p);
-    if (!ok) std::fprintf(stderr, "scene: could not write %s\n", pathToUtf8(p).c_str());
+    if (!ok) std::fprintf(stderr, "scene: could not write %s\n", mischief::pathToUtf8(p).c_str());
     return ok;
 }
 
@@ -432,16 +432,16 @@ void Rig::onPump() {
 }
 
 std::optional<std::filesystem::path> resolveData(const Args& a) {
-    if (!a.dataPath.empty()) return pathFromUtf8(a.dataPath);
-    if (auto env = getEnv("TM_DATA")) return pathFromUtf8(*env);
+    if (!a.dataPath.empty()) return mischief::pathFromUtf8(a.dataPath);
+    if (auto env = mischief::getEnv("TM_DATA")) return mischief::pathFromUtf8(*env);
     const char* base = SDL_GetBasePath();
-    return vfs::autoDetectDataPath(base ? pathFromUtf8(base) : std::filesystem::path());
+    return mischief::vfs::autoDetectDataPath(base ? mischief::pathFromUtf8(base) : std::filesystem::path());
 }
 
 void setupRig(Rig& r) {
     EngineConfig cfg;
     cfg.clock = &r.clock;
-    r.engine = std::make_unique<Engine>(r.files, gfx::ColorMode::Colour256, cfg);
+    r.engine = std::make_unique<Engine>(r.files, mischief::gfx::ColorMode::Colour256, cfg);
     r.font = std::make_unique<text::Font>(text::Font::load(*r.files.res));
     r.text = std::make_unique<text::TextRenderer>(*r.font, &r.engine->frame(), &r.engine->presenter());
     r.dialogs = std::make_unique<ui::DialogSystem>(*r.engine, *r.font);
@@ -562,7 +562,7 @@ int runScene(Rig& r) {
         engine.presentAll();
     };
     if (a.kind == "quiz") {
-        if (!a.hasArg || a.arg < 0 || a.arg >= kQuestionCount) throw Error("quiz needs a question 0..358");
+        if (!a.hasArg || a.arg < 0 || a.arg >= kQuestionCount) throw mischief::Error("quiz needs a question 0..358");
         r.state.player.room = static_cast<uint8_t>(a.room >= 0 ? a.room : 9);
         makeLayout(r);
         r.state.inv.numClues = static_cast<uint8_t>(a.clues);
@@ -633,7 +633,7 @@ int runScene(Rig& r) {
         std::printf("castle: done, room 0x%02X, coins %u nets %u\n", r.state.player.room, r.state.inv.coins,
                     r.state.inv.nets);
     } else {
-        throw Error("unknown scene kind " + a.kind);
+        throw mischief::Error("unknown scene kind " + a.kind);
     }
     return 0;
 }
@@ -648,7 +648,7 @@ std::optional<int> runScenesCommand(int argc, char** argv) {
         std::fprintf(stderr, "tmport: %s\n\n%s", error.c_str(), scenesUsage().c_str());
         return 2;
     }
-    log::setVerbose(a->verbose);
+    mischief::log::setVerbose(a->verbose);
     const auto dataPath = resolveData(*a);
     if (!dataPath) {
         std::fprintf(stderr, "tmport: the game data was not found. Pass --data <folder or CD image> or set TM_DATA.\n");
@@ -665,7 +665,7 @@ std::optional<int> runScenesCommand(int argc, char** argv) {
     try {
         r.files = GameFiles::open(*dataPath);
         cli::applyToolMods(r.files, a->modDirs);
-        r.outDir = pathFromUtf8(a->out);
+        r.outDir = mischief::pathFromUtf8(a->out);
         std::filesystem::create_directories(r.outDir);
         setupRig(r);
         r.startMs = r.clock.nowMs();
@@ -686,7 +686,7 @@ std::optional<int> runScenesCommand(int argc, char** argv) {
         r.shot("final");
         std::printf("scene: %llu ms simulated\n", static_cast<unsigned long long>(r.clock.nowMs() - r.startMs));
         return rc;
-    } catch (const MissingFileError& e) {
+    } catch (const mischief::MissingFileError& e) {
         std::fprintf(stderr, "tmport: missing game file %s: %s\n", e.file().c_str(), e.what());
         return 3;
     } catch (const std::exception& e) {

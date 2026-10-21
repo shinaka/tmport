@@ -4,7 +4,7 @@
 
 #include "data/dgroup_offsets.h"
 #include "data/exe_tables.h"
-#include "util/error.h"
+#include "mischief/util/error.h"
 
 namespace tmport::game::room {
 
@@ -39,7 +39,7 @@ ElfScript readScript(const ExeTables& exe, uint32_t framesOff, bool withSfx) {
         if (f == -1 || f == -2) break;
     }
     if (s.frames.empty() || (s.frames.back() != -1 && s.frames.back() != -2))
-        throw FormatError(std::format("elf script at DS:{:04x} has no terminator", framesOff));
+        throw mischief::FormatError(std::format("elf script at DS:{:04x} has no terminator", framesOff));
     const size_t steps = s.frames.size() - 1;
     const uint32_t dxOff = framesOff + static_cast<uint32_t>(s.frames.size());
     const uint32_t yOff = dxOff + static_cast<uint32_t>(2 * steps);

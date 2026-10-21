@@ -12,6 +12,11 @@
 #include "cli/tool_mods.h"
 #include "data/exe_tables.h"
 #include "gfx/frame_buffer.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
+#include "mischief/util/png_writer.h"
+#include "mischief/vfs/data_source.h"
 #include "platform/engine.h"
 #include "res/game_files.h"
 #include "text/font.h"
@@ -19,11 +24,6 @@
 #include "ui/dialog_desc.h"
 #include "ui/game_dialog.h"
 #include "ui/help_topics.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/log.h"
-#include "util/png_writer.h"
-#include "vfs/data_source.h"
 
 namespace tmport::cli {
 
@@ -162,7 +162,7 @@ std::optional<Args> parse(int argc, char** argv, std::string& error) {
             if (!need(i, 1)) return a;
             a.modDirs.emplace_back(argv[++i]);
         } else if (s == "--verbose") {
-            log::setVerbose(true);
+            mischief::log::setVerbose(true);
         } else {
             error = std::format("unknown argument '{}'", s);
             return a;
@@ -172,15 +172,15 @@ std::optional<Args> parse(int argc, char** argv, std::string& error) {
 }
 
 std::optional<std::filesystem::path> resolveDataPath(const Args& a) {
-    if (!a.dataPath.empty()) return pathFromUtf8(a.dataPath);
-    if (auto env = getEnv("TM_DATA")) return pathFromUtf8(*env);
+    if (!a.dataPath.empty()) return mischief::pathFromUtf8(a.dataPath);
+    if (auto env = mischief::getEnv("TM_DATA")) return mischief::pathFromUtf8(*env);
     const char* base = SDL_GetBasePath();
-    return vfs::autoDetectDataPath(base ? pathFromUtf8(base) : std::filesystem::path());
+    return mischief::vfs::autoDetectDataPath(base ? mischief::pathFromUtf8(base) : std::filesystem::path());
 }
 
 // Binary PPM (P6, maxval 255) reader for --bg.
 bool readPpm(const std::filesystem::path& path, int& w, int& h, std::vector<uint8_t>& rgb) {
-    const auto data = readWholeFile(path);
+    const auto data = mischief::readWholeFile(path);
     if (!data) return false;
     const auto& d = *data;
     size_t p = 0;
@@ -221,11 +221,11 @@ bool drawBackground(const Args& a, Engine& engine) {
     if (!a.bgPpm.empty()) {
         int w = 0, h = 0;
         std::vector<uint8_t> rgb;
-        if (!readPpm(pathFromUtf8(a.bgPpm), w, h, rgb) || w != 512 || h != 384) {
-            log::error("--bg: {} is not a 512x384 binary PPM (P6, maxval 255)", a.bgPpm);
+        if (!readPpm(mischief::pathFromUtf8(a.bgPpm), w, h, rgb) || w != 512 || h != 384) {
+            mischief::log::error("--bg: {} is not a 512x384 binary PPM (P6, maxval 255)", a.bgPpm);
             return false;
         }
-        const gfx::Palette& pal = engine.palette();
+        const mischief::gfx::Palette& pal = engine.palette();
         // Map every RGB to the nearest palette index (cached per colour).
         std::vector<std::pair<uint32_t, uint8_t>> cache;
         for (int y = 0; y < 384; ++y) {
@@ -242,7 +242,7 @@ bool drawBackground(const Args& a, Engine& engine) {
                         break;
                     }
                 if (!hit) {
-                    idx = pal.nearestIndex(Rgb8{rgb[o], rgb[o + 1], rgb[o + 2]});
+                    idx = pal.nearestIndex(mischief::Rgb8{rgb[o], rgb[o + 1], rgb[o + 2]});
                     cache.emplace_back(key, idx);
                 }
                 row[x] = idx;
@@ -252,7 +252,7 @@ bool drawBackground(const Args& a, Engine& engine) {
     if (a.bgPmap) {
         auto pm = engine.files().res->pixmap(a.bgPmap);
         if (!pm) {
-            log::error("--bg-pmap: PMAP {} does not exist", a.bgPmap);
+            mischief::log::error("--bg-pmap: PMAP {} does not exist", a.bgPmap);
             return false;
         }
         fb.drawOpaque(a.bgX, a.bgY, *pm);
@@ -262,18 +262,18 @@ bool drawBackground(const Args& a, Engine& engine) {
 }
 
 bool writeScreen(const Args& a, Engine& engine) {
-    const gfx::Palette& pal = engine.palette();
+    const mischief::gfx::Palette& pal = engine.palette();
     const auto& fb = engine.frame();
-    std::vector<Rgb8> colours(pal.colours().begin(), pal.colours().begin() + pal.size());
+    std::vector<mischief::Rgb8> colours(pal.colours().begin(), pal.colours().begin() + pal.size());
     const std::span<const uint8_t> screen(fb.pixels(), static_cast<size_t>(512) * 384);
-    if (!png::writeIndexed(pathFromUtf8(a.outPath), 512, 384, screen, colours)) {
-        log::error("cannot write {}", a.outPath);
+    if (!mischief::png::writeIndexed(mischief::pathFromUtf8(a.outPath), 512, 384, screen, colours)) {
+        mischief::log::error("cannot write {}", a.outPath);
         return false;
     }
     if (!a.fbDump.empty()) {
         const std::span<const uint8_t> all(fb.pixels(), static_cast<size_t>(gfx::FrameBuffer::kWidth) * gfx::FrameBuffer::kHeight);
-        if (!png::writeIndexed(pathFromUtf8(a.fbDump), gfx::FrameBuffer::kWidth, gfx::FrameBuffer::kHeight, all, colours)) {
-            log::error("cannot write {}", a.fbDump);
+        if (!mischief::png::writeIndexed(mischief::pathFromUtf8(a.fbDump), gfx::FrameBuffer::kWidth, gfx::FrameBuffer::kHeight, all, colours)) {
+            mischief::log::error("cannot write {}", a.fbDump);
             return false;
         }
     }
@@ -282,18 +282,18 @@ bool writeScreen(const Args& a, Engine& engine) {
 
 std::vector<uint8_t> othrText(const ResourceManager& res, int id) {
     auto body = res.loadRaw(ResType::OTHR, id);
-    if (!body) throw MissingFileError("TMT.DLL", std::format("OTHR {} not found in TMT.DLL", id));
-    const text::Bytes s = text::untilNul(*body);
+    if (!body) throw mischief::MissingFileError("TMT.DLL", std::format("OTHR {} not found in TMT.DLL", id));
+    const mischief::text::Bytes s = mischief::text::untilNul(*body);
     return {s.begin(), s.end()};
 }
 
 // Line count of a layout: number of distinct cell rows that received a glyph.
 struct LayoutStats {
-    text::TextExtent extent;
+    mischief::text::TextExtent extent;
     int lines = 0;
     int glyphs = 0;
 };
-LayoutStats layoutStats(text::TextRenderer& tr, text::Bytes s, int w) {
+LayoutStats layoutStats(text::TextRenderer& tr, mischief::text::Bytes s, int w) {
     LayoutStats st;
     std::set<int> rows;
     tr.setGlyphObserver([&](uint8_t, int, int y, int) {
@@ -322,11 +322,11 @@ int runDialog(const Args& a, GameFiles& files, Engine& engine, const text::Font&
     if (!off) {
         std::string names;
         for (const auto& d : ui::staticDialogs()) names += std::format(" {}({:04x})", d.name, d.offset);
-        log::error("unknown dialog '{}'; known:{}", a.target, names);
+        mischief::log::error("unknown dialog '{}'; known:{}", a.target, names);
         return 2;
     }
     ui::DlgDesc d = ui::DlgDesc::fromExe(*files.exe, *off);
-    if (a.arg) d.body = ui::formatPercentS(d.body, text::asBytes(*a.arg));
+    if (a.arg) d.body = ui::formatPercentS(d.body, mischief::text::asBytes(*a.arg));
     if (a.sel) d.defaultButton = static_cast<uint8_t>(*a.sel < 0 ? 0 : *a.sel);
     if (!drawBackground(a, engine)) return 1;
     ui::DialogSystem dialogs(engine, font);
@@ -342,12 +342,12 @@ int runDialog(const Args& a, GameFiles& files, Engine& engine, const text::Font&
 
 int runHelp(const Args& a, GameFiles& files, Engine& engine, const text::Font& font) {
     if (a.topic < 1 || a.topic > static_cast<int>(ui::kHelpTopics.size())) {
-        log::error("help topics are 1..{}", ui::kHelpTopics.size());
+        mischief::log::error("help topics are 1..{}", ui::kHelpTopics.size());
         return 2;
     }
     const ui::PagerDesc p = ui::buildHelpPager(*files.exe, *files.res, a.topic - 1);
     if (a.page < 1 || a.page > p.pageCount) {
-        log::error("help topic {} has pages 1..{}", a.topic, p.pageCount);
+        mischief::log::error("help topic {} has pages 1..{}", a.topic, p.pageCount);
         return 2;
     }
     ui::DlgDesc d = ui::DialogSystem::pagerPage(p, a.page - 1);
@@ -397,7 +397,7 @@ int runFont(const Args& a, Engine& engine, const text::Font& font) {
     const int rows = (font.glyphCount() + cols - 1) / cols;
     const int W = cols * cellW + 1, H = rows * cellH + 1;
     if (W > gfx::FrameBuffer::kWidth || H > gfx::FrameBuffer::kHeight) {
-        log::error("font sheet {}x{} does not fit the frame buffer", W, H);
+        mischief::log::error("font sheet {}x{} does not fit the frame buffer", W, H);
         return 1;
     }
     fb.fillRectColor(0, 0, W, H, 7);
@@ -407,19 +407,19 @@ int runFont(const Args& a, Engine& engine, const text::Font& font) {
         fb.setForeColor(0);
         font.drawChar(fb, x + 2, y + 2, static_cast<uint8_t>(c));
     }
-    const gfx::Palette& pal = engine.palette();
+    const mischief::gfx::Palette& pal = engine.palette();
     std::vector<uint8_t> rgba(static_cast<size_t>(W) * H * 4);
     for (int y = 0; y < H; ++y)
         for (int x = 0; x < W; ++x) {
-            const Rgb8& c = pal.colour(fb.at(x, y));
+            const mischief::Rgb8& c = pal.colour(fb.at(x, y));
             uint8_t* p = &rgba[(static_cast<size_t>(y) * W + x) * 4];
             p[0] = c.r;
             p[1] = c.g;
             p[2] = c.b;
             p[3] = 255;
         }
-    if (!png::writeRgba(pathFromUtf8(a.outPath), W, H, rgba)) {
-        log::error("cannot write {}", a.outPath);
+    if (!mischief::png::writeRgba(mischief::pathFromUtf8(a.outPath), W, H, rgba)) {
+        mischief::log::error("cannot write {}", a.outPath);
         return 1;
     }
     out("FFNT {}: {} glyphs, height {} -> {} ({}x{})\n", text::kGameFontId, font.glyphCount(), font.height(), a.outPath, W,
@@ -457,7 +457,7 @@ std::optional<int> runTextUiCommand(int argc, char** argv) {
     }
     try {
         ResourceManager::Options ro;
-        ro.colorMode = a->colour16 ? gfx::ColorMode::Colour16 : gfx::ColorMode::Colour256;
+        ro.colorMode = a->colour16 ? mischief::gfx::ColorMode::Colour16 : mischief::gfx::ColorMode::Colour256;
         ro.requireSounds = false;
         GameFiles files = GameFiles::open(*dataPath, ro);
         applyToolMods(files, a->modDirs);
@@ -471,7 +471,7 @@ std::optional<int> runTextUiCommand(int argc, char** argv) {
             case Cmd::Font: return runFont(*a, engine, font);
             default: break;
         }
-    } catch (const MissingFileError& e) {
+    } catch (const mischief::MissingFileError& e) {
         std::fprintf(stderr, "tmport: missing game file %s: %s\n", e.file().c_str(), e.what());
         return 3;
     } catch (const std::exception& e) {

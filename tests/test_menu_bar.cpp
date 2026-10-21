@@ -8,14 +8,14 @@
 #include <filesystem>
 #include <vector>
 
-#include "app_test_util.h"
-#include "gfx/presenter.h"
+#include "mischief/gfx/presenter.h"
+#include "mischief/test/app_test_util.h"
+#include "mischief/timing/clock.h"
+#include "mischief/util/file_util.h"
 #include "platform/engine.h"
 #include "test_data.h"
 #include "text/font.h"
-#include "timing/clock.h"
 #include "ui/menu_bar.h"
-#include "util/file_util.h"
 
 using namespace tmport;
 using namespace apptest;
@@ -28,7 +28,7 @@ namespace {
 std::string str(const ui::MenuLabel& l) { return l.str(); }
 
 struct Rig {
-    ManualClock clock;
+    mischief::ManualClock clock;
     std::unique_ptr<Engine> engine;
     std::unique_ptr<text::Font> font;
     std::unique_ptr<MenuBar> menu;
@@ -37,7 +37,7 @@ struct Rig {
     explicit Rig(GameFiles& g) {
         EngineConfig cfg;
         cfg.clock = &clock;
-        engine = std::make_unique<Engine>(g, gfx::ColorMode::Colour256, cfg);
+        engine = std::make_unique<Engine>(g, mischief::gfx::ColorMode::Colour256, cfg);
         font = std::make_unique<text::Font>(text::Font::load(*g.res));
         menu = std::make_unique<MenuBar>(*engine, MenuBarModel::fromExe(*g.exe), *font);
         for (int c = 1; c < static_cast<int>(MenuCommand::Count); ++c) {
@@ -426,7 +426,7 @@ TEST_CASE("menu bar: headless render of the canvas with a menu open") {
     Engine& e = *r.engine;
     MenuBar& m = *r.menu;
     // The title picture as the game area.
-    auto pm = g->res->pixmap(2100, gfx::ColorMode::Colour256);
+    auto pm = g->res->pixmap(2100, mischief::gfx::ColorMode::Colour256);
     REQUIRE(pm);
     e.frame().drawOpaque(0, 20, *pm);
     e.presentAll();

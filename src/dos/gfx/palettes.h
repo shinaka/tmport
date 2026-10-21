@@ -22,7 +22,7 @@
 #include <string_view>
 #include <vector>
 
-#include "util/rgb.h"
+#include "mischief/util/rgb.h"
 
 namespace tmport::dos {
 
@@ -36,17 +36,17 @@ std::string_view lookName(Look look);
 
 // The 16 colours of an RGBI display (index = I<<3 | R<<2 | G<<1 | B; colour 6 shown as brown).
 // Hardware fact, not game data.
-const std::array<Rgb8, 16>& rgbiColours();
+const std::array<mischief::Rgb8, 16>& rgbiColours();
 // CGA mode 4, palette 1, high intensity.
-const std::array<Rgb8, 4>& cgaColours();
+const std::array<mischief::Rgb8, 4>& cgaColours();
 
 struct LookPalette {
     Look look = Look::Ega;
-    std::array<Rgb8, 16> colours{};      // logical colour -> displayed colour (CGA: the dither's average is not used)
+    std::array<mischief::Rgb8, 16> colours{};      // logical colour -> displayed colour (CGA: the dither's average is not used)
     std::array<uint8_t, 16> cgaDither{};  // DS:0174 (filled for every look, used by Look::Cga)
 
     // Displayed colour of logical colour c at screen pixel (x, y).
-    Rgb8 at(uint8_t c, int x, int y) const;
+    mischief::Rgb8 at(uint8_t c, int x, int y) const;
 };
 
 // Reads the tables from SST.EXE. Never fails for a validated DosExe.

@@ -1,7 +1,8 @@
-// DOS edition runtime (dos/app/dos_runtime.h, script_input.h): the virtual PIT and its accuracy over
-// long runs, lockstep stepping (frameBegin -> gameTick -> frameBody per game tick), the slow-machine
-// step gate, the 13-tick and 60-tick counters, the tick cap, determinism under any host chunking,
-// the original frame clock, scripted input, and Turbo C 2.0 rand == rtl/borland_rand.
+// DOS edition runtime (dos/app/dos_runtime.h; the engine's mischief/dos/app/script_input.h): the
+// virtual PIT and its accuracy over long runs, lockstep stepping (frameBegin -> gameTick ->
+// frameBody per game tick), the slow-machine step gate, the 13-tick and 60-tick counters, the tick
+// cap, determinism under any host chunking, the original frame clock, scripted input, and Turbo C
+// 2.0 rand == mischief/rtl/borland_rand.
 #include <doctest/doctest.h>
 
 #include <SDL3/SDL_scancode.h>
@@ -11,9 +12,9 @@
 #include <vector>
 
 #include "dos/app/dos_runtime.h"
-#include "dos/app/script_input.h"
 #include "dos_test_data.h"
-#include "rtl/borland_rand.h"
+#include "mischief/dos/app/script_input.h"
+#include "mischief/rtl/borland_rand.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -499,7 +500,7 @@ TEST_CASE("DOS runtime: the same script gives the same ticks for any host chunki
         log.rt = &rt;
         rt.setClient(&log);
         std::string err;
-        auto s = ScriptedInput::parse(script, err);
+        auto s = mischief::dos::ScriptedInput::parse(script, err);
         REQUIRE_MESSAGE(s, err);
         rt.setScript(*s);
         uint32_t seed = 7;
@@ -515,7 +516,7 @@ TEST_CASE("DOS runtime: the same script gives the same ticks for any host chunki
     log.rt = &rt;
     rt.setClient(&log);
     std::string err;
-    rt.setScript(*ScriptedInput::parse(script, err));
+    rt.setScript(*mischief::dos::ScriptedInput::parse(script, err));
     rt.stepGameTicks(400);
     CHECK(a == log.log);
     CHECK(b == log.log);
@@ -577,63 +578,13 @@ TEST_CASE("DOS original frame clock: reference rates and period mode") {
     CHECK(rt.frameClock().steps(FrameFeature::TitleSparkle) == 1);
 }
 
-TEST_CASE("DOS scripted input: parsing") {
-    std::string err;
-    auto s = ScriptedInput::parse("55:down:right, 103:up:right\n+92:tap:pgup:95 300:click:10:20 301:buttons:2 302:move:5:6", err);
-    REQUIRE_MESSAGE(s, err);
-    const auto& e = s->events();
-    REQUIRE(e.size() == 9);
-    CHECK(e[0] == ScriptEvent{55, ScriptEvent::Kind::KeyDown, PcKey{0x4D, true}});
-    CHECK(e[1].tick == 103);
-    CHECK(e[2] == ScriptEvent{195, ScriptEvent::Kind::KeyDown, PcKey{0x49, true}});
-    CHECK(e[3] == ScriptEvent{290, ScriptEvent::Kind::KeyUp, PcKey{0x49, true}});
-    CHECK(e[4].kind == ScriptEvent::Kind::MouseMove);
-    CHECK(e[4].x == 10);
-    CHECK(e[5].buttons == 1);
-    CHECK(e[6].tick == 301);
-    CHECK(e[6].buttons == 0);
-    CHECK(e[7].buttons == 2);
-    CHECK(s->lastTick() == 302);
-    CHECK(s->take(54).empty());
-    CHECK(s->take(103).size() == 2);
-    CHECK(s->take(300).size() == 4);
-    CHECK_FALSE(s->finished());
-    CHECK(s->take(1000).size() == 3);
-    CHECK(s->finished());
-    // Sub-tick times: N.F lies between game ticks N and N + 1 (applied before N + 1, its own time).
-    auto sub = ScriptedInput::parse("806.4923:down:down 902.2367:up:down +0.5:tap:a:2 20.0:down:up 3.000001:up:up", err);
-    REQUIRE_MESSAGE(sub, err);
-    const auto& f = sub->events();
-    REQUIRE(f.size() == 6);
-    CHECK(f[0].tick == 4);  // 3.000001
-    CHECK(f[0].phasePpm == 1);
-    CHECK(f[1].tick == 20);  // 20.0 is the whole tick
-    CHECK(f[1].phasePpm == ScriptEvent::kOnTick);
-    CHECK(f[2].tick == 807);
-    CHECK(f[2].phasePpm == 492300);
-    CHECK(f[3].tick == 903);
-    CHECK(f[3].phasePpm == 236700);
-    CHECK(f[4].tick == 903);  // 902.7367 (+0.5)
-    CHECK(f[4].phasePpm == 736700);
-    CHECK(f[4].kind == ScriptEvent::Kind::KeyDown);
-    CHECK(f[5].tick == 905);  // up two ticks later, same phase
-    CHECK(f[5].phasePpm == 736700);
-    for (const char* bad : {"down:right", "x:down:right", "5:down:nokey", "5:jump:up", "5:tap:up:0", "5:move:1", "+x:up:up",
-                            "5.1234567:down:up", "5.:down:up", ".5:down:up"}) {
-        INFO(bad);
-        CHECK_FALSE(ScriptedInput::parse(bad, err));
-        CHECK_FALSE(err.empty());
-    }
-    CHECK(ScriptedInput::parse("  ", err)->events().empty());
-}
-
 TEST_CASE("DOS scripted input: a sub-tick key down sets the phase of its typematic repeats") {
     // A key held from 10.0 or from 10.5 game ticks: the first repeat 500 ms later, then every 33 ms;
     // the repeat bytes reach the keyboard before the first tick at or after their time.
     auto repeatsBy = [](const char* script, uint64_t ticks) {
         DosRuntime rt;
         std::string err;
-        rt.setScript(*ScriptedInput::parse(script, err));
+        rt.setScript(*mischief::dos::ScriptedInput::parse(script, err));
         rt.stepGameTicks(ticks);
         return rt.keyboard().repeatsGenerated();
     };
@@ -648,30 +599,10 @@ TEST_CASE("DOS scripted input: a sub-tick key down sets the phase of its typemat
     log.rt = &rt;
     rt.setClient(&log);
     std::string err;
-    rt.setScript(*ScriptedInput::parse("10.5:down:right", err));
+    rt.setScript(*mischief::dos::ScriptedInput::parse("10.5:down:right", err));
     rt.stepGameTicks(11);
     CHECK(log.log[9].keys == 0);
     CHECK(log.log[10].keys == 0x08);
-}
-
-TEST_CASE("DOS rand: Turbo C 2.0 rand is rtl/borland_rand (seed*0x015A4E35+1, bits 16..30, seed 1)") {
-    BorlandRand r;
-    for (int v : {346, 130, 10982, 1090, 11656, 7117, 17595, 6415, 22948, 31126}) CHECK(r.rand() == v);
-    // Seeds read out of DOSBox-X save states (DS:8F48, u32) lie on the unseeded sequence from 1:
-    // ega/signin after 13894 calls, tandy/signin after 49972, tandy/level2_resumed (a resumed game:
-    // no srand) after 50429 (PORTING_NOTES.md §2.4).
-    BorlandRand s;
-    int calls = 0;
-    auto advanceTo = [&](int n) {
-        while (calls < n) {
-            s.rand();
-            ++calls;
-        }
-        return s.seed();
-    };
-    CHECK(advanceTo(13894) == 0x2EA1217Bu);
-    CHECK(advanceTo(49972) == 0xB957427Du);
-    CHECK(advanceTo(50429) == 0x74265B9Au);
 }
 
 TEST_CASE("DOS rand: the LCG of the user's SST.EXE (rand 4d12:001F, srand 4d12:000E, seed DS:8F48)") {

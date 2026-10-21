@@ -13,8 +13,8 @@
 #include "dos/save/users_dat.h"
 #include "dos/save/users_store.h"
 #include "dos_test_data.h"
+#include "mischief/util/file_util.h"
 #include "save/settings.h"
-#include "util/file_util.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -48,7 +48,7 @@ std::vector<fs::path> referenceUsersFiles(const fs::path& dir) {
     std::error_code ec;
     for (const auto& e : fs::recursive_directory_iterator(dir, ec)) {
         if (!e.is_regular_file(ec)) continue;
-        const std::string name = toUpperAscii(pathToUtf8(e.path().filename()));
+        const std::string name = mischief::toUpperAscii(mischief::pathToUtf8(e.path().filename()));
         if ((name.starts_with("USERS") && name.ends_with(".DAT")) || name.ends_with(".USERS")) out.push_back(e.path());
     }
     std::sort(out.begin(), out.end());
@@ -192,7 +192,7 @@ TEST_CASE("DOS USERS.DAT: the user's TM-DOS\\USERS.DAT round trips byte for byte
     }
     const auto path = findDosUsersDat(*dir);
     REQUIRE(path);
-    const auto data = readWholeFile(*path);
+    const auto data = mischief::readWholeFile(*path);
     REQUIRE(data);
     REQUIRE(data->size() == kUsersFileSize);
     const auto d = UsersDat::parse(*data);
@@ -211,8 +211,8 @@ TEST_CASE("DOS USERS.DAT: every reference file of the original round trips byte 
     CHECK(files.size() >= 8);
     int checked = 0;
     for (const auto& f : files) {
-        INFO(pathToUtf8(f));
-        const auto data = readWholeFile(f);
+        INFO(mischief::pathToUtf8(f));
+        const auto data = mischief::readWholeFile(f);
         REQUIRE(data);
         CHECK(data->size() == kUsersFileSize);
         const auto d = UsersDat::parse(*data);
@@ -226,7 +226,7 @@ TEST_CASE("DOS USERS.DAT: every reference file of the original round trips byte 
 
     // Field values against tools/dos/users_dos.py for one file the original wrote after a game.
     const fs::path one = *dir / "USERS_after_castle_climb_Ada.DAT";
-    if (const auto data = readWholeFile(one)) {
+    if (const auto data = mischief::readWholeFile(one)) {
         const auto d = UsersDat::parse(*data);
         REQUIRE(d);
         CHECK(d->spriteHighWater == 0x04F6);
@@ -278,7 +278,7 @@ TEST_CASE("DOS users store: path, write moments, damaged files") {
     store.users().spriteHighWater = 0x0480;
     REQUIRE(store.saveNewPlayer(rec, "Ada"));
     CHECK(store.lastMoment() == DosSaveMoment::NewPlayer);
-    auto onDisk = readWholeFile(store.path());
+    auto onDisk = mischief::readWholeFile(store.path());
     REQUIRE(onDisk);
     CHECK(onDisk->size() == kUsersFileSize);
     CHECK(*onDisk == store.users().bytes());
@@ -303,23 +303,23 @@ TEST_CASE("DOS users store: path, write moments, damaged files") {
     REQUIRE(again.removePlayer(0));
     CHECK(again.users().records[0].empty());
     CHECK(again.users().records[0].answerMasks[8] == 7);
-    CHECK(readWholeFile(again.path()) == again.users().bytes());
+    CHECK(mischief::readWholeFile(again.path()) == again.users().bytes());
     // The replaced (whole) file was kept as .bak.
-    CHECK(readWholeFile(backupPathFor(again.path()))->size() == kUsersFileSize);
+    CHECK(mischief::readWholeFile(mischief::backupPathFor(again.path()))->size() == kUsersFileSize);
 
     // A short file is not overwritten from scratch; with a whole .bak the roster comes from it.
-    REQUIRE(writeWholeFile(again.path(), std::vector<uint8_t>(10, 1)));
+    REQUIRE(mischief::writeWholeFile(again.path(), std::vector<uint8_t>(10, 1)));
     DosUsersStore damaged(again.path());
     CHECK(damaged.load() == DosUsersStatus::Short);
     CHECK(damaged.fromBackup());
     CHECK(damaged.writable());
     std::error_code ec;
-    fs::remove(backupPathFor(again.path()), ec);
+    fs::remove(mischief::backupPathFor(again.path()), ec);
     DosUsersStore noBackup(again.path());
     CHECK(noBackup.load() == DosUsersStatus::Short);
     CHECK_FALSE(noBackup.writable());
     CHECK_FALSE(noBackup.saveStartOver(0));
-    CHECK(readWholeFile(again.path())->size() == 10);
+    CHECK(mischief::readWholeFile(again.path())->size() == 10);
 }
 
 TEST_CASE("DOS users store: import from the DOS folder and export back") {
@@ -329,17 +329,17 @@ TEST_CASE("DOS users store: import from the DOS folder and export back") {
     const fs::path engineFile = dir / "pref" / "dos_users.dat";
 
     // Case-insensitive lookup; a short file is refused.
-    REQUIRE(writeWholeFile(dosFolder / "users.dat", std::vector<uint8_t>(100, 0)));
+    REQUIRE(mischief::writeWholeFile(dosFolder / "users.dat", std::vector<uint8_t>(100, 0)));
     REQUIRE(findDosUsersDat(dosFolder));
     CHECK(importDosUsers(*findDosUsersDat(dosFolder), engineFile, false) == DosImportResult::SourceInvalid);
 
     const auto original = pseudoRandomFile(11);
-    REQUIRE(writeWholeFile(dosFolder / "users.dat", original));
+    REQUIRE(mischief::writeWholeFile(dosFolder / "users.dat", original));
     DosUsersStore store(engineFile);
     DosImportOutcome outcome;
     CHECK(store.loadWithImport(dosFolder, &outcome) == DosUsersStatus::Ok);
     CHECK(outcome.result == DosImportResult::Imported);
-    CHECK(readWholeFile(engineFile) == original);
+    CHECK(mischief::readWholeFile(engineFile) == original);
     CHECK(store.users().bytes() == original);
     // Only once: the engine's file is kept afterwards.
     CHECK(store.loadWithImport(dosFolder, &outcome) == DosUsersStatus::Ok);
@@ -350,14 +350,14 @@ TEST_CASE("DOS users store: import from the DOS folder and export back") {
     // Export back: byte for byte.
     const fs::path exported = dir / "out" / "USERS.DAT";
     REQUIRE(exportDosUsers(engineFile, exported));
-    CHECK(readWholeFile(exported) == original);
+    CHECK(mischief::readWholeFile(exported) == original);
 
     // The user's own USERS.DAT, copied (never written in place).
     if (const auto d = testdata::dosDataPath()) {
         if (const auto src = findDosUsersDat(*d)) {
             const fs::path engine2 = dir / "pref2" / "dos_users.dat";
             CHECK(importDosUsers(*src, engine2, false) == DosImportResult::Imported);
-            CHECK(readWholeFile(engine2) == readWholeFile(*src));
+            CHECK(mischief::readWholeFile(engine2) == mischief::readWholeFile(*src));
         }
     }
 }

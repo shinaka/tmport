@@ -4,9 +4,9 @@
 //
 //  host key down/up (SDL scancode)
 //    -> PcKey (set-1 scan code, E0 prefix for the grey keys)
-//    -> PcKeyboard (the shared ScanKeyboard, dos/input/pc_keyboard.h): scan bytes in time order, plus
-//       SYNTHESISED typematic repeats of the last key pressed (DOSBox-X: first repeat 500 ms after
-//       the press, then every 33 ms; host key repeats are ignored)
+//    -> PcKeyboard (the engine's ScanKeyboard, mischief/dos/input/pc_keyboard.h): scan bytes in time
+//       order, plus SYNTHESISED typematic repeats of the last key pressed (DOSBox-X: first repeat
+//       500 ms after the press, then every 33 ms; host key repeats are ignored)
 //    -> KbdIsr (held bits g_keys DS:9105, the diagonal/jump rule, swallowed scans)
 //    -> BiosKeyboard (key words for Input_Poll), unless Kbd_ISR swallowed the byte.
 //
@@ -21,7 +21,7 @@
 
 #include <cstdint>
 
-#include "dos/input/pc_keyboard.h"
+#include "mischief/dos/input/pc_keyboard.h"
 
 namespace tmport::dos {
 
@@ -62,8 +62,8 @@ struct KeyboardOptions {
     bool tandy = false;               // KbdIsr::tandy
 };
 
-// The PC keyboard (dos/input/pc_keyboard.h) with Kbd_ISR as the game's handler.
-class PcKeyboard final : public ScanKeyboard {
+// The PC keyboard (mischief/dos/input/pc_keyboard.h) with Kbd_ISR as the game's handler.
+class PcKeyboard final : public mischief::dos::ScanKeyboard {
 public:
     explicit PcKeyboard(KeyboardOptions options = {});
 
@@ -74,7 +74,7 @@ public:
     const KbdIsr& isr() const { return isr_; }
 
 private:
-    static ScanKeyboardOptions scanOptions(const KeyboardOptions& o);
+    static mischief::dos::ScanKeyboardOptions scanOptions(const KeyboardOptions& o);
     bool handleScanByte(uint8_t byte) override { return isr_.onScanByte(byte); }
 
     KeyboardOptions options_;

@@ -81,7 +81,7 @@ Every resource type in every DLL has a format spec; no id range is of unknown fo
 | TMT.DLL RRGB | 1 | `fmt_pmap.md` §5 | |
 | TM0–8SOUND SSND | 2861 | `fmt_sound.md` §3 | |
 | `SOUNDS\*.MID` | 20 | `fmt_sound.md` §8.1 (standard SMF) | |
-| **TMTWINCD.EXE own resources**: cursors 128–130 (RT_CURSOR/RT_GROUP_CURSOR), icon 15000, DIALOG 1–8, name table | – | only mentioned (`sys_resources_saves.md` §2.1, `code_1008-1030.md` §6.4) | cursor and icon formats now specified and decoded by the engine (RT_GROUP_CURSOR/RT_CURSOR in `src/input/cursors.h`; RT_GROUP_ICON/RT_ICON, icon 15000 = one 32×32 16-colour entry, in `src/platform/exe_icon.h`); **gap** left: DLGTEMPLATE (P1-5) |
+| **TMTWINCD.EXE own resources**: cursors 128–130 (RT_CURSOR/RT_GROUP_CURSOR), icon 15000, DIALOG 1–8, name table | – | only mentioned (`sys_resources_saves.md` §2.1, `code_1008-1030.md` §6.4) | cursor and icon formats now specified and decoded by the engine (RT_GROUP_CURSOR/RT_CURSOR in `src/input/cursors.h`; RT_GROUP_ICON/RT_ICON, icon 15000 = one 32×32 16-colour entry, in the engine's `src/mischief/platform/exe_icon.h`); **gap** left: DLGTEMPLATE (P1-5) |
 
 ### 2.2 Resources never used by the Windows EXE [O unless marked]
 
@@ -187,7 +187,7 @@ pad byte.
 
 ## 4. Behaviours to observe in the original (DOSBox-X plan)
 
-Tooling: `tools/tmctl.py` (keyboard only, `shot` = exact 640×480 frame, `save/load` states, `turbo`).
+Tooling: the engine's `tools/tmctl.py` (keyboard only, `shot` = exact 640×480 frame, `save/load` states, `turbo`).
 Only one agent may drive the emulator. Mouse-dependent items are marked **(mouse)** and need a
 manual session. Audio cannot be captured through `tmctl.py`; items marked **(audio)** need DOSBox-X's
 own WAV/MIDI recording or a person listening. For tick-exact captures use `turbo off` and a save
@@ -263,8 +263,8 @@ C20 and C24 were applied as well (`code_1168-1198.md` OQ6, `dgroup_map.md` §4.1
 | P1-2 | Mouse session E16 (hot-spot priority, cursor) | H3, M10 | manual DOSBox-X run or debugger watch on DS:4b7a |
 | P1-3 | Audio session: E1 music switch, E15, M3 resume position, E17 | M2, M3, music rules | DOSBox-X MIDI/WAV recording |
 | P1-4 | Decide port policies: input loss (M5), quirks table (`PORTING_NOTES.md` §6.1), MIDI back end, 16-colour support | design decisions that depend on P1-1..3 | PORTING_NOTES |
-| P1-5 | Spec for the EXE's own resources: ~~Win16 RT_CURSOR / RT_GROUP_CURSOR (hotspot, AND/XOR masks), RT_GROUP_ICON~~ (done: `src/input/cursors.h`, `src/platform/exe_icon.h`), DLGTEMPLATE | the port reads cursors (129/130 walking cursors) and optionally dialog texts from the user's EXE | `extracted/wincd/TMTWINCD/TMTWINCD.EXE` resource table (`tools/ne_resources.py`) |
-| P1-6 | Re-export Ghidra with the hidden functions created and truncated bodies fixed (`10b0:00b5`, `1178:0cb0`, `10c0:0cde`, `1160:137d`, `1140:*`, `1010:0196` body), then regenerate `functions.tsv`, `disassembly.asm` and the DGROUP `refs` column | future verification without private scripts; `dgroup_map.md` OQ10 | `tools/ghidra_scripts/FindMoreFunctions.java` on a copy of `re/ghidra_proj` |
+| P1-5 | Spec for the EXE's own resources: ~~Win16 RT_CURSOR / RT_GROUP_CURSOR (hotspot, AND/XOR masks), RT_GROUP_ICON~~ (done: `src/input/cursors.h`, the engine's `src/mischief/platform/exe_icon.h`), DLGTEMPLATE | the port reads cursors (129/130 walking cursors) and optionally dialog texts from the user's EXE | `extracted/wincd/TMTWINCD/TMTWINCD.EXE` resource table (the engine's `tools/ne_resources.py`) |
+| P1-6 | Re-export Ghidra with the hidden functions created and truncated bodies fixed (`10b0:00b5`, `1178:0cb0`, `10c0:0cde`, `1160:137d`, `1140:*`, `1010:0196` body), then regenerate `functions.tsv`, `disassembly.asm` and the DGROUP `refs` column | future verification without private scripts; `dgroup_map.md` OQ10 | the engine's `tools/ghidra_scripts/FindMoreFunctions.java` on a copy of `re/ghidra_proj` |
 | P1-7 | **Not needed** (M6 settled per REFERENCE_CAPTURES §R4: one hall animation at a time; the port has no fixed limits). ~~Measure peak loads (dirty rects, sprites) in E9~~ | M6 | – |
 
 ### P2: completeness

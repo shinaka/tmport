@@ -4,10 +4,10 @@
 #include <filesystem>
 #include <string>
 
+#include "mischief/util/file_util.h"
 #include "platform/engine_setup.h"
 #include "save/settings.h"
 #include "save/user_record.h"
-#include "util/file_util.h"
 
 using namespace tmport;
 using namespace tmport::save;
@@ -25,46 +25,13 @@ fs::path tempDir(const char* name) {
 }
 
 bool writeText(const fs::path& p, const std::string& s) {
-    return writeWholeFile(p, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(s.data()), s.size()));
+    return mischief::writeWholeFile(p, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(s.data()), s.size()));
 }
 
 }  // namespace
 
-TEST_CASE("ini: parse, get, set keeps comments, order and unknown keys") {
-    IniFile ini = IniFile::parse(
-        "; TM Port settings\r\n"
-        "[Engine]\r\n"
-        "data = D:\\Games\\TMTWINCD ; not a comment\r\n"
-        "window_scale=3\r\n"
-        "\r\n"
-        "[custom]\r\n"
-        "foo = bar\r\n");
-    CHECK(ini.get("engine", "DATA") == "D:\\Games\\TMTWINCD ; not a comment");
-    CHECK(ini.get("ENGINE", "window_scale") == "3");
-    CHECK(ini.get("engine", "missing") == std::nullopt);
-    ini.set("engine", "window_scale", "2");
-    ini.set("engine", "integer_scale", "true");
-    ini.set("input", "mode", "first-event");
-    const std::string t = ini.text();
-    CHECK(t ==
-          "; TM Port settings\n"
-          "[Engine]\n"
-          "data = D:\\Games\\TMTWINCD ; not a comment\n"
-          "window_scale = 2\n"
-          "integer_scale = true\n"
-          "\n"
-          "[custom]\n"
-          "foo = bar\n"
-          "\n"
-          "[input]\n"
-          "mode = first-event\n");
-    IniFile again = IniFile::parse(t);
-    CHECK(again.get("input", "mode") == "first-event");
-    CHECK(again.get("custom", "foo") == "bar");
-}
-
 TEST_CASE("settings: defaults, round trip, bad values") {
-    const EngineSettings d = EngineSettings::fromIni(IniFile{});
+    const EngineSettings d = EngineSettings::fromIni(mischief::save::IniFile{});
     CHECK(d == EngineSettings{});
     CHECK(d.inputMode == InputModeSetting::Lossless);
     CHECK(d.pauseOnFocusLoss);
@@ -83,11 +50,11 @@ TEST_CASE("settings: defaults, round trip, bad values") {
     s.midiBackend = MidiBackend::Null;
     s.importedOriginal = true;
     s.importFrom = "E:\\old\\users.dat";
-    IniFile ini;
+    mischief::save::IniFile ini;
     s.toIni(ini);
-    CHECK(EngineSettings::fromIni(IniFile::parse(ini.text())) == s);
+    CHECK(EngineSettings::fromIni(mischief::save::IniFile::parse(ini.text())) == s);
 
-    const EngineSettings bad = EngineSettings::fromIni(IniFile::parse(
+    const EngineSettings bad = EngineSettings::fromIni(mischief::save::IniFile::parse(
         "[engine]\nwindow_scale = huge\npause_on_focus_loss = maybe\ncursor_scale = 99\n[input]\nmode = ???\n"
         "[audio]\nmidi_set = b\nmidi_backend = WinMM\n"));
     CHECK(bad.windowScale == 2);
@@ -121,10 +88,10 @@ TEST_CASE("settings: one-time import of the original users.dat") {
 
     std::vector<uint8_t> bytes(kFileSize);
     for (size_t i = 0; i < bytes.size(); ++i) bytes[i] = static_cast<uint8_t>(i * 31);
-    REQUIRE(writeWholeFile(source, bytes));
+    REQUIRE(mischief::writeWholeFile(source, bytes));
     CHECK(importOriginalUsersDat(s, source, dest) == ImportResult::Imported);
     CHECK(s.importedOriginal);
-    CHECK(readWholeFile(dest) == bytes);  // byte for byte
+    CHECK(mischief::readWholeFile(dest) == bytes);  // byte for byte
     CHECK(importOriginalUsersDat(s, source, dest) == ImportResult::AlreadyDone);
 
     EngineSettings fresh;
@@ -134,13 +101,13 @@ TEST_CASE("settings: one-time import of the original users.dat") {
     // loadSettingsAndImport records the flag in tmport.ini (and keeps the user's other lines).
     const fs::path pref = dir / "pref2";
     const Paths paths = Paths::under(pref, dir / "noexe");
-    REQUIRE(writeText(paths.iniPath, "; mine\n[saves]\nimport_from = " + pathToUtf8(source) + "\n"));
+    REQUIRE(writeText(paths.iniPath, "; mine\n[saves]\nimport_from = " + mischief::pathToUtf8(source) + "\n"));
     ImportResult r{};
     const EngineSettings loaded = loadSettingsAndImport(paths, &r);
     CHECK(r == ImportResult::Imported);
     CHECK(loaded.importedOriginal);
-    CHECK(readWholeFile(paths.usersDat) == bytes);
-    const auto ini = IniFile::load(paths.iniPath);
+    CHECK(mischief::readWholeFile(paths.usersDat) == bytes);
+    const auto ini = mischief::save::IniFile::load(paths.iniPath);
     REQUIRE(ini);
     CHECK(ini->get("saves", "imported_original") == "true");
     CHECK(ini->text().rfind("; mine\n", 0) == 0);
@@ -168,11 +135,11 @@ TEST_CASE("settings -> EngineConfig") {
     // [debug]: show_treasure starts with the boxes on and enables F9; keys only enables F9.
     CHECK_FALSE(c.debugKeys);
     CHECK_FALSE(c.showTreasure);
-    const EngineSettings dbg = EngineSettings::fromIni(IniFile::parse("[debug]\nshow_treasure = true\n"));
+    const EngineSettings dbg = EngineSettings::fromIni(mischief::save::IniFile::parse("[debug]\nshow_treasure = true\n"));
     CHECK(dbg.showTreasure);
     CHECK(engineConfigFromSettings(dbg).showTreasure);
     CHECK(engineConfigFromSettings(dbg).debugKeys);
-    const EngineSettings keys = EngineSettings::fromIni(IniFile::parse("[DEBUG]\nKeys = true\n"));
+    const EngineSettings keys = EngineSettings::fromIni(mischief::save::IniFile::parse("[DEBUG]\nKeys = true\n"));
     CHECK(engineConfigFromSettings(keys).debugKeys);
     CHECK_FALSE(engineConfigFromSettings(keys).showTreasure);
     CHECK(parseInputMode("first-event", InputMode::Lossless) == InputMode::FirstEventPerDrain);
@@ -181,29 +148,8 @@ TEST_CASE("settings -> EngineConfig") {
     CHECK(loadEngineSettings(tempDir("noini") / "tmport.ini") == EngineSettings{});
 }
 
-TEST_CASE("ini (REVIEW_1 H-1): tmport.ini is replaced atomically and the previous file kept as .bak") {
-    const fs::path dir = tempDir("ini_atomic");
-    const fs::path path = dir / "tmport.ini";
-    IniFile a = IniFile::parse("; mine\n[engine]\nfullscreen = true\n");
-    REQUIRE(a.save(path));
-    CHECK_FALSE(fs::exists(backupPathFor(path)));
-    IniFile b = a;
-    b.set("engine", "fullscreen", "false");
-    REQUIRE(b.save(path));
-    CHECK(IniFile::load(path)->get("engine", "fullscreen") == "false");
-    const auto bak = IniFile::load(backupPathFor(path));
-    REQUIRE(bak);
-    CHECK(bak->get("engine", "fullscreen") == "true");
-    CHECK_FALSE(fs::exists(dir / "tmport.ini.tmp"));
-    // A failed save leaves the file as it was.
-    fs::create_directories(dir / "tmport.ini.tmp");
-    b.set("engine", "window_scale", "3");
-    CHECK_FALSE(b.save(path));
-    CHECK_FALSE(IniFile::load(path)->get("engine", "window_scale"));
-}
-
 TEST_CASE("settings: [engine] edition and the [dos] section") {
-    const EngineSettings d = EngineSettings::fromIni(IniFile{});
+    const EngineSettings d = EngineSettings::fromIni(mischief::save::IniFile{});
     CHECK_FALSE(d.edition);
     CHECK(d.dosDataPath.empty());
     CHECK(d.dos == dos::DosSettings{});
@@ -214,7 +160,7 @@ TEST_CASE("settings: [engine] edition and the [dos] section") {
     CHECK_FALSE(d.dos.squarePixels);
     CHECK(d.dos.windowScale == 3);
 
-    const EngineSettings s = EngineSettings::fromIni(IniFile::parse(
+    const EngineSettings s = EngineSettings::fromIni(mischief::save::IniFile::parse(
         "[engine]\nedition = DOS\n"
         "[dos]\ndata = D:\\TM-DOS\nlook = Tandy\nsound = speaker\nslow_cpu = yes\nframe_speed = period\n"
         "square_pixels = true\nwindow_scale = 5\n"));
@@ -228,22 +174,22 @@ TEST_CASE("settings: [engine] edition and the [dos] section") {
     CHECK(s.dos.windowScale == 5);
     // The Windows keys are not touched by the new ones.
     CHECK(s.windowScale == 2);
-    CHECK(EngineSettings::fromIni(IniFile::parse("[engine]\nedition = win\n")).edition == Edition::WinCd);
-    CHECK_FALSE(EngineSettings::fromIni(IniFile::parse("[engine]\nedition = auto\n")).edition);
+    CHECK(EngineSettings::fromIni(mischief::save::IniFile::parse("[engine]\nedition = win\n")).edition == Edition::WinCd);
+    CHECK_FALSE(EngineSettings::fromIni(mischief::save::IniFile::parse("[engine]\nedition = auto\n")).edition);
 
     // Round trip.
-    IniFile ini;
+    mischief::save::IniFile ini;
     s.toIni(ini);
-    CHECK(EngineSettings::fromIni(IniFile::parse(ini.text())) == s);
+    CHECK(EngineSettings::fromIni(mischief::save::IniFile::parse(ini.text())) == s);
     EngineSettings autoEd = s;
     autoEd.edition.reset();
-    IniFile ini2;
+    mischief::save::IniFile ini2;
     autoEd.toIni(ini2);
     CHECK(ini2.get("engine", "edition") == "auto");
-    CHECK(EngineSettings::fromIni(IniFile::parse(ini2.text())) == autoEd);
+    CHECK(EngineSettings::fromIni(mischief::save::IniFile::parse(ini2.text())) == autoEd);
 
     // Bad values keep their defaults.
-    const EngineSettings bad = EngineSettings::fromIni(IniFile::parse(
+    const EngineSettings bad = EngineSettings::fromIni(mischief::save::IniFile::parse(
         "[engine]\nedition = amiga\n[dos]\nlook = svga\nsound = gus\nslow_cpu = sometimes\nframe_speed = turbo\n"
         "window_scale = 0\n"));
     CHECK_FALSE(bad.edition);

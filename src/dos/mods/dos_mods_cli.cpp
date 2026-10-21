@@ -10,8 +10,8 @@
 #include "dos/mods/dos_mod_kit.h"
 #include "dos/mods/dos_mods.h"
 #include "edition/edition.h"
-#include "util/error.h"
-#include "util/file_util.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
 
 namespace tmport::dos {
 
@@ -31,13 +31,13 @@ std::optional<std::filesystem::path> dosModsDataPath(const std::string& dataArg,
     std::filesystem::path p;
     std::optional<std::string> iniData;
     if (!paths.iniPath.empty())
-        if (auto ini = save::IniFile::load(paths.iniPath)) iniData = ini->get("dos", "data");
+        if (auto ini = mischief::save::IniFile::load(paths.iniPath)) iniData = ini->get("dos", "data");
     if (!dataArg.empty()) {
-        p = pathFromUtf8(dataArg);
-    } else if (auto env = getEnv("TM_DATA_DOS"); env && !env->empty()) {
-        p = pathFromUtf8(*env);
+        p = mischief::pathFromUtf8(dataArg);
+    } else if (auto env = mischief::getEnv("TM_DATA_DOS"); env && !env->empty()) {
+        p = mischief::pathFromUtf8(*env);
     } else if (iniData && !iniData->empty()) {
-        p = pathFromUtf8(*iniData);
+        p = mischief::pathFromUtf8(*iniData);
     } else if (auto d = autoDetectDosPath(exeDir)) {
         p = *d;
     } else {
@@ -50,7 +50,7 @@ int runDosModsCommand(const DosModsCommand& c) {
     const char* base = SDL_GetBasePath();
     std::optional<std::filesystem::path> folder;
     try {
-        folder = dosModsDataPath(c.dataArg, c.paths, base ? pathFromUtf8(base) : std::filesystem::path());
+        folder = dosModsDataPath(c.dataArg, c.paths, base ? mischief::pathFromUtf8(base) : std::filesystem::path());
     } catch (const std::exception& e) {
         std::fprintf(stderr, "tmport: %s\n", e.what());
         return 3;
@@ -63,11 +63,11 @@ int runDosModsCommand(const DosModsCommand& c) {
         const DosFiles originals = DosFiles::open(*folder, nullptr);
         if (c.exportKit) {
             const auto t0 = std::chrono::steady_clock::now();
-            out("Exporting the DOS mod kit of {} to {}{}\n", pathToUtf8(*folder), c.outDir, c.verify ? " (with round-trip check)" : "");
+            out("Exporting the DOS mod kit of {} to {}{}\n", mischief::pathToUtf8(*folder), c.outDir, c.verify ? " (with round-trip check)" : "");
             DosModKitOptions o;
             o.force = c.force;
             o.verify = c.verify;
-            const DosModKitReport r = exportDosModKit(originals, pathFromUtf8(c.outDir), o);
+            const DosModKitReport r = exportDosModKit(originals, mischief::pathFromUtf8(c.outDir), o);
             for (const auto& [g, n] : r.counts) out("  {:<7} {:>5} files\n", g, n);
             const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
             out("{} files, {:.1f} MB in {:.1f} s\n", r.files, static_cast<double>(r.bytes) / (1024.0 * 1024.0), secs);
@@ -92,10 +92,10 @@ int runDosModsCommand(const DosModsCommand& c) {
         DosFileSet files = originals.fileSet();
         const DosModsReport rep = applyDosModFolders(folders, exe, files);
         out("DOS mod folders ({}):\n", rep.folders.size());
-        for (const auto& d : rep.folders) out("  {}\n", pathToUtf8(d));
+        for (const auto& d : rep.folders) out("  {}\n", mischief::pathToUtf8(d));
         if (rep.folders.empty()) {
             out("  (none found; looked in:");
-            for (const auto& d : dirs) out(" {}", pathToUtf8(d));
+            for (const auto& d : dirs) out(" {}", mischief::pathToUtf8(d));
             out(")\n");
         }
         std::string changed;
@@ -116,7 +116,7 @@ int runDosModsCommand(const DosModsCommand& c) {
         }
         out("Result: {}\n", rep.errors.empty() ? "OK" : "PROBLEMS FOUND");
         return rep.errors.empty() ? 0 : 1;
-    } catch (const MissingFileError& e) {
+    } catch (const mischief::MissingFileError& e) {
         std::fprintf(stderr, "tmport: missing game file %s: %s\n", e.file().c_str(), e.what());
         return 3;
     } catch (const std::exception& e) {

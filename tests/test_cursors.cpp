@@ -8,10 +8,10 @@
 
 #include "data/dgroup_offsets.h"
 #include "input/cursors.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/png_writer.h"
 #include "test_data.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/png_writer.h"
 
 using namespace tmport;
 
@@ -100,9 +100,9 @@ TEST_CASE("cursor decode: synthetic Win16 cursor (both DIB header kinds)") {
     // Rejected input.
     auto bad = makeCursor(kArrow, 0, 0);
     put32(bad, 4, 64);
-    CHECK_THROWS_AS(decodeCursorResource(bad), FormatError);
-    CHECK_THROWS_AS(decodeCursorResource(makeCursor(kArrow, 16, 0)), FormatError);  // hot spot outside
-    CHECK_THROWS_AS(decodeCursorResource(std::vector<uint8_t>(20, 0)), FormatError);
+    CHECK_THROWS_AS(decodeCursorResource(bad), mischief::FormatError);
+    CHECK_THROWS_AS(decodeCursorResource(makeCursor(kArrow, 16, 0)), mischief::FormatError);  // hot spot outside
+    CHECK_THROWS_AS(decodeCursorResource(std::vector<uint8_t>(20, 0)), mischief::FormatError);
 }
 
 TEST_CASE("cursor decode: the EXE's cursors 128-130") {
@@ -159,7 +159,7 @@ TEST_CASE("cursor decode: the EXE's cursors 128-130") {
     CHECK(set.image(1)->pixels == imgs[1].pixels);
     CHECK(set.image(3) == nullptr);
 
-    if (auto dir = getEnv("TM_CURSOR_DUMP")) {
+    if (auto dir = mischief::getEnv("TM_CURSOR_DUMP")) {
         for (int i = 0; i < 3; ++i)
             for (int scale : {1, 4}) {
                 const auto px = imgs[static_cast<size_t>(i)].rgba(scale);
@@ -167,8 +167,8 @@ TEST_CASE("cursor decode: the EXE's cursors 128-130") {
                 std::vector<uint8_t> out(px.size());
                 for (size_t k = 0; k < px.size(); k += 4)
                     for (size_t c = 0; c < 4; ++c) out[k + c] = c == 3 ? 255 : (px[k + 3] ? px[k + c] : 128);
-                const auto path = pathFromUtf8(*dir) / std::format("cursor_{}_x{}.png", ids[static_cast<size_t>(i)], scale);
-                CHECK(png::writeRgba(path, 32 * scale, 32 * scale, out));
+                const auto path = mischief::pathFromUtf8(*dir) / std::format("cursor_{}_x{}.png", ids[static_cast<size_t>(i)], scale);
+                CHECK(mischief::png::writeRgba(path, 32 * scale, 32 * scale, out));
             }
     }
 }

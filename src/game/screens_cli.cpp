@@ -19,6 +19,10 @@
 #include "game/rules.h"
 #include "game/signin.h"
 #include "game/title.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
+#include "mischief/vfs/data_source.h"
 #include "platform/engine.h"
 #include "res/game_files.h"
 #include "save/settings.h"
@@ -26,10 +30,6 @@
 #include "text/font.h"
 #include "text/text_renderer.h"
 #include "ui/game_dialog.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/log.h"
-#include "vfs/data_source.h"
 
 namespace tmport::game {
 
@@ -154,7 +154,7 @@ bool parseScript(const std::string& text, std::vector<Action>& actions, std::str
 // Plays the script on the manual clock: called from every ManualClock::sleepMs.
 class ScriptDriver {
 public:
-    ScriptDriver(Engine& engine, ManualClock& clock, std::vector<Action> actions, std::filesystem::path outDir,
+    ScriptDriver(Engine& engine, mischief::ManualClock& clock, std::vector<Action> actions, std::filesystem::path outDir,
                  uint64_t maxMs)
         : engine_(engine), clock_(clock), actions_(std::move(actions)), outDir_(std::move(outDir)), maxMs_(maxMs),
           start_(clock.nowMs()) {}
@@ -171,9 +171,9 @@ public:
                 case Action::Shot: {
                     const auto path = outDir_ / (a.name + ".png");
                     if (engine_.presenter().writeGameAreaPng(path))
-                        out("[{:>7} ms] shot {}\n", t, pathToUtf8(path));
+                        out("[{:>7} ms] shot {}\n", t, mischief::pathToUtf8(path));
                     else
-                        out("[{:>7} ms] shot {} FAILED\n", t, pathToUtf8(path));
+                        out("[{:>7} ms] shot {} FAILED\n", t, mischief::pathToUtf8(path));
                     break;
                 }
                 case Action::End: throw ScriptEnd{false};
@@ -184,7 +184,7 @@ public:
 
 private:
     Engine& engine_;
-    ManualClock& clock_;
+    mischief::ManualClock& clock_;
     std::vector<Action> actions_;
     size_t next_ = 0;
     std::filesystem::path outDir_;
@@ -197,18 +197,18 @@ private:
 // The wave voice timed on the manual clock: a sound "plays" for its length; nothing is heard.
 class ClockWaveOutput final : public audio::WaveOutput {
 public:
-    explicit ClockWaveOutput(Clock& clock) : clock_(clock) {}
+    explicit ClockWaveOutput(mischief::Clock& clock) : clock_(clock) {}
     bool available() const override { return true; }
     void start(const audio::Sound& s) override { end_ = clock_.nowMs() + s.durationUs() / 1000; }
     void stop() override { end_ = 0; }
     bool done() override { return clock_.nowMs() >= end_; }
 
 private:
-    Clock& clock_;
+    mischief::Clock& clock_;
     uint64_t end_ = 0;
 };
 
-std::unique_ptr<audio::AudioSystem> makeSilentAudio(GameFiles& files, ManualClock& clock) {
+std::unique_ptr<audio::AudioSystem> makeSilentAudio(GameFiles& files, mischief::ManualClock& clock) {
     audio::AudioParts parts;
     parts.wave = std::make_unique<ClockWaveOutput>(clock);
     parts.sounds = std::make_unique<audio::ResourceSoundLoader>(*files.res);
@@ -239,7 +239,7 @@ std::optional<Args> parseArgs(int argc, char** argv, std::string& error) {
             a.keys += " " + next("--keys");
         } else if (s == "--keys-file") {
             const std::string f = next("--keys-file");
-            std::ifstream in(pathFromUtf8(f));
+            std::ifstream in(mischief::pathFromUtf8(f));
             if (!in) error = std::format("cannot read {}", f);
             std::stringstream ss;
             ss << in.rdbuf();
@@ -282,24 +282,24 @@ std::optional<Args> parseArgs(int argc, char** argv, std::string& error) {
 }
 
 std::optional<std::filesystem::path> resolveDataPath(const Args& a) {
-    if (!a.dataPath.empty()) return pathFromUtf8(a.dataPath);
-    if (auto env = getEnv("TM_DATA")) return pathFromUtf8(*env);
+    if (!a.dataPath.empty()) return mischief::pathFromUtf8(a.dataPath);
+    if (auto env = mischief::getEnv("TM_DATA")) return mischief::pathFromUtf8(*env);
     const char* base = SDL_GetBasePath();
-    return vfs::autoDetectDataPath(base ? pathFromUtf8(base) : std::filesystem::path());
+    return mischief::vfs::autoDetectDataPath(base ? mischief::pathFromUtf8(base) : std::filesystem::path());
 }
 
-int runScreens(const Args& a, GameFiles& files, gfx::ColorMode mode) {
+int runScreens(const Args& a, GameFiles& files, mischief::gfx::ColorMode mode) {
     std::vector<Action> actions;
     std::string error;
     if (!parseScript(a.keys, actions, error)) {
         std::fprintf(stderr, "tmport: %s\n", error.c_str());
         return 2;
     }
-    const std::filesystem::path outDir = pathFromUtf8(a.outDir);
+    const std::filesystem::path outDir = mischief::pathFromUtf8(a.outDir);
     std::error_code ec;
     std::filesystem::create_directories(outDir, ec);
 
-    ManualClock clock(1000);
+    mischief::ManualClock clock(1000);
     EngineConfig cfg;
     cfg.clock = &clock;
     Engine engine(files, mode, cfg);  // headless: no window
@@ -331,7 +331,7 @@ int runScreens(const Args& a, GameFiles& files, gfx::ColorMode mode) {
         state.options.voiceOn = audio->settings().voiceOn;
     }
     save::Paths paths;
-    paths.usersDat = a.users.empty() ? outDir / "users.dat" : pathFromUtf8(a.users);
+    paths.usersDat = a.users.empty() ? outDir / "users.dat" : mischief::pathFromUtf8(a.users);
 
     AppContext ctx{engine, files, font, text, dialogs};
     ctx.audio = audio.get();
@@ -403,7 +403,7 @@ std::optional<int> runScreensCommand(int argc, char** argv) {
         std::fprintf(stderr, "tmport: %s\n\n%s", error.c_str(), screensUsage().c_str());
         return 2;
     }
-    log::setVerbose(a->verbose);
+    mischief::log::setVerbose(a->verbose);
     const auto dataPath = resolveDataPath(*a);
     if (!dataPath) {
         std::fprintf(stderr, "tmport: the game data was not found. Pass --data <folder or CD image> or set TM_DATA.\n");
@@ -411,12 +411,12 @@ std::optional<int> runScreensCommand(int argc, char** argv) {
     }
     try {
         ResourceManager::Options ro;
-        ro.colorMode = a->colour16 ? gfx::ColorMode::Colour16 : gfx::ColorMode::Colour256;
+        ro.colorMode = a->colour16 ? mischief::gfx::ColorMode::Colour16 : mischief::gfx::ColorMode::Colour256;
         ro.requireSounds = false;
         GameFiles files = GameFiles::open(*dataPath, ro);
         cli::applyToolMods(files, a->modDirs);
         return runScreens(*a, files, ro.colorMode);
-    } catch (const MissingFileError& e) {
+    } catch (const mischief::MissingFileError& e) {
         std::fprintf(stderr, "tmport: missing game file %s: %s\n", e.file().c_str(), e.what());
         return 3;
     } catch (const std::exception& e) {

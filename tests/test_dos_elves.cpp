@@ -33,7 +33,7 @@ using namespace tmport::dos;
 namespace {
 
 int randCallsBetween(uint32_t from, uint32_t to, int limit = 200) {
-    BorlandRand r;
+    mischief::BorlandRand r;
     r.setRawSeed(from);
     for (int n = 0; n <= limit; ++n) {
         if (r.seed() == to) return n;
@@ -73,7 +73,7 @@ Elf& prepareElf(DosGame& g, int i, uint16_t base, uint16_t state, uint16_t slot,
 // A rand() seed whose next value has (rand() & mask) == want (or != want when `equal` is false).
 uint32_t seedWithNext(int mask, int want, bool equal = true) {
     for (uint32_t s = 1; s < 100000; ++s) {
-        BorlandRand r;
+        mischief::BorlandRand r;
         r.setRawSeed(s);
         if (((r.rand() & mask) == want) == equal) return s;
     }
@@ -120,7 +120,7 @@ TEST_CASE("dos elves: Elves_Spawn order A, D, B, C with one rand() each; x, y, d
     CHECK(g.elves.elfActiveCount == 15);
     const int n = cnt[0] + cnt[1] + cnt[2] + cnt[3];
     CHECK(randCallsBetween(4242, g.rand.seed()) == n);
-    BorlandRand r;
+    mischief::BorlandRand r;
     r.setRawSeed(4242);
     const auto& range = g.tables.elves.levelXRange[0];
     int i = 0;
@@ -715,7 +715,7 @@ TEST_CASE("dos elves: coin creature appears, is collected (+2, respawn rand) or 
     CHECK(e.state == 25);
     CHECK(e.spriteSlot == 0);
     CHECK(randCallsBetween(s, g.rand.seed()) == 1);
-    BorlandRand r;
+    mischief::BorlandRand r;
     r.setRawSeed(s);
     const auto& range = g.tables.elves.levelXRange[1];
     CHECK(e.obj.x == ((r.rand() & range[2]) + range[0]));

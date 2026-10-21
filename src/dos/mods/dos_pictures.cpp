@@ -9,14 +9,14 @@
 #include "dos/gfx/pak.h"
 #include "dos/gfx/palettes.h"
 #include "dos/gfx/pan.h"
-#include "mods/png_codec.h"
-#include "util/error.h"
+#include "mischief/mods/png_codec.h"
+#include "mischief/util/error.h"
 
 namespace tmport::dos {
 
 namespace {
 
-[[noreturn]] void fail(const std::string& name, const std::string& why) { throw FormatError(std::format("{}: {}", name, why)); }
+[[noreturn]] void fail(const std::string& name, const std::string& why) { throw mischief::FormatError(std::format("{}: {}", name, why)); }
 
 void put16(std::vector<uint8_t>& v, size_t at, uint16_t x) {
     v[at] = static_cast<uint8_t>(x & 0xFF);
@@ -28,7 +28,7 @@ void push16(std::vector<uint8_t>& v, uint16_t x) {
     v.push_back(static_cast<uint8_t>(x >> 8));
 }
 
-int distance2(const Rgb8& a, const Rgb8& b) {
+int distance2(const mischief::Rgb8& a, const mischief::Rgb8& b) {
     const int dr = a.r - b.r, dg = a.g - b.g, db = a.b - b.b;
     return dr * dr + dg * dg + db * db;
 }
@@ -54,11 +54,11 @@ std::vector<uint8_t> logicalToPng(const LogicalImage& img, const DosColours& col
         alpha.assign(colours.size(), 255);
         alpha[0] = 0;
     }
-    return mods::encodePngIndexed(img.width, img.height, img.pixels, colours, alpha);
+    return mischief::mods::encodePngIndexed(img.width, img.height, img.pixels, colours, alpha);
 }
 
 LogicalImage pngToLogical(std::span<const uint8_t> png, const DosColours& colours, bool sprite) {
-    const mods::DecodedPng d = mods::decodePng(png);
+    const mischief::mods::DecodedPng d = mischief::mods::decodePng(png);
     LogicalImage img;
     img.width = d.width;
     img.height = d.height;
@@ -71,7 +71,7 @@ LogicalImage pngToLogical(std::span<const uint8_t> png, const DosColours& colour
         for (size_t i = 0; i < d.indices.size(); ++i) {
             const uint8_t v = d.indices[i];
             if (v >= colours.size())
-                throw FormatError(std::format("pixel ({}, {}) uses palette entry {}: the DOS pictures have 16 colours (0-15)",
+                throw mischief::FormatError(std::format("pixel ({}, {}) uses palette entry {}: the DOS pictures have 16 colours (0-15)",
                                               i % static_cast<size_t>(d.width), i / static_cast<size_t>(d.width), v));
             img.pixels[i] = v;
             used.insert(v);
@@ -85,12 +85,12 @@ LogicalImage pngToLogical(std::span<const uint8_t> png, const DosColours& colour
         seen.insert(static_cast<uint32_t>(p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24)));
         if (p[3] < 128) {
             if (!sprite)
-                throw FormatError(std::format("pixel ({}, {}) is transparent: scenery pictures have no transparency",
+                throw mischief::FormatError(std::format("pixel ({}, {}) is transparent: scenery pictures have no transparency",
                                               i % static_cast<size_t>(d.width), i / static_cast<size_t>(d.width)));
             img.pixels[i] = 0;
             continue;
         }
-        const Rgb8 c{p[0], p[1], p[2]};
+        const mischief::Rgb8 c{p[0], p[1], p[2]};
         int best = 0, bestD = distance2(c, colours[0]);
         for (int k = 1; k < static_cast<int>(colours.size()); ++k) {
             const int dk = distance2(c, colours[static_cast<size_t>(k)]);
@@ -123,11 +123,11 @@ PakFrameHeader pakFrameHeader(const PakFrame& f) {
 }
 
 std::vector<uint8_t> encodePakFrame(const LogicalImage& img, const PakFrameHeader& h) {
-    if (img.width <= 0 || img.height <= 0) throw FormatError("a frame needs at least one pixel");
-    if (img.width % 2 != 0) throw FormatError(std::format("width {} is odd: frames are stored 2 pixels per byte", img.width));
-    if (img.width / 2 > 0x7FFF || img.height > 0x7FFF) throw FormatError("frame too large");
+    if (img.width <= 0 || img.height <= 0) throw mischief::FormatError("a frame needs at least one pixel");
+    if (img.width % 2 != 0) throw mischief::FormatError(std::format("width {} is odd: frames are stored 2 pixels per byte", img.width));
+    if (img.width / 2 > 0x7FFF || img.height > 0x7FFF) throw mischief::FormatError("frame too large");
     if (h.xOffset < -32768 || h.xOffset > 32767 || h.yOffset < -32768 || h.yOffset > 32767)
-        throw FormatError("hotspot offset outside -32768..32767");
+        throw mischief::FormatError("hotspot offset outside -32768..32767");
     const int wb = img.width / 2;
     std::vector<uint8_t> out;
     push16(out, h.word0);
@@ -161,7 +161,7 @@ std::vector<uint8_t> encodePakFrame(const LogicalImage& img, const PakFrameHeade
             out.push_back(static_cast<uint8_t>(0x80 | wb));
             out.insert(out.end(), row.begin(), row.end());
         } else {
-            throw FormatError(std::format("row {} cannot be stored: {} bytes wide (raw rows hold 127) with {} colour runs "
+            throw mischief::FormatError(std::format("row {} cannot be stored: {} bytes wide (raw rows hold 127) with {} colour runs "
                                           "(run rows hold 63)",
                                           y, wb, runs.size()));
         }
@@ -200,7 +200,7 @@ PakRebuild rebuildPak(std::span<const uint8_t> base, const std::map<int, PakFram
             if (!same) {
                 try {
                     enc = encodePakFrame(img, h);
-                } catch (const FormatError& ex) {
+                } catch (const mischief::FormatError& ex) {
                     fail(name, std::format("frame {}: {}", k, ex.what()));
                 }
             }
@@ -262,7 +262,7 @@ LogicalImage panPicture(const PanContent& c, int k) {
 
 std::vector<uint8_t> encodePan(const PanContent& c) {
     const size_t pictureWords = static_cast<size_t>(c.width) * c.height;
-    if (c.map.size() != pictureWords * static_cast<size_t>(c.pictures)) throw FormatError("PAN map size does not match its pictures");
+    if (c.map.size() != pictureWords * static_cast<size_t>(c.pictures)) throw mischief::FormatError("PAN map size does not match its pictures");
     std::vector<uint8_t> mapStream;
     std::map<std::vector<uint16_t>, size_t> firstRow;  // row entries -> word index of its first occurrence
     std::vector<uint16_t> row(static_cast<size_t>(c.width));
@@ -272,7 +272,7 @@ std::vector<uint8_t> encodePan(const PanContent& c) {
             const size_t start = static_cast<size_t>(p) * pictureWords + r;
             for (int col = 0; col < c.width; ++col) {
                 const uint16_t v = c.map[start + static_cast<size_t>(col) * c.height];
-                if (v >= 0x0FFF) throw FormatError(std::format("PAN map entry {:#x} is too large (tiles 0-2046)", v));
+                if (v >= 0x0FFF) throw mischief::FormatError(std::format("PAN map entry {:#x} is too large (tiles 0-2046)", v));
                 row[static_cast<size_t>(col)] = v;
             }
             words.clear();
@@ -307,7 +307,7 @@ std::vector<uint8_t> encodePan(const PanContent& c) {
             ++i;
         }
     }
-    if (mapStream.size() > 0xFFFF || tileStream.size() > 0xFFFF) throw FormatError("PAN packed data larger than 64 KB");
+    if (mapStream.size() > 0xFFFF || tileStream.size() > 0xFFFF) throw mischief::FormatError("PAN packed data larger than 64 KB");
     std::vector<uint8_t> file;
     push16(file, static_cast<uint16_t>(mapStream.size()));
     push16(file, static_cast<uint16_t>(c.width));
@@ -382,14 +382,14 @@ PanRebuild rebuildPan(std::span<const uint8_t> base, const std::map<int, Logical
 
     try {
         r.file = encodePan(c);
-    } catch (const FormatError& e) {
+    } catch (const mischief::FormatError& e) {
         fail(name, e.what());
     }
     // Unpack the result the way the game does and compare.
     PanContent back;
     try {
         back = panContent(PanFile::load(r.file, name));
-    } catch (const FormatError& e) {
+    } catch (const mischief::FormatError& e) {
         fail(name, std::format("the game could not unpack the new file ({})", e.what()));
     }
     if (back.map != c.map || back.tiles != c.tiles)

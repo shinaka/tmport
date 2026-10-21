@@ -9,7 +9,7 @@
 #include <windows.h>
 #include <mmsystem.h>
 
-#include "util/log.h"
+#include "mischief/util/log.h"
 
 namespace tmport::audio {
 
@@ -25,7 +25,7 @@ public:
         HMIDIOUT h = nullptr;
         const MMRESULT r = midiOutOpen(&h, MIDI_MAPPER, 0, 0, CALLBACK_NULL);
         if (r != MMSYSERR_NOERROR) {
-            log::warn("midi: midiOutOpen(MIDI_MAPPER) failed ({}); music is disabled", static_cast<unsigned>(r));
+            mischief::log::warn("midi: midiOutOpen(MIDI_MAPPER) failed ({}); music is disabled", static_cast<unsigned>(r));
             return false;
         }
         handle_ = h;

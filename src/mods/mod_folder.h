@@ -22,7 +22,7 @@
 #include <utility>
 #include <vector>
 
-#include "gfx/palette.h"
+#include "mischief/gfx/palette.h"
 #include "res/resource_types.h"
 
 namespace tmport::mods {

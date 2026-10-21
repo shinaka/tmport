@@ -12,15 +12,16 @@
 #include <span>
 
 #include "dos/audio/adlib_driver.h"
-#include "dos/audio/opl_chip.h"
-#include "dos/audio/opl_output.h"
+#include "mischief/dos/audio/opl_chip.h"
+#include "mischief/dos/audio/opl_output.h"
 
 namespace tmport::dos {
 
 struct SoundTables;
 
-// The OPL output stage (render, skip: dos/audio/opl_output.h) with the driver calls of the sequencer.
-class OplBackend : public OplOutput {
+// The OPL output stage (render, skip: mischief/dos/audio/opl_output.h) with the driver calls of the
+// sequencer.
+class OplBackend : public mischief::dos::OplOutput {
 public:
     virtual void init() {}                                  // 4ac9:00b7 AdLib_Init
     virtual void playTune(int tune, int variant) = 0;       // 4ac9:0002 AdLib_PlayTune (variant = rand() & 3)
@@ -43,7 +44,7 @@ public:
 // back are ceil(duration / tick + 0.2) - 1: 1 for 3 to 6 used channels, 2 for 7 to 9 (all 14 tune
 // starts of the capture; the orchestrations use 6 to 9). playTuneTicks() reports it to the sequencer,
 // which holds the tune back as long.
-class AdLibOpl final : public OplBackend, private OplWriter {
+class AdLibOpl final : public OplBackend, private mischief::dos::OplWriter {
 public:
     static constexpr double kPlayTuneWriteSeconds = 76.3e-6;  // AdLib_PlayTune per register write
     static constexpr double kCallPhase = 0.2;                  // PIT ticks from the interrupt to the call
@@ -68,7 +69,7 @@ public:
 private:
     void oplWrite(uint8_t reg, uint8_t value) override;
 
-    OplChip chip_;
+    mischief::dos::OplChip chip_;
     AdLibDriver driver_;
     std::function<void(uint8_t, uint8_t)> observer_;
     size_t writes_ = 0;  // register writes so far

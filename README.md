@@ -12,13 +12,16 @@ the engine reads everything game-specific from your copy of the Windows CD editi
 TM Port is not affiliated with or endorsed by The Learning Company or any later owner of
 *Treasure Mountain!*.
 
+The engine core that TM Port shares with a port of *Super Solvers: Gizmos & Gadgets!* lives in a
+repository of its own, MischiefEngine; see [The engine](#the-engine).
+
 Contents: [Features](#features) · [Requirements](#requirements) ·
 [Getting started](#getting-started) · [Controls](#controls) · [Menus](#menus) ·
 [Saved players](#saved-players) · [Options](#options) ·
 [DOS edition](#dos-edition) · [Modding](#modding) ·
 [Building](#building) · [Command-line tools](#command-line-tools) ·
 [Project layout](#project-layout) · [Status and known differences](#status-and-known-differences) ·
-[Gizmos & Gadgets](#gizmos--gadgets) · [Credits and licences](#credits-and-licences)
+[The engine](#the-engine) · [Credits and licences](#credits-and-licences)
 
 ## Features
 
@@ -54,7 +57,7 @@ Contents: [Features](#features) · [Requirements](#requirements) ·
   and plays with Xcode's Clang.
 * **Music on Linux and macOS** needs a General MIDI SoundFont (`.sf2`), which you supply (see
   [Options](#options)); Windows uses its built-in MIDI synthesizer.
-* **To build it**: CMake 3.24 or newer and a C++20 compiler. See [Building](#building).
+* **To build it**: CMake 3.24 or newer, a C++20 compiler and Git. See [Building](#building).
 
 There are no prebuilt releases at the moment: build the engine from source.
 
@@ -347,10 +350,13 @@ cmake --preset release
 cmake --build --preset release
 ```
 
-The first configure downloads SDL, TinySoundFont, ymfm and doctest (pinned versions, checked by
-SHA-256). [`docs/BUILDING.md`](docs/BUILDING.md) lists the requirements (on Linux, the development
-packages SDL needs), the build outputs (`tmport`, and on Windows also the console program
-`tmport-cli` for scripts), the tests and continuous integration.
+The first configure downloads the engine, [MischiefEngine](#the-engine), at the commit pinned in
+`cmake/engine_pin.cmake`, and through it SDL, ymfm and doctest, plus TinySoundFont (pinned versions,
+checked by SHA-256). A MischiefEngine checkout next to this repository (`../MischiefEngine`), or the
+one `-DMISCHIEF_ENGINE_DIR=<folder>` names, is used instead of the download.
+[`docs/BUILDING.md`](docs/BUILDING.md) lists the requirements (on Linux, the development packages SDL
+needs), the engine's pin and local checkout, the build outputs (`tmport`, and on Windows also the
+console program `tmport-cli` for scripts), the tests and continuous integration.
 
 `scripts\package.bat` / `scripts/package.sh` make a ready-to-play copy with your game data next
 to the engine (see [Getting started](#getting-started)).
@@ -384,12 +390,12 @@ The game itself can also run headless with scripted input (`--headless --keys ".
 
 | Path | Contents |
 |---|---|
-| `src/` | the engine: `src/gg/` is *Gizmos & Gadgets!* (below); the rest is Treasure Mountain and the core both games share: `util`, `vfs` (folders and CD images), `ne` (Windows NE executables), `data` (tables of `TMTWINCD.EXE`), `res` (resources), `gfx`, `text`, `anim`, `input`, `timing`, `audio`, `ui` (dialogs, menu bar), `save`, `game` (the game itself), `mods`, `rtl`, `platform` (SDL), `app` (start-up), `cli` (tools); `docs/DESIGN.md` describes them |
+| `src/` | the engine's Treasure Mountain part (the core is MischiefEngine's, [The engine](#the-engine)): `ne` (Windows NE executables), `data` (tables of `TMTWINCD.EXE`), `res` (resources), `gfx`, `text`, `anim`, `input`, `audio`, `ui` (dialogs, menu bar), `save`, `game` (the game itself), `mods`, `platform`, `app` (start-up), `cli` (tools), `edition`, `dos` (the 1990 DOS edition); `docs/DESIGN.md` describes them |
 | `tests/` | unit tests (doctest); tests that need the game read it from `TM_DATA` (`TM_DATA_DOS` for the DOS edition, `TM_DOS_CAPTURES` for the DOS reference captures) and skip themselves without it |
 | `docs/` | `BUILDING.md` (building, running, tools), `DESIGN.md` (engine conventions), `MODDING.md` |
-| `re/` | the specifications written from the study of the original: `re/docs/ARCHITECTURE.md` first, then `PORTING_NOTES.md` and the topic documents; reviews in `re/reviews/`; `re/gg/docs/` the study of *Gizmos & Gadgets!* (DOS, 1993), the second game (its engine map: `re/gg/docs/ENGINE_MAP.md`) |
-| `tools/` | Python tools used for the study (resource extraction and reference decoders); `tools/dos/` the DOS edition's decoders and its fidelity runner with the scenario files (`tools/dos/README.md`); `tools/gg/` the decoders and Ghidra and capture tools for *Gizmos & Gadgets!* (`tools/gg/README.md`) |
-| `cmake/`, `CMakeLists.txt`, `CMakePresets.json`, `scripts/` | the build |
+| `re/` | the specifications written from the study of the original: `re/docs/ARCHITECTURE.md` first, then `PORTING_NOTES.md` and the topic documents; the DOS edition's in `re/dos/docs/`; reviews in `re/reviews/` |
+| `tools/` | Python tools used for the study (reference decoders of the resources in `tools/assets/`); `tools/dos/` the DOS edition's decoders and its fidelity runner with the scenario files (`tools/dos/README.md`); `tmctl_profiles.json` and the `dosbox_tm*.conf` files (the original under DOSBox-X, driven by the engine's `tmctl.py`); `mischief_engine.py` (finds the engine's tools) and `engine_pin.py` (the engine's pin) |
+| `cmake/`, `CMakeLists.txt`, `CMakePresets.json`, `scripts/` | the build; `cmake/engine.cmake` and `cmake/engine_pin.cmake` get the engine |
 | `.github/workflows/` | continuous integration (Windows, Linux, macOS) |
 
 Your game files, extracted data and disassembly output stay outside the repository (`.gitignore`
@@ -433,61 +439,42 @@ compatibility).
 Not tried yet: the continuous-integration workflow on GitHub (it runs only when started by hand). Limits of the mod layer
 (no high-resolution art, no new rooms or questions) are listed in `docs/MODDING.md`.
 
-## Gizmos & Gadgets
+## The engine
 
-The repository also holds a port of a second game of The Learning Company, *Super Solvers: Gizmos &
-Gadgets!* (DOS version 1.0, 1993), in the same way: an engine (`ggport`) that reads your own copy of
-the game (the folder with `ssg.exe` and `gizmo000.dat` .. `gizmo003.dat`) and contains none of its
-data. It shares the engine core with TM Port (`docs/DESIGN.md`, "Core and games").
+TM Port is built on [MischiefEngine](https://github.com/shinaka/MischiefEngine), the engine core it
+shares with a second port of a game of The Learning Company: file and CD-image access, the Borland
+random numbers, clocks and timers, the SDL window and presentation, the DOS sound chips and the
+keyboard and mouse models, the DOSBox-X save-state reader, the INI file and codecs, and the TLC text
+engine. Its game-neutral study tools (`tmctl.py`, which drives the original in DOSBox-X, and the
+others) live in its `tools/` folder; this repository's scripts find them through
+`tools/mischief_engine.py` (`MISCHIEF_ENGINE_DIR`, else `../MischiefEngine`). Building against it:
+[`docs/BUILDING.md`](docs/BUILDING.md), "The engine".
 
-`ggport --data <your G&G folder>` plays **the game**: the attract sequence, the sign-in (new players,
-With or Without Chimps, the roster, Ctrl+R), the Technology Center, the three buildings with their
-blueprints, the workshop (the conveyor belt, building and painting the vehicle, the recycler), the
-warehouse rooms with the Cyber Chimps, the bananas, the parts and the doors, the eight kinds of
-puzzles, the races, the results with the rank messages, the post-race menu, the levels, the final
-movie, the menus, the help and the New Player Hints. Players are saved in `players.dat` in the
-engine's own preference folder (`GGPort`; the game folder's `PLAYERS.DAT` is imported on the first
-run and never written), byte for byte as the original writes it and at the same moments, so Save &
-Exit and a later sign-in resume a building where it was left. `--sound off|speaker|fm` (or the
-original's switches, `--gg-args "-SI"`), `--cpu 286|386` (the 286's chimp path), `--fullscreen`,
-`--square-pixels`, `--scale N` and `--help` work as for TM Port; the settings are kept in
-`ggport.ini`. The wave 2 preview of the engine's screens stays behind `--gg-preview`. For studying
-the game against the original: `--gg-trace FILE` (a row per frame: state, rooms, the player, the
-`rand()` calls), `--gg-dump-state TICK FILE` (the original's data segment at a moment) and
-`--gg-load-state FILE` (start from a DOSBox-X save state).
-
-The screens, the sound and the game's random numbers match the original running in DOSBox-X: played
-through, from a new player to the final movie, the engine's pictures equal the reference captures
-(`re/gg/docs/ENGINE_MAP.md` §11). Known differences: screen changes come a few video frames early
-(the reference machine's drawing time is not modelled, and with it the order of a few sound writes
-around effects); the puzzles' pointer moves (gears, magnets) are untried with a real mouse in a
-window; only the reference captures' puzzle variants and levels were compared with the original
-(`re/gg/docs/ENGINE_MAP.md` §8).
-Building: `docs/BUILDING.md`, "Gizmos & Gadgets". A ready-to-play copy next to your game folder:
-`scripts\package_gg.bat` (Windows) or `scripts/package_gg.sh <G&G folder>` (Linux, macOS), which
-writes `dist/GGPort` (`docs/BUILDING.md`, "A ready-to-play copy").
+*Super Solvers: Gizmos & Gadgets!* (DOS, 1993) is ported on the same engine in
+[ggport](https://github.com/shinaka/ggport).
 
 ## Credits and licences
 
-*Super Solvers Treasure Mountain!* © 1990, 1992–95 The Learning Company. *Super Solvers: Gizmos &
-Gadgets!* © 1993 The Learning Company. The games, their pictures, sounds, music and texts belong to
-their rights holders; none of it is part of this project.
+*Super Solvers Treasure Mountain!* © 1990, 1992–95 The Learning Company. The game, its pictures,
+sounds, music and texts belong to their rights holders; none of it is part of this project.
 
-Third-party components, downloaded by CMake at configure time (not stored in this repository) and
-built into the programs:
+Components downloaded by CMake at configure time (not stored in this repository) and built into the
+programs. TinySoundFont is fetched by this repository; SDL, ymfm and doctest come with the engine,
+MischiefEngine (the project's own code, MIT, in a repository of its own):
 
 | Component | Version | Licence | Used for |
 |---|---|---|---|
-| [SDL](https://libsdl.org) | 3.4.18 | zlib | window, input, audio, timing (linked statically) |
+| [MischiefEngine](https://github.com/shinaka/MischiefEngine) | the commit in `cmake/engine_pin.cmake` | MIT | the engine core ([The engine](#the-engine)) |
+| [SDL](https://libsdl.org) (through MischiefEngine) | 3.4.18 | zlib | window, input, audio, timing (linked statically) |
 | [TinySoundFont](https://github.com/schellingb/TinySoundFont) (`tsf.h`, Bernhard Schelling) | commit `853a0a1` | MIT | the SoundFont MIDI synthesizer |
-| [ymfm](https://github.com/aaronsgiles/ymfm) (Aaron Giles) | commit `81aec25` | BSD-3-Clause | the OPL2 (YM3812) of the DOS edition's AdLib music |
-| [doctest](https://github.com/doctest/doctest) | 2.4.12 | MIT | the unit tests only (`tmtests`) |
+| [ymfm](https://github.com/aaronsgiles/ymfm) (Aaron Giles; through MischiefEngine) | commit `81aec25` | BSD-3-Clause | the OPL2 (YM3812) of the DOS edition's AdLib music |
+| [doctest](https://github.com/doctest/doctest) (through MischiefEngine) | 2.4.12 | MIT | the unit tests only (`tmtests`) |
 
 If you pass on builds of `tmport`, include the MIT licence text of TinySoundFont and the
 BSD-3-Clause licence text of ymfm (SDL's zlib licence does not require a notice in binaries).
-Everything else (the PNG and zlib codecs, the MIDI sequencer, the CD-image reader, the NE parser)
-is the project's own code. The reverse-engineering work used Ghidra and Python, which are not
-part of the engine.
+Everything else (the MIDI sequencer, the NE parser, and in MischiefEngine the PNG and zlib codecs
+and the CD-image reader) is the project's own code. The reverse-engineering work used Ghidra and
+Python, which are not part of the engine.
 
 The project's own code and documentation are released under the [MIT licence](LICENSE). The licence
 covers this project only: it grants no rights to *Treasure Mountain!* itself, whose files you

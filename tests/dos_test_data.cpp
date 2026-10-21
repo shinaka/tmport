@@ -3,12 +3,12 @@
 #include <memory>
 #include <system_error>
 
-#include "util/file_util.h"
+#include "mischief/util/file_util.h"
 
 namespace testdata {
 
 std::optional<std::filesystem::path> dosDataPath() {
-    if (auto p = tmport::getEnv("TM_DATA_DOS")) return tmport::pathFromUtf8(*p);
+    if (auto p = mischief::getEnv("TM_DATA_DOS")) return mischief::pathFromUtf8(*p);
     return std::nullopt;
 }
 
@@ -33,9 +33,9 @@ const tmport::dos::DosFiles* dosFiles() {
 }
 
 std::optional<std::filesystem::path> dosCapturesPath() {
-    const auto p = tmport::getEnv("TM_DOS_CAPTURES");
+    const auto p = mischief::getEnv("TM_DOS_CAPTURES");
     if (!p || p->empty()) return std::nullopt;
-    const auto dir = tmport::pathFromUtf8(*p);
+    const auto dir = mischief::pathFromUtf8(*p);
     std::error_code ec;
     if (!std::filesystem::is_directory(dir, ec)) return std::nullopt;
     return dir;

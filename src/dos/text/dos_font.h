@@ -28,7 +28,7 @@ public:
     static constexpr uint16_t kMeasureOnly = 1;        // Font_DrawChar colour word that only measures
 
     // Reads the font from SST.EXE (checks the MOV SI,2447h of the glyph blitter); throws
-    // tmport::FormatError if the image does not hold it there.
+    // mischief::FormatError if the image does not hold it there.
     static DosFont fromExe(const DosExe& exe);
     // A font block in the layout above with a bytes-per-row table indexed by width (tests).
     static DosFont fromBlock(std::span<const uint8_t> block, std::span<const uint16_t> bytesPerRowByWidth);

@@ -13,7 +13,7 @@
 #include "game/game_hooks.h"
 #include "game/game_state.h"
 #include "game/game_tables.h"
-#include "rtl/borland_rand.h"
+#include "mischief/rtl/borland_rand.h"
 
 namespace tmport::game {
 
@@ -89,7 +89,7 @@ void netShopTakeNet(GameState& s, GameHooks& hooks = nullHooks());
 // Treasures_PickForLevel: only on levels 0..2. gemsNeeded[tier] treasure indices: base =
 // climbsDone mod 43; element 0 = base if no treasure was found this climb (treasureCount2 == 0),
 // otherwise random; the others base + R(51 - base), distinct (re-rolled).
-void pickTreasuresForLevel(GameState& s, const GameTables& t, BorlandRand& rng);
+void pickTreasuresForLevel(GameState& s, const GameTables& t, mischief::BorlandRand& rng);
 // The treasure shown for the gemsFound-th find on this level (BNDL 330 + index).
 int treasureForNextFind(const GameState& s);
 // Treasure delivered at the end of a climb, after climbsDone++ (10f0:0000): (climbsDone-1) mod 43.
@@ -97,7 +97,7 @@ int deliveredTreasureIndex(uint16_t climbsDoneAfterIncrement);
 
 // --- Rescue coin pile (1110:00aa) ------------------------------------------------------------------
 // CoinPile_Update, once per room tick. Returns true when the pile was picked up (+10 coins, sfx 7).
-bool updateCoinPile(GameState& s, BorlandRand& rng, GameHooks& hooks = nullHooks());
+bool updateCoinPile(GameState& s, mischief::BorlandRand& rng, GameHooks& hooks = nullHooks());
 
 // --- Quiz answer, inventory side (1150:0403 + 1150:100a) -------------------------------------------
 // After a correct quizJudgeAnswer and the praise screen: Inv_AddClue, then +2/+1/0 coins.
@@ -111,14 +111,14 @@ struct AnswerOutcome {
 };
 // The whole answer path of Quiz_AskQuestion in the original order: judge (state), the result
 // screen's R(4), then for a correct answer the clue word and the coins.
-AnswerOutcome answerQuestion(GameState& s, int slot, int pos, const GameTables& t, BorlandRand& rng,
+AnswerOutcome answerQuestion(GameState& s, int slot, int pos, const GameTables& t, mischief::BorlandRand& rng,
                              GameHooks& hooks = nullHooks());
 
 // --- Castle wall per tier (1168:0047, 1168:1143) ---------------------------------------------------
 // ClimbScene_PickLayout: R(tier + 1).
-int pickCastleLayout(uint8_t rankTier, BorlandRand& rng);
+int pickCastleLayout(uint8_t rankTier, mischief::BorlandRand& rng);
 // Creature spawn test of ClimbScene_UpdateCreature: R(1000) < permille[tier].
-bool creatureSpawnRoll(uint8_t rankTier, const GameTables& t, BorlandRand& rng);
+bool creatureSpawnRoll(uint8_t rankTier, const GameTables& t, mischief::BorlandRand& rng);
 
 // --- Climb flow (1118:0000 GameMain, 1160:1632, 1160:137d, 10f0:0000) ------------------------------
 // 1160:1632 Users_InitNewPlayer (sound is switched on for a new player; voice and the per-climb
@@ -138,14 +138,14 @@ struct ClimbSetup {
 // room (9 before the first finished climb, else 0); clue texts and voice ids; spawn elves
 // (hooks.spawnElves); pick treasures; the player pose from the room; reset gems on a new climb.
 // The caller seeds the RNG first (srand(low 16 bits of timeGetTime()), 1118:00e5).
-ClimbSetup setupClimb(GameState& s, const GameTables& t, BorlandRand& rng, GameHooks& hooks = nullHooks());
+ClimbSetup setupClimb(GameState& s, const GameTables& t, mischief::BorlandRand& rng, GameHooks& hooks = nullHooks());
 
 // After Room_Run changed the room (1118 climb loop): when the music zone changed, re-pick the
 // treasures, and when the level also changed (through a gate) first unload elves, clear the
 // clues, carry missed questions, clear key and gems, then (after the cut-scene, which is the
 // caller's) respawn elves. Returns true when the level changed. Music and transitions are the
 // caller's.
-bool onRoomChanged(GameState& s, int oldZone, int oldLevel, const GameTables& t, BorlandRand& rng,
+bool onRoomChanged(GameState& s, int oldZone, int oldLevel, const GameTables& t, mischief::BorlandRand& rng,
                    GameHooks& hooks = nullHooks());
 
 // End of a climb, before the save (1118:0378..03b4): room is already 0xFE; elves unloaded, clues

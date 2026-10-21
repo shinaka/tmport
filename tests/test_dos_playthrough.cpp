@@ -21,10 +21,10 @@
 #include "app/bootstrap.h"
 #include "app/launch_options.h"
 #include "save/settings.h"
-#include "app_test_util.h"
+#include "mischief/test/app_test_util.h"
 #include "dos/game/trace.h"
 #include "dos_test_data.h"
-#include "util/file_util.h"
+#include "mischief/util/file_util.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -136,10 +136,10 @@ const Row* rowAt(const std::vector<Row>& rows, uint64_t tick) {
 
 // One headless run of the game with a key script, a trace and the given preference folder.
 std::vector<Row> runScript(const fs::path& dir, const std::string& keys, const std::string& tag) {
-    const std::string data = pathToUtf8(*testdata::dosDataPath());
-    const std::string pref = pathToUtf8(dir), ini = pathToUtf8(dir / "tmport.ini");
+    const std::string data = mischief::pathToUtf8(*testdata::dosDataPath());
+    const std::string pref = mischief::pathToUtf8(dir), ini = mischief::pathToUtf8(dir / "tmport.ini");
     const fs::path tracePath = dir / (tag + ".csv");
-    const std::string trace = pathToUtf8(tracePath);
+    const std::string trace = mischief::pathToUtf8(tracePath);
     std::vector<const char*> argv = {"tmport", "--edition", "dos", "--data", data.c_str(), "--headless", "--pref-dir",
                                      pref.c_str(), "--config", ini.c_str(), "--sound", "tandy", "--dos-trace", trace.c_str(),
                                      "--dos-layout-seed", "0x1EE2", "--keys", keys.c_str()};

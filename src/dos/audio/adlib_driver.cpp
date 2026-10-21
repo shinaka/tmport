@@ -12,7 +12,7 @@ constexpr uint8_t kMaxVolume = 0x7F;
 
 }  // namespace
 
-AdLibDriver::AdLibDriver(const SoundTables& tables, OplWriter& out) : tables_(tables), out_(out) {}
+AdLibDriver::AdLibDriver(const SoundTables& tables, mischief::dos::OplWriter& out) : tables_(tables), out_(out) {}
 
 uint8_t AdLibDriver::ds8(uint16_t off) const { return tables_.ds8(off); }
 int16_t AdLibDriver::ds16s(uint16_t off) const { return static_cast<int16_t>(tables_.ds16(off)); }

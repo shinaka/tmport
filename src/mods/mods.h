@@ -21,7 +21,7 @@
 namespace tmport::mods {
 
 // The mod folders configured by an ini file (nullptr = no file: the defaults).
-std::vector<std::filesystem::path> modDirsFromIni(const save::IniFile* ini, const std::filesystem::path& iniDir,
+std::vector<std::filesystem::path> modDirsFromIni(const mischief::save::IniFile* ini, const std::filesystem::path& iniDir,
                                                   const std::filesystem::path& prefDir, const std::filesystem::path& exeDir);
 // The same for the game's tmport.ini (paths.iniPath).
 std::vector<std::filesystem::path> configuredModDirs(const save::Paths& paths);

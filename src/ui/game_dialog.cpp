@@ -5,9 +5,9 @@
 #include "data/dgroup_offsets.h"
 #include "data/exe_tables.h"
 #include "gfx/frame_buffer.h"
-#include "gfx/presenter.h"
+#include "mischief/gfx/presenter.h"
+#include "mischief/util/log.h"
 #include "platform/engine.h"
-#include "util/log.h"
 
 namespace tmport::ui {
 
@@ -50,7 +50,7 @@ uint16_t DialogSystem::waitInputCode() {
         if (!engine_.hasWindow()) {
             // Headless without an input source nothing can ever arrive: answer Esc instead of
             // spinning forever (engine-only safeguard; tests install DialogHooks::getInputCode).
-            log::warn("modal dialog without a window or input source: answering Esc");
+            mischief::log::warn("modal dialog without a window or input source: answering Esc");
             return 0x1B;
         }
         SDL_Delay(1);
@@ -414,7 +414,7 @@ int DialogSystem::runModal(const DlgDesc& d) {
     addHotspots(d);
 
     if (d.type != dlgtype::kMessage && d.type != dlgtype::kYesNo)
-        log::warn("GameDlg_RunModal: type {} has no input table (the original never returns); treated as type 1",
+        mischief::log::warn("GameDlg_RunModal: type {} has no input table (the original never returns); treated as type 1",
                   d.type);
     const bool yesNo = d.type == dlgtype::kYesNo;
     bool done = false;

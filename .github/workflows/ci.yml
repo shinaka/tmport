@@ -1,15 +1,22 @@
 # Builds the engine and runs the unit tests on Windows, Linux and macOS.
 #
 # The repository contains no game data, and neither does CI: the tests that need the user's copy
-# of the game (TM_DATA) skip themselves, every data-free test runs. SDL 3 and doctest are fetched by
-# CMake at configure time (pinned by URL and SHA-256, see CMakeLists.txt).
+# of the game (TM_DATA) skip themselves, every data-free test runs. CMake fetches the engine
+# (MischiefEngine) at the commit pinned in cmake/engine_pin.cmake, and through it SDL 3 and doctest
+# (pinned by URL and SHA-256); docs/BUILDING.md "The engine". A run can build against another engine
+# commit instead (the engine_ref input), e.g. to try an engine change before it is pinned.
 
 name: CI
 
-# Manual runs only (Actions tab → CI → "Run workflow"), so pushes to the private repository do not
-# use Actions minutes. Re-add push/pull_request triggers here to run CI automatically.
+# Manual runs only (Actions tab → CI → "Run workflow"), so pushes do not use Actions minutes.
+# Re-add push/pull_request triggers here to run CI automatically.
 on:
   workflow_dispatch:
+    inputs:
+      engine_ref:
+        description: "MischiefEngine branch, tag or commit to build against (empty: the pinned commit)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -32,6 +39,16 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
+      # The engine override: a checkout of shinaka/MischiefEngine at engine_ref, passed to CMake as
+      # MISCHIEF_ENGINE_DIR. Without it the configure fetches the pinned commit.
+      - name: Check out the engine (engine_ref)
+        if: inputs.engine_ref != ''
+        uses: actions/checkout@v4
+        with:
+          repository: shinaka/MischiefEngine
+          ref: ${{ inputs.engine_ref }}
+          path: engine
+
       # SDL 3 needs the X11/Wayland, audio and input development headers on Linux
       # (SDL's docs/README-linux.md). Windows (MSVC) and macOS (Xcode) need nothing extra.
       - name: Install SDL build dependencies (Linux)
@@ -47,8 +64,17 @@ jobs:
 
       # The "ci" presets (CMakePresets.json) use the platform's default generator: Visual Studio on
       # Windows (multi-config, Release), Unix Makefiles elsewhere (CMAKE_BUILD_TYPE=Release).
+      # A relative MISCHIEF_ENGINE_DIR is taken relative to the current directory (the checkout).
       - name: Configure
-        run: cmake --preset ci
+        shell: bash
+        env:
+          ENGINE_REF: ${{ inputs.engine_ref }}
+        run: |
+          if [ -n "$ENGINE_REF" ]; then
+            cmake --preset ci -DMISCHIEF_ENGINE_DIR=engine
+          else
+            cmake --preset ci -DMISCHIEF_ENGINE_FETCH=ON
+          fi
 
       - name: Build
         run: cmake --build --preset ci --parallel 4

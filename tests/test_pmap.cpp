@@ -3,9 +3,9 @@
 #include <algorithm>
 
 #include "gfx/pixmap.h"
+#include "mischief/util/hash.h"
 #include "res/resource_manager.h"
 #include "test_data.h"
-#include "util/hash.h"
 
 using namespace tmport;
 
@@ -42,28 +42,28 @@ const PixExpect k16[] = {
 constexpr uint64_t kAll256 = 0xea2670dd62c34093ull;  // all 764, id order: (id, w, h, pixels)
 constexpr uint64_t kAll16 = 0x2ba65138a68b7f2bull;
 
-void checkSet(const ResourceManager& res, gfx::ColorMode mode, std::span<const PixExpect> set) {
+void checkSet(const ResourceManager& res, mischief::gfx::ColorMode mode, std::span<const PixExpect> set) {
     for (const auto& e : set) {
         INFO("PMAP " << e.id);
         auto pm = res.pixmap(e.id, mode);
         REQUIRE(pm != nullptr);
         CHECK(pm->width == e.w);
         CHECK(pm->height == e.h);
-        CHECK(fnv1a64(pm->pixels) == e.hash);
+        CHECK(mischief::fnv1a64(pm->pixels) == e.hash);
     }
 }
 
-uint64_t combined(const ResourceManager& res, gfx::ColorMode mode, DllId dll, size_t& count) {
+uint64_t combined(const ResourceManager& res, mischief::gfx::ColorMode mode, DllId dll, size_t& count) {
     auto ids = res.ids(ResType::PMAP, dll);
     std::sort(ids.begin(), ids.end());
-    uint64_t h = kFnv64Offset;
+    uint64_t h = mischief::kFnv64Offset;
     count = 0;
     for (int id : ids) {
         auto pm = res.pixmap(id, mode);
-        h = fnv1a64U16(static_cast<uint16_t>(id), h);
-        h = fnv1a64U16(static_cast<uint16_t>(pm->width), h);
-        h = fnv1a64U16(static_cast<uint16_t>(pm->height), h);
-        h = fnv1a64(pm->pixels, h);
+        h = mischief::fnv1a64U16(static_cast<uint16_t>(id), h);
+        h = mischief::fnv1a64U16(static_cast<uint16_t>(pm->width), h);
+        h = mischief::fnv1a64U16(static_cast<uint16_t>(pm->height), h);
+        h = mischief::fnv1a64(pm->pixels, h);
         ++count;
     }
     return h;
@@ -73,12 +73,12 @@ uint64_t combined(const ResourceManager& res, gfx::ColorMode mode, DllId dll, si
 
 TEST_CASE("PMAP: pixel hashes match tools/assets/pmap.py (TMT256 and TMT16)") {
     TM_REQUIRE_GAME_DATA();
-    checkSet(*g->res, gfx::ColorMode::Colour256, k256);
-    checkSet(*g->res, gfx::ColorMode::Colour16, k16);
+    checkSet(*g->res, mischief::gfx::ColorMode::Colour256, k256);
+    checkSet(*g->res, mischief::gfx::ColorMode::Colour16, k16);
     size_t n = 0;
-    CHECK(combined(*g->res, gfx::ColorMode::Colour256, DllId::TMT256, n) == kAll256);
+    CHECK(combined(*g->res, mischief::gfx::ColorMode::Colour256, DllId::TMT256, n) == kAll256);
     CHECK(n == 764);
-    CHECK(combined(*g->res, gfx::ColorMode::Colour16, DllId::TMT16, n) == kAll16);
+    CHECK(combined(*g->res, mischief::gfx::ColorMode::Colour16, DllId::TMT16, n) == kAll16);
     CHECK(n == 764);
     g->res->clearCache();
 }
@@ -88,7 +88,7 @@ TEST_CASE("PMAP: RUND decode -> re-encode is byte-identical for every RUND image
     size_t rund = 0, raw8 = 0;
     for (int id : g->res->ids(ResType::PMAP, DllId::TMT256)) {
         INFO("PMAP " << id);
-        auto body = g->res->loadRaw(ResType::PMAP, id, gfx::ColorMode::Colour256);
+        auto body = g->res->loadRaw(ResType::PMAP, id, mischief::gfx::ColorMode::Colour256);
         REQUIRE(body.has_value());
         const gfx::PixMap pm = gfx::decodePmap(*body, 8);
         if (pm.encoding == gfx::PixEncoding::Raw8) {
@@ -117,8 +117,8 @@ TEST_CASE("PMAP: TMT16 and TMT256 have the same ids and sizes") {
     std::sort(b.begin(), b.end());
     CHECK(a == b);
     for (int id : a) {
-        auto p8 = g->res->pixmap(id, gfx::ColorMode::Colour256);
-        auto p4 = g->res->pixmap(id, gfx::ColorMode::Colour16);
+        auto p8 = g->res->pixmap(id, mischief::gfx::ColorMode::Colour256);
+        auto p4 = g->res->pixmap(id, mischief::gfx::ColorMode::Colour16);
         CHECK(p8->width == p4->width);
         CHECK(p8->height == p4->height);
         CHECK(*std::max_element(p4->pixels.begin(), p4->pixels.end()) <= 15);

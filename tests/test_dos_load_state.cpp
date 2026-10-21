@@ -1,5 +1,5 @@
-// Starting the DOS game from DOSBox-X save states (wave 4 harness): the shared inflate
-// (util/inflate.h), the save-state reader (dos/save/dosbox_state.h) on synthetic states, and the
+// Starting the DOS game from DOSBox-X save states (wave 4 harness): the engine's inflate
+// (mischief/util/inflate.h), the save-state reader (dos/save/dosbox_state.h) on synthetic states, and the
 // loader (dos/game/load_state.h) on every state of the user's reference library (TM_DOS_CAPTURES):
 // the files it finds in RAM, the round trip DGROUP -> engine -> DGROUP, and the picture the engine
 // composes from the loaded state against the state's video memory. Only counts and numbers are
@@ -19,7 +19,6 @@
 
 #include "app/bootstrap.h"
 #include "app/launch_options.h"
-#include "app_test_util.h"
 #include "dos/data/dgroup_offsets.h"
 #include "dos/game/game.h"
 #include "dos/game/load_state.h"
@@ -27,11 +26,12 @@
 #include "dos/save/dosbox_state.h"
 #include "dos_game_fixture.h"
 #include "dos_test_data.h"
-#include "mods/png_codec.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/inflate.h"
-#include "util/png_writer.h"
+#include "mischief/mods/png_codec.h"
+#include "mischief/test/app_test_util.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/inflate.h"
+#include "mischief/util/png_writer.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -118,29 +118,29 @@ std::vector<std::filesystem::path> referenceStates(const std::filesystem::path& 
 TEST_CASE("inflate: zlib round trips with the mod layer's deflate, raw streams, the output limit") {
     for (uint32_t seed : {1u, 7u, 99u}) {
         const std::vector<uint8_t> data = patternBytes(70000 + seed * 13, seed);
-        const std::vector<uint8_t> z = mods::deflateZlib(data);
-        CHECK(inflateZlib(z) == data);
-        CHECK(mods::inflateZlib(z) == data);  // the PNG reader's entry point forwards to util
+        const std::vector<uint8_t> z = mischief::mods::deflateZlib(data);
+        CHECK(mischief::inflateZlib(z) == data);
+        CHECK(mischief::mods::inflateZlib(z) == data);  // the PNG reader's entry point forwards to util
         // The raw deflate data between the 2-byte header and the Adler-32.
         const std::span<const uint8_t> raw(z.data() + 2, z.size() - 6);
-        CHECK(inflateRaw(raw) == data);
-        const std::vector<uint8_t> prefix = inflateRaw(raw, 1000, InflateLimit::Stop);
+        CHECK(mischief::inflateRaw(raw) == data);
+        const std::vector<uint8_t> prefix = mischief::inflateRaw(raw, 1000, mischief::InflateLimit::Stop);
         REQUIRE(prefix.size() == 1000);
         CHECK(std::equal(prefix.begin(), prefix.end(), data.begin()));
-        CHECK_THROWS_AS((void)inflateRaw(raw, 1000, InflateLimit::Throw), FormatError);
-        CHECK_THROWS_AS((void)inflateZlib(z, 1000), FormatError);
+        CHECK_THROWS_AS((void)mischief::inflateRaw(raw, 1000, mischief::InflateLimit::Throw), mischief::FormatError);
+        CHECK_THROWS_AS((void)mischief::inflateZlib(z, 1000), mischief::FormatError);
     }
     // A stored block: BFINAL = 1, BTYPE = 00, LEN, NLEN, the bytes.
     const std::vector<uint8_t> stored = {0x01, 0x03, 0x00, 0xFC, 0xFF, 'a', 'b', 'c'};
-    CHECK(inflateRaw(stored) == std::vector<uint8_t>{'a', 'b', 'c'});
-    CHECK(inflateRaw(stored, 2, InflateLimit::Stop) == std::vector<uint8_t>{'a', 'b'});
+    CHECK(mischief::inflateRaw(stored) == std::vector<uint8_t>{'a', 'b', 'c'});
+    CHECK(mischief::inflateRaw(stored, 2, mischief::InflateLimit::Stop) == std::vector<uint8_t>{'a', 'b'});
     const std::vector<uint8_t> badLen = {0x01, 0x03, 0x00, 0x00, 0x00, 'a', 'b', 'c'};
-    CHECK_THROWS_AS((void)inflateRaw(badLen), FormatError);
+    CHECK_THROWS_AS((void)mischief::inflateRaw(badLen), mischief::FormatError);
     const std::vector<uint8_t> badType = {0x07};
-    CHECK_THROWS_AS((void)inflateRaw(badType), FormatError);
-    std::vector<uint8_t> z = mods::deflateZlib(patternBytes(500, 3));
+    CHECK_THROWS_AS((void)mischief::inflateRaw(badType), mischief::FormatError);
+    std::vector<uint8_t> z = mischief::mods::deflateZlib(patternBytes(500, 3));
     z.back() ^= 1;
-    CHECK_THROWS_AS((void)inflateZlib(z), FormatError);  // Adler-32 mismatch
+    CHECK_THROWS_AS((void)mischief::inflateZlib(z), mischief::FormatError);  // Adler-32 mismatch
 }
 
 // ---------------------------------------------------------------------- synthetic DOSBox-X states
@@ -167,7 +167,7 @@ TEST_CASE("DosboxState: a synthetic Tandy state (DGROUP, relocation, back buffer
     memory.insert(memory.end(), ram.begin(), ram.end());
     const std::string machine = "MCH_TANDY";
     const auto path = tempFile("synthetic_tandy.sav");
-    REQUIRE(writeWholeFile(path, storedZip({{"Machine_Type", std::vector<uint8_t>(machine.begin(), machine.end())},
+    REQUIRE(mischief::writeWholeFile(path, storedZip({{"Machine_Type", std::vector<uint8_t>(machine.begin(), machine.end())},
                                             {"Memory", memory}})));
     const DosboxState s = DosboxState::load(path);
     CHECK(s.machine() == DosboxState::Machine::Tandy);
@@ -221,7 +221,7 @@ TEST_CASE("DosboxState: a synthetic EGA state (planes after the latch table, the
     memory.insert(memory.end(), ram.begin(), ram.end());
     const std::string machine = "MCH_EGA";
     const auto path = tempFile("synthetic_ega.sav");
-    REQUIRE(writeWholeFile(path, storedZip({{"Machine_Type", std::vector<uint8_t>(machine.begin(), machine.end())},
+    REQUIRE(mischief::writeWholeFile(path, storedZip({{"Machine_Type", std::vector<uint8_t>(machine.begin(), machine.end())},
                                             {"Memory", memory},
                                             {"Vga", vga}})));
     const DosboxState s = DosboxState::load(path);
@@ -245,12 +245,12 @@ TEST_CASE("DosboxState: a synthetic EGA state (planes after the latch table, the
 
 TEST_CASE("DosboxState: files that are not states of SST.EXE") {
     const auto path = tempFile("not_a_state.sav");
-    REQUIRE(writeWholeFile(path, std::vector<uint8_t>{'P', 'K', 0, 0}));
-    CHECK_THROWS_AS((void)DosboxState::load(path), Error);
+    REQUIRE(mischief::writeWholeFile(path, std::vector<uint8_t>{'P', 'K', 0, 0}));
+    CHECK_THROWS_AS((void)DosboxState::load(path), mischief::Error);
     std::vector<uint8_t> memory(0x88 + 0x20000, 0);  // RAM without SST.EXE's DGROUP
-    REQUIRE(writeWholeFile(path, storedZip({{"Memory", memory}})));
-    CHECK_THROWS_AS((void)DosboxState::load(path), FormatError);
-    CHECK_THROWS_AS((void)DosboxState::load(tempFile("missing_state.sav")), Error);
+    REQUIRE(mischief::writeWholeFile(path, storedZip({{"Memory", memory}})));
+    CHECK_THROWS_AS((void)DosboxState::load(path), mischief::FormatError);
+    CHECK_THROWS_AS((void)DosboxState::load(tempFile("missing_state.sav")), mischief::Error);
     std::error_code ec;
     std::filesystem::remove(path, ec);
 }
@@ -277,10 +277,10 @@ TEST_CASE("--dos-load-state: a headless run continues from the state (users file
     const DosboxState s = DosboxState::load(*start);
     const std::filesystem::path dir = apptest::outDir("dos_load_state_run");
     std::ofstream(dir / "tmport.ini") << "[saves]\nimported_original = true\n";
-    const std::string data = pathToUtf8(*testdata::dosDataPath());
-    const std::string pref = pathToUtf8(dir), ini = pathToUtf8(dir / "tmport.ini"), state = pathToUtf8(*start);
-    const std::string trace = pathToUtf8(dir / "trace.csv"), dump0 = "0:" + pathToUtf8(dir / "d0.bin"),
-                      dump10 = "10:" + pathToUtf8(dir / "d10.bin");
+    const std::string data = mischief::pathToUtf8(*testdata::dosDataPath());
+    const std::string pref = mischief::pathToUtf8(dir), ini = mischief::pathToUtf8(dir / "tmport.ini"), state = mischief::pathToUtf8(*start);
+    const std::string trace = mischief::pathToUtf8(dir / "trace.csv"), dump0 = "0:" + mischief::pathToUtf8(dir / "d0.bin"),
+                      dump10 = "10:" + mischief::pathToUtf8(dir / "d10.bin");
     std::vector<const char*> argv = {"tmport", "--edition", "dos", "--data", data.c_str(), "--headless", "--pref-dir",
                                      pref.c_str(), "--config", ini.c_str(), "--dos-load-state", state.c_str(), "--dos-trace",
                                      trace.c_str(), "--dos-dump-state", dump0.c_str(), "--dos-dump-state", dump10.c_str(),
@@ -290,9 +290,9 @@ TEST_CASE("--dos-load-state: a headless run continues from the state (users file
                        [&](const app::StartupError& e) { errors.push_back(e.what()); }) == 0);
     CHECK(errors.empty());
     // The state's USERS.DAT copy is the preference folder's DOS save now.
-    CHECK(readWholeFile(dir / "dos_users.dat") == readWholeFile(DosboxState::usersFileOf(*start)));
+    CHECK(mischief::readWholeFile(dir / "dos_users.dat") == mischief::readWholeFile(DosboxState::usersFileOf(*start)));
     // Tick 0 is the loaded moment: DS:0000..CC1F as the state holds it (g_ticks included).
-    const auto d0 = readWholeFile(dir / "d0.bin");
+    const auto d0 = mischief::readWholeFile(dir / "d0.bin");
     REQUIRE(d0.has_value());
     REQUIRE(d0->size() == kDgroupSize);
     CHECK(static_cast<uint32_t>((*d0)[dg::kTicks] | (*d0)[dg::kTicks + 1] << 8 | (*d0)[dg::kTicks + 2] << 16 |
@@ -379,13 +379,13 @@ TEST_CASE("load state: every reference state loads; DGROUP round trip, files fou
             if (px) differingPictures[name] = px;
             if (pending) pendingPictures[name] = pending;
             // TM_DOS_LOAD_STATE_DUMP=<folder>: both pictures of every differing state, for a look.
-            if (const auto dir = getEnv("TM_DOS_LOAD_STATE_DUMP"); px && dir) {
-                const auto out = pathFromUtf8(*dir);
+            if (const auto dir = mischief::getEnv("TM_DOS_LOAD_STATE_DUMP"); px && dir) {
+                const auto out = mischief::pathFromUtf8(*dir);
                 std::error_code ec;
                 std::filesystem::create_directories(out, ec);
                 const std::string stem = path.parent_path().filename().string() + "_" + path.stem().string();
-                png::writeRgba(out / (stem + "_screen.png"), BackBuffer::kWidth, BackBuffer::kHeight, toRgba(g.screen, g.palette));
-                png::writeRgba(out / (stem + "_composed.png"), BackBuffer::kWidth, BackBuffer::kHeight, toRgba(shown, g.palette));
+                mischief::png::writeRgba(out / (stem + "_screen.png"), BackBuffer::kWidth, BackBuffer::kHeight, toRgba(g.screen, g.palette));
+                mischief::png::writeRgba(out / (stem + "_composed.png"), BackBuffer::kWidth, BackBuffer::kHeight, toRgba(shown, g.palette));
             }
         }
         // The first game tick after the load comes on the interrupt DS:3D34 said, and the runtime's

@@ -8,7 +8,7 @@
 namespace tmport::cli {
 
 TestSceneResult composeTestScene(gfx::FrameBuffer& fb, const ResourceManager& res, const ExeTables& exe,
-                                 const gfx::Palette& palette, gfx::ColorMode mode) {
+                                 const mischief::gfx::Palette& palette, mischief::gfx::ColorMode mode) {
     using gfx::FrameBuffer;
     TestSceneResult out;
     auto pm = [&](int id) {

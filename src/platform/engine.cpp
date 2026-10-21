@@ -7,17 +7,17 @@
 #include <vector>
 
 #include "data/dgroup_offsets.h"
+#include "mischief/util/log.h"
 #include "platform/exe_icon_ne.h"
-#include "util/log.h"
 
 namespace tmport {
 
 namespace {
 
 // The Windows CD layout and the EngineConfig fields the host takes over.
-platform::HostConfig hostConfigFor(const EngineConfig& c) {
-    platform::HostConfig h;
-    h.layout = gfx::PresenterLayout::windowsCd();
+mischief::platform::HostConfig hostConfigFor(const EngineConfig& c) {
+    mischief::platform::HostConfig h;
+    h.layout = mischief::gfx::PresenterLayout::windowsCd();
     h.title = c.title;
     h.windowScale = c.windowScale < 1 ? 1 : c.windowScale;
     h.integerScale = c.integerScale;
@@ -30,7 +30,7 @@ platform::HostConfig hostConfigFor(const EngineConfig& c) {
 
 }  // namespace
 
-Engine::Engine(GameFiles& files, gfx::ColorMode mode, EngineConfig config)
+Engine::Engine(GameFiles& files, mischief::gfx::ColorMode mode, EngineConfig config)
     : files_(files),
       mode_(mode),
       config_(std::move(config)),
@@ -56,7 +56,7 @@ Engine::Engine(GameFiles& files, gfx::ColorMode mode, EngineConfig config)
     // The host's event pump feeds the Win16 message model: the menu bar's filter first, window
     // state for the cursor scale, everything else into the input queue (posted, dispatched by the
     // next fetch).
-    platform::HostHandlers h;
+    mischief::platform::HostHandlers h;
     h.filter = [this](const SDL_Event& e) { return eventFilter_ && eventFilter_(e); };
     h.window = [this](const SDL_Event& e) { handleWindowEvent(e); };
     h.input = [this](const SDL_Event& e) { handleInputEvent(e); };
@@ -78,7 +78,7 @@ Engine::Engine(GameFiles& files, gfx::ColorMode mode, EngineConfig config)
             }
             cursors_.load(files_.exe->exe(), ids);
         } catch (const std::exception& e) {
-            log::warn("cursors: {}", e.what());
+            mischief::log::warn("cursors: {}", e.what());
         }
     }
 }
@@ -100,7 +100,7 @@ void Engine::closeWindow() {
     host_.closeWindow();
 }
 
-void Engine::setPalette(const gfx::Palette& p) {
+void Engine::setPalette(const mischief::gfx::Palette& p) {
     palette_ = p;
     frame_.setPalette(palette_);
     presenter().setPalette(palette_);
@@ -112,10 +112,10 @@ void Engine::applyWindowIcon(SDL_Window* window) {
     // 1018:00a8 RegisterMainWindowClass: the class icon is LoadIcon(hInst, 15000), from the user's EXE.
     if (!window || !files_.exe) return;
     try {
-        const IconImage icon = loadGroupIcon(files_.exe->exe(), kWindowIconGroupId);
-        if (!setWindowIcon(window, icon)) log::warn("window icon: {}", SDL_GetError());
+        const mischief::IconImage icon = loadGroupIcon(files_.exe->exe(), kWindowIconGroupId);
+        if (!mischief::setWindowIcon(window, icon)) mischief::log::warn("window icon: {}", SDL_GetError());
     } catch (const std::exception& e) {
-        log::warn("window icon: {}", e.what());
+        mischief::log::warn("window icon: {}", e.what());
     }
 }
 
@@ -129,7 +129,7 @@ void Engine::updateCursorScale() {
         float density = SDL_GetWindowPixelDensity(window);
         if (density <= 0.0f) density = 1.0f;
         if (SDL_GetRenderLogicalPresentationRect(renderer, &r) && r.w > 0.0f)
-            scale = static_cast<int>(std::lround(r.w / density / gfx::Presenter::kCanvasWidth));
+            scale = static_cast<int>(std::lround(r.w / density / mischief::gfx::Presenter::kCanvasWidth));
         scale = std::clamp(scale, 1, 8);
     }
     cursors_.setScale(scale);
@@ -175,7 +175,7 @@ void Engine::handleInputEvent(const SDL_Event& e) {
         (e.key.mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_SHIFT)) == 0) {
         if (!e.key.repeat) {
             setShowTreasure(!showTreasure());
-            log::info("debug: treasure boxes {}", showTreasure() ? "on" : "off");
+            mischief::log::info("debug: treasure boxes {}", showTreasure() ? "on" : "off");
         }
         return;
     }

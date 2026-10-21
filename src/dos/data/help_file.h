@@ -21,7 +21,7 @@ public:
     static constexpr size_t kBufferSize = 0xED8;
 
     // Keeps the first 0xED8 bytes (zero-padded, as the BSS buffer) and checks the counts, offsets
-    // and that every page is NUL-terminated inside the buffer. Throws tmport::FormatError.
+    // and that every page is NUL-terminated inside the buffer. Throws mischief::FormatError.
     static HelpFile parse(std::span<const uint8_t> helpDat);
 
     int pageCount(int topic) const { return counts_.at(static_cast<size_t>(topic)); }

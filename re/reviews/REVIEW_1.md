@@ -7,7 +7,7 @@ Date: 2026-10-18. Tree state: working tree as of this date; another agent edited
 Scope: `src/game` core (game_state, rules, layout, quiz, room_table, game_tables), `src/game/room/*`,
 `src/game/scenes/*`, `src/game/title.*`, `src/game/signin.*`, `src/text`, `src/ui`, `src/anim`,
 `src/audio` (except the SoundFont files), `src/input`, `src/save`, `src/res`, `src/gfx`, `src/ne`,
-`src/vfs`, `src/data`. Priority: per-frame code and code that parses user files.
+`src/vfs` (now MischiefEngine's `src/mischief/vfs`), `src/data`. Priority: per-frame code and code that parses user files.
 
 ## How this was checked
 
@@ -56,7 +56,7 @@ report; the reviewer's `harness.cpp` and `harness2.cpp` were rebuilt against the
 ### H-1 One interrupted or failed `users.dat` write can erase every saved player — confirmed
 
 **Where**
-* `src/util/file_util.cpp:33-40` `writeWholeFile`: opens the target with `std::ios::trunc` (the old
+* `src/util/file_util.cpp:33-40` (now MischiefEngine's `src/mischief/util/file_util.cpp`) `writeWholeFile`: opens the target with `std::ios::trunc` (the old
   contents are gone at once), writes, and returns `static_cast<bool>(f)` **before** the
   `std::ofstream` destructor flushes and closes; an error at the final flush/close is never seen.
 * `src/save/users_file.cpp:85-91` `readUsersFile`: a missing, unreadable or short file becomes an
@@ -265,7 +265,7 @@ with blank lines pushing one past slot 9; exactly 10). Harness H4: `numLines=10`
 counts straight from the file (UB for ≥ 32; silent truncation for 16..31); `:297`
 `readResource` resizes to the declared rounded length (up to `0xFFFF << shift`, about 4 GB,
 zero-filled), and it runs during `NeImage::open` for the type-15 table.
-`src/vfs/cd_image_source.cpp:242-243` reads a whole directory whose size comes from the ISO record
+`src/vfs/cd_image_source.cpp:242-243` (now MischiefEngine's `src/mischief/vfs/cd_image_source.cpp`) reads a whole directory whose size comes from the ISO record
 (up to 4 GB).
 
 **Failure scenario** A damaged or foreign `TMT256.DLL` / CD image: multi-GB allocation (bad_alloc or

@@ -5,10 +5,10 @@
 
 #include <format>
 
+#include "mischief/util/byte_reader.h"
+#include "mischief/util/error.h"
+#include "mischief/util/log.h"
 #include "ne/ne_image.h"
-#include "util/byte_reader.h"
-#include "util/error.h"
-#include "util/log.h"
 
 namespace tmport {
 
@@ -40,7 +40,7 @@ std::vector<uint8_t> CursorImage::rgba(int scale) const {
 }
 
 CursorImage decodeCursorResource(std::span<const uint8_t> data) {
-    ByteReader r(data, "RT_CURSOR");
+    mischief::ByteReader r(data, "RT_CURSOR");
     CursorImage img;
     img.hotX = r.u16(0);
     img.hotY = r.u16(2);
@@ -49,9 +49,9 @@ CursorImage decodeCursorResource(std::span<const uint8_t> data) {
     if (hdrSize == 40) {  // BITMAPINFOHEADER
         width = r.i32(8);
         height2 = r.i32(12);
-        if (r.u16(16) != 1) throw FormatError("RT_CURSOR: planes != 1");
+        if (r.u16(16) != 1) throw mischief::FormatError("RT_CURSOR: planes != 1");
         bpp = r.u16(18);
-        if (r.u32(20) != 0) throw FormatError("RT_CURSOR: compressed bitmap");
+        if (r.u32(20) != 0) throw mischief::FormatError("RT_CURSOR: compressed bitmap");
         colours = static_cast<int>(r.u32(36));
         rgbSize = 4;
     } else if (hdrSize == 12) {  // BITMAPCOREHEADER
@@ -60,11 +60,11 @@ CursorImage decodeCursorResource(std::span<const uint8_t> data) {
         bpp = r.u16(14);
         rgbSize = 3;
     } else {
-        throw FormatError(std::format("RT_CURSOR: unsupported header size {}", hdrSize));
+        throw mischief::FormatError(std::format("RT_CURSOR: unsupported header size {}", hdrSize));
     }
-    if (bpp != 1) throw FormatError(std::format("RT_CURSOR: {} bpp (only monochrome cursors are supported)", bpp));
+    if (bpp != 1) throw mischief::FormatError(std::format("RT_CURSOR: {} bpp (only monochrome cursors are supported)", bpp));
     if (width <= 0 || width > 256 || height2 <= 0 || height2 > 512 || (height2 & 1))
-        throw FormatError(std::format("RT_CURSOR: bad size {}x{}", width, height2));
+        throw mischief::FormatError(std::format("RT_CURSOR: bad size {}x{}", width, height2));
     if (colours == 0) colours = 2;
     const int height = height2 / 2;
     const size_t tableOff = 4 + hdrSize;
@@ -103,18 +103,18 @@ CursorImage decodeCursorResource(std::span<const uint8_t> data) {
         }
     }
     if (img.hotX >= width || img.hotY >= height)
-        throw FormatError(std::format("RT_CURSOR: hot spot ({},{}) outside {}x{}", img.hotX, img.hotY, width, height));
+        throw mischief::FormatError(std::format("RT_CURSOR: hot spot ({},{}) outside {}x{}", img.hotX, img.hotY, width, height));
     return img;
 }
 
 CursorImage loadGroupCursor(const ne::NeImage& image, uint16_t groupId) {
     const ne::Resource* g = image.findResource(kRtGroupCursor, groupId);
-    if (!g) throw Error(std::format("{}: RT_GROUP_CURSOR {} not found", image.name(), groupId));
+    if (!g) throw mischief::Error(std::format("{}: RT_GROUP_CURSOR {} not found", image.name(), groupId));
     const auto gdata = image.readResource(*g);
-    ByteReader r(gdata, std::format("RT_GROUP_CURSOR {}", groupId));
-    if (r.u16(0) != 0 || r.u16(2) != 2) throw FormatError(std::format("RT_GROUP_CURSOR {}: not a cursor directory", groupId));
+    mischief::ByteReader r(gdata, std::format("RT_GROUP_CURSOR {}", groupId));
+    if (r.u16(0) != 0 || r.u16(2) != 2) throw mischief::FormatError(std::format("RT_GROUP_CURSOR {}: not a cursor directory", groupId));
     const int count = r.u16(4);
-    if (count < 1) throw FormatError(std::format("RT_GROUP_CURSOR {}: empty", groupId));
+    if (count < 1) throw mischief::FormatError(std::format("RT_GROUP_CURSOR {}: empty", groupId));
     int pick = 0;
     for (int i = 0; i < count; ++i)
         if (r.u16(6 + static_cast<size_t>(i) * 14 + 6) == 1) {
@@ -125,7 +125,7 @@ CursorImage loadGroupCursor(const ne::NeImage& image, uint16_t groupId) {
     const uint16_t cursorId = r.u16(e + 12);
     const uint32_t bytes = r.u32(e + 8);
     const ne::Resource* c = image.findResource(kRtCursor, cursorId);
-    if (!c) throw Error(std::format("{}: RT_CURSOR {} (group {}) not found", image.name(), cursorId, groupId));
+    if (!c) throw mischief::Error(std::format("{}: RT_CURSOR {} (group {}) not found", image.name(), cursorId, groupId));
     auto cdata = image.readResource(*c);
     if (bytes != 0 && bytes <= cdata.size()) cdata.resize(bytes);  // drop the NE alignment padding
     return decodeCursorResource(cdata);
@@ -142,7 +142,7 @@ void CursorSet::load(const ne::NeImage& image, std::span<const uint16_t> ids) {
         try {
             images_[i] = loadGroupCursor(image, ids[i]);
         } catch (const std::exception& ex) {
-            log::warn("cursor {}: {}", ids[i], ex.what());
+            mischief::log::warn("cursor {}: {}", ids[i], ex.what());
         }
     }
     if (attached_) {
@@ -222,11 +222,11 @@ void CursorSet::createSdlCursors() {
         SDL_Surface* s = SDL_CreateSurfaceFrom(img->width * scale_, img->height * scale_, SDL_PIXELFORMAT_RGBA32,
                                                px.data(), img->width * scale_ * 4);
         if (!s) {
-            log::warn("cursor {}: SDL_CreateSurfaceFrom failed: {}", i, SDL_GetError());
+            mischief::log::warn("cursor {}: SDL_CreateSurfaceFrom failed: {}", i, SDL_GetError());
             continue;
         }
         sdl_[static_cast<size_t>(i)] = SDL_CreateColorCursor(s, img->hotX * scale_, img->hotY * scale_);
-        if (!sdl_[static_cast<size_t>(i)]) log::warn("cursor {}: SDL_CreateColorCursor failed: {}", i, SDL_GetError());
+        if (!sdl_[static_cast<size_t>(i)]) mischief::log::warn("cursor {}: SDL_CreateColorCursor failed: {}", i, SDL_GetError());
         SDL_DestroySurface(s);
     }
 }

@@ -4,7 +4,7 @@
 #include <optional>
 
 #include "dos/data/dgroup_offsets.h"
-#include "util/log.h"
+#include "mischief/util/log.h"
 
 namespace tmport::dos {
 
@@ -237,7 +237,7 @@ void DosPreview::toggleSound() {
     } else {
         musicPlay(tuneForArea(area_));
     }
-    if (options_.verbose) log::info("dos preview: music and sound {}", on ? "on" : "off");
+    if (options_.verbose) mischief::log::info("dos preview: music and sound {}", on ? "on" : "off");
 }
 
 void DosPreview::syncSound() {

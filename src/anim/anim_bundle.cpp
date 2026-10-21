@@ -2,8 +2,8 @@
 
 #include <format>
 
-#include "util/error.h"
-#include "util/log.h"
+#include "mischief/util/error.h"
+#include "mischief/util/log.h"
 
 namespace tmport::anim {
 
@@ -11,13 +11,13 @@ namespace {
 
 BundleInfo requireBundle(const ResourceManager& res, int bndlId) {
     auto b = res.bundle(bndlId);
-    if (!b) throw Error(std::format("animation bundle BNDL {} not found", bndlId));
+    if (!b) throw mischief::Error(std::format("animation bundle BNDL {} not found", bndlId));
     return std::move(*b);
 }
 
 std::shared_ptr<const gfx::PixMap> loadPixmap(const ResourceManager& res, int bndlId, int id) {
     auto pm = res.pixmap(id);
-    if (!pm) log::warn("BNDL {}: member PMAP {} not found; its frame slot stays empty", bndlId, id);
+    if (!pm) mischief::log::warn("BNDL {}: member PMAP {} not found; its frame slot stays empty", bndlId, id);
     return pm;
 }
 
@@ -25,9 +25,9 @@ std::shared_ptr<const gfx::PixMap> loadPixmap(const ResourceManager& res, int bn
 
 ScriptPtr loadScript(const ResourceManager& res, int id) {
     auto bytes = res.loadRaw(ResType::OTHR, id);
-    if (!bytes) throw Error(std::format("DAM script OTHR {} not found", id));
+    if (!bytes) throw mischief::Error(std::format("DAM script OTHR {} not found", id));
     ScriptPtr s = makeScript(id, std::move(*bytes));
-    if (!s->hasDamTag() && !s->isDop()) log::warn("OTHR {} does not start with the DAM tag", id);
+    if (!s->hasDamTag() && !s->isDop()) mischief::log::warn("OTHR {} does not start with the DAM tag", id);
     return s;
 }
 

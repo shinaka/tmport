@@ -56,7 +56,7 @@ struct DosOptions {
 
     // Run context (from the launch options and the paths):
     bool headless = false;          // --headless: no window, no sound; end when the --keys script is used up
-    std::string keys;               // --keys script in game ticks (dos/app/script_input.h, PORTING_NOTES §4)
+    std::string keys;               // --keys script in game ticks (mischief/dos/app/script_input.h, PORTING_NOTES §4)
     std::filesystem::path prefDir;  // the engine's preference folder (DOS saves keep their own file there, §5)
     bool verbose = false;           // --verbose
     // --frame-dump given as a folder (an existing folder or a name without an extension): the DOS

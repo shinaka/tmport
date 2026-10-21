@@ -54,13 +54,13 @@ struct DosModFolder {
 
 // Scans a folder; a missing folder gives an empty DosModFolder.
 DosModFolder scanDosModFolder(const std::filesystem::path& dir);
-// Parses mod.json. Throws tmport::FormatError.
+// Parses mod.json. Throws mischief::FormatError.
 DosModManifest parseDosManifest(std::string_view json);
 
 // The DOS mod folders of an ini file (nullptr = none): [mods] enabled = false gives none; [mods]
 // dos_paths = a ';'-separated list (relative to the ini's folder); else <pref>/dos_mods and
 // <executable>/dos_mods. Later folders override earlier ones.
-std::vector<std::filesystem::path> dosModDirsFromIni(const save::IniFile* ini, const std::filesystem::path& iniDir,
+std::vector<std::filesystem::path> dosModDirsFromIni(const mischief::save::IniFile* ini, const std::filesystem::path& iniDir,
                                                      const std::filesystem::path& prefDir, const std::filesystem::path& exeDir);
 // The same for the paths' tmport.ini, then `extra` (--mods) in order.
 std::vector<std::filesystem::path> configuredDosModDirs(const save::Paths& paths, const std::vector<std::filesystem::path>& extra = {});

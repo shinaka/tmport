@@ -1,6 +1,6 @@
 #pragma once
 // Engine: the Windows CD edition's runtime. Owns the frame buffer, palette, input model, cursors,
-// timers and RNG for one run, on top of an edition-neutral platform::Host (platform/host.h: the
+// timers and RNG for one run, on top of the engine's mischief::platform::Host (mischief/platform/host.h: the
 // SDL window, the presenter, the event pump, focus pause, fullscreen, screenshots, the clock).
 // Designed for the original's nested blocking loops (docs/DESIGN.md "Runtime model"): game code
 // runs as ordinary nested functions on the main thread and every wait primitive calls
@@ -23,17 +23,17 @@
 #include <vector>
 
 #include "gfx/frame_buffer.h"
-#include "gfx/palette.h"
-#include "gfx/presenter.h"
 #include "input/cursor_controller.h"
 #include "input/cursors.h"
 #include "input/hotspot_table.h"
 #include "input/input_queue.h"
-#include "platform/host.h"
+#include "mischief/gfx/palette.h"
+#include "mischief/gfx/presenter.h"
+#include "mischief/platform/host.h"
+#include "mischief/rtl/borland_rand.h"
+#include "mischief/timing/clock.h"
+#include "mischief/timing/deadline_timers.h"
 #include "res/game_files.h"
-#include "rtl/borland_rand.h"
-#include "timing/clock.h"
-#include "timing/deadline_timers.h"
 
 union SDL_Event;
 
@@ -56,7 +56,7 @@ struct EngineConfig {
     bool tapLatch = false;          // keep arrow taps shorter than one drain visible for one poll
     int cursorScale = 0;            // 0: follow the window scale; n: fixed magnification of the EXE cursors
     bool gameCursors = true;        // use the EXE's cursors (false: system arrow only)
-    Clock* clock = nullptr;         // nullptr: SDL clock (tests pass a ManualClock)
+    mischief::Clock* clock = nullptr;         // nullptr: SDL clock (tests pass a ManualClock)
     std::filesystem::path screenshotDir;  // empty: <pref path>/screenshots
     std::string title = "Treasure Mountain! (TM Port)";
     bool debugKeys = false;         // F9 toggles showTreasure ([debug] keys, --debug)
@@ -65,7 +65,7 @@ struct EngineConfig {
 
 class Engine {
 public:
-    Engine(GameFiles& files, gfx::ColorMode mode, EngineConfig config = {});
+    Engine(GameFiles& files, mischief::gfx::ColorMode mode, EngineConfig config = {});
     ~Engine();
     Engine(const Engine&) = delete;
     Engine& operator=(const Engine&) = delete;
@@ -76,7 +76,7 @@ public:
     void closeWindow();
     bool hasWindow() const { return host_.hasWindow(); }
     // The platform layer under the engine (window, presenter, event pump, clock).
-    platform::Host& host() { return host_; }
+    mischief::platform::Host& host() { return host_; }
 
     // --- pump and input fetch ---------------------------------------------------------------------
     // Processes pending SDL events (and events queued with postEvent): window events at once,
@@ -104,7 +104,7 @@ public:
     void timerWait(int slot);
     // 10a8:0066 Timer_Expired for spin loops: pumps, and yields up to 1 ms while not expired.
     bool timerExpired(int slot);
-    Clock& clock() { return host_.clock(); }
+    mischief::Clock& clock() { return host_.clock(); }
 
     // --- presentation -----------------------------------------------------------------------------
     // Gfx_BlitToWindow(0,0,512,384) and Gfx_FlushDirtyRects.
@@ -113,7 +113,7 @@ public:
     // F12: game area (512x384) as PNG into the screenshot directory.
     bool screenshot() { return host_.screenshot(); }
 
-    void setPalette(const gfx::Palette& p);
+    void setPalette(const mischief::gfx::Palette& p);
     void setTitle(std::string_view title);
 
     // --- fullscreen -----------------------------------------------------------------------------------
@@ -166,16 +166,16 @@ public:
     bool holding() const { return holding_; }
 
     GameFiles& files() { return files_; }
-    gfx::ColorMode colorMode() const { return mode_; }
+    mischief::gfx::ColorMode colorMode() const { return mode_; }
     gfx::FrameBuffer& frame() { return frame_; }
-    const gfx::Palette& palette() const { return palette_; }
-    gfx::Presenter& presenter() { return host_.presenter(); }
+    const mischief::gfx::Palette& palette() const { return palette_; }
+    mischief::gfx::Presenter& presenter() { return host_.presenter(); }
     InputQueue& input() { return input_; }
     HotspotTable& hotspots() { return input_.hotspots(); }
     CursorSet& cursors() { return cursors_; }
     CursorController& cursor() { return cursorCtl_; }
-    DeadlineTimers& timers() { return timers_; }
-    BorlandRand& rng() { return rng_; }
+    mischief::DeadlineTimers& timers() { return timers_; }
+    mischief::BorlandRand& rng() { return rng_; }
     const EngineConfig& config() const { return config_; }
     // Debug: the room loop boxes the hiding places that hold a treasure or the key (F9 with debugKeys).
     bool showTreasure() const { return config_.showTreasure; }
@@ -191,17 +191,17 @@ private:
     bool liveMousePos(int& x, int& y) const;
 
     GameFiles& files_;
-    gfx::ColorMode mode_;
+    mischief::gfx::ColorMode mode_;
     EngineConfig config_;
-    platform::Host host_;
-    Clock* clock_;
-    gfx::Palette palette_;
+    mischief::platform::Host host_;
+    mischief::Clock* clock_;
+    mischief::gfx::Palette palette_;
     gfx::FrameBuffer frame_;
     InputQueue input_;
     CursorSet cursors_;
     CursorController cursorCtl_;
-    DeadlineTimers timers_;
-    BorlandRand rng_;
+    mischief::DeadlineTimers timers_;
+    mischief::BorlandRand rng_;
 
     std::function<void(bool)> activationHook_;
     std::function<bool(const SDL_Event&)> eventFilter_;

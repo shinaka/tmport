@@ -84,7 +84,9 @@ def load_image(path=None, dos_dir=None) -> Image:
         data = open(path, 'rb').read()
     else:
         sys.path.insert(0, os.path.join(ROOT, 'tools'))
-        import unexepack  # noqa: E402  (tools/unexepack.py)
+        import mischief_engine  # noqa: E402
+        mischief_engine.add_tools_path()
+        import unexepack  # noqa: E402  (the engine's tools/unexepack.py)
         packed = open(os.path.join(dos_dir or DEFAULT_DOS, 'SST.EXE'), 'rb').read()
         data, _, _ = unexepack.unpack(packed)
     (sig, last, pages, nrel, hdr_paras, _mn, _mx, ss, sp, _cs, ip, cs) = \

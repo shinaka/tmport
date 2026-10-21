@@ -11,7 +11,7 @@
 namespace tmport::anim {
 
 // An OTHR resource as a DAM script (bytes with the NE-rounded size, as GetResource loads it).
-// Throws tmport::Error if the resource does not exist. A wrong tag is only logged: the
+// Throws mischief::Error if the resource does not exist. A wrong tag is only logged: the
 // interpreter itself checks nothing but "DOP".
 ScriptPtr loadScript(const ResourceManager& res, int id);
 
@@ -23,7 +23,7 @@ struct LoadedBundle {
 };
 
 // 10d8:0000 Anim_LoadBundle: member 0 of BNDL bndlId is the DAM script, members 1..n-1 go into
-// frame slots frameBase..frameBase+n-2. Throws tmport::Error if the BNDL does not exist; a
+// frame slots frameBase..frameBase+n-2. Throws mischief::Error if the BNDL does not exist; a
 // missing PMAP member leaves its slot empty (logged).
 LoadedBundle loadBundle(const ResourceManager& res, AnimEngine& anim, int bndlId, int frameBase);
 

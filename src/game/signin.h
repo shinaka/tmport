@@ -31,7 +31,7 @@
 #include "save/user_record.h"
 #include "save/users_file.h"
 
-namespace tmport {
+namespace mischief {
 class DeadlineTimers;
 }
 
@@ -114,9 +114,9 @@ public:
 // with 333 ms; a late poll delays every later toggle (no catch-up).
 class CaretBlink {
 public:
-    void start(DeadlineTimers& timers);
+    void start(mischief::DeadlineTimers& timers);
     // expired = the result of Timer_Expired(0) of this pass. True when the caret must be redrawn.
-    bool update(bool expired, DeadlineTimers& timers);
+    bool update(bool expired, mischief::DeadlineTimers& timers);
     int colour() const { return colour_; }
 
 private:

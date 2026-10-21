@@ -27,8 +27,8 @@ endif()
 
 # TinySoundFont (MIT, Bernhard Schelling): the SoundFont 2 synthesizer of the cross-platform MIDI
 # back end. Header-only (tsf.h); compiled once in src/audio/sf2_synth.cpp. The repository has no
-# release tags, so it is pinned to a commit, by URL and SHA-256 like SDL and doctest. It has no
-# CMakeLists.txt: FetchContent only downloads it.
+# release tags, so it is pinned to a commit, by URL and SHA-256 like the engine's SDL and doctest.
+# It has no CMakeLists.txt: FetchContent only downloads it.
 FetchContent_Declare(tinysoundfont
     URL https://github.com/schellingb/TinySoundFont/archive/853a0a171759f1ddba0de1442133a75912bbeffa.tar.gz
     URL_HASH SHA256=76c356df524f71f2a34f67fa0cb2cb946036fe7a65d2930a849569c5e742fa57)

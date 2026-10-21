@@ -11,7 +11,7 @@
 #include "dos/game/sound.h"
 #include "dos/gfx/dos_screens.h"
 #include "dos/save/users_store.h"
-#include "util/error.h"
+#include "mischief/util/error.h"
 
 namespace tmport::dos::autoplay {
 
@@ -47,7 +47,7 @@ Rig::Rig(const DosGfxFiles& files, const RigOptions& o) : options_(o) {
     // effect status; the AdLib driver draws its orchestration rand() from the game's generator.
     const SoundDevice device = o.sound == SoundDevice::Off ? SoundDevice::Tandy : o.sound;
     audio_ = makeDosAudioDevice(files.files(), device, [this] { return game_ ? game_->rand.rand() : 0; });
-    if (!audio_) throw Error("the DOS sound driver could not be created");
+    if (!audio_) throw mischief::Error("the DOS sound driver could not be created");
     sound_ = std::make_unique<DosAudioSound>(*audio_, true);
     sound_->setDelaySource([this] { return runtime_->soundDelay(); });  // as runGame (wave 5)
 
@@ -63,9 +63,9 @@ Rig::~Rig() {
     game_.reset();
 }
 
-void Rig::keyDown(PcKey k) { runtime_->keyDownNow(k); }
-void Rig::keyUp(PcKey k) { runtime_->keyUpNow(k); }
-bool Rig::held(PcKey k) const { return runtime_->keyboard().isHeld(k); }
+void Rig::keyDown(mischief::dos::PcKey k) { runtime_->keyDownNow(k); }
+void Rig::keyUp(mischief::dos::PcKey k) { runtime_->keyUpNow(k); }
+bool Rig::held(mischief::dos::PcKey k) const { return runtime_->keyboard().isHeld(k); }
 void Rig::releaseAll() { runtime_->releaseAllKeys(); }
 
 bool Rig::running() const { return runtime_->running() && !shutdown_; }

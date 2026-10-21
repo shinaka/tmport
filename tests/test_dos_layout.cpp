@@ -16,7 +16,7 @@
 #include "dos/game/signin.h"
 #include "dos/save/users_dat.h"
 #include "dos_game_fixture.h"
-#include "util/png_writer.h"
+#include "mischief/util/png_writer.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -25,7 +25,7 @@ namespace {
 
 // Number of rand() calls that take a generator from `from` to `to` (-1 if more than `limit`).
 int randCallsBetween(uint32_t from, uint32_t to, int limit = 5000) {
-    BorlandRand r;
+    mischief::BorlandRand r;
     r.setRawSeed(from);
     for (int n = 0; n <= limit; ++n) {
         if (r.seed() == to) return n;
@@ -58,7 +58,7 @@ uint32_t layoutCrc(const DosGame& g, int nrand) {
     b.push_back(static_cast<uint8_t>(g.core.tier));
     b.push_back(static_cast<uint8_t>(nrand & 0xFF));
     b.push_back(static_cast<uint8_t>(nrand >> 8));
-    return png::crc32(b);
+    return mischief::png::crc32(b);
 }
 
 struct ReferenceLayout {
@@ -391,7 +391,7 @@ TEST_CASE("dos layout: helpers (slots, mirrors, quirks, CPU patches, castle)") {
     for (uint16_t tier = 0; tier <= 3; ++tier) {
         g.core.tier = tier;
         g.rand.setRawSeed(1234 + tier);
-        BorlandRand ref;
+        mischief::BorlandRand ref;
         ref.setRawSeed(1234 + tier);
         const int expect = ref.rand() % (tier + 1);
         CHECK(castlePickLayout(g) == expect);
@@ -404,7 +404,7 @@ TEST_CASE("dos layout: helpers (slots, mirrors, quirks, CPU patches, castle)") {
     g.core.tier = 7;
     g.world.castleLayout = 3;
     g.rand.setRawSeed(99);
-    BorlandRand ref;
+    mischief::BorlandRand ref;
     ref.setRawSeed(99);
     CHECK(castlePickLayout(g) == ref.rand() % 3);
 

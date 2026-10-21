@@ -9,9 +9,9 @@
 #include "game/game_tables.h"
 #include "game/room_table.h"
 #include "game/rules.h"
+#include "mischief/util/file_util.h"
 #include "save/user_record.h"
 #include "save/users_file.h"
-#include "util/file_util.h"
 
 namespace tmport::autoplay {
 
@@ -228,7 +228,7 @@ void Checker::onRoomTick(const game::GameState& s) {
 void Checker::onSave(const game::GameState& s, const std::filesystem::path& usersDat, std::string_view why) {
     ++saveChecks_;
     const std::string where = std::format("save ({})", why);
-    auto bytes = readWholeFile(usersDat);
+    auto bytes = mischief::readWholeFile(usersDat);
     if (!bytes) {
         if (s.player.signedIn()) fail(std::format("{}: users.dat missing after the save", where));
         return;

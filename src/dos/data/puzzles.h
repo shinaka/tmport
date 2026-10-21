@@ -29,7 +29,7 @@ public:
     static constexpr size_t kEntrySize = 16;
     static constexpr int kReachable = 128;  // a byte b >= 0x80 selects entry b & 0x7F
 
-    // Needs at least the 128 reachable entries. Throws tmport::FormatError.
+    // Needs at least the 128 reachable entries. Throws mischief::FormatError.
     static Dictionary parse(std::span<const uint8_t> prgDict);
 
     // Entry i & 0x7F up to its NUL. Like the original's copy loop it runs into the next entry when
@@ -50,7 +50,7 @@ struct Puzzle {
     std::array<std::string, 3> answers; // DS:a22a + 35*n; answer 0 is correct
 };
 
-// Splits an expanded question. Throws tmport::FormatError if there is no '~' (none in V 1.0).
+// Splits an expanded question. Throws mischief::FormatError if there is no '~' (none in V 1.0).
 Puzzle splitPuzzle(std::string_view expanded);
 
 // ALL_PUZS: 360 u16 offsets (relative to the end of the table), then the NUL-terminated texts.
@@ -61,7 +61,7 @@ public:
     static constexpr size_t kWindowSize = 0x7B00; // the one read of question texts
 
     // Checks the table and that every text is NUL-terminated inside the file. Throws
-    // tmport::FormatError.
+    // mischief::FormatError.
     static PuzzleFile parse(std::span<const uint8_t> allPuzs);
 
     size_t fileSize() const { return bytes_.size(); }
@@ -94,7 +94,7 @@ public:
     static constexpr int kEntries = 7;
 
     // Words 0..4 from the EXE, word 5 = puzzles.tier5Start(), word 6 = 360. Checks that the words
-    // ascend and fit 360. Throws tmport::FormatError.
+    // ascend and fit 360. Throws mischief::FormatError.
     static QuizTiers read(const DosExe& exe, const PuzzleFile& puzzles);
 
     uint16_t start(int index) const { return starts_.at(static_cast<size_t>(index)); }

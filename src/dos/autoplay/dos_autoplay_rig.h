@@ -17,6 +17,10 @@
 
 #include "edition/dos_options.h"
 
+namespace mischief::dos {
+struct PcKey;
+}  // namespace mischief::dos
+
 namespace tmport::dos {
 class DosGfxFiles;
 class DosGame;
@@ -24,7 +28,6 @@ class DosRuntime;
 class DosUsersStore;
 class DosAudioDevice;
 class DosAudioSound;
-struct PcKey;
 }  // namespace tmport::dos
 
 namespace tmport::dos::autoplay {
@@ -54,9 +57,9 @@ public:
     const RigOptions& options() const { return options_; }
 
     // Key events at the current virtual time (applied right before the next game tick).
-    void keyDown(PcKey k);
-    void keyUp(PcKey k);
-    bool held(PcKey k) const;
+    void keyDown(mischief::dos::PcKey k);
+    void keyUp(mischief::dos::PcKey k);
+    bool held(mischief::dos::PcKey k) const;
     void releaseAll();
 
     // One game tick (with its frame). False once the game has quit (g_quit after a frame): then

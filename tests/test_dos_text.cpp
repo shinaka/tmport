@@ -14,7 +14,7 @@
 #include "dos/text/text_draw.h"
 #include "dos/text/ui_draw.h"
 #include "dos_test_data.h"
-#include "util/hash.h"
+#include "mischief/util/hash.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -168,8 +168,8 @@ TEST_CASE("DOS font and boxes: the user's SST.EXE") {
     CHECK(f.unknown0() == 7);
     std::vector<uint8_t> widths;
     for (int c = 0; c < f.count(); ++c) widths.push_back(static_cast<uint8_t>(f.width(c)));
-    uint64_t h = fnv1a64(widths);
-    for (int c = 0; c < f.count(); ++c) h = fnv1a64(f.glyph(c), h);
+    uint64_t h = mischief::fnv1a64(widths);
+    for (int c = 0; c < f.count(); ++c) h = mischief::fnv1a64(f.glyph(c), h);
     CHECK(h == 0x7b7d14cae5d8c149ull);  // as tools/dos/dos_font.py
     CHECK(f.width(' ') == 7);
     // The expansion table 2005:8900 and the sprite mask 2005:8600 in the back-buffer segment.

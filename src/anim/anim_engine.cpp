@@ -1,6 +1,6 @@
 #include "anim/anim_engine.h"
 
-#include "util/log.h"
+#include "mischief/util/log.h"
 
 namespace tmport::anim {
 
@@ -157,13 +157,13 @@ void AnimEngine::runChannel(int ch) {
             if (c.cursor < bytes.size()) {
                 op = bytes[c.cursor++];
             } else {
-                log::warn("DAM script {}: channel {} ran past the end of the script; ending it", script->id, ch);
+                mischief::log::warn("DAM script {}: channel {} ran past the end of the script; ending it", script->id, ch);
             }
             if (op == kOpEndFrame) return;
         }
         if (c.stop) op = kOpEnd;  // a pending stop turns the next opcode into END
         if (++ops > kMaxOpsPerTick) {
-            log::warn("DAM script {}: channel {} did not reach FE in {} opcodes; ending it", script->id, ch, kMaxOpsPerTick);
+            mischief::log::warn("DAM script {}: channel {} did not reach FE in {} opcodes; ending it", script->id, ch, kMaxOpsPerTick);
             op = kOpEnd;
         }
         switch (op) {
@@ -241,7 +241,7 @@ void AnimEngine::drawSprites(uint8_t layerId, int yOff, int bgYOff) {
         if (!s.pixmap) {
             if (missingWarnings < kMaxWarnings) {
                 ++missingWarnings;
-                log::warn("DAM sprite at ({}, {}) uses empty frame slot {}; not drawn", s.x, s.y, s.frame);
+                mischief::log::warn("DAM sprite at ({}, {}) uses empty frame slot {}; not drawn", s.x, s.y, s.frame);
             }
             continue;
         }

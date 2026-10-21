@@ -17,9 +17,9 @@
 #include "dos/gfx/palettes.h"
 #include "dos/save/dosbox_state.h"
 #include "dos_test_data.h"
-#include "mods/png_codec.h"
+#include "mischief/mods/png_codec.h"
+#include "mischief/util/file_util.h"
 #include "test_dos_player_harness.h"
-#include "util/file_util.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -911,7 +911,7 @@ struct CaptureRun {
 // latches scene 3 first, so the icon stays as in the other 4 runs (re/dos/docs/ENGINE_MAP.md §8).
 constexpr std::array<int, 4> kKeyIcon = {6, 165, 22, 191};
 
-int differingPixels(const DosGame& g, const tmport::mods::DecodedPng& cap, bool keyMask) {
+int differingPixels(const DosGame& g, const mischief::mods::DecodedPng& cap, bool keyMask) {
     const std::vector<uint8_t> shown = toRgba(g.screen, g.palette);
     int n = 0;
     for (int y = 0; y < BackBuffer::kHeight; ++y)
@@ -987,9 +987,9 @@ TEST_CASE("DOS player: the end of a game from the reference states equals the ca
             done = std::max(done, c.tick);
             const auto file = testdata::dosCapture(c.capture);
             REQUIRE(file.has_value());
-            const auto bytes = readWholeFile(*file);
+            const auto bytes = mischief::readWholeFile(*file);
             REQUIRE(bytes.has_value());
-            const tmport::mods::DecodedPng cap = tmport::mods::decodePng(*bytes);
+            const mischief::mods::DecodedPng cap = mischief::mods::decodePng(*bytes);
             REQUIRE(cap.width == BackBuffer::kWidth);
             REQUIRE(cap.height == BackBuffer::kHeight);
             CHECK(differingPixels(g, cap, c.keyMask) == 0);

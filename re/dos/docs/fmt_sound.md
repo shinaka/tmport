@@ -537,7 +537,7 @@ Outputs (`python -P tools/dos/dos_sound.py all`): `tunes_ibm_00..02.wav`,
   at 236.696 Hz (e.g. advance it in the audio callback by sample count) and feed either a
   speaker model or an SN76496 model. The two period tables and the envelope table must come
   from SST.EXE's DGROUP (offsets in §4.2/§5.4), so the engine needs the unpacked EXE image
-  (EXEPACK, `tools\unexepack.py` algorithm) or must locate DGROUP the same way the tools do
+  (EXEPACK, the engine's `tools\unexepack.py` algorithm) or must locate DGROUP the same way the tools do
   (the entry point starts `MOV DX,DGROUP`; DS:0004 holds the Turbo C copyright).
 * Reproduce the quirks that change the sound: music frozen during effects (non-AdLib),
   effect priority by id, Tandy octave folding (periods > 1023), the release gap rules, the

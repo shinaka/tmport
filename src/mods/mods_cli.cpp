@@ -10,14 +10,14 @@
 
 #include "dos/mods/dos_mods_cli.h"
 #include "edition/edition.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
+#include "mischief/vfs/data_source.h"
 #include "mods/mod_kit.h"
 #include "mods/mods.h"
 #include "res/game_files.h"
 #include "save/settings.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/log.h"
-#include "vfs/data_source.h"
 
 namespace tmport::mods {
 
@@ -32,16 +32,16 @@ void out(std::format_string<Args...> fmt, Args&&... args) {
 
 std::filesystem::path exeDirectory() {
     const char* base = SDL_GetBasePath();
-    return base ? pathFromUtf8(base) : std::filesystem::path();
+    return base ? mischief::pathFromUtf8(base) : std::filesystem::path();
 }
 
 std::optional<std::filesystem::path> dataPathFrom(const std::string& arg, const save::Paths& paths) {
-    if (!arg.empty()) return pathFromUtf8(arg);
-    if (auto env = getEnv("TM_DATA")) return pathFromUtf8(*env);
+    if (!arg.empty()) return mischief::pathFromUtf8(arg);
+    if (auto env = mischief::getEnv("TM_DATA")) return mischief::pathFromUtf8(*env);
     if (!paths.iniPath.empty())
-        if (auto ini = save::IniFile::load(paths.iniPath))
-            if (auto d = ini->get("engine", "data"); d && !d->empty()) return pathFromUtf8(*d);
-    return vfs::autoDetectDataPath(exeDirectory());
+        if (auto ini = mischief::save::IniFile::load(paths.iniPath))
+            if (auto d = ini->get("engine", "data"); d && !d->empty()) return mischief::pathFromUtf8(*d);
+    return mischief::vfs::autoDetectDataPath(exeDirectory());
 }
 
 // --edition dos, or (no --edition) a --data path that holds only the DOS edition. Without either,
@@ -49,7 +49,7 @@ std::optional<std::filesystem::path> dataPathFrom(const std::string& arg, const 
 bool isDosEdition(const std::string& edition, const std::string& dataArg) {
     if (!edition.empty() && edition != "auto") return parseEditionKey(edition) == Edition::Dos1990;
     if (dataArg.empty()) return false;
-    const EditionScan scan = scanEditions(pathFromUtf8(dataArg));
+    const EditionScan scan = scanEditions(mischief::pathFromUtf8(dataArg));
     return scan.dos && !scan.win;
 }
 
@@ -125,9 +125,9 @@ std::optional<int> runModsCommand(int argc, char** argv) {
             return 2;
         }
     }
-    log::setVerbose(verbose);
+    mischief::log::setVerbose(verbose);
     save::Paths paths = save::Paths::detect();
-    if (!configPath.empty()) paths.iniPath = pathFromUtf8(configPath);
+    if (!configPath.empty()) paths.iniPath = mischief::pathFromUtf8(configPath);
     // The 1990 DOS edition (dos/mods/dos_mods_cli.h): --edition dos, or --data naming a DOS folder.
     if (!edition.empty() && edition != "auto" && !parseEditionKey(edition)) {
         std::fprintf(stderr, "tmport: --edition takes win, dos or auto, not '%s'\n", edition.c_str());
@@ -142,7 +142,7 @@ std::optional<int> runModsCommand(int argc, char** argv) {
         dc.exportKit = cmd == Cmd::Export;
         dc.outDir = outDir;
         dc.dataArg = dataPath;
-        for (const auto& d : dirs) dc.modDirs.push_back(pathFromUtf8(d));
+        for (const auto& d : dirs) dc.modDirs.push_back(mischief::pathFromUtf8(d));
         dc.force = force;
         dc.verify = verify;
         dc.compare = compare;
@@ -156,7 +156,7 @@ std::optional<int> runModsCommand(int argc, char** argv) {
     }
     try {
         ResourceManager::Options ro;
-        ro.colorMode = colour16 ? gfx::ColorMode::Colour16 : gfx::ColorMode::Colour256;
+        ro.colorMode = colour16 ? mischief::gfx::ColorMode::Colour16 : mischief::gfx::ColorMode::Colour256;
         ro.requireSounds = cmd == Cmd::Export;
         ro.cachePixmaps = false;
         GameFiles files = GameFiles::open(*data, ro);
@@ -166,7 +166,7 @@ std::optional<int> runModsCommand(int argc, char** argv) {
             ModKitOptions mo;
             mo.force = force;
             mo.verify = verify;
-            const ModKitReport r = exportModKit(files, pathFromUtf8(outDir), mo);
+            const ModKitReport r = exportModKit(files, mischief::pathFromUtf8(outDir), mo);
             for (const auto& [g, n] : r.counts) out("  {:<7} {:>5} files\n", g, n);
             const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
             out("{} files, {:.1f} MB in {:.1f} s\n", r.files, static_cast<double>(r.bytes) / (1024.0 * 1024.0), secs);
@@ -176,15 +176,15 @@ std::optional<int> runModsCommand(int argc, char** argv) {
             return r.failures.empty() ? 0 : 1;
         }
         std::vector<std::filesystem::path> modDirs;
-        for (const auto& d : dirs) modDirs.push_back(pathFromUtf8(d));
+        for (const auto& d : dirs) modDirs.push_back(mischief::pathFromUtf8(d));
         if (modDirs.empty()) modDirs = configuredModDirs(paths);
         ModsReport rep = applyMods(files, modDirs);
         validateInstalledMods(files, rep);
         out("Mod folders ({}):\n", rep.folders.size());
-        for (const auto& d : rep.folders) out("  {}\n", pathToUtf8(d));
+        for (const auto& d : rep.folders) out("  {}\n", mischief::pathToUtf8(d));
         if (rep.folders.empty()) {
             out("  (none found; looked in:");
-            for (const auto& d : modDirs) out(" {}", pathToUtf8(d));
+            for (const auto& d : modDirs) out(" {}", mischief::pathToUtf8(d));
             out(")\n");
         }
         out("{} resource override(s), {} table file(s), {} MIDI file(s)\n", rep.resourceOverrides, rep.tableFiles, rep.tunes);
@@ -198,7 +198,7 @@ std::optional<int> runModsCommand(int argc, char** argv) {
         }
         out("Result: {}\n", rep.errors.empty() ? "OK" : "PROBLEMS FOUND");
         return rep.errors.empty() ? 0 : 1;
-    } catch (const MissingFileError& e) {
+    } catch (const mischief::MissingFileError& e) {
         std::fprintf(stderr, "tmport: missing game file %s: %s\n", e.file().c_str(), e.what());
         return 3;
     } catch (const std::exception& e) {

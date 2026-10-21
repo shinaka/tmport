@@ -5,7 +5,7 @@
 #include <mutex>
 
 #include "audio/midi_backend_soundfont.h"
-#include "util/log.h"
+#include "mischief/util/log.h"
 
 namespace tmport::audio {
 
@@ -34,7 +34,7 @@ std::unique_ptr<MidiBackend> createMidiBackend(const MidiBackendConfig& config) 
         case MidiBackendKind::WinMM: return createWinMmMidiBackend();
         case MidiBackendKind::SoundFont:
             if (!haveSf2) {
-                log::warn("midi: the SoundFont MIDI output needs a SoundFont: set soundfont = <file.sf2> in [audio] of "
+                mischief::log::warn("midi: the SoundFont MIDI output needs a SoundFont: set soundfont = <file.sf2> in [audio] of "
                           "tmport.ini or pass --soundfont <file.sf2>; music is disabled");
                 return std::make_unique<SoundFontMidiBackend>(SoundFontMidiBackend::Config{});  // cannot open
             }
@@ -43,7 +43,7 @@ std::unique_ptr<MidiBackend> createMidiBackend(const MidiBackendConfig& config) 
             if (config.kind == MidiBackendKind::Auto) {
                 static std::once_flag once;
                 std::call_once(once, [] {
-                    log::info("midi: no MIDI synthesizer on this platform and no SoundFont configured, so the music is "
+                    mischief::log::info("midi: no MIDI synthesizer on this platform and no SoundFont configured, so the music is "
                               "silent. Set soundfont = <General MIDI .sf2 file> in [audio] of tmport.ini (or pass "
                               "--soundfont <file.sf2>) to hear it; see docs/BUILDING.md.");
                 });

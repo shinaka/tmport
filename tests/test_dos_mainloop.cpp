@@ -15,7 +15,7 @@
 #include <vector>
 
 #include "app/bootstrap.h"
-#include "app_test_util.h"
+#include "mischief/test/app_test_util.h"
 #include "dos/app/dos_preview.h"
 #include "dos/audio/dos_audio_device.h"
 #include "dos/game/anim.h"
@@ -28,8 +28,8 @@
 #include "dos/save/dosbox_state.h"
 #include "dos_game_fixture.h"
 #include "dos_test_data.h"
-#include "rtl/borland_rand.h"
-#include "util/file_util.h"
+#include "mischief/rtl/borland_rand.h"
+#include "mischief/util/file_util.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -521,7 +521,7 @@ TEST_CASE("dos mainloop: a DGROUP dump and its field list") {
     const fs::path dir = apptest::outDir("dos_mainloop_dump");
     const fs::path file = dir / "state.bin";
     REQUIRE(writeDgroupDump(g, file));
-    const auto bytes = readWholeFile(file);
+    const auto bytes = mischief::readWholeFile(file);
     REQUIRE(bytes);
     CHECK(bytes->size() == kDgroupSize);
     CHECK((*bytes)[dg::kCoins] == 0x34);
@@ -540,7 +540,7 @@ namespace {
 
 // The number of rand() calls that take the Turbo C generator from seed 1 to `seed` (bounded search).
 int randDrawsSinceStart(uint32_t seed, int limit = 200000) {
-    BorlandRand r;
+    mischief::BorlandRand r;
     for (int n = 0; n <= limit; ++n) {
         if (r.seed() == seed) return n;
         (void)r.rand();
@@ -662,10 +662,10 @@ TEST_CASE("dos mainloop: a headless start-up runs the game with a trace, a state
     const bool audioBefore = SDL_WasInit(SDL_INIT_AUDIO) != 0;
     const fs::path dir = apptest::outDir("dos_mainloop_run");
     std::ofstream(dir / "tmport.ini") << "[saves]\nimported_original = true\n";
-    const std::string data = pathToUtf8(*testdata::dosDataPath());
-    const std::string pref = pathToUtf8(dir), ini = pathToUtf8(dir / "tmport.ini");
-    const std::string trace = pathToUtf8(dir / "trace.csv"), frames = pathToUtf8(dir / "frames");
-    const std::string dump = "150:" + pathToUtf8(dir / "state150.bin");
+    const std::string data = mischief::pathToUtf8(*testdata::dosDataPath());
+    const std::string pref = mischief::pathToUtf8(dir), ini = mischief::pathToUtf8(dir / "tmport.ini");
+    const std::string trace = mischief::pathToUtf8(dir / "trace.csv"), frames = mischief::pathToUtf8(dir / "frames");
+    const std::string dump = "150:" + mischief::pathToUtf8(dir / "state150.bin");
     std::vector<const char*> argv = {"tmport", "--edition", "dos", "--data", data.c_str(), "--headless", "--pref-dir", pref.c_str(),
                                      "--config", ini.c_str(), "--frame-dump", frames.c_str(), "--dos-trace", trace.c_str(),
                                      "--dos-dump-state", dump.c_str(), "--dos-ticks", "200", "--keys", "60:tap:enter"};

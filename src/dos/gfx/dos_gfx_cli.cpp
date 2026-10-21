@@ -9,9 +9,9 @@
 
 #include "dos/gfx/dos_screens.h"
 #include "dos/gfx/scenery.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/png_writer.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/png_writer.h"
 
 namespace tmport::dos {
 
@@ -163,9 +163,9 @@ std::optional<Args> parse(int argc, char** argv, std::string& error) {
 
 // The DOS folder: --data, TM_DATA_DOS, or the folder of an input file.
 std::optional<std::filesystem::path> dataDir(const Args& a) {
-    if (!a.dataPath.empty()) return pathFromUtf8(a.dataPath);
-    if (auto env = getEnv("TM_DATA_DOS")) return pathFromUtf8(*env);
-    const auto p = pathFromUtf8(a.target);
+    if (!a.dataPath.empty()) return mischief::pathFromUtf8(a.dataPath);
+    if (auto env = mischief::getEnv("TM_DATA_DOS")) return mischief::pathFromUtf8(*env);
+    const auto p = mischief::pathFromUtf8(a.target);
     std::error_code ec;
     if (std::filesystem::is_regular_file(p, ec)) return p.parent_path().empty() ? std::filesystem::path(".") : p.parent_path();
     return std::nullopt;
@@ -173,7 +173,7 @@ std::optional<std::filesystem::path> dataDir(const Args& a) {
 
 // A file given as a path, or by name / stem in the DOS folder; returns its upper-case stem.
 std::string stemOf(const Args& a, std::string_view ext) {
-    std::string stem = toUpperAscii(pathToUtf8(pathFromUtf8(a.target).filename()));
+    std::string stem = mischief::toUpperAscii(mischief::pathToUtf8(mischief::pathFromUtf8(a.target).filename()));
     if (stem.ends_with(ext)) stem.resize(stem.size() - ext.size());
     return stem;
 }
@@ -181,7 +181,7 @@ std::string stemOf(const Args& a, std::string_view ext) {
 // Logical-colour image (one byte per pixel) -> PNG: indexed with the look's 16 colours (plus
 // `extra` colours for indices 16..), or RGBA for CGA (its colour depends on the pixel position).
 bool writeLogical(const std::filesystem::path& out, int w, int h, const std::vector<uint8_t>& px, const LookPalette& pal,
-                  int scale, std::span<const Rgb8> extra = {}) {
+                  int scale, std::span<const mischief::Rgb8> extra = {}) {
     const int sw = w * scale, sh = h * scale;
     auto src = [&](int x, int y) { return px[static_cast<size_t>(y / scale) * w + x / scale]; };
     if (pal.look == Look::Cga) {
@@ -189,18 +189,18 @@ bool writeLogical(const std::filesystem::path& out, int w, int h, const std::vec
         for (int y = 0; y < sh; ++y)
             for (int x = 0; x < sw; ++x) {
                 const uint8_t c = src(x, y);
-                const Rgb8 rgb = c < 16 ? pal.at(c, x / scale, y / scale) : extra[c - 16];
+                const mischief::Rgb8 rgb = c < 16 ? pal.at(c, x / scale, y / scale) : extra[c - 16];
                 uint8_t* o = &rgba[(static_cast<size_t>(y) * sw + x) * 4];
                 o[0] = rgb.r, o[1] = rgb.g, o[2] = rgb.b, o[3] = 0xFF;
             }
-        return png::writeRgba(out, sw, sh, rgba);
+        return mischief::png::writeRgba(out, sw, sh, rgba);
     }
-    std::vector<Rgb8> colours(pal.colours.begin(), pal.colours.end());
+    std::vector<mischief::Rgb8> colours(pal.colours.begin(), pal.colours.end());
     colours.insert(colours.end(), extra.begin(), extra.end());
     std::vector<uint8_t> idx(static_cast<size_t>(sw) * sh);
     for (int y = 0; y < sh; ++y)
         for (int x = 0; x < sw; ++x) idx[static_cast<size_t>(y) * sw + x] = src(x, y);
-    return png::writeIndexed(out, sw, sh, idx, colours);
+    return mischief::png::writeIndexed(out, sw, sh, idx, colours);
 }
 
 int runPan(const Args& a, const std::filesystem::path& dir) {
@@ -224,9 +224,9 @@ int runPan(const Args& a, const std::filesystem::path& dir) {
     } else {  // the whole 16x16-block world on the block grid DS:0CAA
         auto pictures = initialCellPictures(files.exe());
         if (!a.usersPath.empty()) {
-            const auto users = readWholeFile(pathFromUtf8(a.usersPath));
+            const auto users = mischief::readWholeFile(mischief::pathFromUtf8(a.usersPath));
             const size_t at = 3 + static_cast<size_t>(a.slot) * 0x168;
-            if (!users || users->size() < at + 0x168) throw FormatError(a.usersPath + ": no record " + std::to_string(a.slot));
+            if (!users || users->size() < at + 0x168) throw mischief::FormatError(a.usersPath + ": no record " + std::to_string(a.slot));
             restoreCellPictures(files.exe(), std::span<const uint8_t>(*users).subspan(at, 0x168), pictures);
         }
         w = h = 16 * 128;
@@ -239,8 +239,8 @@ int runPan(const Args& a, const std::filesystem::path& dir) {
             for (int y = 0; y < 128; ++y) std::copy_n(&pic[static_cast<size_t>(y) * 128], 128, &px[static_cast<size_t>(oy + y) * w + ox]);
         }
     }
-    const Rgb8 extra[] = {{40, 40, 52}};
-    if (!writeLogical(pathFromUtf8(a.outPath), w, h, px, pal, a.scale, extra)) throw Error("cannot write " + a.outPath);
+    const mischief::Rgb8 extra[] = {{40, 40, 52}};
+    if (!writeLogical(mischief::pathFromUtf8(a.outPath), w, h, px, pal, a.scale, extra)) throw mischief::Error("cannot write " + a.outPath);
     std::printf("%s: %d picture(s) of %dx%d tiles, %d tiles -> %s (%dx%d)\n", pan.name().c_str(), pan.pictureCount(),
                 pan.widthTiles(), pan.heightTiles(), pan.tileCount(), a.outPath.c_str(), w * a.scale, h * a.scale);
     return 0;
@@ -294,8 +294,8 @@ int runPak(const Args& a, const std::filesystem::path& dir) {
             }
         drawLabel(px, w, files.font(), p.x, p.y + f.height + 1, std::to_string(f.index), kText);
     }
-    const Rgb8 extra[] = {{40, 40, 52}, {72, 72, 90}, {230, 230, 230}};
-    if (!writeLogical(pathFromUtf8(a.outPath), w, h, px, pal, a.scale, extra)) throw Error("cannot write " + a.outPath);
+    const mischief::Rgb8 extra[] = {{40, 40, 52}, {72, 72, 90}, {230, 230, 230}};
+    if (!writeLogical(mischief::pathFromUtf8(a.outPath), w, h, px, pal, a.scale, extra)) throw mischief::Error("cannot write " + a.outPath);
     std::printf("%s: %d frames -> %s (%dx%d)\n", pak.name().c_str(), pak.count(), a.outPath.c_str(), w * a.scale, h * a.scale);
     return 0;
 }
@@ -309,7 +309,7 @@ int runScreen(const Args& a, const std::filesystem::path& dir) {
     }
     const DosGfxFiles files = DosGfxFiles::open(dir);
     DosScreenSpec spec = defaultScreenSpec(*screen, a.look);
-    if (!a.usersPath.empty()) spec.usersFile = pathFromUtf8(a.usersPath);
+    if (!a.usersPath.empty()) spec.usersFile = mischief::pathFromUtf8(a.usersPath);
     spec.usersSlot = a.slot;
     if (a.camera) spec.camX = static_cast<uint16_t>(a.camera->first), spec.camY = static_cast<uint16_t>(a.camera->second);
     if (a.noSparkle) spec.sparkleSpot = -1;
@@ -339,16 +339,16 @@ int runScreen(const Args& a, const std::filesystem::path& dir) {
     spec.typedName = a.typedName;
     spec.cursorOn = !a.cursorOff;
     if (!a.backgroundPath.empty()) {
-        const auto bg = readWholeFile(pathFromUtf8(a.backgroundPath));
+        const auto bg = mischief::readWholeFile(mischief::pathFromUtf8(a.backgroundPath));
         if (!bg || bg->size() != static_cast<size_t>(BackBuffer::kWidth) * BackBuffer::kHeight)
-            throw Error(a.backgroundPath + ": expected 64000 bytes of logical colours (320x200)");
+            throw mischief::Error(a.backgroundPath + ": expected 64000 bytes of logical colours (320x200)");
         spec.background = *bg;
     }
     const BackBuffer buf = composeScreen(files, spec);
     const auto logical = buf.logicalPixels();
-    if (!a.logicalPath.empty() && !writeWholeFile(pathFromUtf8(a.logicalPath), logical)) throw Error("cannot write " + a.logicalPath);
-    if (!writeLogical(pathFromUtf8(a.outPath), BackBuffer::kWidth, BackBuffer::kHeight, logical, lookPalette(files.exe(), a.look), a.scale))
-        throw Error("cannot write " + a.outPath);
+    if (!a.logicalPath.empty() && !mischief::writeWholeFile(mischief::pathFromUtf8(a.logicalPath), logical)) throw mischief::Error("cannot write " + a.logicalPath);
+    if (!writeLogical(mischief::pathFromUtf8(a.outPath), BackBuffer::kWidth, BackBuffer::kHeight, logical, lookPalette(files.exe(), a.look), a.scale))
+        throw mischief::Error("cannot write " + a.outPath);
     std::printf("%s (%s) -> %s\n", std::string(dosScreenName(*screen)).c_str(), std::string(lookName(a.look)).c_str(), a.outPath.c_str());
     return 0;
 }
@@ -375,7 +375,7 @@ std::optional<int> runDosGfxCommand(int argc, char** argv) {
             case Cmd::Screen: return runScreen(*args, *dir);
             case Cmd::None: break;
         }
-    } catch (const MissingFileError& e) {
+    } catch (const mischief::MissingFileError& e) {
         std::fprintf(stderr, "tmport: missing game file %s: %s\n", e.file().c_str(), e.what());
         return 3;
     } catch (const std::out_of_range& e) {

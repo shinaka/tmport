@@ -2,8 +2,8 @@
 
 #include <format>
 
+#include "mischief/util/error.h"
 #include "ne/ne_image.h"
-#include "util/error.h"
 
 namespace tmport {
 
@@ -14,17 +14,17 @@ constexpr uint16_t kRtGroupIcon = 14;
 
 }  // namespace
 
-IconImage loadGroupIcon(const ne::NeImage& image, uint16_t groupId) {
+mischief::IconImage loadGroupIcon(const ne::NeImage& image, uint16_t groupId) {
     const ne::Resource* g = image.findResource(kRtGroupIcon, groupId);
-    if (!g) throw Error(std::format("{}: RT_GROUP_ICON {} not found", image.name(), groupId));
-    const auto entries = parseIconDirectory(image.readResource(*g));
-    if (entries.empty()) throw FormatError(std::format("RT_GROUP_ICON {}: empty", groupId));
-    const IconDirEntry* best = bestIconEntry(entries);
+    if (!g) throw mischief::Error(std::format("{}: RT_GROUP_ICON {} not found", image.name(), groupId));
+    const auto entries = mischief::parseIconDirectory(image.readResource(*g));
+    if (entries.empty()) throw mischief::FormatError(std::format("RT_GROUP_ICON {}: empty", groupId));
+    const mischief::IconDirEntry* best = mischief::bestIconEntry(entries);
     const ne::Resource* res = image.findResource(kRtIcon, best->iconId);
-    if (!res) throw Error(std::format("{}: RT_ICON {} (group {}) not found", image.name(), best->iconId, groupId));
+    if (!res) throw mischief::Error(std::format("{}: RT_ICON {} (group {}) not found", image.name(), best->iconId, groupId));
     auto data = image.readResource(*res);
     if (best->bytesInRes != 0 && best->bytesInRes <= data.size()) data.resize(best->bytesInRes);  // NE padding
-    return decodeIconResource(data);
+    return mischief::decodeIconResource(data);
 }
 
 }  // namespace tmport

@@ -1260,7 +1260,8 @@ incomplete; direct calls also use 1, 2, 5, 8 and 9, and the scripts use 0, 2, 3,
 
 ## 13. Randomness in these modules (order of `rand()` calls)
 
-Turbo C `rand` = Borland LCG (`src/rtl/borland_rand`); `R(n)` = `rand() % n` (signed, result ≥ 0).
+Turbo C `rand` = Borland LCG (the engine's `src/mischief/rtl/borland_rand`); `R(n)` = `rand() % n`
+(signed, result ≥ 0).
 In the order the calls happen [O]:
 
 | When | Calls |

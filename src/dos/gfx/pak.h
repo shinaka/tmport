@@ -42,7 +42,7 @@ struct PakFrame {
 
 class PakFile {
 public:
-    // Decodes a .PAK file; throws tmport::FormatError on a malformed file.
+    // Decodes a .PAK file; throws mischief::FormatError on a malformed file.
     static PakFile load(std::span<const uint8_t> file, std::string name);
 
     const std::string& name() const { return name_; }

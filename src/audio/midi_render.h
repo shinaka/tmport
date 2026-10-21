@@ -32,7 +32,7 @@ struct MidiRenderResult {
     int maxVoices = 0;          // most synthesizer voices sounding at a block boundary
 };
 
-// Renders `song` on `synth` (which is reset first). Throws tmport::Error if the synth is missing.
+// Renders `song` on `synth` (which is reset first). Throws mischief::Error if the synth is missing.
 MidiRenderResult renderMidiSong(const std::shared_ptr<const MidiSong>& song, const std::shared_ptr<Sf2Synth>& synth,
                                 const MidiRenderOptions& options);
 

@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "util/error.h"
+#include "mischief/util/error.h"
 
 namespace tmport::mods {
 
@@ -36,10 +36,10 @@ inline bool isNePadded(std::span<const uint8_t> body, size_t significant) {
 }
 
 // A syntax error in a mod text file, with the 1-based line (and column, 0 if unknown).
-class ModSyntaxError : public FormatError {
+class ModSyntaxError : public mischief::FormatError {
 public:
     ModSyntaxError(const std::string& msg, int line, int column = 0)
-        : FormatError(column > 0 ? "line " + std::to_string(line) + ", column " + std::to_string(column) + ": " + msg
+        : mischief::FormatError(column > 0 ? "line " + std::to_string(line) + ", column " + std::to_string(column) + ": " + msg
                                  : "line " + std::to_string(line) + ": " + msg),
           line_(line),
           column_(column) {}

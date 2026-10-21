@@ -15,10 +15,10 @@
 #include "game/layout.h"
 #include "game/quiz.h"
 #include "game/rules.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/hash.h"
 #include "save/user_record.h"
 #include "test_data.h"
-#include "util/file_util.h"
-#include "util/hash.h"
 
 using namespace tmport;
 using namespace tmport::game;
@@ -144,12 +144,12 @@ TEST_CASE("record: field mapping and name strcpy semantics") {
 }
 
 TEST_CASE("record: real users.dat records round-trip; reference climbs re-derived") {
-    const auto path = getEnv("TM_USERS_DAT");
+    const auto path = mischief::getEnv("TM_USERS_DAT");
     if (!path) {
         MESSAGE("TM_USERS_DAT is not set: test skipped");
         return;
     }
-    const auto file = readWholeFile(pathFromUtf8(*path));
+    const auto file = mischief::readWholeFile(mischief::pathFromUtf8(*path));
     REQUIRE(file);
     REQUIRE(file->size() >= 4 + 7 * kRecordSize);
     std::vector<Record> records;
@@ -183,7 +183,7 @@ TEST_CASE("record: real users.dat records round-trip; reference climbs re-derive
         }
     }
 
-    if (fnv1a64(*file) != kReferenceUsersDatHash) {
+    if (mischief::fnv1a64(*file) != kReferenceUsersDatHash) {
         MESSAGE("not the REFERENCE_CAPTURES.md users.dat: reference checks skipped");
         return;
     }
@@ -266,7 +266,7 @@ TEST_CASE("record: real users.dat records round-trip; reference climbs re-derive
     for (size_t i = 0; i < records.size(); ++i) fromRecord(saved[i], records[i]);
     for (uint32_t seed = 0; seed <= 0xFFFF; ++seed) {
         QuizState q = fresh;
-        BorlandRand rng;
+        mischief::BorlandRand rng;
         rng.srand(uint16_t(seed));
         quizNewRound(q, t.quiz, rng);
         const LayoutChoice c = pickLayoutRecords(int(t.layouts[0].size()), rng);

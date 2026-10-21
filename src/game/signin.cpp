@@ -9,14 +9,14 @@
 #include "game/game_state.h"
 #include "game/game_tables.h"
 #include "game/rules.h"
+#include "mischief/timing/deadline_timers.h"
+#include "mischief/util/error.h"
+#include "mischief/util/log.h"
 #include "platform/engine.h"
 #include "res/game_files.h"
 #include "save/settings.h"
 #include "text/text_renderer.h"
-#include "timing/deadline_timers.h"
 #include "ui/game_dialog.h"
-#include "util/error.h"
-#include "util/log.h"
 
 namespace tmport::game {
 
@@ -133,12 +133,12 @@ int NameBuffer::caretIndex() const {
     return i;
 }
 
-void CaretBlink::start(DeadlineTimers& timers) {
+void CaretBlink::start(mischief::DeadlineTimers& timers) {
     colour_ = 0;
     timers.set(kCaretSlot, kCaretMs);
 }
 
-bool CaretBlink::update(bool expired, DeadlineTimers& timers) {
+bool CaretBlink::update(bool expired, mischief::DeadlineTimers& timers) {
     if (!expired) return false;
     colour_ ^= 15;
     timers.set(kCaretSlot, kCaretMs);
@@ -178,7 +178,7 @@ bool SignInScreen::writeUsers() {
     const save::Paths* paths = io_.ctx().paths;
     if (!paths) {
         // TODO(integration): AppContext::paths is set by the app; without it nothing is saved.
-        log::warn("sign-in: no users.dat path, roster not written");
+        mischief::log::warn("sign-in: no users.dat path, roster not written");
         return false;
     }
     if (save::writeUsersFile(paths->usersDat, table_)) return true;
@@ -195,7 +195,7 @@ void SignInScreen::saveRecord(const save::PlayerRecord& player, save::UsersTable
         if (!o.written) io_.ctx().dialogs.runModal(io_.dialog(dg::kDlgWriteError));
     } else {
         if (!player.name.empty() && player.name[0] == save::kNoPlayerChar) return;
-        log::warn("sign-in: no users.dat path, player not saved");
+        mischief::log::warn("sign-in: no users.dat path, player not saved");
         save::mergePlayer(t, player, userSel_);
     }
     if (out) *out = t;
@@ -223,10 +223,10 @@ void SignInScreen::loadUsers() {
 void SignInScreen::loadArt() {
     const ResourceManager& res = *io_.ctx().files.res;
     const auto b = res.bundle(kArtBndl);
-    if (!b || b->ids.size() < 4) throw Error(std::format("sign-in art BNDL {} not found", kArtBndl));
+    if (!b || b->ids.size() < 4) throw mischief::Error(std::format("sign-in art BNDL {} not found", kArtBndl));
     auto get = [&](size_t i) {
         auto pm = res.pixmap(b->ids[i]);
-        if (!pm) throw Error(std::format("sign-in art PMAP {} not found", b->ids[i]));
+        if (!pm) throw mischief::Error(std::format("sign-in art PMAP {} not found", b->ids[i]));
         return pm;
     };
     panel_ = get(0);
@@ -300,7 +300,7 @@ SignInResult SignInScreen::run(bool restart) {
         fb.fillRect(0, 0, 512, 384);
         // g_gfxConst4 is 4: Fx_FadeOut_Stub(-2), which does nothing.
         auto pm = io_.ctx().files.res->pixmap(kBackdropPmap);
-        if (!pm) throw Error(std::format("sign-in backdrop PMAP {} not found", kBackdropPmap));
+        if (!pm) throw mischief::Error(std::format("sign-in backdrop PMAP {} not found", kBackdropPmap));
         fb.drawOpaqueOrFlippedWhiteKey(0, 20, *pm, false);
         fb.copyRect(0, 0, 512, 384, 0, gfx::FrameBuffer::kLayer1Y);
     } else {
@@ -322,7 +322,7 @@ SignInResult SignInScreen::run(bool restart) {
     fb.fillRect(0, 0, 512, 384);
     table_ = save::UsersTable{};  // DisposePtrDeep(g_users)
 
-    if (!result_) throw Error("sign-in ended without a player");  // cannot happen
+    if (!result_) throw mischief::Error("sign-in ended without a player");  // cannot happen
     if (st) copyName(st->player, name_);
     result_->name = name_.string();
     result_->userSel = userSel_;

@@ -6,9 +6,9 @@
 #include <vector>
 
 #include "dos/data/dos_exe.h"
-#include "util/file_util.h"
-#include "util/log.h"
-#include "vfs/data_source.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
+#include "mischief/vfs/data_source.h"
 
 namespace tmport {
 
@@ -19,7 +19,7 @@ std::optional<std::filesystem::path> findEntry(const std::filesystem::path& dir,
     std::error_code ec;
     if (!std::filesystem::is_directory(dir, ec)) return std::nullopt;
     for (std::filesystem::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
-        if (!iequalsAscii(pathToUtf8(it->path().filename()), name)) continue;
+        if (!mischief::iequalsAscii(mischief::pathToUtf8(it->path().filename()), name)) continue;
         std::error_code ec2;
         if (it->is_directory(ec2) == wantDir) return it->path();
     }
@@ -37,7 +37,7 @@ std::vector<std::filesystem::path> subfolders(const std::filesystem::path& dir) 
     return out;
 }
 
-std::string extensionOf(const std::filesystem::path& p) { return toLowerAscii(pathToUtf8(p.extension())); }
+std::string extensionOf(const std::filesystem::path& p) { return mischief::toLowerAscii(mischief::pathToUtf8(p.extension())); }
 
 bool isImageFile(const std::filesystem::path& p) {
     const std::string ext = extensionOf(p);
@@ -50,8 +50,8 @@ std::optional<EditionCandidate> scanWindows(const std::filesystem::path& path) {
         if (isImageFile(path)) return EditionCandidate{Edition::WinCd, path, {}, {}};
         return std::nullopt;
     }
-    if (findEntry(path, vfs::kGameExeName, false)) return EditionCandidate{Edition::WinCd, path, {}, {}};
-    if (auto sub = findEntry(path, vfs::kGameFolderName, true); sub && findEntry(*sub, vfs::kGameExeName, false))
+    if (findEntry(path, mischief::vfs::kGameExeName, false)) return EditionCandidate{Edition::WinCd, path, {}, {}};
+    if (auto sub = findEntry(path, mischief::vfs::kGameFolderName, true); sub && findEntry(*sub, mischief::vfs::kGameExeName, false))
         return EditionCandidate{Edition::WinCd, *sub, {}, {}};
     std::vector<std::filesystem::path> images;
     for (std::filesystem::directory_iterator it(path, ec), end; !ec && it != end; it.increment(ec)) {
@@ -67,7 +67,7 @@ std::optional<EditionCandidate> scanWindows(const std::filesystem::path& path) {
 std::optional<EditionCandidate> scanDos(const std::filesystem::path& path) {
     std::error_code ec;
     if (std::filesystem::is_regular_file(path, ec)) {
-        if (iequalsAscii(pathToUtf8(path.filename()), kDosExeName)) return checkDosFolder(path.parent_path());
+        if (mischief::iequalsAscii(mischief::pathToUtf8(path.filename()), kDosExeName)) return checkDosFolder(path.parent_path());
         return std::nullopt;
     }
     if (findEntry(path, kDosExeName, false)) return checkDosFolder(path);
@@ -93,7 +93,7 @@ std::string_view editionName(Edition e) { return e == Edition::Dos1990 ? "the 19
 std::string_view editionKey(Edition e) { return e == Edition::Dos1990 ? "dos" : "win"; }
 
 std::optional<Edition> parseEditionKey(std::string_view text) {
-    const std::string t = toLowerAscii(text);
+    const std::string t = mischief::toLowerAscii(text);
     if (t == "win" || t == "wincd" || t == "windows") return Edition::WinCd;
     if (t == "dos" || t == "dos1990") return Edition::Dos1990;
     return std::nullopt;
@@ -104,7 +104,7 @@ EditionCandidate checkDosFolder(const std::filesystem::path& dir) {
     for (std::string_view f : kDosMarkerFiles) {
         if (findEntry(dir, f, false)) continue;
         c.missingFile = std::string(f);
-        c.problem = std::format("A file of the 1990 DOS edition is missing: {}\n\nDOS game folder: {}", f, pathToUtf8(dir));
+        c.problem = std::format("A file of the 1990 DOS edition is missing: {}\n\nDOS game folder: {}", f, mischief::pathToUtf8(dir));
         return c;
     }
     const auto exe = findEntry(dir, kDosExeName, false);
@@ -113,7 +113,7 @@ EditionCandidate checkDosFolder(const std::filesystem::path& dir) {
     } catch (const std::exception& e) {
         c.missingFile = std::string(kDosExeName);
         c.problem = std::format("{} cannot be used: {}.\n\nOnly the 1990 DOS edition, version 1.0, is supported.\n\nDOS game folder: {}",
-                                kDosExeName, e.what(), pathToUtf8(dir));
+                                kDosExeName, e.what(), mischief::pathToUtf8(dir));
     }
     return c;
 }
@@ -131,7 +131,7 @@ EditionCandidate detectEdition(const std::filesystem::path& path, std::optional<
         if (!s.dos)
             throw EditionError(std::format("The 1990 DOS edition was not found in {}: there is no {} in that folder "
                                            "or in one of its subfolders.",
-                                           pathToUtf8(path), kDosExeName),
+                                           mischief::pathToUtf8(path), kDosExeName),
                                std::string(kDosExeName));
         if (!s.dos->usable()) throw EditionError(s.dos->problem, s.dos->missingFile);
         return *s.dos;
@@ -142,12 +142,12 @@ EditionCandidate detectEdition(const std::filesystem::path& path, std::optional<
         throw EditionError(std::format("{} holds two editions of Treasure Mountain!:\n"
                                        "  - the Windows CD edition: {}\n"
                                        "  - the 1990 DOS edition: {}\n\n{}",
-                                       pathToUtf8(path), pathToUtf8(s.win->path), pathToUtf8(s.dos->path), howToChoose()));
+                                       mischief::pathToUtf8(path), mischief::pathToUtf8(s.win->path), mischief::pathToUtf8(s.dos->path), howToChoose()));
     if (s.dos && !s.win) {
         if (!s.dos->usable()) throw EditionError(s.dos->problem, s.dos->missingFile);
         return *s.dos;
     }
-    if (s.dos) log::warn("{} (ignored: playing the Windows CD edition in {})", s.dos->problem, pathToUtf8(path));
+    if (s.dos) mischief::log::warn("{} (ignored: playing the Windows CD edition in {})", s.dos->problem, mischief::pathToUtf8(path));
     // The Windows start-up of before: the path as given (GameFiles names what is missing).
     return EditionCandidate{Edition::WinCd, path, {}, {}};
 }

@@ -5,7 +5,7 @@ Resources: TMT.DLL, Windows custom type 32515 (Mac type 'OTHR'), ids
     11500-11532  Flutter hint balloons, 33 records,      index = id - 11500
     11600-11611  help / parent-info dialog pages, 12 records
 
-The raw resources are read from the directory produced by tools/ne_resources.py
+The raw resources are read from the directory produced by the engine's tools/ne_resources.py
 (extracted/res/TMT.DLL/32515/<id>).  Optionally TMTWINCD.EXE is read to pull the
 tables the game keeps in DGROUP (level ranges, speech ids, voice bank, hint map ...).
 No game text is embedded in this script.

@@ -417,7 +417,7 @@ std::string othrTextFile(std::span<const uint8_t> payload) { return escapeGameTe
 
 std::vector<uint8_t> othrBodyFromTextFile(std::string_view file) {
     std::vector<uint8_t> b = unescapeGameText(file);
-    if (b.empty()) throw FormatError("the text is empty");
+    if (b.empty()) throw mischief::FormatError("the text is empty");
     b.push_back(0);
     padToNe(b);
     return b;

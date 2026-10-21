@@ -5,7 +5,7 @@
 #include "dos/data/dgroup_offsets.h"
 #include "dos/data/dos_exe.h"
 #include "dos/gfx/back_buffer.h"
-#include "util/file_util.h"
+#include "mischief/util/file_util.h"
 
 namespace tmport::dos {
 
@@ -19,7 +19,7 @@ constexpr uint16_t kDsCga = dg::kPalCga;    // dither bytes, 1437:0027 -> 1000:1
 }  // namespace
 
 std::optional<Look> parseLook(std::string_view name) {
-    const std::string n = toLowerAscii(name);
+    const std::string n = mischief::toLowerAscii(name);
     if (n == "ega") return Look::Ega;
     if (n == "tandy") return Look::Tandy;
     if (n == "mcga") return Look::Mcga;
@@ -37,16 +37,16 @@ std::string_view lookName(Look look) {
     return "ega";
 }
 
-const std::array<Rgb8, 16>& rgbiColours() {
-    static const std::array<Rgb8, 16> k = {{{0x00, 0x00, 0x00}, {0x00, 0x00, 0xAA}, {0x00, 0xAA, 0x00}, {0x00, 0xAA, 0xAA},
+const std::array<mischief::Rgb8, 16>& rgbiColours() {
+    static const std::array<mischief::Rgb8, 16> k = {{{0x00, 0x00, 0x00}, {0x00, 0x00, 0xAA}, {0x00, 0xAA, 0x00}, {0x00, 0xAA, 0xAA},
                                             {0xAA, 0x00, 0x00}, {0xAA, 0x00, 0xAA}, {0xAA, 0x55, 0x00}, {0xAA, 0xAA, 0xAA},
                                             {0x55, 0x55, 0x55}, {0x55, 0x55, 0xFF}, {0x55, 0xFF, 0x55}, {0x55, 0xFF, 0xFF},
                                             {0xFF, 0x55, 0x55}, {0xFF, 0x55, 0xFF}, {0xFF, 0xFF, 0x55}, {0xFF, 0xFF, 0xFF}}};
     return k;
 }
 
-const std::array<Rgb8, 4>& cgaColours() {
-    static const std::array<Rgb8, 4> k = {{{0x00, 0x00, 0x00}, {0x55, 0xFF, 0xFF}, {0xFF, 0x55, 0xFF}, {0xFF, 0xFF, 0xFF}}};
+const std::array<mischief::Rgb8, 4>& cgaColours() {
+    static const std::array<mischief::Rgb8, 4> k = {{{0x00, 0x00, 0x00}, {0x55, 0xFF, 0xFF}, {0xFF, 0x55, 0xFF}, {0xFF, 0xFF, 0xFF}}};
     return k;
 }
 
@@ -64,7 +64,7 @@ CgaBinding::CgaBinding(BackBuffer& back, BackBuffer& screen, const LookPalette& 
     screen.enableCga(pal.cgaDither);
 }
 
-Rgb8 LookPalette::at(uint8_t c, int x, int y) const {
+mischief::Rgb8 LookPalette::at(uint8_t c, int x, int y) const {
     if (look == Look::Cga) return cgaColours()[static_cast<size_t>(cgaPixel(cgaDither, c, x, y))];
     return colours[c & 15];
 }
@@ -75,7 +75,7 @@ LookPalette lookPalette(const DosExe& exe, Look look) {
     for (int i = 0; i < 16; ++i) p.cgaDither[static_cast<size_t>(i)] = exe.ds8(static_cast<uint16_t>(kDsCga + i));
     const auto& rgbi = rgbiColours();
     for (int i = 0; i < 16; ++i) {
-        Rgb8& c = p.colours[static_cast<size_t>(i)];
+        mischief::Rgb8& c = p.colours[static_cast<size_t>(i)];
         switch (look) {
             case Look::Ega:
             case Look::Cga: {  // CGA: the EGA colours describe the logical colours (not shown)
@@ -102,7 +102,7 @@ void toRgba(const BackBuffer& buf, const LookPalette& pal, std::span<uint8_t> ou
     const bool plane = pal.look == Look::Cga && buf.cgaEnabled();
     for (int y = 0; y < BackBuffer::kHeight; ++y)
         for (int x = 0; x < BackBuffer::kWidth; ++x) {
-            const Rgb8 c = plane ? cgaColours()[buf.cgaPixel(x, y)] : pal.at(buf.pixel(x, y), x, y);
+            const mischief::Rgb8 c = plane ? cgaColours()[buf.cgaPixel(x, y)] : pal.at(buf.pixel(x, y), x, y);
             out[o++] = c.r;
             out[o++] = c.g;
             out[o++] = c.b;
@@ -113,7 +113,7 @@ void toRgba(const BackBuffer& buf, const LookPalette& pal, std::span<uint8_t> ou
 void toRgba32(const BackBuffer& buf, const LookPalette& pal, std::span<uint32_t> out) {
     if (out.size() < static_cast<size_t>(BackBuffer::kWidth) * BackBuffer::kHeight)
         throw std::invalid_argument("toRgba32: output buffer too small");
-    auto pack = [](Rgb8 c) { return static_cast<uint32_t>(c.r) | (static_cast<uint32_t>(c.g) << 8) | (static_cast<uint32_t>(c.b) << 16) | 0xFF000000u; };
+    auto pack = [](mischief::Rgb8 c) { return static_cast<uint32_t>(c.r) | (static_cast<uint32_t>(c.g) << 8) | (static_cast<uint32_t>(c.b) << 16) | 0xFF000000u; };
     std::array<uint32_t, 16> packed{};
     for (size_t i = 0; i < 16; ++i) packed[i] = pack(pal.colours[i]);
     const bool plane = pal.look == Look::Cga && buf.cgaEnabled();

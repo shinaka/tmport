@@ -28,7 +28,7 @@
 #include "dos/input/mouse.h"
 #include "dos/save/users_store.h"
 #include "edition/dos_options.h"
-#include "rtl/borland_rand.h"
+#include "mischief/rtl/borland_rand.h"
 
 namespace tmport::dos {
 
@@ -58,7 +58,7 @@ public:
     DosRuntime& rt;
     SoundFacade& sound;
     DosUsersStore& users;             // the USERS.DAT image g_usersFile DS:BA14 and its writes
-    BorlandRand rand;                 // the one Turbo C rand() (seed DS:8F48 = 1; srand only in Layout_Generate)
+    mischief::BorlandRand rand;                 // the one Turbo C rand() (seed DS:8F48 = 1; srand only in Layout_Generate)
     InputTables inputTables;          // key/command/zone lists of the 6 input contexts (mutable: DS:7D84..80DA, 6194)
     InputPoll input;                  // g_cmd DS:9226, DS:90F6, DS:9238, DS:9285, g_inputContext DS:922C
     MousePointer mouse;               // DS:911A/911E/90F4, previous 925E/9266/9143, 92AC/92AE (Mouse_Poll)
@@ -104,7 +104,7 @@ public:
     TickCounters& counters() { return rt.counters(); }                       // DS:90FE, DS:9100, g_seconds DS:9115
     uint32_t ticks() const;                                                  // g_ticks DS:3D2B
     OriginalFrameClock& frameClock() { return rt.frameClock(); }
-    BiosKeyboard& bios() { return rt.keyboard().bios(); }                    // the BIOS buffer (name entry, Kbd_Remove)
+    mischief::dos::BiosKeyboard& bios() { return rt.keyboard().bios(); }                    // the BIOS buffer (name entry, Kbd_Remove)
 
     // *g_userRec DS:9228: the selected player record (ui.userRec); throws std::logic_error if none.
     UserRecord& rec();

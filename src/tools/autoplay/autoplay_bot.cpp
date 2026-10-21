@@ -387,7 +387,7 @@ void Bot::onTrace(std::string_view l) {
         // The menu bar runs the command inside the input fetch of a room tick: that tick's frame
         // timer is still armed, so only a later tick means "back in the room".
         Engine& e = rig_.engine();
-        lastTickDeadline_ = e.clock().nowMs() + e.timers().remaining(DeadlineTimers::kFrameSlot);
+        lastTickDeadline_ = e.clock().nowMs() + e.timers().remaining(mischief::DeadlineTimers::kFrameSlot);
     } else if (startsWith(l, "S12 shutdown")) {
         mode_ = Mode::Shutdown;
         if (end_ == BotEnd::Running) end_ = stats_.climbsDone >= o_.climbs ? BotEnd::Finished : BotEnd::ExitedMidClimb;
@@ -432,7 +432,7 @@ void Bot::onPump(PumpPhase phase) {
         dialogAnswered_ = false;
         dialogExpected_ = false;
     }
-    const uint64_t rem = e.timers().remaining(DeadlineTimers::kFrameSlot);
+    const uint64_t rem = e.timers().remaining(mischief::DeadlineTimers::kFrameSlot);
     const bool tickFetch = rem >= 90 && rem <= 100 && now + rem != lastTickDeadline_;
     if (menuStep()) {
         // The menu command runs inside a later fetch of this tick (the menu bar's pump hook): its

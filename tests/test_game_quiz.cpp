@@ -14,8 +14,8 @@
 #include "game/game_tables.h"
 #include "game/quiz.h"
 #include "game/rules.h"
+#include "mischief/util/hash.h"
 #include "test_data.h"
-#include "util/hash.h"
 
 using namespace tmport;
 using namespace tmport::game;
@@ -43,7 +43,7 @@ void put16(std::vector<uint8_t>& b, size_t v) {
 
 TEST_CASE("quiz: all 359 questions parse like othr_puzzles.py") {
     TM_REQUIRE_GAME_DATA();
-    uint64_t h = kFnv64Offset;
+    uint64_t h = mischief::kFnv64Offset;
     std::map<int, int> hist;
     int totalLines = 0, answers3 = 0, withBlankLine = 0;
     for (int q = 0; q < kQuestionCount; ++q) {
@@ -66,7 +66,7 @@ TEST_CASE("quiz: all 359 questions parse like othr_puzzles.py") {
             put16(blob, s.size());
             blob.insert(blob.end(), s.begin(), s.end());
         }
-        h = fnv1a64(blob, h);
+        h = mischief::fnv1a64(blob, h);
         ++hist[pq->numLines];
         totalLines += pq->numLines;
         if (pq->answerCount == 3) ++answers3;
@@ -183,7 +183,7 @@ TEST_CASE("quiz: new-player deal (fresh history)") {
     for (uint16_t seed : std::initializer_list<uint16_t>{1, 2, 777, 65535}) {
         CAPTURE(seed);
         QuizState s;
-        BorlandRand rng;
+        mischief::BorlandRand rng;
         rng.srand(seed);
         CHECK_FALSE(quizNewRound(s, t, rng));
         std::set<int> qs;
@@ -200,7 +200,7 @@ TEST_CASE("quiz: new-player deal (fresh history)") {
         for (uint8_t v : s.status) dealt += (v & kQuizDealtBit) ? 1 : 0;
         CHECK(dealt == 9);
         // Exactly 9 picks + 9 slot draws + 27 order draws = 45 rand() calls (1150:01d5).
-        BorlandRand ref;
+        mischief::BorlandRand ref;
         ref.srand(seed);
         for (int i = 0; i < 45; ++i) ref.rand();
         CHECK(rng.seed() == ref.seed());
@@ -217,7 +217,7 @@ TEST_CASE("quiz: pools, fallback chain and pick order") {
     s.status[71] = kQuizNeverAnswered;
     s.status[150] = kQuizRightAfterMiss;    // one retried
     s.status[10] = kQuizMissed | kQuizDealtBit;  // stale bit outside the range: cleared by the round
-    BorlandRand rng;
+    mischief::BorlandRand rng;
     rng.srand(4242);
     // 116 questions, 112 right first time: total*80 = 9280 <= count1*100 = 11200 -> promoted,
     // and the deal comes from tier 2.
@@ -237,7 +237,7 @@ TEST_CASE("quiz: pools, fallback chain and pick order") {
     u.status[150] = kQuizRightAfterMiss;
     for (int q = 63; q <= 178; ++q)
         if (q != 100 && q != 150) u.status[size_t(q)] = q < 120 ? kQuizRightFirstTry : kQuizNeverAnswered;
-    BorlandRand r2;
+    mischief::BorlandRand r2;
     r2.srand(99);
     CHECK_FALSE(quizNewRound(u, t, r2));
     CHECK(u.tier == 1);
@@ -263,7 +263,7 @@ TEST_CASE("quiz: tier promotion boundary (80 %)") {
         quizSetTierRange(s, t);
         for (int q = s.rangeLo, k = 0; q <= s.rangeHi; ++q, ++k)
             s.status[size_t(q)] = k < right ? kQuizRightFirstTry : kQuizMissed;
-        BorlandRand rng;
+        mischief::BorlandRand rng;
         return quizNewRound(s, t, rng);
     };
     CHECK(promotes(0, 51));        // 63*80 = 5040 <= 5100
@@ -301,7 +301,7 @@ TEST_CASE("quiz: judging, coins and statuses") {
     s.inv.coins = 5;
     s.inv.numClues = 1;
     s.quiz.slots[0] = QuizSlot{3, {1, 0, 2}, {0, 0, 0}};
-    BorlandRand rng, ref;
+    mischief::BorlandRand rng, ref;
     rng.srand(5);
     ref.srand(5);
     const AnswerOutcome a = answerQuestion(s, 0, 1, t, rng);

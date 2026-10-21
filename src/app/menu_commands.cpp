@@ -5,12 +5,12 @@
 #include "data/dgroup_offsets.h"
 #include "data/exe_tables.h"
 #include "game/game_state.h"
+#include "mischief/util/log.h"
 #include "res/game_files.h"
 #include "ui/dialog_desc.h"
 #include "ui/game_dialog.h"
 #include "ui/help_topics.h"
 #include "ui/menu_bar.h"
-#include "util/log.h"
 
 namespace tmport::app {
 
@@ -86,7 +86,7 @@ void menuCmdSeeRank(AppContext& ctx) {
     if (ctx.services.seeRank)
         ctx.services.seeRank();
     else
-        log::debug("menu: See Rank is not available yet");  // TODO(integration): game area (10f0:0487)
+        mischief::log::debug("menu: See Rank is not available yet");  // TODO(integration): game area (10f0:0487)
 }
 
 void registerMenuCommands(AppContext& ctx) {

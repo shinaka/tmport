@@ -56,7 +56,7 @@ struct DosStringPool {
 
 class DosStringCatalogue {
 public:
-    // Reads the tables of V 1.0. Throws tmport::FormatError if a pointer does not point into DGROUP.
+    // Reads the tables of V 1.0. Throws mischief::FormatError if a pointer does not point into DGROUP.
     static DosStringCatalogue read(const DosExe& exe);
     const std::vector<DosStringEntry>& entries() const { return entries_; }
     const std::vector<DosStringPool>& pools() const { return pools_; }
@@ -86,7 +86,7 @@ struct DosStringEdit {
 using DosStringEdits = std::map<uint16_t, DosStringEdit>;
 // Reads a strings.json into `edits` (a later file overrides an earlier one per field). Keys are
 // "DS:XXXX" (or "XXXX"); in an entry only "text", "countAt" and "pluralAt" are read. Throws
-// tmport::FormatError naming the key (nothing of the file is used then).
+// mischief::FormatError naming the key (nothing of the file is used then).
 void parseStringsJson(std::string_view json, const DosStringCatalogue& catalogue, DosStringEdits& edits);
 
 // What the layout checks know of the pictures (from the effective SPRITES.PAK).
@@ -112,7 +112,7 @@ DosStringsResult applyStringEdits(DosExe& exe, const DosStringCatalogue& catalog
 //  the mode set (replaced right away, never visible), "cga": 16 dither bytes (four 2-bit pixels)}.
 std::string exportPalettesJson(const DosExe& exe);
 // Checks the whole document, then writes it. A key may be left out; null keeps an element. Throws
-// tmport::FormatError naming the place (nothing is written then). Returns the bytes changed.
+// mischief::FormatError naming the place (nothing is written then). Returns the bytes changed.
 size_t applyPalettesJson(DosExe& exe, std::string_view json);
 
 }  // namespace tmport::dos

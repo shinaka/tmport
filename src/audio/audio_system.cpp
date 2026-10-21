@@ -1,9 +1,9 @@
 #include "audio/audio_system.h"
 
 #include "audio/sdl_wave_output.h"
+#include "mischief/util/error.h"
+#include "mischief/util/log.h"
 #include "res/game_files.h"
-#include "util/error.h"
-#include "util/log.h"
 
 namespace tmport::audio {
 
@@ -14,7 +14,7 @@ constexpr uint16_t kCodeCtrlS = 0x13;
 
 template <class T>
 std::unique_ptr<T> require(std::unique_ptr<T> p, const char* what) {
-    if (!p) throw Error(std::string("AudioSystem: missing ") + what);
+    if (!p) throw mischief::Error(std::string("AudioSystem: missing ") + what);
     return p;
 }
 
@@ -38,7 +38,7 @@ std::unique_ptr<AudioSystem> AudioSystem::create(GameFiles& files, const AudioCo
     parts.midi = std::make_unique<MidiPlayer>(createMidiBackend(mc), MicroClock(realClockUs), true);
     parts.tracks = std::make_unique<DataSourceTrackLoader>(*files.source);
     auto a = std::make_unique<AudioSystem>(AudioTables::fromExe(*files.exe), std::move(parts), config.musicSet);
-    log::debug("audio: wave voice {}, MIDI back end '{}' ({})", a->voice().available() ? "available" : "unavailable",
+    mischief::log::debug("audio: wave voice {}, MIDI back end '{}' ({})", a->voice().available() ? "available" : "unavailable",
                a->midiPlayer().backendName(), a->midi().midiOk() ? "open" : "failed");
     return a;
 }

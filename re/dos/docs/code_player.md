@@ -9,7 +9,7 @@ Wave-3 engineers implement from this document without reading the decompiled cod
 Evidence: Ghidra export `re/dos/ghidra_export/` (`functions/*.c`, `disassembly.asm`), bytes of
 `extracted/SST_unpacked.EXE`, the animation script table decoded from DGROUP, the PAK previews in
 `extracted/previews/dos/gfx/`, and the EGA AVIs in `extracted/captures/dos/avi/` (decoded with
-`tools/avi_frames.py`). Scratch scripts are in `extracted/scratch/dos_w1_player/`: `dis.py`
+the engine's `tools/avi_frames.py`). Scratch scripts are in `extracted/scratch/dos_w1_player/`: `dis.py`
 (disassembly with DGROUP names), `dec.py` (decompile with slot/field names), `scripts.py` (script
 table dump), `animsum.py` (per-script summary: steps, ticks, movement, sfx). Capture requests:
 `extracted/scratch/dos_requests/player.md`. Names: the canonical names of

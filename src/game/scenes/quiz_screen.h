@@ -73,15 +73,15 @@ struct QuizLayout {
     int ansX = 0, ansW = 0, ansH = 0;     // common answer box x / width / height (lh + 6)
     std::array<int, 3> ansY{};            // box top per display position
     std::array<int, 3> ansTextX{}, ansTextY{}, ansTextW{};  // where each answer is drawn
-    gfx::Rect speaker{};                  // g_quizSpkRect (focus frame / hot spot 0xA88)
+    mischief::gfx::Rect speaker{};                  // g_quizSpkRect (focus frame / hot spot 0xA88)
 
-    gfx::Rect answerBox(int pos) const { return {ansX, ansY[static_cast<size_t>(pos)], ansW, ansH}; }
+    mischief::gfx::Rect answerBox(int pos) const { return {ansX, ansY[static_cast<size_t>(pos)], ansW, ansH}; }
     // Reading highlight of an answer (1150:0d2d mode 0).
-    gfx::Rect answerHighlight(int pos) const { return {ansX, ansY[static_cast<size_t>(pos)] + 3, ansW, lineHeight}; }
+    mischief::gfx::Rect answerHighlight(int pos) const { return {ansX, ansY[static_cast<size_t>(pos)] + 3, ansW, lineHeight}; }
     // Hot spot 0xA70+k: k*lh rows, blank lines not skipped (kept quirk).
-    gfx::Rect lineHotspot(int k) const { return {textX, textY + k * lineHeight, textW, lineHeight}; }
+    mischief::gfx::Rect lineHotspot(int k) const { return {textX, textY + k * lineHeight, textW, lineHeight}; }
     // Reading highlight of line k: the real row g_quizLineY[k].
-    gfx::Rect lineHighlight(int k) const { return {textX, textY + lineY[static_cast<size_t>(k)], textW, lineHeight}; }
+    mischief::gfx::Rect lineHighlight(int k) const { return {textX, textY + lineY[static_cast<size_t>(k)], textW, lineHeight}; }
 };
 
 // 1150:0a97 layout part. speakerW/H = size of PMAP 2001 (44x64 in the shipped art).

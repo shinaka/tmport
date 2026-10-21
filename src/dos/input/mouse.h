@@ -1,6 +1,6 @@
 #pragma once
 // The DOS edition's mouse (re/dos/docs/code_runtime.md §3.12, §4.20-4.21, PORTING_NOTES.md §4):
-//  * MouseDriver: INT 33h (the shared model, dos/input/int33_mouse.h) as Mouse_Setup (1460:0A74)
+//  * MouseDriver: INT 33h (the engine's model, mischief/dos/input/int33_mouse.h) as Mouse_Setup (1460:0A74)
 //    programs it: x range 0..159 (AX=7, the game's x unit is one byte = 2 pixels), y range 0..199
 //    (AX=8), buttons from AX=3. The engine feeds it the host pointer in the 320x200 logical screen
 //    (absolute; the original's mickey ratio AX=0Fh does not apply).
@@ -12,7 +12,7 @@
 #include <cstdint>
 
 #include "dos/gfx/palettes.h"
-#include "dos/input/int33_mouse.h"
+#include "mischief/dos/input/int33_mouse.h"
 
 namespace tmport::dos {
 
@@ -20,13 +20,13 @@ namespace tmport::dos {
 // one the game never reads the mouse (Mouse_Poll and the mouse part of Input_MouseWalk return at once).
 // setLogicalPosition clamps like the driver's range; x(), y(), buttons() are INT 33h AX=3: CX = x
 // (0..159), DX = y (0..199), BX = buttons. No event handler is installed (the game polls).
-class MouseDriver final : public Int33Mouse {
+class MouseDriver final : public mischief::dos::Int33Mouse {
 public:
     static constexpr int kMaxX = 0x9F;  // Mouse_Setup AX=7 CX=0 DX=0x9F
     static constexpr int kMaxY = 0xC7;  // AX=8 CX=0 DX=0xC7
 
     // The EGA start position until resetPosition() picks the look's (gameInit, Mouse_Setup).
-    MouseDriver() : Int33Mouse(Int33MouseConfig{0, kMaxX, 0, kMaxY, 1, 2, kMaxX, 101}) {}
+    MouseDriver() : mischief::dos::Int33Mouse(mischief::dos::Int33MouseConfig{0, kMaxX, 0, kMaxY, 1, 2, kMaxX, 101}) {}
 
     // Where the driver leaves the pointer after Mouse_Detect's reset (INT 33h AX=0, 1460:0A5E) in
     // the game's video mode and Mouse_Setup's ranges (x in bytes, y in rows): the DOSBox-X driver of

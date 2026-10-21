@@ -11,7 +11,7 @@
 #include "game/game_state.h"
 #include "game/game_tables.h"
 #include "game/room_table.h"
-#include "rtl/borland_rand.h"
+#include "mischief/rtl/borland_rand.h"
 
 namespace tmport::game {
 
@@ -50,10 +50,10 @@ struct LayoutChoice {
 // layouts[rankTier] with R(count) (re-rolled on collision), applies them, stores mask and key
 // kind per level, then resolves the clue attributes (1100:06cc). Exactly 3+ rand() calls.
 LayoutChoice generateClimbLayout(RoomTable& rooms, ClueState& clues, uint8_t rankTier, const GameTables& t,
-                                 BorlandRand& rng);
+                                 mischief::BorlandRand& rng);
 // The index draw alone (same rand() calls), for a table of `count` records. Throws FormatError when
 // count < kMinLayoutRecords (the original would re-roll forever).
-LayoutChoice pickLayoutRecords(int count, BorlandRand& rng);
+LayoutChoice pickLayoutRecords(int count, mischief::BorlandRand& rng);
 
 // 1100:06cc Clue_ResolveAttributes: the key object's attributes named by the mask, packed in the
 // order count, size, shape, noun; plural = key object's count > 1 (even when count is not named).

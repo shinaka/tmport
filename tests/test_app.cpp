@@ -19,20 +19,20 @@
 #include "app/launch_options.h"
 #include "app/menu_commands.h"
 #include "app/script_input.h"
-#include "app_test_util.h"
 #include "audio_test_util.h"
 #include "game/game_state.h"
 #include "game/game_tables.h"
+#include "mischief/test/app_test_util.h"
+#include "mischief/timing/clock.h"
+#include "mischief/util/file_util.h"
 #include "platform/engine.h"
 #include "save/user_record.h"
 #include "save/users_file.h"
 #include "test_data.h"
 #include "text/font.h"
 #include "text/text_renderer.h"
-#include "timing/clock.h"
 #include "ui/game_dialog.h"
 #include "ui/menu_bar.h"
-#include "util/file_util.h"
 
 using namespace tmport;
 using namespace apptest;
@@ -51,7 +51,7 @@ std::filesystem::path prefDirFor(const char* name) {
 
 // Everything a menu command needs, on a headless engine with a manual clock and fake audio.
 struct AppRig {
-    ManualClock clock;
+    mischief::ManualClock clock;
     audiotest::Rig audioRig;
     std::unique_ptr<Engine> engine;
     std::unique_ptr<text::Font> font;
@@ -67,7 +67,7 @@ struct AppRig {
     explicit AppRig(GameFiles& g) {
         EngineConfig cfg;
         cfg.clock = &clock;
-        engine = std::make_unique<Engine>(g, gfx::ColorMode::Colour256, cfg);
+        engine = std::make_unique<Engine>(g, mischief::gfx::ColorMode::Colour256, cfg);
         font = std::make_unique<text::Font>(text::Font::load(*g.res));
         text = std::make_unique<text::TextRenderer>(*font, &engine->frame(), &engine->presenter());
         dialogs = std::make_unique<ui::DialogSystem>(*engine, *font);
@@ -97,10 +97,10 @@ struct AppRig {
 
 TEST_CASE("engine: pump hooks see Busy / Fetch phases and can be removed") {
     TM_REQUIRE_GAME_DATA();
-    ManualClock clock;
+    mischief::ManualClock clock;
     EngineConfig cfg;
     cfg.clock = &clock;
-    Engine e(*g, gfx::ColorMode::Colour256, cfg);
+    Engine e(*g, mischief::gfx::ColorMode::Colour256, cfg);
     std::vector<PumpPhase> seen;
     const int id = e.addPumpHook([&](PumpPhase p) { seen.push_back(p); });
     e.pump();
@@ -151,10 +151,10 @@ TEST_CASE("engine: pump hooks see Busy / Fetch phases and can be removed") {
 
 TEST_CASE("engine: holdWhile deactivates, handles events and reactivates") {
     TM_REQUIRE_GAME_DATA();
-    ManualClock clock;
+    mischief::ManualClock clock;
     EngineConfig cfg;
     cfg.clock = &clock;
-    Engine e(*g, gfx::ColorMode::Colour256, cfg);
+    Engine e(*g, mischief::gfx::ColorMode::Colour256, cfg);
     std::vector<int> act;
     e.setActivationHook([&](bool on) { act.push_back(on); });
     int keys = 0;
@@ -454,7 +454,7 @@ TEST_CASE("script input: parsing") {
     CHECK((*s)[2].kind == K::Wait);
     CHECK((*s)[2].ms == 250);
     CHECK((*s)[3].kind == K::Shot);
-    CHECK(pathToUtf8((*s)[3].path) == "C:/x/y.png");
+    CHECK(mischief::pathToUtf8((*s)[3].path) == "C:/x/y.png");
     CHECK((*s)[4].kind == K::Click);
     CHECK((*s)[4].x == 100);
     CHECK((*s)[4].y == 7);
@@ -477,10 +477,10 @@ TEST_CASE("bootstrap: missing data is reported, naming the file, without a windo
 
     app::LaunchOptions o;
     o.headless = true;
-    o.prefDir = pathToUtf8(prefDirFor("boot_pref"));
+    o.prefDir = mischief::pathToUtf8(prefDirFor("boot_pref"));
 
     SUBCASE("folder without the game") {
-        o.dataPath = pathToUtf8(scratchDir("boot_empty"));
+        o.dataPath = mischief::pathToUtf8(scratchDir("boot_empty"));
         CHECK(app::runGame(o, {}, sink) == 3);
         REQUIRE(errors.size() == 1);
         CHECK(errors[0].file() == "TMTWINCD.EXE");
@@ -488,7 +488,7 @@ TEST_CASE("bootstrap: missing data is reported, naming the file, without a windo
         CHECK(std::string(errors[0].what()).find("--data") != std::string::npos);
     }
     SUBCASE("path that does not exist") {
-        o.dataPath = pathToUtf8(scratchDir("boot_missing") / "no_such_folder");
+        o.dataPath = mischief::pathToUtf8(scratchDir("boot_missing") / "no_such_folder");
         CHECK(app::runGame(o, {}, sink) == 3);
         REQUIRE(errors.size() == 1);
         CHECK(std::string(errors[0].what()).find("does not exist") != std::string::npos);
@@ -496,15 +496,15 @@ TEST_CASE("bootstrap: missing data is reported, naming the file, without a windo
     SUBCASE("EXE present, DLLs missing") {
         auto* gf = testdata::game();
         auto dp = testdata::dataPath();
-        if (!gf || !dp || !std::filesystem::is_directory(pathFromUtf8(*dp))) {
+        if (!gf || !dp || !std::filesystem::is_directory(mischief::pathFromUtf8(*dp))) {
             MESSAGE("TM_DATA (a folder) is not set: subcase skipped");
             return;
         }
         auto dir = scratchDir("boot_exe_only");
         std::error_code ec;
-        std::filesystem::copy_file(pathFromUtf8(*dp) / "TMTWINCD.EXE", dir / "TMTWINCD.EXE", ec);
+        std::filesystem::copy_file(mischief::pathFromUtf8(*dp) / "TMTWINCD.EXE", dir / "TMTWINCD.EXE", ec);
         REQUIRE(!ec);
-        o.dataPath = pathToUtf8(dir);
+        o.dataPath = mischief::pathToUtf8(dir);
         CHECK(app::runGame(o, {}, sink) == 3);
         REQUIRE(errors.size() == 1);
         CHECK(errors[0].file().ends_with(".DLL"));
@@ -539,10 +539,10 @@ TEST_CASE("bootstrap: scripted headless run of the game with the menu open") {
     app::LaunchOptions o;
     o.headless = true;
     o.dataPath = *testdata::dataPath();
-    o.prefDir = pathToUtf8(pref);
+    o.prefDir = mischief::pathToUtf8(pref);
     // The settings of this run only: a tmport.ini next to the test executable would otherwise win
     // over the preference directory's (save::Paths::under) and could change the flow.
-    o.configPath = pathToUtf8(pref / "tmport.ini");
+    o.configPath = mischief::pathToUtf8(pref / "tmport.ini");
     // Title: Space ends the pages, Space ends the closing animation; Club Sign-In (empty roster):
     // typing starts a new player "Test"; climb set-up in room 9, where the first two New Player
     // Messages (hints 0 and 2) wait for Enter while the menu bar is greyed; then open Options,
@@ -551,8 +551,8 @@ TEST_CASE("bootstrap: scripted headless run of the game with the menu open") {
     // GameMain's shutdown saves the player. The waits are generous so that a loaded machine
     // still reaches each screen before its keys.
     o.keys = "space,wait:800,space,wait:2000,t,e,s,t,enter,wait:1500,enter,wait:800,enter,wait:800,alt+o,down,down,shot:" +
-             pathToUtf8(shot) + ",esc,esc,alt+h,up,enter,wait:300,enter,wait:300,shot:" + pathToUtf8(shot2);
-    o.frameDump = pathToUtf8(dump);
+             mischief::pathToUtf8(shot) + ",esc,esc,alt+h,up,enter,wait:300,enter,wait:300,shot:" + mischief::pathToUtf8(shot2);
+    o.frameDump = mischief::pathToUtf8(dump);
     std::vector<std::string> errors;
     apptest::LogCapture logs;
     const int rc = app::runGame(o, {}, [&](const app::StartupError& e) { errors.push_back(e.what()); });
@@ -560,8 +560,8 @@ TEST_CASE("bootstrap: scripted headless run of the game with the menu open") {
     CHECK(errors.empty());
     for (const auto& e : errors) MESSAGE(e);
     // Process-local evidence first (another test process sharing TM_APP_SHOTS could remove files).
-    const bool wrote1 = logs.has("script: canvas -> " + pathToUtf8(shot));
-    const bool wrote2 = logs.has("script: canvas -> " + pathToUtf8(shot2));
+    const bool wrote1 = logs.has("script: canvas -> " + mischief::pathToUtf8(shot));
+    const bool wrote2 = logs.has("script: canvas -> " + mischief::pathToUtf8(shot2));
     CHECK(wrote1);
     CHECK(wrote2);
     CHECK(logs.has("script: finished"));      // every step was used; the run did not end early

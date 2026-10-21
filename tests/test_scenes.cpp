@@ -25,13 +25,13 @@
 #include "game/scenes/level_cutscene.h"
 #include "game/scenes/quiz_screen.h"
 #include "input/input_codes.h"
+#include "mischief/util/hash.h"
 #include "platform/engine.h"
 #include "res/resource_manager.h"
 #include "test_data.h"
 #include "text/font.h"
 #include "text/text_renderer.h"
 #include "ui/game_dialog.h"
-#include "util/hash.h"
 
 using namespace tmport;
 using namespace tmport::game;
@@ -45,7 +45,7 @@ struct ScriptAbort {};
 // effects are silent no-ops, Voice follows GameState::options).
 struct SceneRig {
     GameFiles& files;
-    ManualClock clock{1000};
+    mischief::ManualClock clock{1000};
     std::unique_ptr<Engine> engine;
     std::unique_ptr<text::Font> font;
     std::unique_ptr<text::TextRenderer> text;
@@ -61,7 +61,7 @@ struct SceneRig {
     explicit SceneRig(GameFiles& f) : files(f) {
         EngineConfig cfg;
         cfg.clock = &clock;
-        engine = std::make_unique<Engine>(files, gfx::ColorMode::Colour256, cfg);
+        engine = std::make_unique<Engine>(files, mischief::gfx::ColorMode::Colour256, cfg);
         font = std::make_unique<text::Font>(text::Font::load(*files.res));
         text = std::make_unique<text::TextRenderer>(*font, &engine->frame(), &engine->presenter());
         dialogs = std::make_unique<ui::DialogSystem>(*engine, *font);
@@ -141,12 +141,12 @@ TEST_CASE("scenes: question layout of all 359 questions matches the reference") 
         CHECK(L.ansY[2] + L.ansH <= 287);
         CHECK(L.ansY[1] - L.ansY[0] == L.lineHeight + 4);
         CHECK(L.ansX + L.ansW <= L.speaker.x);
-        CHECK(L.speaker == gfx::Rect{434, 217, 52, 70});
+        CHECK(L.speaker == mischief::gfx::Rect{434, 217, 52, 70});
         for (int k = 0; k < L.numLines; ++k)
             if (L.lineHotspot(k).y != L.lineHighlight(k).y) ++overlaps;
     }
     CHECK(blob.size() == 15336);
-    CHECK(fnv1a64(blob) == 0xc64190d5ef517318ull);
+    CHECK(mischief::fnv1a64(blob) == 0xc64190d5ef517318ull);
     MESSAGE("line hot spots that differ from their highlight row (k*lh quirk): " << overlaps);
     CHECK(overlaps > 0);
 }
@@ -192,7 +192,7 @@ TEST_CASE("scenes: question focus navigation and judging through scripted input"
         slot.tried = c.tried;
         rig.codes = c.codes;
         rig.engine->rng().srand(77);
-        BorlandRand expectRng;
+        mischief::BorlandRand expectRng;
         expectRng.srand(77);
         const uint16_t coinsBefore = rig.state.inv.coins;
         const QuizResult r = askQuestion(*rig.ctx, rig.state, rig.tables, 1);
@@ -351,7 +351,7 @@ struct Castle {
     GameState s;
     CastleTables t;
     CastleSizes z;
-    BorlandRand rng;
+    mischief::BorlandRand rng;
     struct Rec : GameHooks {
         std::vector<int> sfx;
         int hud = 0;

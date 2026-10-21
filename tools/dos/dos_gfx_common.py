@@ -72,7 +72,12 @@ class DosExe:
 def _unexepack():
     sys.path.insert(0, TOOLS)
     try:
-        import unexepack  # tools/unexepack.py
+        import mischief_engine  # tools/mischief_engine.py
+    finally:
+        sys.path.pop(0)
+    sys.path.insert(0, mischief_engine.tools_dir())
+    try:
+        import unexepack  # the engine's tools/unexepack.py
     finally:
         sys.path.pop(0)
     return unexepack

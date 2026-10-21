@@ -9,11 +9,11 @@
 #include "data/exe_tables.h"
 #include "game/rules.h"
 #include "input/input_codes.h"
+#include "mischief/util/error.h"
+#include "mischief/util/log.h"
 #include "platform/engine.h"
 #include "res/resource_manager.h"
 #include "text/text_renderer.h"
-#include "util/error.h"
-#include "util/log.h"
 
 namespace tmport::game::scenes {
 
@@ -122,12 +122,12 @@ void QuizScreen::drawScreen() {
     hs.set(quizhot::kPlayArea, 0, gfx::FrameBuffer::kPlayTop, 512, gfx::FrameBuffer::kPlayHeight);
     for (int pos = 0; pos < 3; ++pos)
         if (!tried(pos)) {
-            const gfx::Rect r = layout_.answerBox(pos);
+            const mischief::gfx::Rect r = layout_.answerBox(pos);
             hs.set(static_cast<uint16_t>(quizhot::kAnswer0 + pos), r.x, r.y, r.w, r.h);
         }
     if (voice_)
         for (int k = 0; k < layout_.numLines; ++k) {
-            const gfx::Rect r = layout_.lineHotspot(k);
+            const mischief::gfx::Rect r = layout_.lineHotspot(k);
             hs.set(static_cast<uint16_t>(quizhot::kLine0 + k), r.x, r.y, r.w, r.h);
         }
     // The clean screen (without the speaker button) goes to the back page.
@@ -135,7 +135,7 @@ void QuizScreen::drawScreen() {
                 gfx::FrameBuffer::kPlayTop + gfx::FrameBuffer::kLayer1Y);
     if (voice_) {
         fb.drawSprite(quiz::kSpeakerX, quiz::kSpeakerY, *speakerIcon_, false);
-        const gfx::Rect& r = layout_.speaker;
+        const mischief::gfx::Rect& r = layout_.speaker;
         hs.set(quizhot::kSpeaker, r.x, r.y, r.w, r.h);
     }
 }
@@ -144,12 +144,12 @@ void QuizScreen::highlight(int item, bool frame) {
     gfx::FrameBuffer& fb = io_.fb();
     if (item < 10) {
         if (!frame) {
-            const gfx::Rect r = layout_.answerHighlight(item);
+            const mischief::gfx::Rect r = layout_.answerHighlight(item);
             io_.highlightRect(r.x, r.y, r.w, r.h);
             io_.present(r.x, r.y, r.w, r.h);
         } else {
-            gfx::Rect r = layout_.answerBox(item);
-            const gfx::Rect box = r;
+            mischief::gfx::Rect r = layout_.answerBox(item);
+            const mischief::gfx::Rect box = r;
             fb.setForeColor(quiz::kFocusColour);
             for (int i = 0; i < 2; ++i) {
                 fb.frameRect(r.x, r.y, r.w, r.h);
@@ -158,26 +158,26 @@ void QuizScreen::highlight(int item, bool frame) {
             io_.present(box.x, box.y, box.w, box.h);
         }
     } else {
-        const gfx::Rect r = layout_.lineHighlight(item - 10);
+        const mischief::gfx::Rect r = layout_.lineHighlight(item - 10);
         io_.highlightRect(r.x, r.y, r.w, r.h);
         io_.present(r.x, r.y, r.w, r.h);
     }
 }
 
 void QuizScreen::unhighlight(int item) {
-    const gfx::Rect r = item < 10 ? layout_.answerBox(item) : layout_.lineHighlight(item - 10);
+    const mischief::gfx::Rect r = item < 10 ? layout_.answerBox(item) : layout_.lineHighlight(item - 10);
     io_.fb().copyRect(r.x, r.y + gfx::FrameBuffer::kLayer1Y, r.w, r.h, r.x, r.y);
     io_.present(r.x, r.y, r.w, r.h);
 }
 
 void QuizScreen::speakerFocus(bool focused) {
     gfx::FrameBuffer& fb = io_.fb();
-    const gfx::Rect& s = layout_.speaker;
+    const mischief::gfx::Rect& s = layout_.speaker;
     if (!focused) {
         fb.copyRect(s.x, s.y + gfx::FrameBuffer::kLayer1Y, s.w, s.h, s.x, s.y);
     } else {
         fb.setForeColor(quiz::kFocusColour);
-        gfx::Rect r = s;
+        mischief::gfx::Rect r = s;
         for (int i = 0; i < 2; ++i) {
             fb.frameRect(r.x, r.y, r.w, r.h);
             r = {r.x + 1, r.y + 1, r.w - 2, r.h - 2};
@@ -306,7 +306,7 @@ void QuizScreen::showWrong() {
 QuizResult QuizScreen::run() {
     QuizResult out;
     if (slotIndex_ < 0 || slotIndex_ >= kQuizSlotCount || slot().q < 0 || slot().q >= kQuestionCount) {
-        log::warn("Quiz_AskQuestion: slot {} holds no question", slotIndex_);
+        mischief::log::warn("Quiz_AskQuestion: slot {} holds no question", slotIndex_);
         return out;
     }
     // Setup (1150:100a).
@@ -323,7 +323,7 @@ QuizResult QuizScreen::run() {
     {
         auto raw = io_.res().loadRaw(kQuestionFirstId + q_);
         auto parsed = raw ? parseQuestion(*raw) : std::nullopt;
-        if (!parsed) throw Error(std::format("OTHR {} is missing or has no question terminator", kQuestionFirstId + q_));
+        if (!parsed) throw mischief::Error(std::format("OTHR {} is missing or has no question terminator", kQuestionFirstId + q_));
         pq_ = std::move(*parsed);
     }
     io_.tracef("question {} slot {} voice {}", q_, slotIndex_, voice_ ? 1 : 0);

@@ -6,9 +6,9 @@
 #include <format>
 
 #include "app/app_context.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
 #include "platform/engine.h"
-#include "util/file_util.h"
-#include "util/log.h"
 
 namespace tmport::app {
 
@@ -116,7 +116,7 @@ std::optional<std::vector<ScriptStep>> parseScript(std::string_view text, std::s
                 return std::nullopt;
             }
             s.kind = ScriptStep::Kind::Shot;
-            s.path = pathFromUtf8(std::string(rest));
+            s.path = mischief::pathFromUtf8(std::string(rest));
         } else if (head == "click" || head == "move") {
             const size_t c2 = rest.find(':');
             if (c2 == std::string_view::npos || !toInt(rest.substr(0, c2), s.x) || !toInt(rest.substr(c2 + 1), s.y)) {
@@ -202,9 +202,9 @@ void ScriptInput::onPump(PumpPhase phase) {
             case ScriptStep::Kind::Shot:
                 if (engine_.presenter().writeCanvasPng(s.path)) {
                     ++shots_;
-                    log::info("script: canvas -> {}", pathToUtf8(s.path));
+                    mischief::log::info("script: canvas -> {}", mischief::pathToUtf8(s.path));
                 } else {
-                    log::error("script: cannot write {}", pathToUtf8(s.path));
+                    mischief::log::error("script: cannot write {}", mischief::pathToUtf8(s.path));
                 }
                 continue;  // a shot takes no time: go on with the next step
             case ScriptStep::Kind::Quit: throw QuitGame{};
@@ -215,7 +215,7 @@ void ScriptInput::onPump(PumpPhase phase) {
     }
     // Quit once the game has taken the last input (or after a while if it never fetches it).
     if (quitAtEnd_ && (engine_.input().empty() || ++endFetches_ > 200)) {
-        log::info("script: finished");
+        mischief::log::info("script: finished");
         throw QuitGame{};
     }
 }

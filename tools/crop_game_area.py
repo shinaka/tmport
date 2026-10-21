@@ -1,5 +1,5 @@
 """Crop the 512x384 game area out of a 640x480 capture of the original game (tmctl.py shot,
-or a frame decoded by avi_frames.py).
+or a frame decoded by avi_frames.py; both are the engine's tools).
 
 Where the game area sits (measured on captures of TMTWINCD.EXE under Windows 3.1, 640x480,
 small fonts; see re/docs/REFERENCE_CAPTURES.md):

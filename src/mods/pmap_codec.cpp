@@ -3,9 +3,9 @@
 #include <format>
 #include <unordered_map>
 
+#include "mischief/mods/png_codec.h"
+#include "mischief/util/error.h"
 #include "mods/mod_common.h"
-#include "mods/png_codec.h"
-#include "util/error.h"
 
 namespace tmport::mods {
 
@@ -15,7 +15,7 @@ constexpr int kMaxSide = 4096;
 
 class Quantiser {
 public:
-    explicit Quantiser(const gfx::Palette& p) : pal_(p), n_(p.size()) {
+    explicit Quantiser(const mischief::gfx::Palette& p) : pal_(p), n_(p.size()) {
         for (int i = 0; i < n_; ++i)
             if (p.keyTable()[static_cast<size_t>(i)]) {
                 key_ = i;
@@ -27,12 +27,12 @@ public:
     bool isKey(int i) const { return pal_.keyTable()[static_cast<size_t>(i)]; }
 
     uint8_t key() const {
-        if (key_ < 0) throw FormatError("the game palette has no colour-key entry (RGB 0,0,170): transparent pixels are impossible");
+        if (key_ < 0) throw mischief::FormatError("the game palette has no colour-key entry (RGB 0,0,170): transparent pixels are impossible");
         return static_cast<uint8_t>(key_);
     }
 
     // Colour -> index (alpha already handled by the caller).
-    uint8_t map(Rgb8 c, bool& exact) {
+    uint8_t map(mischief::Rgb8 c, bool& exact) {
         if (c.r == 0 && c.g == 0 && c.b == 0xAA) {
             exact = true;
             return key();
@@ -46,7 +46,7 @@ public:
         long bestD = 0;
         for (int i = 0; i < n_; ++i) {
             if (isKey(i)) continue;
-            const Rgb8 q = pal_.colour(static_cast<uint8_t>(i));
+            const mischief::Rgb8 q = pal_.colour(static_cast<uint8_t>(i));
             const long dr = c.r - q.r, dg = c.g - q.g, db = c.b - q.b;
             const long d = dr * dr + dg * dg + db * db;
             if (best < 0 || d < bestD) {
@@ -54,14 +54,14 @@ public:
                 bestD = d;
             }
         }
-        if (best < 0) throw FormatError("the game palette has no usable colour");
+        if (best < 0) throw mischief::FormatError("the game palette has no usable colour");
         exact = bestD == 0;
         cache_[k] = {static_cast<uint8_t>(best), exact};
         return static_cast<uint8_t>(best);
     }
 
 private:
-    const gfx::Palette& pal_;
+    const mischief::gfx::Palette& pal_;
     int n_;
     int key_ = -1;
     std::unordered_map<uint32_t, std::pair<uint8_t, bool>> cache_;
@@ -69,10 +69,10 @@ private:
 
 }  // namespace
 
-PmapImage pngToIndices(std::span<const uint8_t> pngFile, const gfx::Palette& palette) {
-    const DecodedPng png = decodePng(pngFile);
+PmapImage pngToIndices(std::span<const uint8_t> pngFile, const mischief::gfx::Palette& palette) {
+    const mischief::mods::DecodedPng png = mischief::mods::decodePng(pngFile);
     if (png.width > kMaxSide || png.height > kMaxSide)
-        throw FormatError(std::format("the picture is {}x{}; at most {}x{} is supported", png.width, png.height, kMaxSide, kMaxSide));
+        throw mischief::FormatError(std::format("the picture is {}x{}; at most {}x{} is supported", png.width, png.height, kMaxSide, kMaxSide));
     PmapImage img;
     img.width = png.width;
     img.height = png.height;
@@ -125,7 +125,7 @@ PmapImage pngToIndices(std::span<const uint8_t> pngFile, const gfx::Palette& pal
             continue;
         }
         bool exact = false;
-        img.indices[i] = q.map(Rgb8{p[0], p[1], p[2]}, exact);
+        img.indices[i] = q.map(mischief::Rgb8{p[0], p[1], p[2]}, exact);
         if (q.isKey(img.indices[i])) ++img.keyPixels;
         if (!exact) ++img.remapped;
     }
@@ -134,7 +134,7 @@ PmapImage pngToIndices(std::span<const uint8_t> pngFile, const gfx::Palette& pal
 
 std::vector<uint8_t> encodePmapBody(const PmapImage& img, int depth, gfx::PixEncoding encoding) {
     if (img.width <= 0 || img.height <= 0 || img.width > 0xFFFF || img.height > 0xFFFF)
-        throw FormatError(std::format("bad picture size {}x{}", img.width, img.height));
+        throw mischief::FormatError(std::format("bad picture size {}x{}", img.width, img.height));
     std::vector<uint8_t> out;
     auto header = [&] {
         out.push_back(static_cast<uint8_t>(img.width & 0xFF));
@@ -164,13 +164,13 @@ std::vector<uint8_t> encodePmapBody(const PmapImage& img, int depth, gfx::PixEnc
     return out;
 }
 
-std::vector<uint8_t> pixmapToEditablePng(const gfx::PixMap& pm, const gfx::Palette& palette) {
+std::vector<uint8_t> pixmapToEditablePng(const gfx::PixMap& pm, const mischief::gfx::Palette& palette) {
     const int n = palette.size();
-    std::vector<Rgb8> colours(palette.colours().begin(), palette.colours().begin() + n);
+    std::vector<mischief::Rgb8> colours(palette.colours().begin(), palette.colours().begin() + n);
     std::vector<uint8_t> alpha(static_cast<size_t>(n), 255);
     for (int i = 0; i < n; ++i)
         if (palette.keyTable()[static_cast<size_t>(i)]) alpha[static_cast<size_t>(i)] = 0;
-    return encodePngIndexed(pm.width, pm.height, pm.pixels, colours, alpha);
+    return mischief::mods::encodePngIndexed(pm.width, pm.height, pm.pixels, colours, alpha);
 }
 
 }  // namespace tmport::mods

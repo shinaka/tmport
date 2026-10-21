@@ -5,13 +5,13 @@
 
 #include "audio/midi_backend_soundfont.h"
 #include "audio/midi_sequencer.h"
-#include "util/error.h"
+#include "mischief/util/error.h"
 
 namespace tmport::audio {
 
 MidiRenderResult renderMidiSong(const std::shared_ptr<const MidiSong>& song, const std::shared_ptr<Sf2Synth>& synth,
                                 const MidiRenderOptions& o) {
-    if (!synth) throw Error("renderMidiSong: no synthesizer");
+    if (!synth) throw mischief::Error("renderMidiSong: no synthesizer");
     MidiRenderResult r;
     r.sampleRate = synth->sampleRate();
     const uint64_t rate = static_cast<uint64_t>(r.sampleRate);
@@ -23,7 +23,7 @@ MidiRenderResult renderMidiSong(const std::shared_ptr<const MidiSong>& song, con
     c.clock = [&now] { return now; };
     c.volume = o.volume;
     SoundFontMidiBackend backend(std::move(c));
-    if (!backend.open()) throw Error("renderMidiSong: the synthesizer could not be opened");
+    if (!backend.open()) throw mischief::Error("renderMidiSong: the synthesizer could not be opened");
     MidiSequencer seq(backend);
     seq.setSong(song);
     if (song) seq.start(0, 0);

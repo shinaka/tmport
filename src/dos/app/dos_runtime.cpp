@@ -14,9 +14,9 @@ constexpr uint64_t kPitTickUnits = 3ull * kPitDivisor;  // 15123
 
 // ------------------------------------------------------------------------------------- PitClock
 
-const PitTimeBase& PitClock::timeBase() {
+const mischief::PitTimeBase& PitClock::timeBase() {
     // One PIT tick = 3 * 5041 / 3579545 s = 3024600000000 / 715909 ns (reduced by 5).
-    static const PitTimeBase base(kPitDivisor);
+    static const mischief::PitTimeBase base(kPitDivisor);
     return base;
 }
 
@@ -58,7 +58,7 @@ DosRuntime::DosRuntime(RuntimeOptions options)
 }
 
 bool DosRuntime::hostKey(uint32_t sdlScancode, bool down, bool hostRepeat) {
-    const auto k = pcKeyForSdlScancode(sdlScancode);
+    const auto k = mischief::dos::pcKeyForSdlScancode(sdlScancode);
     if (!k) return false;
     if (hostRepeat) return true;
     if (down) keyDownNow(*k);
@@ -125,19 +125,19 @@ void DosRuntime::runPitTicksTo(uint64_t lastPit) {
 }
 
 void DosRuntime::applyScript(uint64_t n, uint64_t timeNs) {
-    for (const ScriptEvent& e : script_.take(n)) {
+    for (const mischief::dos::ScriptEvent& e : script_.take(n)) {
         // A sub-tick event carries its own time between game ticks e.tick - 1 and e.tick (an event
         // of an earlier tick that is applied late is taken as happening now: the keyboard clamps).
         uint64_t t = timeNs;
-        if (e.phasePpm != ScriptEvent::kOnTick && e.tick > 0) {
+        if (e.phasePpm != mischief::dos::ScriptEvent::kOnTick && e.tick > 0) {
             const uint64_t t0 = PitClock::timeOfGameTick(e.tick - 1), t1 = PitClock::timeOfGameTick(e.tick);
-            t = std::min(timeNs, t0 + (t1 - t0) * e.phasePpm / ScriptEvent::kOnTick);
+            t = std::min(timeNs, t0 + (t1 - t0) * e.phasePpm / mischief::dos::ScriptEvent::kOnTick);
         }
         switch (e.kind) {
-            case ScriptEvent::Kind::KeyDown: keyboard_.keyDown(e.key, t); break;
-            case ScriptEvent::Kind::KeyUp: keyboard_.keyUp(e.key, t); break;
-            case ScriptEvent::Kind::MouseMove: mouse_.setLogicalPosition(e.x, e.y); break;
-            case ScriptEvent::Kind::MouseButtons: mouse_.setButtons(e.buttons); break;
+            case mischief::dos::ScriptEvent::Kind::KeyDown: keyboard_.keyDown(e.key, t); break;
+            case mischief::dos::ScriptEvent::Kind::KeyUp: keyboard_.keyUp(e.key, t); break;
+            case mischief::dos::ScriptEvent::Kind::MouseMove: mouse_.setLogicalPosition(e.x, e.y); break;
+            case mischief::dos::ScriptEvent::Kind::MouseButtons: mouse_.setButtons(e.buttons); break;
         }
     }
 }

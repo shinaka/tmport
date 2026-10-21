@@ -7,7 +7,7 @@
 //
 // Windows: tmport.exe is a GUI-subsystem program (no console window on a double-click); SDL_main.h
 // supplies WinMain, which calls main() with UTF-8 arguments. Started from a console it attaches
-// to that console for its output (platform/console.h). tmport-cli.exe is the same program as a
+// to that console for its output (mischief/platform/console.h). tmport-cli.exe is the same program as a
 // console application, for scripts that need the shell to wait and see the exit code.
 
 #include <SDL3/SDL_main.h>
@@ -16,10 +16,10 @@
 #include "app/launch_options.h"
 #include "cli/commands.h"
 #include "game/game_main.h"
-#include "platform/console.h"
+#include "mischief/platform/console.h"
 
 int main(int argc, char** argv) {
-    tmport::platform::attachParentConsole();
+    mischief::platform::attachParentConsole();
     if (tmport::app::isGameInvocation(argc, argv)) {
         // The game: GameMain (1118:0000, game/game_main.h).
         return tmport::app::runGame(argc, argv, [](tmport::AppContext& ctx) { tmport::game::gameMain(ctx); });

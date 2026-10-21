@@ -23,9 +23,9 @@
 #include "audio/sf2_synth.h"
 #include "audio/sf2_writer.h"
 #include "audio_test_util.h"
+#include "mischief/util/file_util.h"
 #include "save/settings.h"
 #include "test_data.h"
-#include "util/file_util.h"
 
 using namespace tmport;
 using namespace tmport::audio;
@@ -181,14 +181,14 @@ TEST_CASE("SoundFont: the synthetic test SoundFont loads (presets, banks, files,
 
     // From a file (a non-ASCII name: the loader must not go through narrow fopen paths).
     const auto file = tempDir("load") / std::filesystem::path(u8"test_t\u00f6ne.sf2");
-    REQUIRE(writeWholeFile(file, sf2));
+    REQUIRE(mischief::writeWholeFile(file, sf2));
     std::string error;
     CHECK(Sf2Synth::loadFile(file, 22050, error) != nullptr);
 
     CHECK(Sf2Synth::loadFile(tempDir("load") / "missing.sf2", kRate, error) == nullptr);
     CHECK(error.find("open") != std::string::npos);
     const std::vector<uint8_t> junk(100, 0x41);
-    REQUIRE(writeWholeFile(tempDir("load") / "junk.sf2", junk));
+    REQUIRE(mischief::writeWholeFile(tempDir("load") / "junk.sf2", junk));
     CHECK(Sf2Synth::loadFile(tempDir("load") / "junk.sf2", kRate, error) == nullptr);
     CHECK(error.find("SoundFont") != std::string::npos);
     CHECK(Sf2Synth::loadMemory(junk, kRate, error) == nullptr);
@@ -664,23 +664,23 @@ TEST_CASE("SoundFont: back end selection and tmport.ini keys") {
     mc.kind = MidiBackendKind::Null;
     CHECK(createMidiBackend(mc)->name() == "null");
 
-    const save::EngineSettings d = save::EngineSettings::fromIni(save::IniFile{});
+    const save::EngineSettings d = save::EngineSettings::fromIni(mischief::save::IniFile{});
     CHECK(d.soundFont.empty());
     CHECK(d.musicVolume == 100);
-    const save::EngineSettings s = save::EngineSettings::fromIni(save::IniFile::parse(
+    const save::EngineSettings s = save::EngineSettings::fromIni(mischief::save::IniFile::parse(
         "[audio]\nmidi_backend = winmm\nmidi = SoundFont\nsoundfont = C:\\sf2\\GeneralUser GS.sf2\nmusic_volume = 40\n"));
     CHECK(s.midiBackend == save::MidiBackend::SoundFont);  // "midi" wins over "midi_backend"
     CHECK(s.soundFont == "C:\\sf2\\GeneralUser GS.sf2");
     CHECK(s.musicVolume == 40);
-    CHECK(save::EngineSettings::fromIni(save::IniFile::parse("[audio]\nmidi_backend = sf2\n")).midiBackend == save::MidiBackend::SoundFont);
-    CHECK(save::EngineSettings::fromIni(save::IniFile::parse("[audio]\nmusic_volume = 101\n")).musicVolume == 100);  // bad: default
-    save::IniFile ini = save::IniFile::parse("[audio]\nmidi = soundfont\n");
+    CHECK(save::EngineSettings::fromIni(mischief::save::IniFile::parse("[audio]\nmidi_backend = sf2\n")).midiBackend == save::MidiBackend::SoundFont);
+    CHECK(save::EngineSettings::fromIni(mischief::save::IniFile::parse("[audio]\nmusic_volume = 101\n")).musicVolume == 100);  // bad: default
+    mischief::save::IniFile ini = mischief::save::IniFile::parse("[audio]\nmidi = soundfont\n");
     save::EngineSettings w = s;
     w.midiBackend = save::MidiBackend::Null;
     w.toIni(ini);
     CHECK(ini.get("audio", "midi") == "null");  // the alias is kept in step
     CHECK(ini.get("audio", "midi_backend") == "null");
-    CHECK(save::EngineSettings::fromIni(save::IniFile::parse(ini.text())) == w);
+    CHECK(save::EngineSettings::fromIni(mischief::save::IniFile::parse(ini.text())) == w);
 }
 
 TEST_CASE("SoundFont: the back end on SDL's silent dummy driver, sharing the wave voice's device") {
@@ -731,11 +731,11 @@ TEST_CASE("SoundFont: the back end on SDL's silent dummy driver, sharing the wav
 TEST_CASE("SoundFont: AudioSystem::create with the SoundFont back end (dummy SDL driver, user's tunes)") {
     TM_REQUIRE_GAME_DATA();
     const auto sf2 = tempDir("system") / "test.sf2";
-    REQUIRE(writeWholeFile(sf2, makeTestSoundFont()));
+    REQUIRE(mischief::writeWholeFile(sf2, makeTestSoundFont()));
     AudioConfig cfg;
     cfg.sdlAudioDriver = "dummy";
     cfg.midiBackend = MidiBackendKind::SoundFont;
-    cfg.soundFontPath = pathToUtf8(sf2);
+    cfg.soundFontPath = mischief::pathToUtf8(sf2);
     cfg.musicVolume = 0.8f;
     auto a = AudioSystem::create(*g, cfg);
     REQUIRE(a != nullptr);
@@ -770,7 +770,7 @@ TEST_CASE("SoundFont: AudioSystem::create with the SoundFont back end (dummy SDL
     a->music().stopScene();
 
     // A missing SoundFont: the back end does not open, music reports not playing, nothing crashes.
-    cfg.soundFontPath = pathToUtf8(tempDir("system") / "nope.sf2");
+    cfg.soundFontPath = mischief::pathToUtf8(tempDir("system") / "nope.sf2");
     auto b = AudioSystem::create(*g, cfg);
     CHECK_FALSE(b->midi().midiOk());
     b->music().playZone(zone::kLevel0);
@@ -781,8 +781,8 @@ TEST_CASE("SoundFont: --midi-render of SOUNDS\\EOPEN1.MID with the synthetic Sou
     TM_REQUIRE_GAME_DATA();
     const auto data = testdata::dataPath();
     const auto dir = tempDir("render");
-    const std::string sf2 = pathToUtf8(dir / "test.sf2");
-    const std::string wav = pathToUtf8(dir / "eopen1.wav");
+    const std::string sf2 = mischief::pathToUtf8(dir / "test.sf2");
+    const std::string wav = mischief::pathToUtf8(dir / "eopen1.wav");
     {
         std::vector<std::string> args = {"tmport", "--make-test-soundfont", sf2};
         std::vector<char*> argv;
@@ -808,7 +808,7 @@ TEST_CASE("SoundFont: --midi-render of SOUNDS\\EOPEN1.MID with the synthetic Sou
     REQUIRE(song.lengthUs > 5'000'000);  // the intro tune lasts about 8 s
     const uint64_t expectedFrames = (song.lengthUs * 44100 + 999'999) / 1'000'000 + 2 * 44100;  // + 2 s tail
 
-    const auto bytes = readWholeFile(pathFromUtf8(wav));
+    const auto bytes = mischief::readWholeFile(mischief::pathFromUtf8(wav));
     REQUIRE(bytes);
     REQUIRE(bytes->size() > 44);
     auto u16 = [&](size_t o) { return static_cast<uint32_t>((*bytes)[o] | (*bytes)[o + 1] << 8); };
@@ -835,7 +835,7 @@ TEST_CASE("SoundFont: --midi-render of SOUNDS\\EOPEN1.MID with the synthetic Sou
 
     // --seconds sets the exact length.
     REQUIRE(runRender({"--seconds", "5"}) == 0);
-    const auto shortWav = readWholeFile(pathFromUtf8(wav));
+    const auto shortWav = mischief::readWholeFile(mischief::pathFromUtf8(wav));
     REQUIRE(shortWav);
     CHECK(shortWav->size() == 44 + 5 * 44100 * 4);
     // Bad arguments.

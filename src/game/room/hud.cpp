@@ -1,9 +1,9 @@
 #include "game/room/hud.h"
 
 #include "input/hotspot_table.h"
+#include "mischief/util/log.h"
 #include "res/resource_manager.h"
 #include "text/text_renderer.h"
-#include "util/log.h"
 
 namespace tmport::game::room {
 
@@ -44,7 +44,7 @@ std::vector<uint8_t> hudPointsText(std::span<const uint8_t> tmpl, uint16_t v) {
 void Hud::loadArt(const ResourceManager& res) {
     const auto b = res.bundle(kHudBndl);
     if (!b) {
-        log::warn("HUD: BNDL {} not found", kHudBndl);
+        mischief::log::warn("HUD: BNDL {} not found", kHudBndl);
         return;
     }
     for (size_t i = 0; i < art_.size(); ++i) art_[i] = i < b->ids.size() ? res.pixmap(b->ids[i]) : nullptr;
@@ -80,7 +80,7 @@ void Hud::drawClueTexts(const GameState& s) {
     if (level >= kLevelCount) return;  // the original would read past the per-level table
     for (int i = 0; i < s.inv.numClues && i < 3; ++i) {
         const std::string_view w = s.clues.text[level][static_cast<size_t>(i)];
-        text_.draw(hud::kClueX, i * hud::kClueDy + hud::kClueY, text::asBytes(w));
+        text_.draw(hud::kClueX, i * hud::kClueDy + hud::kClueY, mischief::text::asBytes(w));
     }
 }
 

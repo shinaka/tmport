@@ -32,12 +32,12 @@
 #include "dos/mods/dos_text_files.h"
 #include "dos/text/dos_font.h"
 #include "dos_test_data.h"
-#include "mods/json.h"
+#include "mischief/mods/json.h"
+#include "mischief/mods/png_codec.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
 #include "mods/mod_common.h"
 #include "mods/mods_cli.h"
-#include "mods/png_codec.h"
-#include "util/error.h"
-#include "util/file_util.h"
 
 using namespace tmport;
 using namespace tmport::dos;
@@ -59,7 +59,7 @@ struct TempDir {
 
 void put(const std::filesystem::path& p, std::span<const uint8_t> b) {
     std::filesystem::create_directories(p.parent_path());
-    REQUIRE(writeWholeFile(p, b));
+    REQUIRE(mischief::writeWholeFile(p, b));
 }
 void putText(const std::filesystem::path& p, std::string_view s) {
     put(p, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(s.data()), s.size()));
@@ -127,12 +127,12 @@ TEST_CASE("dos mods: DOS mod folders come from tmport.ini [mods] dos_paths or th
 #else
     const std::string absDir = "/abs/b";
 #endif
-    const auto ini = save::IniFile::parse("[mods]\ndos_paths = a ; " + absDir + " ;\n");
+    const auto ini = mischief::save::IniFile::parse("[mods]\ndos_paths = a ; " + absDir + " ;\n");
     const auto dirs = dosModDirsFromIni(&ini, "C:/ini", "C:/pref", "C:/exe");
     REQUIRE(dirs.size() == 2);
     CHECK(dirs[0] == std::filesystem::path("C:/ini") / "a");
     CHECK(dirs[1] == std::filesystem::path(absDir));
-    const auto off = save::IniFile::parse("[mods]\nenabled = false\ndos_paths = a\n");
+    const auto off = mischief::save::IniFile::parse("[mods]\nenabled = false\ndos_paths = a\n");
     CHECK(dosModDirsFromIni(&off, "C:/ini", "C:/pref", "C:/exe").empty());
     const auto defaults = dosModDirsFromIni(nullptr, {}, "C:/pref", "C:/exe");
     REQUIRE(defaults.size() == 2);
@@ -325,13 +325,13 @@ TEST_CASE("dos mods: changed frames and pictures are packed and decode back; bad
     CHECK(contains(errorOf([&] { (void)rebuildPan(mountain, {{0, small}}, "MOUNTAIN.PAN"); }), "must be 128x128"));
     CHECK(contains(errorOf([&] { (void)rebuildPan(mountain, {{81, small}}, "MOUNTAIN.PAN"); }), "picture 81 does not exist"));
     std::vector<uint8_t> rgba(16 * 16 * 4, 0);  // fully transparent
-    CHECK(contains(errorOf([&] { (void)pngToLogical(mods::encodePngRgba(16, 16, rgba), colours, false); }), "transparent"));
-    const LogicalImage sprite = pngToLogical(mods::encodePngRgba(16, 16, rgba), colours, true);
+    CHECK(contains(errorOf([&] { (void)pngToLogical(mischief::mods::encodePngRgba(16, 16, rgba), colours, false); }), "transparent"));
+    const LogicalImage sprite = pngToLogical(mischief::mods::encodePngRgba(16, 16, rgba), colours, true);
     CHECK(sprite.pixels == std::vector<uint8_t>(256, 0));
     // An RGB picture: exact colours map to their index, others to the nearest.
     std::vector<uint8_t> rgb(2 * 4);
     rgb = {colours[9].r, colours[9].g, colours[9].b, 255, static_cast<uint8_t>(colours[12].r ^ 1), colours[12].g, colours[12].b, 255};
-    const LogicalImage two = pngToLogical(mods::encodePngRgba(2, 1, rgb), colours, false);
+    const LogicalImage two = pngToLogical(mischief::mods::encodePngRgba(2, 1, rgb), colours, false);
     CHECK(two.pixels == std::vector<uint8_t>{9, 12});
     CHECK(two.remapped == 1);
 }
@@ -581,18 +581,18 @@ TEST_CASE("dos mods: --check-mods and --export-mod-kit work on a DOS folder") {
             std::format(R"({{"strings": {{"DS:{:04X}": {{"text": "x"}}}}}})", static_cast<int>(dg::kStrBtnYes)));
     putText(dir.p / "bad" / "SOUND" / "TUNES.IBM.txt", "tune 0\n");
     DosModsCommand c;
-    c.dataArg = pathToUtf8(dosFiles->folder());
+    c.dataArg = mischief::pathToUtf8(dosFiles->folder());
     c.paths = save::Paths::under(dir.p / "pref", dir.p / "exe");
     c.compare = true;
     c.modDirs = {dir.p / "mod"};
     CHECK(runDosModsCommand(c) == 0);
     c.modDirs = {dir.p / "bad"};
     CHECK(runDosModsCommand(c) == 1);
-    c.dataArg = pathToUtf8(dir.p);  // no DOS edition there
+    c.dataArg = mischief::pathToUtf8(dir.p);  // no DOS edition there
     CHECK(runDosModsCommand(c) == 3);
 
     // The routing of the mods tools: --edition dos (and a --data that names a DOS folder).
-    const std::string data = pathToUtf8(dosFiles->folder()), mod = pathToUtf8(dir.p / "mod");
+    const std::string data = mischief::pathToUtf8(dosFiles->folder()), mod = mischief::pathToUtf8(dir.p / "mod");
     std::vector<std::string> args = {"tmport", "--check-mods", mod, "--data", data};
     std::vector<char*> argv;
     for (auto& a : args) argv.push_back(a.data());

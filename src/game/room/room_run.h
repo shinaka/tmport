@@ -48,7 +48,7 @@
 #include "game/room/room_scene.h"
 #include "game/room/room_state.h"
 #include "game/room/room_tables.h"
-#include "rtl/borland_rand.h"
+#include "mischief/rtl/borland_rand.h"
 
 namespace tmport::anim {
 class AnimEngine;
@@ -95,7 +95,7 @@ struct RoomChange {
 class RoomLoop {
 public:
     // anim: the DAM engine to use (null: AppContext::anim, else an own one).
-    RoomLoop(AppContext& ctx, GameState& s, const GameTables& t, BorlandRand& rng, RoomHooks hooks = {},
+    RoomLoop(AppContext& ctx, GameState& s, const GameTables& t, mischief::BorlandRand& rng, RoomHooks hooks = {},
              anim::AnimEngine* anim = nullptr);
     ~RoomLoop();
     RoomLoop(const RoomLoop&) = delete;
@@ -167,7 +167,7 @@ private:
     AppContext& ctx_;
     GameState& s_;
     const GameTables& t_;
-    BorlandRand& rng_;
+    mischief::BorlandRand& rng_;
     RoomHooks hooks_;
     RoomTables rt_;
     std::unique_ptr<anim::AnimEngine> ownAnim_;

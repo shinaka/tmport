@@ -23,15 +23,15 @@
 #include "app/launch_options.h"
 #include "edition/dos_options.h"
 #include "edition/edition.h"
-#include "platform/host.h"
-#include "util/error.h"
+#include "mischief/platform/host.h"
+#include "mischief/util/error.h"
 
 namespace tmport::app {
 
 // A start-up failure with the message for the player. file(): the missing game file, if any.
-class StartupError : public Error {
+class StartupError : public mischief::Error {
 public:
-    explicit StartupError(const std::string& message, std::string file = {}) : Error(message), file_(std::move(file)) {}
+    explicit StartupError(const std::string& message, std::string file = {}) : mischief::Error(message), file_(std::move(file)) {}
     const std::string& file() const { return file_; }
 
 private:
@@ -98,7 +98,7 @@ dos::DosOptions resolveDosOptions(const LaunchOptions& o, const save::EngineSett
 // The host of the DOS edition: PresenterLayout::dos1990 (square pixels on request), [dos]
 // window_scale, and the shared [engine] integer_scale / fullscreen / pause_on_focus_loss with their
 // command-line overrides.
-platform::HostConfig dosHostConfig(const LaunchOptions& o, const save::EngineSettings& settings,
+mischief::platform::HostConfig dosHostConfig(const LaunchOptions& o, const save::EngineSettings& settings,
                                    const std::filesystem::path& screenshotDir);
 
 // The whole game: parse argv, init, run entry (empty = game::gameMain), report errors through sink

@@ -2,7 +2,7 @@
 
 SSND resources live in TM0SOUND.DLL .. TM8SOUND.DLL (Win16 NE, resource-only).
 They are stored under the numeric NE resource type 0xFF01 (shown as 32513 by
-tools/ne_resources.py) and mapped to the Mac-style type name "SSND" by the
+the engine's tools/ne_resources.py) and mapped to the Mac-style type name "SSND" by the
 DLL's RT_NAMETABLE (type 15) resource.  See re/docs/fmt_sound.md.
 
 Payload layout (all little-endian):

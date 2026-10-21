@@ -6,7 +6,7 @@ save::EngineSettings loadEngineSettings(const std::filesystem::path& iniOverride
     std::filesystem::path ini = iniOverride;
     if (ini.empty()) ini = save::Paths::detect().iniPath;
     if (ini.empty()) return {};
-    auto file = save::IniFile::load(ini);
+    auto file = mischief::save::IniFile::load(ini);
     return file ? save::EngineSettings::fromIni(*file) : save::EngineSettings{};
 }
 

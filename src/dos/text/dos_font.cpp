@@ -6,7 +6,7 @@
 
 #include "dos/data/dos_exe.h"
 #include "dos/gfx/back_buffer.h"
-#include "util/error.h"
+#include "mischief/util/error.h"
 
 namespace tmport::dos {
 
@@ -20,20 +20,20 @@ constexpr std::array<uint8_t, 9> kBlitterSignature = {0xBE, 0x47, 0x24, 0x33, 0x
 DosFont DosFont::fromExe(const DosExe& exe) {
     const auto sig = exe.at(kCodeSegment, 0x219A);
     if (sig.size() < kBlitterSignature.size() || !std::equal(kBlitterSignature.begin(), kBlitterSignature.end(), sig.begin()))
-        throw FormatError("SST.EXE: the glyph blitter 1000:2180 does not load the font from 1000:2447");
+        throw mischief::FormatError("SST.EXE: the glyph blitter 1000:2180 does not load the font from 1000:2447");
     std::vector<uint16_t> bpr(256);
     for (size_t w = 0; w < bpr.size(); ++w) bpr[w] = exe.ds16(static_cast<uint16_t>(kDsBytesPerRow + 2 * w));
     return fromBlock(exe.at(kCodeSegment, kFontOffset), bpr);
 }
 
 DosFont DosFont::fromBlock(std::span<const uint8_t> block, std::span<const uint16_t> bytesPerRowByWidth) {
-    if (block.size() < 3) throw FormatError("DOS font: block too short");
+    if (block.size() < 3) throw mischief::FormatError("DOS font: block too short");
     DosFont f;
     f.unknown0_ = block[0];
     const size_t n = static_cast<size_t>(block[1]) + 1;
     f.height_ = block[2];
     const size_t dataStart = 3 + 3 * n;
-    if (block.size() < dataStart) throw FormatError("DOS font: tables run past the block");
+    if (block.size() < dataStart) throw mischief::FormatError("DOS font: tables run past the block");
     f.widths_.assign(block.begin() + 3, block.begin() + 3 + static_cast<std::ptrdiff_t>(n));
     size_t end = 0;
     for (size_t c = 0; c < n; ++c) {
@@ -44,7 +44,7 @@ DosFont DosFont::fromBlock(std::span<const uint8_t> block, std::span<const uint1
         f.bpr_.push_back(bpr);
         end = std::max(end, off + static_cast<size_t>(bpr) * f.height_);
     }
-    if (block.size() < dataStart + end) throw FormatError("DOS font: glyph data runs past the block");
+    if (block.size() < dataStart + end) throw mischief::FormatError("DOS font: glyph data runs past the block");
     f.data_.assign(block.begin() + static_cast<std::ptrdiff_t>(dataStart), block.begin() + static_cast<std::ptrdiff_t>(dataStart + end));
     return f;
 }

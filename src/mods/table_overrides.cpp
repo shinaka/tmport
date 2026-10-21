@@ -7,8 +7,8 @@
 #include <functional>
 
 #include "data/dgroup_offsets.h"
+#include "mischief/util/error.h"
 #include "mods/text_codec.h"
-#include "util/error.h"
 
 namespace tmport::mods {
 
@@ -115,11 +115,11 @@ struct Plan {
     std::vector<std::string> warnings;
 };
 
-[[noreturn]] void fail(const std::string& path, const std::string& msg) { throw FormatError(path + ": " + msg); }
+[[noreturn]] void fail(const std::string& path, const std::string& msg) { throw mischief::FormatError(path + ": " + msg); }
 
 // Calls fn(index, value) for each element given by an array of length n (nulls skipped) or an
 // object of decimal index keys.
-void forEachIndexed(const json::Value& v, int n, const std::string& path, const std::function<void(int, const json::Value&, const std::string&)>& fn) {
+void forEachIndexed(const mischief::mods::json::Value& v, int n, const std::string& path, const std::function<void(int, const mischief::mods::json::Value&, const std::string&)>& fn) {
     if (v.isArray()) {
         if (static_cast<int>(v.size()) != n)
             fail(path, std::format("needs {} elements, not {} (use null to keep one, or an object {{\"index\": value}})", n, v.size()));
@@ -142,8 +142,8 @@ void forEachIndexed(const json::Value& v, int n, const std::string& path, const 
     fail(path, std::format("must be an array of {} elements or an object of indices", n));
 }
 
-int64_t intValue(const json::Value& v, const std::string& path, int64_t lo, int64_t hi, const char* rangeText) {
-    if (!v.isInteger()) fail(path, std::format("must be a whole number, not {}", json::Value::typeName(v.type())));
+int64_t intValue(const mischief::mods::json::Value& v, const std::string& path, int64_t lo, int64_t hi, const char* rangeText) {
+    if (!v.isInteger()) fail(path, std::format("must be a whole number, not {}", mischief::mods::json::Value::typeName(v.type())));
     const int64_t x = v.asInt();
     if (x < lo || x > hi) fail(path, rangeText ? std::format("{} is not {}", x, rangeText) : std::format("{} is outside {}..{}", x, lo, hi));
     return x;
@@ -154,18 +154,18 @@ void putElem(std::vector<uint8_t>& b, int64_t v, Elem e) {
     for (size_t k = 0; k < elemSize(e); ++k) b.push_back(static_cast<uint8_t>(u >> (8 * k)));
 }
 
-void planArray(const ExeTables& exe, const ArrayTable& t, const json::Value& v, Plan& plan) {
+void planArray(const ExeTables& exe, const ArrayTable& t, const mischief::mods::json::Value& v, Plan& plan) {
     const std::string path = t.name;
     std::vector<int64_t> values(static_cast<size_t>(t.rows * t.cols));
     for (int i = 0; i < t.rows * t.cols; ++i) values[static_cast<size_t>(i)] = readElem(exe, t.off + static_cast<uint32_t>(i * elemSize(t.elem)), t.elem);
-    auto setOne = [&](int idx, const json::Value& e, const std::string& p) {
+    auto setOne = [&](int idx, const mischief::mods::json::Value& e, const std::string& p) {
         values[static_cast<size_t>(idx)] = intValue(e, p, t.lo, t.hi, t.rangeText);
     };
     if (t.rows == 1) {
         forEachIndexed(v, t.cols, path, setOne);
     } else {
-        forEachIndexed(v, t.rows, path, [&](int r, const json::Value& row, const std::string& p) {
-            forEachIndexed(row, t.cols, p, [&](int c, const json::Value& e, const std::string& pp) { setOne(r * t.cols + c, e, pp); });
+        forEachIndexed(v, t.rows, path, [&](int r, const mischief::mods::json::Value& row, const std::string& p) {
+            forEachIndexed(row, t.cols, p, [&](int c, const mischief::mods::json::Value& e, const std::string& pp) { setOne(r * t.cols + c, e, pp); });
         });
     }
     if (std::string_view(t.name) == "rankThresholds") {
@@ -184,8 +184,8 @@ void planArray(const ExeTables& exe, const ArrayTable& t, const json::Value& v, 
     plan.patches.emplace_back(t.off, std::move(bytes));
 }
 
-void planRooms(const ExeTables& exe, const json::Value& v, Plan& plan) {
-    forEachIndexed(v, dg::kRoomCount, "rooms", [&](int room, const json::Value& rec, const std::string& path) {
+void planRooms(const ExeTables& exe, const mischief::mods::json::Value& v, Plan& plan) {
+    forEachIndexed(v, dg::kRoomCount, "rooms", [&](int room, const mischief::mods::json::Value& rec, const std::string& path) {
         if (!rec.isObject()) fail(path, "must be an object of room fields");
         const uint32_t base = dg::kRooms + static_cast<uint32_t>(room) * dg::kRoomSize;
         std::vector<uint8_t> bytes(exe.bytes(base, dg::kRoomSize).begin(), exe.bytes(base, dg::kRoomSize).end());
@@ -219,13 +219,13 @@ void planRooms(const ExeTables& exe, const json::Value& v, Plan& plan) {
     });
 }
 
-void planStrings(const ExeTables& exe, const StringTable& t, const json::Value& v, const std::string& path, Plan& plan) {
-    forEachIndexed(v, t.count, path, [&](int i, const json::Value& e, const std::string& p) {
+void planStrings(const ExeTables& exe, const StringTable& t, const mischief::mods::json::Value& v, const std::string& path, Plan& plan) {
+    forEachIndexed(v, t.count, path, [&](int i, const mischief::mods::json::Value& e, const std::string& p) {
         if (!e.isString()) fail(p, "must be a string");
         std::vector<uint8_t> text;
         try {
             text = unescapeGameText(e.asString());
-        } catch (const FormatError& ex) {
+        } catch (const mischief::FormatError& ex) {
             fail(p, ex.what());
         }
         const uint32_t site = t.off + static_cast<uint32_t>(4 * i);
@@ -244,34 +244,34 @@ const std::vector<std::string>& supportedTables() {
     return n;
 }
 
-json::Value exportTables(const ExeTables& exe) {
-    json::Value doc = json::Value::object();
+mischief::mods::json::Value exportTables(const ExeTables& exe) {
+    mischief::mods::json::Value doc = mischief::mods::json::Value::object();
     // rooms
-    json::Value rooms = json::Value::array();
+    mischief::mods::json::Value rooms = mischief::mods::json::Value::array();
     for (int r = 0; r < dg::kRoomCount; ++r) {
         const uint32_t base = dg::kRooms + static_cast<uint32_t>(r) * dg::kRoomSize;
-        json::Value rec = json::Value::object();
-        for (const auto& f : roomFields()) rec.set(f.name, json::Value(readElem(exe, base + f.off, f.elem)));
+        mischief::mods::json::Value rec = mischief::mods::json::Value::object();
+        for (const auto& f : roomFields()) rec.set(f.name, mischief::mods::json::Value(readElem(exe, base + f.off, f.elem)));
         rooms.push(std::move(rec));
     }
     auto arrayValue = [&](const ArrayTable& t) {
         auto row = [&](int r) {
-            json::Value a = json::Value::array();
+            mischief::mods::json::Value a = mischief::mods::json::Value::array();
             for (int c = 0; c < t.cols; ++c)
-                a.push(json::Value(readElem(exe, t.off + static_cast<uint32_t>((r * t.cols + c) * static_cast<int>(elemSize(t.elem))), t.elem)));
+                a.push(mischief::mods::json::Value(readElem(exe, t.off + static_cast<uint32_t>((r * t.cols + c) * static_cast<int>(elemSize(t.elem))), t.elem)));
             return a;
         };
         if (t.rows == 1) return row(0);
-        json::Value a = json::Value::array();
+        mischief::mods::json::Value a = mischief::mods::json::Value::array();
         for (int r = 0; r < t.rows; ++r) a.push(row(r));
         return a;
     };
     auto strings = [&](const StringTable& t) {
-        json::Value a = json::Value::array();
-        for (int i = 0; i < t.count; ++i) a.push(json::Value(escapeGameText(exe.farCstr(t.off + static_cast<uint32_t>(4 * i)))));
+        mischief::mods::json::Value a = mischief::mods::json::Value::array();
+        for (int i = 0; i < t.count; ++i) a.push(mischief::mods::json::Value(escapeGameText(exe.farCstr(t.off + static_cast<uint32_t>(4 * i)))));
         return a;
     };
-    json::Value clue = json::Value::object();
+    mischief::mods::json::Value clue = mischief::mods::json::Value::object();
     for (const auto& name : supportedTables()) {
         if (name == "rooms") {
             doc.set("rooms", std::move(rooms));
@@ -289,18 +289,18 @@ json::Value exportTables(const ExeTables& exe) {
 }
 
 std::vector<std::pair<std::string, std::string>> exportTableFiles(const ExeTables& exe) {
-    const json::Value doc = exportTables(exe);
+    const mischief::mods::json::Value doc = exportTables(exe);
     std::vector<std::pair<std::string, std::string>> out;
     for (const auto& [k, v] : doc.asObject()) {
-        json::Value one = json::Value::object();
+        mischief::mods::json::Value one = mischief::mods::json::Value::object();
         one.set(k, v);
-        out.emplace_back(k + ".json", json::write(one));
+        out.emplace_back(k + ".json", mischief::mods::json::write(one));
     }
     return out;
 }
 
-TableApplyResult applyTables(ExeTables& exe, const json::Value& doc) {
-    if (!doc.isObject()) throw FormatError("a table file must hold a JSON object keyed by table name");
+TableApplyResult applyTables(ExeTables& exe, const mischief::mods::json::Value& doc) {
+    if (!doc.isObject()) throw mischief::FormatError("a table file must hold a JSON object keyed by table name");
     Plan plan;
     TableApplyResult res;
     for (const auto& [key, v] : doc.asObject()) {
@@ -353,6 +353,6 @@ TableApplyResult applyTables(ExeTables& exe, const json::Value& doc) {
     return res;
 }
 
-TableApplyResult applyTablesText(ExeTables& exe, std::string_view jsonText) { return applyTables(exe, json::parse(jsonText)); }
+TableApplyResult applyTablesText(ExeTables& exe, std::string_view jsonText) { return applyTables(exe, mischief::mods::json::parse(jsonText)); }
 
 }  // namespace tmport::mods

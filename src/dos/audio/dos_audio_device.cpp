@@ -7,7 +7,7 @@ namespace tmport::dos {
 DosAudioDevice::DosAudioDevice(std::shared_ptr<const SoundBank> bank, DosAudioConfig cfg, std::function<int()> rand)
     : bank_(std::move(bank)), cfg_(std::move(cfg)), rand_(std::move(rand)) {
     renderer_ = std::make_unique<DosSoundRenderer>(*bank_, cfg_.render);
-    output_ = std::make_unique<ChipAudioDevice>(renderer_->chips(), cfg_, "dos audio");
+    output_ = std::make_unique<mischief::dos::ChipAudioDevice>(renderer_->chips(), cfg_, "dos audio");
     output_->setTickHook([this] { applyPending(); });
     output_->setAfterRender([this] { publishStatus(); });
     publishStatus();
@@ -102,7 +102,7 @@ void DosAudioDevice::restoreOplDriver(std::span<const uint8_t> dgroup) {
 }
 
 void DosAudioDevice::setOplSynthesis(bool on) {
-    output_->withRenderer([on](ChipRenderer& r) { r.setOplSynthesis(on); });
+    output_->withRenderer([on](mischief::dos::ChipRenderer& r) { r.setOplSynthesis(on); });
 }
 
 void DosAudioDevice::setMusicOn(bool on, uint32_t delay) {

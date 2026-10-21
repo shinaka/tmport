@@ -10,15 +10,15 @@
 #include "dos/data/dos_exe.h"
 #include "dos/mods/dos_text_codec.h"
 #include "dos/text/dos_font.h"
-#include "mods/json.h"
+#include "mischief/mods/json.h"
+#include "mischief/util/error.h"
 #include "mods/mod_common.h"
-#include "util/error.h"
 
 namespace tmport::dos {
 
 namespace {
 
-namespace json = mods::json;
+namespace json = mischief::mods::json;
 using R = DosStringRole;
 
 // Pools: DS ranges whose strings are reached only through far pointers (fmt_data.md §7.2).
@@ -169,7 +169,7 @@ DosStringCatalogue DosStringCatalogue::read(const DosExe& exe) {
         const DosExe::FarPtr fp = exe.readFarPtr(at);
         if (fp.off == 0 && fp.seg == DosExe::kGhidraBase) return;  // null (titles of boxes without one)
         if (fp.seg != DosExe::kDgroupSeg)
-            throw FormatError(std::format("SST.EXE: the string pointer at {} does not point into DGROUP", dsKey(at)));
+            throw mischief::FormatError(std::format("SST.EXE: the string pointer at {} does not point into DGROUP", dsKey(at)));
         auto [it, added] = byDs.try_emplace(fp.off);
         DosStringEntry& e = it->second;
         if (added) {
@@ -302,7 +302,7 @@ std::string exportStringsJson(const DosExe& exe) {
 void parseStringsJson(std::string_view text, const DosStringCatalogue& catalogue, DosStringEdits& edits) {
     const json::Value v = json::parse(text);
     const json::Value* strings = v.isObject() ? v.find("strings") : nullptr;
-    if (!strings || !strings->isObject()) throw FormatError("strings.json needs an object \"strings\" keyed by DS offset (\"DS:5345\")");
+    if (!strings || !strings->isObject()) throw mischief::FormatError("strings.json needs an object \"strings\" keyed by DS offset (\"DS:5345\")");
     DosStringEdits parsed;
     for (const auto& [key, val] : strings->asObject()) {
         if (key.starts_with('_')) continue;
@@ -311,24 +311,24 @@ void parseStringsJson(std::string_view text, const DosStringCatalogue& catalogue
         unsigned off = 0;
         const auto [p, ec] = std::from_chars(hex.data(), hex.data() + hex.size(), off, 16);
         if (hex.empty() || ec != std::errc() || p != hex.data() + hex.size() || off > 0xFFFF)
-            throw FormatError(std::format("strings: \"{}\" is not a DS offset (write \"DS:5345\")", key));
+            throw mischief::FormatError(std::format("strings: \"{}\" is not a DS offset (write \"DS:5345\")", key));
         const DosStringEntry* e = catalogue.find(static_cast<uint16_t>(off));
-        if (!e) throw FormatError(std::format("strings: \"{}\" is not a string of SST.EXE V 1.0 (see the exported strings.json)", key));
-        if (!val.isObject()) throw FormatError(std::format("strings: \"{}\" must be an object with \"text\"", key));
+        if (!e) throw mischief::FormatError(std::format("strings: \"{}\" is not a string of SST.EXE V 1.0 (see the exported strings.json)", key));
+        if (!val.isObject()) throw mischief::FormatError(std::format("strings: \"{}\" must be an object with \"text\"", key));
         DosStringEdit edit;
         if (const json::Value* t = val.find("text")) {
-            if (!t->isString()) throw FormatError(std::format("strings: \"{}\".text must be a string", key));
+            if (!t->isString()) throw mischief::FormatError(std::format("strings: \"{}\".text must be a string", key));
             try {
                 edit.text = unescapeDosText(t->asString(), DosTextForm::Json);
             } catch (const mods::ModSyntaxError& ex) {
-                throw FormatError(std::format("strings: \"{}\".text: {}", key, ex.what()));
+                throw mischief::FormatError(std::format("strings: \"{}\".text: {}", key, ex.what()));
             }
         }
         for (const char* name : {"countAt", "pluralAt"})
             if (const json::Value* n = val.find(name)) {
-                if (e->role != R::Hint) throw FormatError(std::format("strings: \"{}\".{} only applies to Flutter's rank and end messages", key, name));
+                if (e->role != R::Hint) throw mischief::FormatError(std::format("strings: \"{}\".{} only applies to Flutter's rank and end messages", key, name));
                 if (!n->isInteger() || n->asInt() < -1 || n->asInt() > 0x7FFF)
-                    throw FormatError(std::format("strings: \"{}\".{} must be a position (or -1 for none)", key, name));
+                    throw mischief::FormatError(std::format("strings: \"{}\".{} must be a position (or -1 for none)", key, name));
                 (std::string_view(name) == "countAt" ? edit.countAt : edit.pluralAt) = static_cast<int>(n->asInt());
             }
         parsed[e->ds] = std::move(edit);
@@ -587,19 +587,19 @@ std::string exportPalettesJson(const DosExe& exe) {
 
 size_t applyPalettesJson(DosExe& exe, std::string_view text) {
     const json::Value v = json::parse(text);
-    if (!v.isObject()) throw FormatError("palettes.json must hold a JSON object");
+    if (!v.isObject()) throw mischief::FormatError("palettes.json must hold a JSON object");
     std::vector<std::pair<uint16_t, uint8_t>> writes;
     for (const auto& [key, val] : v.asObject()) {
         if (key.starts_with('_')) continue;
         const PaletteTable* t = nullptr;
         for (const PaletteTable& p : kPaletteTables)
             if (key == p.key) t = &p;
-        if (!t) throw FormatError(std::format("palettes: unknown table \"{}\" (ega, tandy, mcga, mcgaModeSet, cga)", key));
+        if (!t) throw mischief::FormatError(std::format("palettes: unknown table \"{}\" (ega, tandy, mcga, mcgaModeSet, cga)", key));
         if (!val.isArray() || static_cast<int>(val.size()) != t->count)
-            throw FormatError(std::format("palettes: \"{}\" must be an array of {} entries", key, t->count));
+            throw mischief::FormatError(std::format("palettes: \"{}\" must be an array of {} entries", key, t->count));
         auto value = [&](const json::Value& n, const std::string& where) -> uint8_t {
             if (!n.isInteger() || n.asInt() < 0 || n.asInt() > t->max)
-                throw FormatError(std::format("palettes: {} must be a number 0-{}", where, t->max));
+                throw mischief::FormatError(std::format("palettes: {} must be a number 0-{}", where, t->max));
             return static_cast<uint8_t>(n.asInt());
         };
         for (int i = 0; i < t->count; ++i) {
@@ -608,7 +608,7 @@ size_t applyPalettesJson(DosExe& exe, std::string_view text) {
             if (t->components == 1) {
                 writes.emplace_back(static_cast<uint16_t>(t->ds + i), value(e, std::format("{}[{}]", key, i)));
             } else {
-                if (!e.isArray() || e.size() != 3) throw FormatError(std::format("palettes: {}[{}] must be [r, g, b]", key, i));
+                if (!e.isArray() || e.size() != 3) throw mischief::FormatError(std::format("palettes: {}[{}] must be [r, g, b]", key, i));
                 for (int k = 0; k < 3; ++k)
                     writes.emplace_back(static_cast<uint16_t>(t->ds + 3 * i + k),
                                         value(e.asArray()[static_cast<size_t>(k)], std::format("{}[{}][{}]", key, i, k)));

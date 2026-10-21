@@ -20,11 +20,11 @@
 #include "audio/sf2_writer.h"
 #include "audio/smf.h"
 #include "audio/sound.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
+#include "mischief/vfs/data_source.h"
 #include "res/game_files.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/log.h"
-#include "vfs/data_source.h"
 
 namespace tmport::audio {
 
@@ -63,10 +63,10 @@ struct AudioCliOptions {
 };
 
 std::optional<std::filesystem::path> resolveDataPath(const AudioCliOptions& o) {
-    if (!o.dataPath.empty()) return pathFromUtf8(o.dataPath);
-    if (auto env = getEnv("TM_DATA")) return pathFromUtf8(*env);
+    if (!o.dataPath.empty()) return mischief::pathFromUtf8(o.dataPath);
+    if (auto env = mischief::getEnv("TM_DATA")) return mischief::pathFromUtf8(*env);
     const char* base = SDL_GetBasePath();
-    return vfs::autoDetectDataPath(base ? pathFromUtf8(base) : std::filesystem::path());
+    return mischief::vfs::autoDetectDataPath(base ? mischief::pathFromUtf8(base) : std::filesystem::path());
 }
 
 std::string formatMs(uint64_t us) {
@@ -90,7 +90,7 @@ int dumpSsnd(const AudioCliOptions& o) {
         return 1;
     }
     const auto wav = makeWav(*s);
-    if (!writeWholeFile(pathFromUtf8(o.outPath), wav)) {
+    if (!mischief::writeWholeFile(mischief::pathFromUtf8(o.outPath), wav)) {
         std::fprintf(stderr, "tmport: cannot write %s\n", o.outPath.c_str());
         return 1;
     }
@@ -140,10 +140,10 @@ int loadMidiArg(const AudioCliOptions& o, LoadedMidi& m) {
     std::vector<uint8_t> bytes;
     std::string name = o.midiArg;
     std::optional<int> loopPos;
-    const auto fsPath = pathFromUtf8(o.midiArg);
+    const auto fsPath = mischief::pathFromUtf8(o.midiArg);
     std::error_code ec;
     if (std::filesystem::is_regular_file(fsPath, ec)) {
-        auto b = readWholeFile(fsPath);
+        auto b = mischief::readWholeFile(fsPath);
         if (!b) {
             std::fprintf(stderr, "tmport: cannot read %s\n", o.midiArg.c_str());
             return 1;
@@ -156,7 +156,7 @@ int loadMidiArg(const AudioCliOptions& o, LoadedMidi& m) {
                          o.midiArg.c_str());
             return 2;
         }
-        auto source = vfs::openDataSource(*dataPath);
+        auto source = mischief::vfs::openDataSource(*dataPath);
         std::string rel = o.midiArg;
         int tuneId = 0;
         if (parseInt(o.midiArg, tuneId)) {
@@ -253,7 +253,7 @@ int midiRender(const AudioCliOptions& o) {
     LoadedMidi m;
     if (const int rc = loadMidiArg(o, m)) return rc;
     std::string error;
-    std::shared_ptr<Sf2Synth> synth = Sf2Synth::loadFile(pathFromUtf8(o.soundFont), o.rate, error);
+    std::shared_ptr<Sf2Synth> synth = Sf2Synth::loadFile(mischief::pathFromUtf8(o.soundFont), o.rate, error);
     if (!synth) {
         std::fprintf(stderr, "tmport: SoundFont %s: %s\n", o.soundFont.c_str(), error.c_str());
         return 1;
@@ -283,7 +283,7 @@ int midiRender(const AudioCliOptions& o) {
     const MidiRenderResult r = renderMidiSong(m.song, synth, ro);
     const PcmStats st = analysePcm(r.pcm);
     const auto wav = makeWavStereo16(r.pcm, r.sampleRate);
-    if (!writeWholeFile(pathFromUtf8(o.outPath), wav)) {
+    if (!mischief::writeWholeFile(mischief::pathFromUtf8(o.outPath), wav)) {
         std::fprintf(stderr, "tmport: cannot write %s\n", o.outPath.c_str());
         return 1;
     }
@@ -306,7 +306,7 @@ int midiRender(const AudioCliOptions& o) {
 
 int makeTestSf2(const AudioCliOptions& o) {
     const auto sf2 = makeTestSoundFont();
-    if (!writeWholeFile(pathFromUtf8(o.outPath), sf2)) {
+    if (!mischief::writeWholeFile(mischief::pathFromUtf8(o.outPath), sf2)) {
         std::fprintf(stderr, "tmport: cannot write %s\n", o.outPath.c_str());
         return 1;
     }
@@ -397,7 +397,7 @@ bool runAudioCli(int argc, char** argv, int& exitCode) {
             o.loop = true;
         } else if (a == "--midi-set") {
             if (!hasArg) return fail("--midi-set needs B or E");
-            const std::string v = toUpperAscii(argv[++i]);
+            const std::string v = mischief::toUpperAscii(argv[++i]);
             if (v == "B")
                 o.set = MusicSet::Base;
             else if (v == "E")
@@ -414,7 +414,7 @@ bool runAudioCli(int argc, char** argv, int& exitCode) {
     }
     if (o.cmd == AudioCliOptions::Cmd::MidiRender && o.soundFont.empty())
         return fail("--midi-render needs --soundfont <file.sf2> (or make one with --make-test-soundfont)");
-    log::setVerbose(o.verbose);
+    mischief::log::setVerbose(o.verbose);
     try {
         switch (o.cmd) {
             case AudioCliOptions::Cmd::DumpSsnd: exitCode = dumpSsnd(o); break;
@@ -422,7 +422,7 @@ bool runAudioCli(int argc, char** argv, int& exitCode) {
             case AudioCliOptions::Cmd::MakeTestSf2: exitCode = makeTestSf2(o); break;
             default: exitCode = midiDump(o); break;
         }
-    } catch (const MissingFileError& e) {
+    } catch (const mischief::MissingFileError& e) {
         std::fprintf(stderr, "tmport: missing game file %s: %s\n", e.file().c_str(), e.what());
         exitCode = 3;
     } catch (const std::exception& e) {

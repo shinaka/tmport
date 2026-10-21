@@ -126,16 +126,16 @@ TEST_CASE("ExeTables: RoomDef table sanity (DS:23d8, 50 x 0x1c)") {
 TEST_CASE("ExeTables: EGA pen colours and 16-colour index table") {
     TM_REQUIRE_GAME_DATA();
     const auto ega = g->exe->egaColours();
-    CHECK(ega[0] == Rgb8{0, 0, 0});
-    CHECK(ega[1] == Rgb8{0, 0, 0xAA});
-    CHECK(ega[6] == Rgb8{0xAA, 0x55, 0});
-    CHECK(ega[7] == Rgb8{0xC0, 0xC0, 0xC0});
-    CHECK(ega[8] == Rgb8{0x55, 0x55, 0x55});
-    CHECK(ega[14] == Rgb8{0xFF, 0xFF, 0x55});
-    CHECK(ega[15] == Rgb8{0xFF, 0xFF, 0xFF});
+    CHECK(ega[0] == mischief::Rgb8{0, 0, 0});
+    CHECK(ega[1] == mischief::Rgb8{0, 0, 0xAA});
+    CHECK(ega[6] == mischief::Rgb8{0xAA, 0x55, 0});
+    CHECK(ega[7] == mischief::Rgb8{0xC0, 0xC0, 0xC0});
+    CHECK(ega[8] == mischief::Rgb8{0x55, 0x55, 0x55});
+    CHECK(ega[14] == mischief::Rgb8{0xFF, 0xFF, 0x55});
+    CHECK(ega[15] == mischief::Rgb8{0xFF, 0xFF, 0xFF});
     CHECK(g->exe->vga16Index() == std::array<uint8_t, 16>{0, 4, 2, 6, 1, 5, 1, 8, 7, 12, 10, 14, 9, 13, 11, 15});
     // Pens in 256 colours: nearest RRGB index; black is logical 1, white logical 0.
-    const gfx::Palette p = g->makePalette(gfx::ColorMode::Colour256);
+    const mischief::gfx::Palette p = g->makePalette(mischief::gfx::ColorMode::Colour256);
     CHECK(p.pen(0) == 1);
     CHECK(p.pen(15) == 0);
     CHECK(p.colour(p.pen(14)) == p.colour(p.nearestIndex({0xFF, 0xFF, 0x55})));

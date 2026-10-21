@@ -14,7 +14,7 @@
 #include "app/script_input.h"
 #include "audio/audio_system.h"
 #include "dos/app/dos_entry.h"
-#include "dos/app/script_input.h"
+#include "mischief/dos/app/script_input.h"
 #include "dos/data/dos_files.h"
 #include "dos/mods/dos_mods.h"
 #include "game/game_main.h"
@@ -29,9 +29,9 @@
 #include "text/text_renderer.h"
 #include "ui/game_dialog.h"
 #include "ui/menu_bar.h"
-#include "util/file_util.h"
-#include "util/log.h"
-#include "vfs/data_source.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
+#include "mischief/vfs/data_source.h"
 
 namespace tmport::app {
 
@@ -44,14 +44,14 @@ constexpr const char* kDosTitle = "Treasure Mountain! 1990 DOS edition (TM Port)
 // for one PNG per screen (DosOptions::frameDumpDir); anything else is the canvas file at the end.
 bool isFrameDumpFolder(const std::string& frameDump) {
     if (frameDump.empty()) return false;
-    const std::filesystem::path p = pathFromUtf8(frameDump);
+    const std::filesystem::path p = mischief::pathFromUtf8(frameDump);
     std::error_code ec;
     return std::filesystem::is_directory(p, ec) || !p.has_extension();
 }
 
 std::filesystem::path exeDirectory() {
     const char* base = SDL_GetBasePath();  // owned by SDL
-    return base ? pathFromUtf8(base) : std::filesystem::path();
+    return base ? mischief::pathFromUtf8(base) : std::filesystem::path();
 }
 
 audio::MusicSet musicSetFrom(const LaunchOptions& o, const save::EngineSettings& s) {
@@ -83,7 +83,7 @@ std::string howToPointAtData(const save::Paths& paths) {
         "  - or write  data = <folder or image>  in the [engine] section of\n    {}\n"
         "(The 1990 DOS edition plays from its folder with SST.EXE: --data, TM_DATA_DOS, or  data =  in "
         "the [dos] section.)",
-        paths.iniPath.empty() ? std::string("tmport.ini") : pathToUtf8(paths.iniPath));
+        paths.iniPath.empty() ? std::string("tmport.ini") : mischief::pathToUtf8(paths.iniPath));
 }
 
 std::string howToPointAtDos() {
@@ -96,9 +96,9 @@ std::string howToPointAtDos() {
 
 // The DOS edition's folder when no --data was given: TM_DATA_DOS, [dos] data, auto-detection.
 std::string resolveDosDataPath(const std::string& iniDosData, const std::filesystem::path& exeDir) {
-    if (auto env = getEnv("TM_DATA_DOS"); env && !env->empty()) return *env;
+    if (auto env = mischief::getEnv("TM_DATA_DOS"); env && !env->empty()) return *env;
     if (!iniDosData.empty()) return iniDosData;
-    if (auto p = autoDetectDosPath(exeDir)) return pathToUtf8(*p);
+    if (auto p = autoDetectDosPath(exeDir)) return mischief::pathToUtf8(*p);
     return {};
 }
 
@@ -114,9 +114,9 @@ ErrorSink defaultErrorSink(bool headless) {
 
 std::string resolveDataPath(const LaunchOptions& o, const std::string& iniDataPath) {
     if (!o.dataPath.empty()) return o.dataPath;
-    if (auto env = getEnv("TM_DATA"); env && !env->empty()) return *env;
+    if (auto env = mischief::getEnv("TM_DATA"); env && !env->empty()) return *env;
     if (!iniDataPath.empty()) return iniDataPath;
-    if (auto p = vfs::autoDetectDataPath(exeDirectory())) return pathToUtf8(*p);
+    if (auto p = mischief::vfs::autoDetectDataPath(exeDirectory())) return mischief::pathToUtf8(*p);
     return {};
 }
 
@@ -140,11 +140,11 @@ EditionChoice selectEdition(const LaunchOptions& o, const save::EngineSettings& 
         return {Edition::WinCd, {}};  // the Windows start-up reports it as before
     }
     try {
-        const EditionCandidate c = detectEdition(pathFromUtf8(path), preferred);
-        if (c.edition == Edition::Dos1990) return {Edition::Dos1990, pathToUtf8(c.path)};
+        const EditionCandidate c = detectEdition(mischief::pathFromUtf8(path), preferred);
+        if (c.edition == Edition::Dos1990) return {Edition::Dos1990, mischief::pathToUtf8(c.path)};
         // Auto: exactly the path as given (the Windows start-up of before); --edition win: the
         // Windows part of a folder holding both.
-        return {Edition::WinCd, preferred == Edition::WinCd ? pathToUtf8(c.path) : path};
+        return {Edition::WinCd, preferred == Edition::WinCd ? mischief::pathToUtf8(c.path) : path};
     } catch (const EditionError& e) {
         // A DOS folder that cannot be played names its file; the two-editions message stands alone.
         if (e.file().empty()) throw StartupError(e.what());
@@ -161,7 +161,7 @@ dos::DosOptions resolveDosOptions(const LaunchOptions& o, const save::EngineSett
         for (std::string a; args >> a;)
             if (a.size() >= 2 && (a[0] == '-' || a[0] == '/') && std::string_view("ECTMHectmh").find(a[1]) != std::string_view::npos)
                 d.lookFromCommandLine = true;
-        for (const std::string& a : dos::applyDosSwitches(d, o.dosArgs)) log::warn("--dos-args: '{}' has no effect", a);
+        for (const std::string& a : dos::applyDosSwitches(d, o.dosArgs)) mischief::log::warn("--dos-args: '{}' has no effect", a);
     }
     if (!o.dosLook.empty()) d.lookFromCommandLine = true;
     if (auto v = dos::parseLookOption(o.dosLook)) d.look = *v;
@@ -174,12 +174,12 @@ dos::DosOptions resolveDosOptions(const LaunchOptions& o, const save::EngineSett
     d.keys = o.keys;
     d.prefDir = prefDir;
     d.verbose = o.verbose;
-    if (isFrameDumpFolder(o.frameDump)) d.frameDumpDir = pathFromUtf8(o.frameDump);
+    if (isFrameDumpFolder(o.frameDump)) d.frameDumpDir = mischief::pathFromUtf8(o.frameDump);
     // DOS game diagnostics (checked by the parser).
-    if (!o.dosTrace.empty()) d.tracePath = pathFromUtf8(o.dosTrace);
+    if (!o.dosTrace.empty()) d.tracePath = mischief::pathFromUtf8(o.dosTrace);
     for (const std::string& s : o.dosDumpStates) {
         const size_t colon = s.find(':');
-        d.stateDumps.push_back({std::stoull(s.substr(0, colon)), pathFromUtf8(s.substr(colon + 1))});
+        d.stateDumps.push_back({std::stoull(s.substr(0, colon)), mischief::pathFromUtf8(s.substr(colon + 1))});
     }
     if (!o.dosTicks.empty()) d.runTicks = std::stoull(o.dosTicks);
     d.preview = o.dosPreview;
@@ -188,21 +188,21 @@ dos::DosOptions resolveDosOptions(const LaunchOptions& o, const save::EngineSett
         const bool hex = s.size() > 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X');
         d.layoutSeed = static_cast<uint16_t>(std::stoul(hex ? s.substr(2) : s, nullptr, hex ? 16 : 10));
     }
-    if (!o.dosLoadState.empty()) d.loadState = pathFromUtf8(o.dosLoadState);
+    if (!o.dosLoadState.empty()) d.loadState = mischief::pathFromUtf8(o.dosLoadState);
     d.greyKeyArtefact = o.dosGreyKeyArtefact;
     return d;
 }
 
-platform::HostConfig dosHostConfig(const LaunchOptions& o, const save::EngineSettings& settings,
+mischief::platform::HostConfig dosHostConfig(const LaunchOptions& o, const save::EngineSettings& settings,
                                    const std::filesystem::path& screenshotDir) {
-    platform::HostConfig h;
-    h.layout = gfx::PresenterLayout::dos1990(settings.dos.squarePixels || o.squarePixels);
+    mischief::platform::HostConfig h;
+    h.layout = mischief::gfx::PresenterLayout::dos1990(settings.dos.squarePixels || o.squarePixels);
     h.title = kDosTitle;
     h.windowScale = settings.dos.windowScale;
     h.integerScale = settings.integerScale || o.integerScale;
     h.fullscreen = (settings.fullscreen || o.fullscreen) && !o.windowed;
     h.pauseOnFocusLoss = settings.pauseOnFocusLoss && !o.noPause;
-    h.screenshotDir = !o.screenshotDir.empty() ? pathFromUtf8(o.screenshotDir) : screenshotDir;
+    h.screenshotDir = !o.screenshotDir.empty() ? mischief::pathFromUtf8(o.screenshotDir) : screenshotDir;
     h.screenshotPrefix = "tmport_dos";
     return h;
 }
@@ -216,7 +216,7 @@ struct App::Parts {
     // The 1990 DOS edition:
     std::filesystem::path dosFolder;
     dos::DosOptions dosOptions;
-    std::unique_ptr<platform::Host> host;
+    std::unique_ptr<mischief::platform::Host> host;
     // The Windows CD edition:
     GameFiles files;
     std::unique_ptr<Engine> engine;
@@ -255,17 +255,17 @@ void App::init() {
     const LaunchOptions& o = options_;
 
     // 1. Paths and settings (tmport.ini, one-time import of the original users.dat).
-    p.paths = o.prefDir.empty() ? save::Paths::detect() : save::Paths::under(pathFromUtf8(o.prefDir), exeDirectory());
-    if (!o.configPath.empty()) p.paths.iniPath = pathFromUtf8(o.configPath);
-    if (p.paths.prefDir.empty()) log::warn("no preference directory: saves and settings are not available");
+    p.paths = o.prefDir.empty() ? save::Paths::detect() : save::Paths::under(mischief::pathFromUtf8(o.prefDir), exeDirectory());
+    if (!o.configPath.empty()) p.paths.iniPath = mischief::pathFromUtf8(o.configPath);
+    if (p.paths.prefDir.empty()) mischief::log::warn("no preference directory: saves and settings are not available");
     save::ImportResult import = save::ImportResult::AlreadyDone;
     p.settings = save::loadSettingsAndImport(p.paths, &import);
-    if (import == save::ImportResult::Imported) log::info("imported the original users.dat into {}", pathToUtf8(p.paths.usersDat));
+    if (import == save::ImportResult::Imported) mischief::log::info("imported the original users.dat into {}", mischief::pathToUtf8(p.paths.usersDat));
 
     // 2. Edition and data path (edition/edition.h). The DOS edition has its own runtime.
     const EditionChoice choice = selectEdition(o, p.settings, exeDirectory());
     if (choice.edition == Edition::Dos1990) {
-        initDos(pathFromUtf8(choice.dataPath));
+        initDos(mischief::pathFromUtf8(choice.dataPath));
         return;
     }
 
@@ -274,13 +274,13 @@ void App::init() {
     if (dataPath.empty())
         throw StartupError("The Treasure Mountain! game files were not found.\n\n" + howToPointAtData(p.paths));
     ResourceManager::Options ro;
-    ro.colorMode = o.colour16 ? gfx::ColorMode::Colour16 : gfx::ColorMode::Colour256;
+    ro.colorMode = o.colour16 ? mischief::gfx::ColorMode::Colour16 : mischief::gfx::ColorMode::Colour256;
     ro.requireSounds = true;
     try {
-        p.files = GameFiles::open(pathFromUtf8(dataPath), ro);
+        p.files = GameFiles::open(mischief::pathFromUtf8(dataPath), ro);
         if (o.colour16 && !p.files.res->hasDll(DllId::TMT16))
-            throw MissingFileError("TMT16.DLL", "TMT16.DLL is needed for the 16-colour mode (--16)");
-    } catch (const MissingFileError& e) {
+            throw mischief::MissingFileError("TMT16.DLL", "TMT16.DLL is needed for the 16-colour mode (--16)");
+    } catch (const mischief::MissingFileError& e) {
         throw StartupError(std::format("A game file is missing: {}\n\n({})\n\nGame data: {}\n\n{}", e.file(), e.what(), dataPath,
                                        howToPointAtData(p.paths)),
                            e.file());
@@ -288,20 +288,20 @@ void App::init() {
         throw StartupError(std::format("The game data could not be read.\n\n{}\n\nGame data: {}\n\n{}", e.what(), dataPath,
                                        howToPointAtData(p.paths)));
     }
-    log::info("game data: {}", p.files.source->describe());
+    mischief::log::info("game data: {}", p.files.source->describe());
 
     // 2b. Mods (docs/MODDING.md): tmport.ini [mods] folders, then --mods. Broken overrides are
     //     logged and fall back to the original data; they never stop the game.
     if (!o.noMods) {
         std::vector<std::filesystem::path> modDirs = mods::configuredModDirs(p.paths);
-        for (const auto& d : o.modDirs) modDirs.push_back(pathFromUtf8(d));
+        for (const auto& d : o.modDirs) modDirs.push_back(mischief::pathFromUtf8(d));
         mods::applyMods(p.files, modDirs);
     }
 
     // 3. Font (FFNT 999) before any window: a missing font is a data error, too.
     try {
         p.font = std::make_unique<text::Font>(text::Font::load(*p.files.res));
-    } catch (const MissingFileError& e) {
+    } catch (const mischief::MissingFileError& e) {
         throw StartupError(std::format("A game file is damaged or incomplete: {}\n\n({})", e.file(), e.what()), e.file());
     } catch (const std::exception& e) {
         throw StartupError(std::format("The game font (FFNT 999) could not be read: {}", e.what()));
@@ -317,7 +317,7 @@ void App::init() {
     if (o.debugKeys || o.showTreasure) cfg.debugKeys = true;
     if (o.showTreasure) cfg.showTreasure = true;
     if (!o.inputMode.empty()) cfg.inputMode = parseInputMode(o.inputMode, cfg.inputMode);
-    cfg.screenshotDir = !o.screenshotDir.empty() ? pathFromUtf8(o.screenshotDir) : p.paths.screenshotDir;
+    cfg.screenshotDir = !o.screenshotDir.empty() ? mischief::pathFromUtf8(o.screenshotDir) : p.paths.screenshotDir;
     cfg.title = kAppTitle;
     p.engine = std::make_unique<Engine>(p.files, ro.colorMode, cfg);
     if (!o.headless && !p.engine->openWindow())
@@ -334,17 +334,17 @@ void App::init() {
         if (!o.soundFont.empty()) {
             ac.soundFontPath = o.soundFont;
         } else if (!p.settings.soundFont.empty()) {
-            std::filesystem::path sf = pathFromUtf8(p.settings.soundFont);
+            std::filesystem::path sf = mischief::pathFromUtf8(p.settings.soundFont);
             if (sf.is_relative() && !p.paths.iniPath.empty()) sf = p.paths.iniPath.parent_path() / sf;
-            ac.soundFontPath = pathToUtf8(sf);
-        } else if (auto sf = findSingleFileWithExtension(exeDirectory(), ".sf2")) {
-            ac.soundFontPath = pathToUtf8(*sf);
-            log::info("audio: SoundFont next to the executable: {}", ac.soundFontPath);
+            ac.soundFontPath = mischief::pathToUtf8(sf);
+        } else if (auto sf = mischief::findSingleFileWithExtension(exeDirectory(), ".sf2")) {
+            ac.soundFontPath = mischief::pathToUtf8(*sf);
+            mischief::log::info("audio: SoundFont next to the executable: {}", ac.soundFontPath);
         }
         ac.musicVolume = static_cast<float>(p.settings.musicVolume) / 100.0f;
         p.audio = audio::AudioSystem::create(p.files, ac);
     } catch (const std::exception& e) {
-        log::warn("audio: {} (the game runs without sound)", e.what());
+        mischief::log::warn("audio: {} (the game runs without sound)", e.what());
         p.audio.reset();
     }
 
@@ -366,7 +366,7 @@ void App::init() {
     try {
         p.menu = std::make_unique<ui::MenuBar>(*p.engine, ui::MenuBarModel::fromExe(*p.files.exe), *p.font);
     } catch (const std::exception& e) {
-        log::warn("menu bar: {} (no menu)", e.what());
+        mischief::log::warn("menu bar: {} (no menu)", e.what());
         p.menu.reset();
     }
     try {
@@ -374,7 +374,7 @@ void App::init() {
         p.tables = std::make_unique<game::GameTables>(game::GameTables::load(*p.files.exe, *p.files.res));
         p.state = std::make_unique<game::GameState>(game::GameState::initial(*p.tables));
     } catch (const std::exception& e) {
-        log::warn("game state: {}", e.what());
+        mischief::log::warn("game state: {}", e.what());
         p.state.reset();
     }
 
@@ -397,16 +397,16 @@ void App::initDos(const std::filesystem::path& folder) {
     p.edition = Edition::Dos1990;
     p.dosFolder = folder;
     p.dosOptions = resolveDosOptions(o, p.settings, p.paths.prefDir);
-    // The DOS --keys script (game ticks, dos/app/script_input.h) and every file of the folder
+    // The DOS --keys script (game ticks, mischief/dos/app/script_input.h) and every file of the folder
     // (dos/data/dos_files.h) are checked before a window opens; the runtime opens the files again.
     if (!p.dosOptions.keys.empty()) {
         std::string error;
-        if (!dos::ScriptedInput::parse(p.dosOptions.keys, error)) throw StartupError("--keys: " + error);
+        if (!mischief::dos::ScriptedInput::parse(p.dosOptions.keys, error)) throw StartupError("--keys: " + error);
     }
     if (!p.dosOptions.loadState.empty()) {
         std::error_code ec;
         if (!std::filesystem::is_regular_file(p.dosOptions.loadState, ec))
-            throw StartupError("--dos-load-state: " + pathToUtf8(p.dosOptions.loadState) + " is not a file");
+            throw StartupError("--dos-load-state: " + mischief::pathToUtf8(p.dosOptions.loadState) + " is not a file");
         if (p.dosOptions.preview) throw StartupError("--dos-load-state does not work with --dos-preview");
     }
     // DOS mods (docs/MODDING.md, "The 1990 DOS edition"): tmport.ini [mods] dos_paths (default
@@ -414,21 +414,21 @@ void App::initDos(const std::filesystem::path& folder) {
     // broken mod files are logged and the original data is used.
     if (!o.noMods) {
         std::vector<std::filesystem::path> extra;
-        for (const auto& d : o.modDirs) extra.push_back(pathFromUtf8(d));
+        for (const auto& d : o.modDirs) extra.push_back(mischief::pathFromUtf8(d));
         dos::installDosMods(dos::configuredDosModDirs(p.paths, extra));
     }
     try {
         (void)dos::DosFiles::open(folder);
-    } catch (const MissingFileError& e) {
+    } catch (const mischief::MissingFileError& e) {
         throw StartupError(std::format("A file of the 1990 DOS edition is missing: {}\n\n({})\n\nDOS game folder: {}\n\n{}",
-                                       e.file(), e.what(), pathToUtf8(folder), howToPointAtDos()),
+                                       e.file(), e.what(), mischief::pathToUtf8(folder), howToPointAtDos()),
                            e.file());
     } catch (const std::exception& e) {
         throw StartupError(std::format("The files of the 1990 DOS edition could not be used.\n\n{}\n\nDOS game folder: {}",
-                                       e.what(), pathToUtf8(folder)));
+                                       e.what(), mischief::pathToUtf8(folder)));
     }
-    p.host = std::make_unique<platform::Host>(dosHostConfig(o, p.settings, p.paths.screenshotDir));
-    log::info("game data: {} ({})", pathToUtf8(folder), editionName(Edition::Dos1990));
+    p.host = std::make_unique<mischief::platform::Host>(dosHostConfig(o, p.settings, p.paths.screenshotDir));
+    mischief::log::info("game data: {} ({})", mischief::pathToUtf8(folder), editionName(Edition::Dos1990));
     if (!o.headless && !p.host->openWindow())
         throw StartupError("The game window could not be opened (see the log for the SDL error).");
 }
@@ -436,21 +436,21 @@ void App::initDos(const std::filesystem::path& folder) {
 int App::run(const GameMainFn& entry) {
     Parts& p = *p_;
     if (p.edition == Edition::Dos1990) {
-        if (!p.host) throw Error("App::run before init");
+        if (!p.host) throw mischief::Error("App::run before init");
         struct DosDump {
             App& app;
             ~DosDump() {
                 // A frame-dump folder is filled by the DOS runtime itself.
                 if (app.options_.frameDump.empty() || !app.p_->dosOptions.frameDumpDir.empty()) return;
-                if (app.p_->host->writeFrameDump(pathFromUtf8(app.options_.frameDump)))
-                    log::info("canvas -> {}", app.options_.frameDump);
+                if (app.p_->host->writeFrameDump(mischief::pathFromUtf8(app.options_.frameDump)))
+                    mischief::log::info("canvas -> {}", app.options_.frameDump);
                 else
-                    log::error("cannot write {}", app.options_.frameDump);
+                    mischief::log::error("cannot write {}", app.options_.frameDump);
             }
         } dump{*this};
         return dos::runDosEdition(*p.host, p.dosOptions, p.dosFolder);
     }
-    if (!ctx_) throw Error("App::run before init");
+    if (!ctx_) throw mischief::Error("App::run before init");
     std::unique_ptr<ScriptInput> script;
     if (!options_.keys.empty() || options_.headless) {
         std::string error;
@@ -473,11 +473,11 @@ int App::run(const GameMainFn& entry) {
         App& app;
         ~Dump() {
             if (app.options_.frameDump.empty()) return;
-            const auto path = pathFromUtf8(app.options_.frameDump);
+            const auto path = mischief::pathFromUtf8(app.options_.frameDump);
             if (app.p_->engine->presenter().writeCanvasPng(path))
-                log::info("canvas -> {}", app.options_.frameDump);
+                mischief::log::info("canvas -> {}", app.options_.frameDump);
             else
-                log::error("cannot write {}", app.options_.frameDump);
+                mischief::log::error("cannot write {}", app.options_.frameDump);
         }
     } dump{*this};
     rc = runGameMain(*ctx_, entry ? entry : GameMainFn([](AppContext& c) { game::gameMain(c); }));
@@ -490,7 +490,7 @@ int App::run(const GameMainFn& entry) {
 // ------------------------------------------------------------------------------------- runGame
 
 int runGame(const LaunchOptions& options, const GameMainFn& entry, const ErrorSink& sinkIn) {
-    log::setVerbose(options.verbose);
+    mischief::log::setVerbose(options.verbose);
     const ErrorSink sink = sinkIn ? sinkIn : defaultErrorSink(options.headless);
     App app(options);
     try {
@@ -522,11 +522,11 @@ int runGame(int argc, char** argv, const GameMainFn& entry, const ErrorSink& sin
     }
     if (!o->keys.empty()) {
         // The editions script in their own units: Windows steps per input fetch (app/script_input.h),
-        // DOS key events in game ticks (dos/app/script_input.h). Before the edition is known (auto),
+        // DOS key events in game ticks (mischief/dos/app/script_input.h). Before the edition is known (auto),
         // a script either one accepts passes; the start-up checks it again for the chosen edition.
         std::string dosError;
         const bool winOk = o->edition != "dos" && parseScript(o->keys, error).has_value();
-        const bool dosOk = o->edition != "win" && !winOk && dos::ScriptedInput::parse(o->keys, dosError).has_value();
+        const bool dosOk = o->edition != "win" && !winOk && mischief::dos::ScriptedInput::parse(o->keys, dosError).has_value();
         if (!winOk && !dosOk) {
             std::fprintf(stderr, "tmport: %s\n", (o->edition == "dos" ? dosError : error).c_str());
             return 2;

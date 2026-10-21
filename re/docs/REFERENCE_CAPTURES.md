@@ -1,7 +1,7 @@
 # Reference captures of the original game (GAPS.md P0-3 and extras)
 
 Frames and videos of the **original** *Treasure Mountain!* (TMTWINCD.EXE v1.01) running under
-Windows 3.1 in DOSBox-X, captured on 2026-10-17/18 with `tools/tmctl.py` (keyboard only, posted
+Windows 3.1 in DOSBox-X, captured on 2026-10-17/18 with the engine's `tools/tmctl.py` (keyboard only, posted
 messages, window parked off-screen). They are the ground truth the engine is compared against
 (`docs/DESIGN.md` "Testing"). Every capture is an exact emulated frame; nothing was scaled.
 
@@ -26,7 +26,7 @@ Tags: **[O]** observed in a capture or video, **[I]** inferred.
 
 Tools (all keyboard-only and focus-safe):
 
-* `tools/tmctl.py` — extended in this work:
+* `tools/tmctl.py` (now the engine's) — extended in this work:
   * `key` tokens `hold:K:MS`, `down:K`, `up:K`, `wait:MS`, `fast:TEXT`. The game reads the arrow
     keys as held flags (`DS:06ee..06f4`, set by WM_KEYDOWN, cleared by WM_KEYUP,
     `code_1008-1030.md` §5), polled once per 100 ms tick, so a posted key-down … key-up pair is a
@@ -37,7 +37,7 @@ Tools (all keyboard-only and focus-safe):
     silently un-parked the window after a restart (see §7).
   * Save states are files (`tools/dosbox-x/bin/x64/Release/save/N.sav`) and survive DOSBox-X
     restarts (verified: states saved in the first session load in the second).
-* `tools/avi_frames.py` (new) — pure-Python ZMBV decoder: `info`, `changes` (which 16×16 blocks
+* `tools/avi_frames.py` (new; now the engine's) — pure-Python ZMBV decoder: `info`, `changes` (which 16×16 blocks
   changed in which frame, with emulated time), `extract` (PNG frames). Decoded frames are
   pixel-identical to `tmctl shot` screenshots (checked on the same state).
 * `tools/crop_game_area.py` (new) — crops the 512×384 game area out of a 640×480 capture (§2).
@@ -483,7 +483,7 @@ Frame numbers are AVI frame indices at 70.0071 Hz (one frame = 14.28 ms); "tick"
   `extracted/scratch/refcap2/audio_state.ps1 -MuteDosbox 1`, run with PowerShell 7). The guest is
   unaffected (it still plays voice/MIDI into the emulated hardware); nothing else on the host was
   touched. Windows may remember the mute for that executable; `-MuteDosbox 0` undoes it.
-* **`tools/tmctl.py state save|load|list NAME`** (new, additive): named save states in
+* **`<engine>/tools/tmctl.py state save|load|list NAME`** (new, additive): named save states in
   `extracted/captures/savestates/NAME.sav`, using slot 10 as scratch. Each state is stored with the
   guest's `USERS.DAT` (`NAME.users`) and `load` restores that file: the game keeps the signed-in
   player's **slot index** in memory and `Users_SaveCurrent` writes that index of the file
@@ -734,7 +734,7 @@ round-1 file. **Slots 1–10 are unchanged** (the table in §3 still applies; sl
 scratch and its round-1 file put back; copies of all round-1 slot files and of the round-1
 `USERS.DAT` are in `extracted/captures/savestates/round1/`).
 
-Round-2 states (`python -P tools/tmctl.py state load round2/NAME`, which also restores the
+Round-2 states (`python -P <engine>/tools/tmctl.py state load round2/NAME`, which also restores the
 matching `USERS.DAT`; `round2/r1_1 .. r1_10` are copies of the round-1 slots):
 
 | NAME | State |

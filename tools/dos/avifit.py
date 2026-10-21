@@ -35,7 +35,9 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, '..', '..'))
 sys.path.insert(0, os.path.join(REPO, 'tools'))
-import avi_frames  # noqa: E402
+import mischief_engine  # noqa: E402
+mischief_engine.add_tools_path()
+import avi_frames  # noqa: E402  (the engine's tools/avi_frames.py)
 
 EGA_K = 47.339086 / 60.29
 TANDY_K = 47.339086 / 59.9228

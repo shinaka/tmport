@@ -8,10 +8,10 @@
 #include "data/exe_tables.h"
 #include "game/rules.h"
 #include "input/input_codes.h"
+#include "mischief/util/error.h"
+#include "mischief/util/log.h"
 #include "platform/engine.h"
 #include "res/resource_manager.h"
-#include "util/error.h"
-#include "util/log.h"
 
 namespace tmport::game::scenes {
 
@@ -63,7 +63,7 @@ namespace {
 template <size_t N>
 void fillSizes(const ResourceManager& res, int bndl, std::array<int16_t, N>& w, std::array<int16_t, N>& h) {
     const auto b = res.bundle(bndl);
-    if (!b) throw Error(std::format("BNDL {} is missing from the game files", bndl));
+    if (!b) throw mischief::Error(std::format("BNDL {} is missing from the game files", bndl));
     for (size_t i = 0; i < b->ids.size() && i < N; ++i) {
         const auto pm = res.pixmap(b->ids[i]);
         if (!pm) continue;
@@ -85,7 +85,7 @@ CastleSizes CastleSizes::fromResources(const ResourceManager& res) {
 // ------------------------------------------------------------------------------------------- logic
 
 CastleClimb::CastleClimb(GameState& s, const GameTables& gt, const CastleTables& t, const CastleSizes& z,
-                         GameHooks& hooks, BorlandRand& rng, CastleOptions options)
+                         GameHooks& hooks, mischief::BorlandRand& rng, CastleOptions options)
     : s_(s), gt_(gt), t_(t), z_(z), hooks_(hooks), rng_(rng), options_(options) {}
 
 int CastleClimb::cell(int scr, int col) const {
@@ -464,7 +464,7 @@ namespace {
 
 std::vector<std::shared_ptr<const gfx::PixMap>> loadFrames(const ResourceManager& res, int bndl) {
     const auto b = res.bundle(bndl);
-    if (!b) throw Error(std::format("BNDL {} is missing from the game files", bndl));
+    if (!b) throw mischief::Error(std::format("BNDL {} is missing from the game files", bndl));
     std::vector<std::shared_ptr<const gfx::PixMap>> v;
     for (int id : b->ids) v.push_back(res.pixmap(id));
     return v;

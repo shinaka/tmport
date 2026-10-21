@@ -1,12 +1,12 @@
 #include "res/ssnd.h"
 
-#include "util/byte_reader.h"
+#include "mischief/util/byte_reader.h"
 
 namespace tmport {
 
 std::optional<SsndInfo> parseSsnd(std::span<const uint8_t> resource) {
     if (resource.size() < 12) return std::nullopt;
-    ByteReader r(resource, "SSND");
+    mischief::ByteReader r(resource, "SSND");
     SsndInfo s;
     s.reserved = r.u32(0);
     s.sampleRate = r.u32(4);    // Wave_Play passes +4 as nSamplesPerSec

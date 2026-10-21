@@ -13,12 +13,12 @@
 
 #include "app/bootstrap.h"
 #include "app/launch_options.h"
-#include "app_test_util.h"
 #include "dos_test_data.h"
 #include "edition/dos_options.h"
 #include "edition/edition.h"
+#include "mischief/test/app_test_util.h"
+#include "mischief/util/file_util.h"
 #include "save/settings.h"
-#include "util/file_util.h"
 
 using namespace tmport;
 namespace fs = std::filesystem;
@@ -56,7 +56,7 @@ bool samePath(const fs::path& a, const fs::path& b) {
 
 // Width and height from a PNG's IHDR.
 std::pair<uint32_t, uint32_t> pngSize(const fs::path& p) {
-    auto data = readWholeFile(p);
+    auto data = mischief::readWholeFile(p);
     if (!data || data->size() < 24) return {0, 0};
     auto be32 = [&](size_t o) {
         return (uint32_t((*data)[o]) << 24) | (uint32_t((*data)[o + 1]) << 16) | (uint32_t((*data)[o + 2]) << 8) | (*data)[o + 3];
@@ -188,7 +188,7 @@ TEST_CASE("edition: the user's DOS folder (TM_DATA_DOS)") {
         const std::string m = e.what();
         CHECK(contains(m, "Windows CD edition"));
         CHECK(contains(m, "1990 DOS edition"));
-        CHECK(contains(m, pathToUtf8(base / "TM-DOS")));
+        CHECK(contains(m, mischief::pathToUtf8(base / "TM-DOS")));
         CHECK(contains(m, "--edition"));
         CHECK(e.file().empty());
     }
@@ -204,12 +204,12 @@ TEST_CASE("edition: the user's DOS folder (TM_DATA_DOS)") {
     CHECK_THROWS_AS(detectEdition(base), EditionError);
     // A truncated SST.EXE is refused with DosExe's message.
     {
-        auto data = readWholeFile(dosDir / "SST.EXE");
+        auto data = mischief::readWholeFile(dosDir / "SST.EXE");
         REQUIRE(data);
         data->resize(data->size() / 2);
         const fs::path cut = base / "cut";
         makeDosFolder(cut, false);
-        REQUIRE(writeWholeFile(cut / "SST.EXE", *data));
+        REQUIRE(mischief::writeWholeFile(cut / "SST.EXE", *data));
         const EditionCandidate bad = checkDosFolder(cut);
         CHECK_FALSE(bad.usable());
         CHECK(contains(bad.problem, "SST.EXE"));
@@ -300,13 +300,13 @@ TEST_CASE("bootstrap: edition choice from --data, --edition and [engine] edition
     save::EngineSettings settings;
     app::LaunchOptions o;
 
-    o.dataPath = pathToUtf8(base);  // empty folder: the Windows start-up reports it as before
+    o.dataPath = mischief::pathToUtf8(base);  // empty folder: the Windows start-up reports it as before
     app::EditionChoice c = app::selectEdition(o, settings, {});
     CHECK(c.edition == Edition::WinCd);
     CHECK(c.dataPath == o.dataPath);
 
     makeDosFolder(base / "broken", false);
-    o.dataPath = pathToUtf8(base / "broken");
+    o.dataPath = mischief::pathToUtf8(base / "broken");
     CHECK_THROWS_AS(app::selectEdition(o, settings, {}), app::StartupError);
     try {
         app::selectEdition(o, settings, {});
@@ -325,16 +325,16 @@ TEST_CASE("bootstrap: edition choice from --data, --edition and [engine] edition
     makeDosFolder(base / "both" / "TM-DOS", true);
     touch(base / "both" / "TMTWINCD" / "TMTWINCD.EXE");
     o = {};
-    o.dataPath = pathToUtf8(base / "both");
+    o.dataPath = mischief::pathToUtf8(base / "both");
     CHECK_THROWS_AS(app::selectEdition(o, settings, {}), app::StartupError);
     settings.edition = Edition::Dos1990;  // [engine] edition = dos
     c = app::selectEdition(o, settings, {});
     CHECK(c.edition == Edition::Dos1990);
-    CHECK(samePath(pathFromUtf8(c.dataPath), base / "both" / "TM-DOS"));
+    CHECK(samePath(mischief::pathFromUtf8(c.dataPath), base / "both" / "TM-DOS"));
     o.edition = "win";  // the command line wins over tmport.ini
     c = app::selectEdition(o, settings, {});
     CHECK(c.edition == Edition::WinCd);
-    CHECK(samePath(pathFromUtf8(c.dataPath), base / "both" / "TMTWINCD"));
+    CHECK(samePath(mischief::pathFromUtf8(c.dataPath), base / "both" / "TMTWINCD"));
     o.edition = "auto";
     CHECK_THROWS_AS(app::selectEdition(o, settings, {}), app::StartupError);
     // --edition dos without --data: TM_DATA_DOS.
@@ -343,11 +343,11 @@ TEST_CASE("bootstrap: edition choice from --data, --edition and [engine] edition
     settings = {};
     c = app::selectEdition(o, settings, {});
     CHECK(c.edition == Edition::Dos1990);
-    CHECK(samePath(pathFromUtf8(c.dataPath), *testdata::dosDataPath()));
+    CHECK(samePath(mischief::pathFromUtf8(c.dataPath), *testdata::dosDataPath()));
 }
 
 TEST_CASE("bootstrap: DOS options and host from tmport.ini and the command line") {
-    save::EngineSettings s = save::EngineSettings::fromIni(save::IniFile::parse(
+    save::EngineSettings s = save::EngineSettings::fromIni(mischief::save::IniFile::parse(
         "[engine]\ninteger_scale = true\nfullscreen = true\npause_on_focus_loss = true\n"
         "[dos]\nlook = mcga\nsound = speaker\nslow_cpu = true\nframe_speed = period\nwindow_scale = 4\n"));
     app::LaunchOptions o;
@@ -378,8 +378,8 @@ TEST_CASE("bootstrap: DOS options and host from tmport.ini and the command line"
     o.noAudio = true;
     CHECK(app::resolveDosOptions(o, s, {}).sound == dos::SoundDevice::Off);
 
-    platform::HostConfig h = app::dosHostConfig(app::LaunchOptions{}, s, "S:/shots");
-    CHECK(h.layout == gfx::PresenterLayout::dos1990());
+    mischief::platform::HostConfig h = app::dosHostConfig(app::LaunchOptions{}, s, "S:/shots");
+    CHECK(h.layout == mischief::gfx::PresenterLayout::dos1990());
     CHECK(h.windowScale == 4);
     CHECK(h.integerScale);
     CHECK(h.fullscreen);
@@ -391,7 +391,7 @@ TEST_CASE("bootstrap: DOS options and host from tmport.ini and the command line"
     o2.squarePixels = true;
     o2.screenshotDir = "T:/shots";
     h = app::dosHostConfig(o2, save::EngineSettings{}, "S:/shots");
-    CHECK(h.layout == gfx::PresenterLayout::dos1990(true));
+    CHECK(h.layout == mischief::gfx::PresenterLayout::dos1990(true));
     CHECK(h.windowScale == 3);
     CHECK_FALSE(h.integerScale);
     CHECK_FALSE(h.fullscreen);
@@ -409,10 +409,10 @@ TEST_CASE("bootstrap: headless run of the DOS edition writes the 320x200 frame d
     app::LaunchOptions o;
     o.headless = true;
     o.edition = "dos";
-    o.dataPath = pathToUtf8(*testdata::dosDataPath());
-    o.prefDir = pathToUtf8(dir);
-    o.configPath = pathToUtf8(dir / "tmport.ini");
-    o.frameDump = pathToUtf8(dump);
+    o.dataPath = mischief::pathToUtf8(*testdata::dosDataPath());
+    o.prefDir = mischief::pathToUtf8(dir);
+    o.configPath = mischief::pathToUtf8(dir / "tmport.ini");
+    o.frameDump = mischief::pathToUtf8(dump);
     std::vector<std::string> errors;
     // With no --keys script the headless run ends at once: the DOS runtime shows the first screen
     // and its empty script is used up.
@@ -427,7 +427,7 @@ TEST_CASE("bootstrap: headless run of the DOS edition writes the 320x200 frame d
 
     // A broken DOS folder: the start-up names SST.EXE and does not open a window.
     const fs::path broken = makeDosFolder(dir / "broken", false);
-    o.dataPath = pathToUtf8(broken);
+    o.dataPath = mischief::pathToUtf8(broken);
     errors.clear();
     CHECK(app::runGame(o, {}, [&](const app::StartupError& e) { errors.push_back(e.what()); }) == 3);
     REQUIRE(errors.size() == 1);

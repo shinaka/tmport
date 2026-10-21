@@ -11,12 +11,12 @@
 #include <vector>
 
 #include "dos/audio/dos_sound_renderer.h"
-#include "dos/audio/opl_log.h"
 #include "dos/data/dos_exe.h"
 #include "dos/save/dosbox_state.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "vfs/directory_source.h"
+#include "mischief/dos/audio/opl_log.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/vfs/directory_source.h"
 
 namespace tmport::dos {
 
@@ -85,7 +85,7 @@ struct Options {
     bool raw = false;
     int rate = 0;  // 0: 44100 raw, 48000 smooth
     int loops = 1;
-    std::optional<NoiseType> noise;  // default: Ti15 with --raw (the oracle's), else Ncr8496
+    std::optional<mischief::dos::NoiseType> noise;  // default: Ti15 with --raw (the oracle's), else Ncr8496
     double maxSeconds = 600.0;
     double lowPassHz = -1.0, dcBlockHz = -1.0;  // < 0: the renderer's defaults
     std::string script{kSoundTestScript};
@@ -101,13 +101,13 @@ public:
     explicit StateLog(bool on) : on_(on) {}
     void sample(uint64_t tick, DosSoundRenderer& r) {
         if (!on_) return;
-        const SpeakerSynth& s = r.speaker();
+        const mischief::dos::SpeakerSynth& s = r.speaker();
         if (s.enabled() != spkOn_ || (s.enabled() && s.divisor() != spkDiv_) || first_) {
             text_ += std::format("{} spk {} {} {:.2f}\n", tick, s.enabled() ? 1 : 0, s.divisor(), s.frequency());
             spkOn_ = s.enabled();
             spkDiv_ = s.divisor();
         }
-        const PsgSynth& p = r.psg();
+        const mischief::dos::PsgSynth& p = r.psg();
         std::array<int, 8> st{p.period(0), p.period(1), p.period(2), p.attenuation(0),
                               p.attenuation(1), p.attenuation(2), p.attenuation(3), p.noiseControl()};
         if (st != psg_ || first_) {
@@ -120,7 +120,7 @@ public:
         if (on_) text_ += line;
     }
     bool enabled() const { return on_; }
-    bool write(const std::string& path) const { return !on_ || writeWholeFile(pathFromUtf8(path), {reinterpret_cast<const uint8_t*>(text_.data()), text_.size()}); }
+    bool write(const std::string& path) const { return !on_ || mischief::writeWholeFile(mischief::pathFromUtf8(path), {reinterpret_cast<const uint8_t*>(text_.data()), text_.size()}); }
 
 private:
     bool on_;
@@ -133,8 +133,8 @@ private:
 
 // The OPL register writes, one line per write: 'tick reg value' (hex), tick = the PIT tick the write
 // belongs to; a command's writes (Music_Play, Music_Stop between two interrupts) carry a fourth
-// column 'c' and the tick they run before. tools/dos/oplcmp.py reads it (dos/audio/opl_log.h).
-using OplLog = OplWriteLog;
+// column 'c' and the tick they run before. tools/dos/oplcmp.py reads it (mischief/dos/audio/opl_log.h).
+using OplLog = mischief::dos::OplWriteLog;
 
 // The AdLib driver with its calls written to the state log ('tick opl tune|on|off ...') and its
 // register writes to the OPL log.
@@ -208,7 +208,7 @@ std::vector<uint8_t> wavMono16(std::span<const int16_t> pcm, int rate) {
 bool writeWav(const std::string& path, const std::vector<double>& samples, const Options& o, int rate) {
     const auto pcm = o.raw ? toPcm16Normalized(samples) : toPcm16(samples, 0.7);  // 0.7: the device's default volume
     const auto bytes = wavMono16(pcm, rate);
-    if (!writeWholeFile(pathFromUtf8(path), bytes)) {
+    if (!mischief::writeWholeFile(mischief::pathFromUtf8(path), bytes)) {
         std::fprintf(stderr, "tmport: cannot write %s\n", path.c_str());
         return false;
     }
@@ -217,9 +217,9 @@ bool writeWav(const std::string& path, const std::vector<double>& samples, const
 
 DosRenderConfig renderConfig(const Options& o) {
     DosRenderConfig rc;
-    rc.mode = o.raw ? SynthMode::Raw : SynthMode::Smooth;
+    rc.mode = o.raw ? mischief::dos::SynthMode::Raw : mischief::dos::SynthMode::Smooth;
     rc.sampleRate = o.rate ? o.rate : (o.raw ? 44100 : 48000);
-    rc.noise = o.noise.value_or(o.raw ? NoiseType::Ti15 : NoiseType::Ncr8496);
+    rc.noise = o.noise.value_or(o.raw ? mischief::dos::NoiseType::Ti15 : mischief::dos::NoiseType::Ncr8496);
     if (o.lowPassHz >= 0) rc.lowPassHz = o.lowPassHz;
     if (o.dcBlockHz >= 0) rc.dcBlockHz = o.dcBlockHz;
     return rc;
@@ -232,7 +232,7 @@ OfflineRender renderOne(const SoundBank& bank, const Options& o, bool tune, int 
 }
 
 std::string fileTag(const SoundFile& f) {
-    std::string t = toLowerAscii(f.name());
+    std::string t = mischief::toLowerAscii(f.name());
     std::replace(t.begin(), t.end(), '.', '_');
     return t;  // "sfx_ibm", "tunes_tan" (dos_sound.py's WAV names)
 }
@@ -252,7 +252,7 @@ int runSoundTest(const SoundBank& bank, const Options& o, StateLog& log, OplLog&
         // The driver as a DOSBox-X state left it (as --dos-load-state continues it): the flags, the
         // effect and music blocks, the voice count, and on AdLib the OPL driver (its registers are
         // written again). The OPL log starts here, like a capture started on that state.
-        const DosboxState st = DosboxState::load(pathFromUtf8(o.fromState));
+        const DosboxState st = DosboxState::load(mischief::pathFromUtf8(o.fromState));
         const auto dg = st.dgroup();
         const auto w = [&](uint16_t off) { return st.dsWord(off); };
         s.setSoundOn(w(0x63B4) != 0);
@@ -277,8 +277,8 @@ int runSoundTest(const SoundBank& bank, const Options& o, StateLog& log, OplLog&
         }
         oplLog.setCommand(false);
     });
-    const uint64_t end = std::min<uint64_t>(steps.back().tick + static_cast<uint64_t>(2.0 * kPitTickHz),
-                                            static_cast<uint64_t>(o.maxSeconds * kPitTickHz));
+    const uint64_t end = std::min<uint64_t>(steps.back().tick + static_cast<uint64_t>(2.0 * mischief::dos::kPitTickHz),
+                                            static_cast<uint64_t>(o.maxSeconds * mischief::dos::kPitTickHz));
     std::vector<double> samples;
     while (r.ticks() < end) {
         r.renderTick(samples);
@@ -288,7 +288,7 @@ int runSoundTest(const SoundBank& bank, const Options& o, StateLog& log, OplLog&
     out("soundtest ({}, {}): {} ticks, {:.2f} s, {} Hz -> {}\n", soundCardName(bank.device), o.raw ? "raw" : "smooth",
         r.ticks(), samples.size() / static_cast<double>(rc.sampleRate), rc.sampleRate, o.outPath);
     for (const Step& st : steps)
-        out("  tick {:6}  {:8.3f} s  {}\n", st.tick, st.tick / kPitTickHz,
+        out("  tick {:6}  {:8.3f} s  {}\n", st.tick, st.tick / mischief::dos::kPitTickHz,
             st.kind == 's' ? std::format("Sfx_Play({})", st.id)
             : st.kind == 'm' ? std::format("Music_Play({}), orchestration {}", st.id, st.variant)
                              : "Music_Stop");
@@ -376,9 +376,9 @@ std::optional<int> runDosSoundCommand(int argc, char** argv) {
         } else if (a == "--noise") {
             auto v = value(a);
             if (!v) return 2;
-            if (*v == "ti") o.noise = NoiseType::Ti15;
-            else if (*v == "ncr") o.noise = NoiseType::Ncr8496;
-            else if (*v == "sn") o.noise = NoiseType::Sn76496;
+            if (*v == "ti") o.noise = mischief::dos::NoiseType::Ti15;
+            else if (*v == "ncr") o.noise = mischief::dos::NoiseType::Ncr8496;
+            else if (*v == "sn") o.noise = mischief::dos::NoiseType::Sn76496;
             else return usageError("bad --noise (ti, ncr or sn)");
         } else if (a == "--script") {
             auto v = value(a);
@@ -423,7 +423,7 @@ std::optional<int> runDosSoundCommand(int argc, char** argv) {
         return usageError("render sfx, tune, soundtest or all");
     }
     if (o.dosData.empty()) {
-        if (auto env = getEnv("TM_DATA_DOS")) o.dosData = *env;
+        if (auto env = mischief::getEnv("TM_DATA_DOS")) o.dosData = *env;
     }
     if (o.dosData.empty()) {
         std::fprintf(stderr, "tmport: the DOS game folder was not given. Pass --dos-data <dir> or set TM_DATA_DOS.\n");
@@ -431,9 +431,9 @@ std::optional<int> runDosSoundCommand(int argc, char** argv) {
     }
 
     try {
-        const vfs::DirectorySource folder(pathFromUtf8(o.dosData));
+        const mischief::vfs::DirectorySource folder(mischief::pathFromUtf8(o.dosData));
         auto exeFile = folder.open("SST.EXE");
-        if (!exeFile) throw MissingFileError("SST.EXE", "SST.EXE is missing from the DOS game folder");
+        if (!exeFile) throw mischief::MissingFileError("SST.EXE", "SST.EXE is missing from the DOS game folder");
         const DosExe exe = DosExe::load(exeFile->readAll());
         auto tables = std::make_shared<const SoundTables>(SoundTables::fromExe(exe));
         const SoundBank bank = SoundBank::load(folder, o.device, tables);
@@ -443,16 +443,16 @@ std::optional<int> runDosSoundCommand(int argc, char** argv) {
         if (o.what == "soundtest") {
             rc = runSoundTest(bank, o, log, oplLog);
         } else if (o.what == "all") {
-            const auto dir = pathFromUtf8(o.outPath);
+            const auto dir = mischief::pathFromUtf8(o.outPath);
             std::filesystem::create_directories(dir);
             for (int tune = 0; tune < 2; ++tune) {
                 const SoundFile& f = tune ? bank.music : bank.sfx;
                 const int n = tune ? SoundFile::kTuneCount : SoundFile::kSfxCount;
                 for (int i = 0; i < n; ++i) {
                     const auto r = renderOne(bank, o, tune != 0, i, log, oplLog);
-                    const std::string path = pathToUtf8(dir / std::format("{}_{:02}.wav", fileTag(f), i));
+                    const std::string path = mischief::pathToUtf8(dir / std::format("{}_{:02}.wav", fileTag(f), i));
                     if (!writeWav(path, r.samples, o, renderConfig(o).sampleRate)) return 1;
-                    out("{:<10} {:2}  {:6} ticks  {:6.2f} s  {}\n", f.name(), i, r.ticks, r.ticks / kPitTickHz, path);
+                    out("{:<10} {:2}  {:6} ticks  {:6.2f} s  {}\n", f.name(), i, r.ticks, r.ticks / mischief::dos::kPitTickHz, path);
                 }
             }
         } else {
@@ -460,7 +460,7 @@ std::optional<int> runDosSoundCommand(int argc, char** argv) {
             const auto r = renderOne(bank, o, tune, o.id, log, oplLog);
             if (!writeWav(o.outPath, r.samples, o, renderConfig(o).sampleRate)) return 1;
             out("{} {} ({}, {}): {} ticks, {:.2f} s -> {}\n", (tune ? bank.music : bank.sfx).name(), o.id,
-                soundCardName(o.device), o.raw ? "raw" : "smooth", r.ticks, r.ticks / kPitTickHz, o.outPath);
+                soundCardName(o.device), o.raw ? "raw" : "smooth", r.ticks, r.ticks / mischief::dos::kPitTickHz, o.outPath);
         }
         if (rc == 0 && !log.write(o.stateLog)) {
             std::fprintf(stderr, "tmport: cannot write %s\n", o.stateLog.c_str());
@@ -471,7 +471,7 @@ std::optional<int> runDosSoundCommand(int argc, char** argv) {
             return 1;
         }
         return rc;
-    } catch (const MissingFileError& e) {
+    } catch (const mischief::MissingFileError& e) {
         std::fprintf(stderr, "tmport: missing game file %s: %s\n", e.file().c_str(), e.what());
         return 3;
     } catch (const std::exception& e) {

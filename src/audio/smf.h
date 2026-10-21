@@ -83,7 +83,7 @@ struct MidiSong {
     uint32_t lastNoteOnTick() const;
 };
 
-// Parses an SMF. Throws tmport::FormatError for data that is not a usable SMF.
+// Parses an SMF. Throws mischief::FormatError for data that is not a usable SMF.
 MidiSong parseSmf(std::vector<uint8_t> bytes);
 
 // One-line description of an event for dumps (e.g. "ch 2 note-on 60 vel 100", "meta tempo 480000").

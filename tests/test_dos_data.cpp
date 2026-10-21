@@ -17,13 +17,13 @@
 #include "dos/data/help_file.h"
 #include "dos/data/puzzles.h"
 #include "dos_test_data.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/png_writer.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/png_writer.h"
 
 using namespace tmport;
 using namespace tmport::dos;
-using tmport::png::crc32;
+using mischief::png::crc32;
 
 namespace {
 
@@ -40,7 +40,7 @@ struct ScratchFolder {
         std::filesystem::create_directories(dir);
         for (const auto& e : std::filesystem::directory_iterator(from))
             if (e.is_regular_file())
-                std::filesystem::copy_file(e.path(), dir / toLowerAscii(pathToUtf8(e.path().filename())));
+                std::filesystem::copy_file(e.path(), dir / mischief::toLowerAscii(mischief::pathToUtf8(e.path().filename())));
     }
     ~ScratchFolder() {
         std::error_code ec;
@@ -68,8 +68,8 @@ TEST_CASE("DOS puzzles: dictionary expansion and the question split (synthetic)"
     CHECK(p.answers[0] == "Axyz");
     CHECK(p.answers[1] == "B");
     CHECK(p.answers[2] == "C");
-    CHECK_THROWS_AS(splitPuzzle("no tilde"), FormatError);
-    CHECK_THROWS_AS(Dictionary::parse(std::span<const uint8_t>(dict).first(100)), FormatError);
+    CHECK_THROWS_AS(splitPuzzle("no tilde"), mischief::FormatError);
+    CHECK_THROWS_AS(Dictionary::parse(std::span<const uint8_t>(dict).first(100)), mischief::FormatError);
     const uint8_t history[2] = {0xE4, 0x01};  // statuses 0, 1, 2, 3, then 1
     CHECK(puzzleStatus(history, 0) == 0);
     CHECK(puzzleStatus(history, 1) == 1);
@@ -82,22 +82,22 @@ TEST_CASE("DOS data files: header checks reject broken files") {
     std::vector<uint8_t> pan = {4, 0, 16, 0, 16, 0, 2, 0, 1, 2, 3, 4, 5, 6};
     CHECK_NOTHROW(checkDosDataFile(FileIndex::MountainPan, "mountain.pan", pan));
     pan.push_back(0);
-    CHECK_THROWS_AS(checkDosDataFile(FileIndex::MountainPan, "mountain.pan", pan), FormatError);
+    CHECK_THROWS_AS(checkDosDataFile(FileIndex::MountainPan, "mountain.pan", pan), mischief::FormatError);
     std::vector<uint8_t> pak(48, 0);
     pak[0] = 1;                    // one frame
     pak[8] = 1;                    // at paragraph 1 (offset 16)
     pak[10] = pak[11] = pak[12] = pak[13] = 0xFF;
     CHECK_NOTHROW(checkDosDataFile(FileIndex::BeginPak, "begin.pak", pak));
     pak[12] = 0;
-    CHECK_THROWS_AS(checkDosDataFile(FileIndex::BeginPak, "begin.pak", pak), FormatError);
+    CHECK_THROWS_AS(checkDosDataFile(FileIndex::BeginPak, "begin.pak", pak), mischief::FormatError);
     std::vector<uint8_t> sfx(0x96, 0);
     sfx[0] = 0x96;
     CHECK_NOTHROW(checkDosDataFile(FileIndex::SfxIbm, "sfx.ibm", sfx));
-    CHECK_THROWS_AS(checkDosDataFile(FileIndex::SfxTan, "sfx.tan", sfx), FormatError);  // .TAN header is 0x230
+    CHECK_THROWS_AS(checkDosDataFile(FileIndex::SfxTan, "sfx.tan", sfx), mischief::FormatError);  // .TAN header is 0x230
     try {
         checkDosDataFile(FileIndex::HelpDat, "help.dat", std::vector<uint8_t>(2, 0));
         FAIL("no exception");
-    } catch (const FormatError& e) {
+    } catch (const mischief::FormatError& e) {
         CHECK(std::string(e.what()).starts_with("HELP.DAT"));
     }
 }
@@ -145,7 +145,7 @@ TEST_CASE("DOS file table: 18 files and their disks") {
     for (int i = 0; i < FileTable::kCount; ++i) {
         const bool two = std::find(std::begin(disk2), std::end(disk2), i) != std::end(disk2);
         CHECK(t.entry(i).disk == (two ? 2 : 1));
-        CHECK(t.indexOf(toUpperAscii(t.entry(i).name)) == i);
+        CHECK(t.indexOf(mischief::toUpperAscii(t.entry(i).name)) == i);
     }
     CHECK(t.indexOf("sprites.pak") == static_cast<int>(FileIndex::SpritesPak));
     CHECK(t.indexOf("SHACK.PAK") == static_cast<int>(FileIndex::ShackPak));
@@ -267,24 +267,24 @@ TEST_CASE("DosFiles: names the missing or broken file") {
     {
         const auto f = DosFiles::open(copy.dir);  // optional
         CHECK(!f.hasUsersDat());
-        CHECK_THROWS_AS(f.bytes(FileIndex::UsersDat), MissingFileError);
+        CHECK_THROWS_AS(f.bytes(FileIndex::UsersDat), mischief::MissingFileError);
     }
     std::filesystem::remove(copy.dir / "all_puzs");
     CHECK(!DosFiles::looksLikeDosFolder(copy.dir));
     try {
         (void)DosFiles::open(copy.dir);
         FAIL("no exception");
-    } catch (const MissingFileError& e) {
+    } catch (const mischief::MissingFileError& e) {
         CHECK(e.file() == "ALL_PUZS");
     }
     std::filesystem::copy_file(*testdata::dosDataPath() / "ALL_PUZS", copy.dir / "ALL_PUZS");
-    auto help = *readWholeFile(copy.dir / "help.dat");
+    auto help = *mischief::readWholeFile(copy.dir / "help.dat");
     help.resize(40);
-    REQUIRE(writeWholeFile(copy.dir / "help.dat", help));
+    REQUIRE(mischief::writeWholeFile(copy.dir / "help.dat", help));
     try {
         (void)DosFiles::open(copy.dir);
         FAIL("no exception");
-    } catch (const FormatError& e) {
+    } catch (const mischief::FormatError& e) {
         CHECK(std::string(e.what()).starts_with("HELP.DAT"));
     }
 }

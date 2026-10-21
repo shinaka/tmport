@@ -42,10 +42,10 @@ std::string puzzlesToText(const PuzzleFile& puzzles, const Dictionary& dict, con
 // The 360 expanded questions (question, '~', three answers ended by CR, the bytes after them).
 // Throws mods::ModSyntaxError.
 std::vector<std::vector<uint8_t>> puzzlesFromText(std::string_view text);
-// One expanded question compressed with the word table (entries 0..127). Throws tmport::FormatError
+// One expanded question compressed with the word table (entries 0..127). Throws mischief::FormatError
 // for a byte >= 0x80 (it would read as a word code).
 std::vector<uint8_t> compressPuzzle(std::span<const uint8_t> expanded, const Dictionary& dict);
-// The file: 360 offsets, then the compressed questions. Throws tmport::FormatError (count, 64 KB).
+// The file: 360 offsets, then the compressed questions. Throws mischief::FormatError (count, 64 KB).
 std::vector<uint8_t> buildAllPuzs(const std::vector<std::vector<uint8_t>>& expanded, const Dictionary& dict);
 // The checks of the quiz code on expanded questions (code_ui.md §10): a '~', three answers of at
 // most 34 bytes (DS:a22a holds 35 per answer), a question of at most 999 bytes (DS:a293), markup,
@@ -69,7 +69,7 @@ std::vector<uint8_t> dictionaryFromText(std::string_view text);
 
 std::string helpToText(std::span<const uint8_t> helpDat);
 // `pageCounts`: the pages per topic the file must have (those of the original: the page picture
-// tables DS:5bed.. are fixed per page). Throws mods::ModSyntaxError / tmport::FormatError (0xED8
+// tables DS:5bed.. are fixed per page). Throws mods::ModSyntaxError / mischief::FormatError (0xED8
 // bytes at most: the size of the game's buffer DS:9325).
 std::vector<uint8_t> helpFromText(std::string_view text, std::span<const uint8_t> pageCounts);
 // Markup errors; text outside the page area (x 10..0x93 bytes, y 0x23..0xA7) as warnings.

@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-#include "util/log.h"
+#include "mischief/util/log.h"
 
 namespace tmport::game {
 
@@ -49,7 +49,7 @@ void quizCountStatusInRange(QuizState& s) {
 }
 
 // 1150:00a7 Quiz_PickByStatus (the recursion on an exhausted pool becomes the outer loop)
-void quizPickByStatus(QuizState& s, int status, int n, std::span<int16_t> out, BorlandRand& rng) {
+void quizPickByStatus(QuizState& s, int status, int n, std::span<int16_t> out, mischief::BorlandRand& rng) {
     n = std::min<int>(n, static_cast<int>(out.size()));
     int emptyPools = 0;
     while (n > 0) {
@@ -83,7 +83,7 @@ void quizPickByStatus(QuizState& s, int status, int n, std::span<int16_t> out, B
 }
 
 // 1150:01d5 Quiz_FillSlots
-void quizFillSlots(QuizState& s, BorlandRand& rng) {
+void quizFillSlots(QuizState& s, mischief::BorlandRand& rng) {
     std::array<int16_t, kQuizSlotCount> picks;
     picks.fill(kQuizNoQuestion);
     quizPickByStatus(s, kQuizNeverAnswered, 3, std::span(picks).subspan(0, 3), rng);
@@ -117,7 +117,7 @@ void quizFillSlots(QuizState& s, BorlandRand& rng) {
 }
 
 // 1150:0327 Quiz_NewRound
-bool quizNewRound(QuizState& s, const QuizTables& t, BorlandRand& rng) {
+bool quizNewRound(QuizState& s, const QuizTables& t, mischief::BorlandRand& rng) {
     quizSetTierRange(s, t);
     for (uint8_t& v : s.status) v &= static_cast<uint8_t>(~kQuizDealtBit);
     quizCountStatusInRange(s);
@@ -290,7 +290,7 @@ std::optional<ParsedQuestion> parseQuestion(std::span<const uint8_t> resource) {
     for (int i = 0; i < std::min(kMaxQuestionLines, pq.lineSlots - 1); ++i)
         if (!pq.blank[static_cast<size_t>(i)]) ++placed;
     if (pq.numLines > placed || pq.numLines < 0) {
-        log::warn("quiz: a question with {} lines; only the first {} can be read out, highlighted and clicked",
+        mischief::log::warn("quiz: a question with {} lines; only the first {} can be read out, highlighted and clicked",
                   int(pq.numLines), placed);
         pq.numLines = static_cast<int16_t>(std::clamp<int>(pq.numLines, 0, placed));
     }

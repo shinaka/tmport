@@ -17,26 +17,26 @@
 #include "dos/mods/dos_sound_text.h"
 #include "dos/mods/dos_text_files.h"
 #include "dos/text/dos_font.h"
-#include "mods/json.h"
-#include "util/error.h"
-#include "util/file_util.h"
-#include "util/log.h"
+#include "mischief/mods/json.h"
+#include "mischief/util/error.h"
+#include "mischief/util/file_util.h"
+#include "mischief/util/log.h"
 
 namespace tmport::dos {
 
 namespace {
 
-namespace json = mods::json;
+namespace json = mischief::mods::json;
 
 std::string readText(const std::filesystem::path& p) {
-    const auto bytes = readWholeFile(p);
-    if (!bytes) throw FormatError("cannot read the file");
+    const auto bytes = mischief::readWholeFile(p);
+    if (!bytes) throw mischief::FormatError("cannot read the file");
     return std::string(bytes->begin(), bytes->end());
 }
 
 std::vector<uint8_t> readBytes(const std::filesystem::path& p) {
-    auto bytes = readWholeFile(p);
-    if (!bytes) throw FormatError("cannot read the file");
+    auto bytes = mischief::readWholeFile(p);
+    if (!bytes) throw mischief::FormatError("cannot read the file");
     return std::move(*bytes);
 }
 
@@ -90,15 +90,15 @@ public:
         strings();
         for (int i = 0; i < FileTable::kCount; ++i)
             if (files_[static_cast<size_t>(i)] != origFiles[static_cast<size_t>(i)])
-                rep_.changedFiles.push_back(toUpperAscii(table_.entry(i).name));
+                rep_.changedFiles.push_back(mischief::toUpperAscii(table_.entry(i).name));
         rep_.exeChanged = !std::equal(exe_.image().begin(), exe_.image().end(), origExe.image().begin(), origExe.image().end());
         return std::move(rep_);
     }
 
 private:
-    std::string nameOf(FileIndex i) const { return toUpperAscii(table_.name(i)); }
-    void error(const DosModFile& f, const std::string& msg) { rep_.errors.push_back(std::format("{}: {}", pathToUtf8(f.path), msg)); }
-    void warn(const DosModFile& f, const std::string& msg) { rep_.warnings.push_back(std::format("{}: {}", pathToUtf8(f.path), msg)); }
+    std::string nameOf(FileIndex i) const { return mischief::toUpperAscii(table_.name(i)); }
+    void error(const DosModFile& f, const std::string& msg) { rep_.errors.push_back(std::format("{}: {}", mischief::pathToUtf8(f.path), msg)); }
+    void warn(const DosModFile& f, const std::string& msg) { rep_.warnings.push_back(std::format("{}: {}", mischief::pathToUtf8(f.path), msg)); }
 
     // The data file a mod file names, if it is one its folder may change.
     std::optional<FileIndex> target(const DosModFile& f) {
@@ -123,7 +123,7 @@ private:
                 if (!idx || !isText(*idx)) return refuse("a text file (ALL_PUZS, PRG_DICT, HELP.DAT)");
                 break;
             case DosModFileKind::RawFile:
-                if (!idx && iequalsAscii(f.target, DosFiles::kExeName)) {
+                if (!idx && mischief::iequalsAscii(f.target, DosFiles::kExeName)) {
                     error(f, "SST.EXE cannot be replaced; its strings and colour tables go in EXE/strings.json and EXE/palettes.json");
                     return std::nullopt;
                 }
@@ -169,7 +169,7 @@ private:
 
     // What a replaced file must pass: the checks of DosFiles::open and the decoders the game runs on
     // it (DosGfxFiles decodes every PAN and PAK, the sound driver parses the sound files), so a mod
-    // can never stop the game from starting. Throws tmport::FormatError.
+    // can never stop the game from starting. Throws mischief::FormatError.
     void checkLoadable(FileIndex idx, std::span<const uint8_t> bytes) {
         const std::string name = nameOf(idx);
         checkDosDataFile(idx, name, bytes);
@@ -211,25 +211,25 @@ private:
     void readHeaders(const Item& item, const PakFile& pak, std::map<int, PakFrameEdit>& edits) {
         const json::Value v = json::parse(readText(item.file->path));
         const json::Value* frames = v.isObject() ? v.find("frames") : nullptr;
-        if (!frames || !frames->isObject()) throw FormatError("needs an object \"frames\" keyed by frame number");
+        if (!frames || !frames->isObject()) throw mischief::FormatError("needs an object \"frames\" keyed by frame number");
         std::map<int, PakFrameEdit> parsed;
         for (const auto& [key, val] : frames->asObject()) {
             if (key.starts_with('_')) continue;
             int k = -1;
             const auto [p, ec] = std::from_chars(key.data(), key.data() + key.size(), k);
             if (ec != std::errc() || p != key.data() + key.size() || k < 0 || k >= pak.count())
-                throw FormatError(std::format("frames: \"{}\" is not a frame of {} (0-{})", key, pak.name(), pak.count() - 1));
-            if (!val.isObject()) throw FormatError(std::format("frames: \"{}\" must be an object", key));
+                throw mischief::FormatError(std::format("frames: \"{}\" is not a frame of {} (0-{})", key, pak.name(), pak.count() - 1));
+            if (!val.isObject()) throw mischief::FormatError(std::format("frames: \"{}\" must be an object", key));
             PakFrameEdit& e = parsed[k];
             for (const auto& [field, n] : val.asObject()) {
                 if (field.starts_with('_')) continue;
                 const bool signedField = field == "x" || field == "y";
                 const bool wordField = field == "a" || field == "c" || field == "e";
                 if (!signedField && !wordField)
-                    throw FormatError(std::format("frames: \"{}\".{}: unknown field (x, y, a, c, e)", key, field));
+                    throw mischief::FormatError(std::format("frames: \"{}\".{}: unknown field (x, y, a, c, e)", key, field));
                 const int64_t lo = signedField ? -32768 : 0, hi = signedField ? 32767 : 65535;
                 if (!n.isInteger() || n.asInt() < lo || n.asInt() > hi)
-                    throw FormatError(std::format("frames: \"{}\".{} must be a number {}..{}", key, field, lo, hi));
+                    throw mischief::FormatError(std::format("frames: \"{}\".{} must be a number {}..{}", key, field, lo, hi));
                 const int x = static_cast<int>(n.asInt());
                 if (field == "x") e.xOffset = x;
                 if (field == "y") e.yOffset = x;
@@ -274,11 +274,11 @@ private:
             }
             for (const auto& [k, item] : frames_[idx]) {
                 try {
-                    if (k >= pak.count()) throw FormatError(std::format("{} has frames 0-{}", name, pak.count() - 1));
+                    if (k >= pak.count()) throw mischief::FormatError(std::format("{} has frames 0-{}", name, pak.count() - 1));
                     LogicalImage img = pngToLogical(readBytes(item.file->path), colours_, true);
                     const PakFrame& f = pak.frame(k);
                     if ((img.width != f.widthPixels() || img.height != f.height) && !item.manifest->frameResizable(name, k))
-                        throw FormatError(std::format("{}x{} pixels; frame {} of {} is {}x{} (list \"{}:{}\" in mod.json's \"resizable\" to "
+                        throw mischief::FormatError(std::format("{}x{} pixels; frame {} of {} is {}x{} (list \"{}:{}\" in mod.json's \"resizable\" to "
                                                       "change its size)",
                                                       img.width, img.height, k, name, f.widthPixels(), f.height, name, k));
                     if (img.remapped > 0) warn(*item.file, std::format("{} pixel(s) were not one of the 16 colours (the nearest is used)", img.remapped));
@@ -405,7 +405,7 @@ private:
                 for (const auto& w : pr.warnings) warn(blame, w);
                 if (!pr.errors.empty()) {
                     for (const auto& e : pr.errors) error(blame, e);
-                    throw FormatError("the questions break the quiz's limits");
+                    throw mischief::FormatError("the questions break the quiz's limits");
                 }
                 file(FileIndex::AllPuzs) = std::move(built);
                 if (dict) {
@@ -426,7 +426,7 @@ private:
                 for (const auto& w : pr.warnings) warn(*it->second.file, w);
                 if (!pr.errors.empty()) {
                     for (const auto& e : pr.errors) error(*it->second.file, e);
-                    throw FormatError("the pages break the help pager's limits");
+                    throw mischief::FormatError("the pages break the help pager's limits");
                 }
                 checkDosDataFile(FileIndex::HelpDat, nameOf(FileIndex::HelpDat), help);
                 file(FileIndex::HelpDat) = std::move(help);
@@ -515,13 +515,13 @@ void DosModSet::apply(DosExe& exe, DosFileSet& files) const {
     cacheKey_ = key;
     cached_ = true;
     std::string names;
-    for (const auto& d : report_.folders) names += (names.empty() ? "" : ", ") + pathToUtf8(d);
+    for (const auto& d : report_.folders) names += (names.empty() ? "" : ", ") + mischief::pathToUtf8(d);
     std::string changed;
     for (const auto& c : report_.changedFiles) changed += (changed.empty() ? "" : ", ") + c;
-    log::info("DOS mods: {} folder(s) [{}]: {} of {} mod file(s) applied; changed: {}{}", report_.folders.size(), names, report_.applied,
+    mischief::log::info("DOS mods: {} folder(s) [{}]: {} of {} mod file(s) applied; changed: {}{}", report_.folders.size(), names, report_.applied,
               report_.modFiles, changed.empty() ? "no data file" : changed, report_.exeChanged ? ", SST.EXE strings/colours" : "");
-    for (const auto& w : report_.warnings) log::warn("DOS mods: {}", w);
-    for (const auto& e : report_.errors) log::error("DOS mods: {}", e);
+    for (const auto& w : report_.warnings) mischief::log::warn("DOS mods: {}", w);
+    for (const auto& e : report_.errors) mischief::log::error("DOS mods: {}", e);
 }
 
 DosModsReport DosModSet::lastReport() const {
@@ -535,7 +535,7 @@ DosModsReport installDosMods(const std::vector<std::filesystem::path>& dirs) {
     for (const auto& d : dirs) {
         std::error_code ec;
         if (!std::filesystem::is_directory(d, ec)) {
-            log::debug("DOS mods: {} does not exist (skipped)", pathToUtf8(d));
+            mischief::log::debug("DOS mods: {} does not exist (skipped)", mischief::pathToUtf8(d));
             continue;
         }
         DosModFolder f = scanDosModFolder(d);

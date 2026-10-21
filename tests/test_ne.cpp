@@ -7,10 +7,10 @@
 #include <string>
 #include <vector>
 
+#include "mischief/util/error.h"
 #include "ne/ne_image.h"
 #include "res/resource_types.h"
 #include "test_data.h"
-#include "util/error.h"
 
 using namespace tmport;
 
@@ -110,7 +110,7 @@ TEST_CASE("NE: resource tables and type-15 name tables of every DLL") {
 
 namespace {
 
-class MemFile final : public vfs::File {
+class MemFile final : public mischief::vfs::File {
 public:
     explicit MemFile(std::vector<uint8_t> d) : d_(std::move(d)) {}
     uint64_t size() const override { return d_.size(); }
@@ -133,7 +133,7 @@ void put16(std::vector<uint8_t>& b, size_t at, uint16_t v) {
 // A minimal synthetic NE file (no game data): MZ stub, NE header at 0x40, no segments, a resource
 // table with one resource of integer type `type` at sector `off` (resource shift units) of `len`
 // units, everything else zero. `fileSize` bytes in all.
-std::shared_ptr<vfs::File> syntheticNe(uint16_t alignShift, uint16_t rsrcShift, uint16_t type, uint16_t off,
+std::shared_ptr<mischief::vfs::File> syntheticNe(uint16_t alignShift, uint16_t rsrcShift, uint16_t type, uint16_t off,
                                        uint16_t len, size_t fileSize) {
     std::vector<uint8_t> b(std::max<size_t>(fileSize, 0x100), 0);
     b[0] = 'M';
@@ -173,15 +173,15 @@ TEST_CASE("NE (REVIEW_1 L-2): shift counts and resource extents from the file ar
     }
     // Shifts above 15 (UB for >= 32, garbage for 16..31) are refused with the file's name.
     CHECK_THROWS_WITH_AS(ne::NeImage::open(syntheticNe(40, 9, 15, 1, 1, 1024), "bad.dll"),
-                         doctest::Contains("bad.dll"), FormatError);
-    CHECK_THROWS_AS(ne::NeImage::open(syntheticNe(16, 9, 15, 1, 1, 1024), "bad.dll"), FormatError);
-    CHECK_THROWS_AS(ne::NeImage::open(syntheticNe(9, 31, 15, 1, 1, 1024), "bad.dll"), FormatError);
-    CHECK_THROWS_AS(ne::NeImage::open(syntheticNe(9, 16, 15, 1, 1, 1024), "bad.dll"), FormatError);
+                         doctest::Contains("bad.dll"), mischief::FormatError);
+    CHECK_THROWS_AS(ne::NeImage::open(syntheticNe(16, 9, 15, 1, 1, 1024), "bad.dll"), mischief::FormatError);
+    CHECK_THROWS_AS(ne::NeImage::open(syntheticNe(9, 31, 15, 1, 1, 1024), "bad.dll"), mischief::FormatError);
+    CHECK_THROWS_AS(ne::NeImage::open(syntheticNe(9, 16, 15, 1, 1, 1024), "bad.dll"), mischief::FormatError);
     // A declared length far past the end of the file: refused at open, before the type-15 table
     // is read (0xFFFF << 9 = 32 MB here; up to 0xFFFF << 15 = 2 GB was zero-filled before).
     CHECK_THROWS_WITH_AS(ne::NeImage::open(syntheticNe(9, 9, 15, 1, 0xFFFF, 1024), "big.dll"),
-                         doctest::Contains("past the end"), FormatError);
+                         doctest::Contains("past the end"), mischief::FormatError);
     // Other resource types too, even though they are only read on demand.
-    CHECK_THROWS_AS(ne::NeImage::open(syntheticNe(9, 9, 32513, 1, 0x100, 1024), "big.dll"), FormatError);
-    CHECK_THROWS_AS(ne::NeImage::open(syntheticNe(9, 15, 32513, 0xFFFF, 1, 1024), "far.dll"), FormatError);
+    CHECK_THROWS_AS(ne::NeImage::open(syntheticNe(9, 9, 32513, 1, 0x100, 1024), "big.dll"), mischief::FormatError);
+    CHECK_THROWS_AS(ne::NeImage::open(syntheticNe(9, 15, 32513, 0xFFFF, 1, 1024), "far.dll"), mischief::FormatError);
 }
